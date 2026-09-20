@@ -44,9 +44,9 @@ Release de ce dépôt, compare son tag à la version installée, et télécharge
 Publier une version tient donc en trois gestes :
 
 ```bash
-# 1. le numéro dans package.json, puis
-npm run publier        # construit et crée la release (demande GH_TOKEN)
-git tag v1.0.0 && git push --tags
+# 1. le numéro de version dans package.json, puis :
+git tag v1.0.0 && git push --tags     # le tag d'abord, la release s'y accroche
+npm run publier                       # construit et publie (demande GH_TOKEN)
 ```
 
 Deux contraintes viennent du Grenier, et **rien ne les signale** si on les enfreint :
