@@ -1,0 +1,222 @@
+/* Fenêtre joueurs : plein écran, rien d'autre que la diapositive. */
+body {
+  background: #040708;
+  cursor: none;
+}
+
+.pv-root {
+  height: 100vh;
+  display: grid;
+  place-items: center;
+  background: #040708;
+  container-type: size;
+}
+
+.pv-stage {
+  container-type: size;
+  position: relative;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: #05080a;
+  width: 100%;
+  width: min(100%, calc(100cqh * 16 / 9));
+  max-height: 100%;
+}
+
+/* Attente : la fenêtre est ouverte mais rien n'est encore diffusé. */
+.pv-idle {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  color: rgba(201, 169, 97, 0.28);
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+
+/* ---- bascule entre les deux emplacements de la régie ---- */
+.pv-under,
+.pv-over {
+  position: absolute;
+  inset: 0;
+}
+.pv-under,
+.pv-over {
+  animation-timing-function: ease;
+  animation-fill-mode: both;
+}
+
+/* Le fondu : les deux images se traversent. L'ancienne ne bouge pas, la
+   nouvelle monte par-dessus. */
+.pv-over.m-fondu {
+  animation-name: pv-in;
+}
+@keyframes pv-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* Le volet : la nouvelle balaie l'ancienne, de gauche à droite. On découpe le
+   calque du dessus plutôt que de le faire glisser — l'image reste en place et
+   se dévoile, au lieu d'entrer en scène par le côté. Un liseré clair marque
+   l'arête, comme le passage d'une lame. */
+.pv-over.m-volet {
+  animation-name: pv-volet;
+}
+@keyframes pv-volet {
+  from {
+    clip-path: inset(0 100% 0 0);
+  }
+  to {
+    clip-path: inset(0 0 0 0);
+  }
+}
+/* Le liseré, une lame de lumière posée sur l'arête.
+
+   Première version : un dégradé plaqué sur tout le calque, avec sa partie
+   claire au bord droit. On ne le voyait jamais — ce bord-là est celui de
+   l'élément, pas celui de la découpe, et il restait donc hors du champ visible
+   tout le temps de la traversée. La lame est maintenant une vraie barre étroite
+   qu'on fait avancer, du bord gauche au bord droit, par les mêmes proportions
+   que la découpe : elle tombe donc toujours dessus. */
+.pv-over.m-volet::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 0.4vw;
+  margin-left: -0.2vw;
+  pointer-events: none;
+  background: linear-gradient(
+    to right,
+    rgba(242, 236, 224, 0) 0%,
+    rgba(242, 236, 224, 0.6) 55%,
+    rgba(242, 236, 224, 0) 100%
+  );
+  /* La durée vient du calque, posée en ligne par la fenêtre : `inherit` est
+     ici le seul moyen de la lui passer. */
+  animation-name: pv-lame;
+  animation-duration: inherit;
+  animation-timing-function: ease;
+  animation-fill-mode: both;
+}
+@keyframes pv-lame {
+  from {
+    left: 0%;
+  }
+  to {
+    left: 100%;
+  }
+}
+
+/* Par le noir : l'ancienne s'éteint d'abord, la nouvelle se lève ensuite. La
+   scène est noire dessous, il n'y a donc rien à peindre entre les deux — le
+   noir, c'est le fond qu'on laisse voir. Les deux moitiés se chevauchent d'un
+   cheveu pour qu'aucune image ne clignote au passage de relais. */
+.pv-under.m-noir {
+  animation-name: pv-out-tot;
+}
+.pv-over.m-noir {
+  animation-name: pv-in-tard;
+}
+@keyframes pv-out-tot {
+  0% {
+    opacity: 1;
+  }
+  45% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+@keyframes pv-in-tard {
+  0% {
+    opacity: 0;
+  }
+  50% {
+    opacity: 0;
+  }
+  100% {
+    opacity: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pv-under,
+  .pv-over {
+    animation-duration: 1ms !important;
+  }
+}
+
+/* ============================================================
+   Le QR d'appairage, tendu à la table
+   Tout le monde regarde cet écran : c'est là qu'on montre le code, plutôt
+   que sur le portable du MJ autour duquel il faudrait se pencher. Il se pose
+   par-dessus la scène sans la remplacer.
+   ============================================================ */
+.pv-qr {
+  position: absolute;
+  inset: 0;
+  z-index: 40;
+  display: grid;
+  place-items: center;
+  /* La scène reste lisible dessous : on la voile, on ne l'efface pas. */
+  background: rgba(10, 16, 19, 0.72);
+  animation: pv-qr-parait 0.35s ease;
+}
+@keyframes pv-qr-parait {
+  from {
+    opacity: 0;
+  }
+}
+.pv-qr-carte {
+  display: grid;
+  justify-items: center;
+  gap: 2.2vh;
+  padding: 4vh 5vh;
+  border-radius: 1.6vh;
+  background: #e7e2d4;
+  color: #141b1e;
+  box-shadow: 0 4vh 10vh -3vh rgba(0, 0, 0, 0.8);
+  max-width: 80vw;
+}
+.pv-qr-titre {
+  font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
+  font-size: 3.4vh;
+  font-weight: 600;
+  line-height: 1;
+}
+/* Le code se scanne à trois mètres : il occupe la hauteur qu'il faut. */
+.pv-qr-carte img {
+  width: 38vh;
+  height: 38vh;
+  max-width: 62vw;
+  display: block;
+  image-rendering: pixelated;
+}
+.pv-qr-url {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 2.4vh;
+  letter-spacing: 0.02em;
+  color: #6b5526;
+}
+.pv-qr-note {
+  font-size: 1.9vh;
+  line-height: 1.45;
+  color: #4a5a60;
+  text-align: center;
+  max-width: 44vh;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .pv-qr {
+    animation: none;
+  }
+}

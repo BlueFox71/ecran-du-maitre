@@ -1,0 +1,22 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="encre" gradientUnits="userSpaceOnUse" x1="0" y1="0" x2="0" y2="512">
+      <stop offset="0" stop-color="#182126"/>
+      <stop offset="1" stop-color="#0a1013"/>
+    </linearGradient>
+    <linearGradient id="laiton" gradientUnits="userSpaceOnUse" x1="88" y1="154" x2="232" y2="380">
+      <stop offset="0" stop-color="#f0d193"/>
+      <stop offset="1" stop-color="#c2913a"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="96" fill="url(#encre)"/>
+  <path d="M88 142 L232 174 L232 186 L88 154 Z" fill="#f4dcae"/>
+  <path d="M88 154 L232 186 L232 380 L88 322 Z" fill="url(#laiton)"/>
+  <path d="M232 174 L348 146 L348 158 L232 186 Z" fill="#a8813a"/>
+  <path d="M232 186 L348 158 L348 328 L232 380 Z" fill="#6d5220"/>
+  <path d="M348 146 L424 164 L424 176 L348 158 Z" fill="#e0c07a"/>
+  <path d="M348 158 L424 176 L424 360 L348 328 Z" fill="#a8813a"/>
+  <path d="M105 209 L215 239 L215 249 L105 218 Z" fill="#8a6a2a" opacity="0.85"/>
+  <path d="M105 235 L215 268 L215 278 L105 243 Z" fill="#8a6a2a" opacity="0.85"/>
+  <path d="M105 260 L215 297 L215 306 L105 269 Z" fill="#8a6a2a" opacity="0.85"/>
+</svg>

@@ -1,0 +1,13 @@
+node_modules/
+out/
+dist/
+*.log
+
+# Bases et médias écrits par l'application au fil du jeu.
+*.db
+*.db-journal
+*.sqlite
+
+# Miettes de système.
+.DS_Store
+Thumbs.db

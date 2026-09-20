@@ -1,0 +1,1159 @@
+/* ============================================================
+   Diapositives — un seul rendu, dimensionné en em.
+   Le conteneur fixe la font-size, tout l'intérieur suit.
+   ============================================================ */
+
+.slide {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  font-size: 8px;
+  color: #e9e3d3;
+  background: #05080a;
+  display: flex;
+  flex-direction: column;
+}
+
+/* échelles selon le contexte d'affichage */
+.mon-frame .slide {
+  font-size: 5.2px;
+}
+.big-stage .slide {
+  font-size: 15px;
+}
+.pv-stage .slide {
+  font-size: 22px;
+}
+.vitem .th .slide {
+  font-size: 2.4px;
+}
+.insp-thumb .slide {
+  font-size: 6.4px;
+}
+.place-img .slide {
+  font-size: 4.6px;
+}
+.portrait .slide {
+  font-size: 3.4px;
+}
+
+.slide-fade {
+  animation: slidein 0.45s ease;
+}
+@keyframes slidein {
+  from {
+    opacity: 0;
+  }
+}
+
+.slide-media {
+  flex: 1;
+  position: relative;
+  min-height: 0;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+}
+.slide-media video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+}
+
+/* ---- cadrage : l'image dans son cadre, agrandie et décalée à la main ---- */
+.framed {
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+}
+/* Une vidéo se cadre exactement comme une image : depuis qu'elle passe par
+   `Framed`, elles partagent la même règle plutôt que deux qui divergeraient. */
+.framed img,
+.framed video {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  display: block;
+  transform-origin: center;
+  will-change: transform;
+}
+/* L'ombre des murs : elle se colle sur le rectangle exact de l'image et prend
+   la même transformation qu'elle, donc elle la suit quand on recadre. */
+.brouillard-cadre {
+  position: absolute;
+  transform-origin: center;
+  pointer-events: none;
+}
+.brouillard {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* Ce qu'on n'a jamais vu : du noir, pas une teinte. Les joueurs ne doivent
+   pas deviner le plan d'une pièce où ils ne sont jamais entrés. */
+.br-noir {
+  fill: #000;
+}
+/* Ce qu'ils ont vu et ne regardent plus : la carte s'en souvient, en sombre. */
+.br-vu {
+  fill: rgba(0, 0, 0, 0.82);
+}
+
+/* Le halo du survol : il ne sort jamais de la régie. Il bat doucement, pour
+   qu'on le trouve sans le chercher, et n'arrête aucun clic. */
+.halo-piece {
+  fill: color-mix(in oklab, #f0c15a 18%, transparent);
+  stroke: #f0c15a;
+  stroke-width: 2;
+  stroke-linejoin: round;
+  animation: halo-bat 1.4s ease-in-out infinite;
+}
+.halo-lum {
+  fill: color-mix(in oklab, #f0c15a 12%, transparent);
+  stroke: #f0c15a;
+  stroke-width: 2;
+  stroke-dasharray: 6 6;
+  animation: halo-bat 1.4s ease-in-out infinite;
+}
+.halo-pt {
+  fill: #f0c15a;
+}
+.halo-porte {
+  /* Sert aussi au rideau, qui est une polyligne : sans `fill: none`, elle se
+     remplirait de noir entre ses deux bouts. */
+  fill: none;
+  stroke: #f0c15a;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  animation: halo-bat 1.4s ease-in-out infinite;
+}
+@keyframes halo-bat {
+  50% {
+    opacity: 0.45;
+  }
+}
+
+/* Une porte, vue par les joueurs : un seuil sur le plan, pas un dessin de MJ.
+   Fermée elle barre, ouverte elle s'efface en pointillé — le passage est libre. */
+.br-porte {
+  stroke: #d9b878;
+  stroke-linecap: round;
+  opacity: 0.9;
+}
+.br-porte.ouverte {
+  opacity: 0.4;
+  stroke-dasharray: 3 7;
+}
+
+.framed.live {
+  cursor: grab;
+}
+.framed.live:active {
+  cursor: grabbing;
+}
+
+.slide-cap {
+  padding: 0.7em 1em;
+  background: rgba(4, 7, 8, 0.85);
+  border-top: 1px solid rgba(233, 227, 211, 0.14);
+  display: flex;
+  align-items: baseline;
+  gap: 0.7em;
+  flex: none;
+}
+.slide-cap .k {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62em;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: #c9a961;
+  flex: none;
+}
+.slide-cap .n {
+  font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
+  font-size: 0.95em;
+  font-weight: 600;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---- voile noir ---- */
+.sl-black {
+  background: #040708;
+  align-items: center;
+  justify-content: center;
+}
+.sl-black .sigil {
+  width: 9em;
+  height: 9em;
+  opacity: 0.13;
+  border-radius: 50%;
+  border: 0.12em solid #c9a961;
+  position: relative;
+}
+.sl-black .sigil::before,
+.sl-black .sigil::after {
+  content: '';
+  position: absolute;
+  inset: 1.2em;
+  border: 0.1em solid #c9a961;
+}
+.sl-black .sigil::before {
+  transform: rotate(45deg);
+}
+.sl-black .sigil::after {
+  border-radius: 50%;
+  inset: 2.6em;
+}
+.sl-black .w {
+  position: absolute;
+  bottom: 2.2em;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.68em;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+  color: rgba(201, 169, 97, 0.4);
+}
+
+/* ---- texte à lire ---- */
+.sl-text {
+  background: radial-gradient(100% 100% at 50% 0%, #121a1e 0%, #05080a 72%);
+  display: grid;
+  place-items: center;
+  padding: 2.4em 3em;
+  overflow: auto;
+}
+.sl-text .q {
+  max-width: 30em;
+  text-align: center;
+}
+.sl-text .k {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.62em;
+  letter-spacing: 0.24em;
+  text-transform: uppercase;
+  color: #c9a961;
+  display: block;
+  margin-bottom: 1.4em;
+}
+.sl-text .body {
+  font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
+  font-size: 1.2em;
+  line-height: 1.55;
+}
+.sl-text .body p {
+  margin: 0 0 0.7em;
+}
+.sl-text .body blockquote {
+  margin: 0.8em 0;
+  padding: 0 0 0 0.8em;
+  border-left: 0.1em solid #c9a961;
+  font-style: italic;
+  text-align: left;
+}
+.sl-text .body h1,
+.sl-text .body h2,
+.sl-text .body h3 {
+  font-size: 1.1em;
+  margin: 0.8em 0 0.4em;
+}
+.sl-text .body ul,
+.sl-text .body ol {
+  text-align: left;
+  margin: 0.5em 0;
+  padding-left: 1.4em;
+}
+.sl-text .body table {
+  border-collapse: collapse;
+  margin: 0.6em auto;
+  font-size: 0.8em;
+}
+.sl-text .body th,
+.sl-text .body td {
+  border: 1px solid rgba(233, 227, 211, 0.25);
+  padding: 0.3em 0.6em;
+}
+.sl-text .body img {
+  max-width: 100%;
+  height: auto;
+}
+
+/* ---- plaque de titre ---- */
+.sl-plate {
+  background:
+    radial-gradient(60% 90% at 22% 88%, rgba(192, 86, 77, 0.32) 0%, transparent 62%),
+    radial-gradient(90% 120% at 78% 10%, #1b232a 0%, #05080a 68%);
+  display: grid;
+  place-items: center;
+  padding: 2em;
+}
+.sl-plate .ttl {
+  font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
+  font-size: 2.4em;
+  font-weight: 700;
+  text-align: center;
+  text-shadow: 0 0.1em 0.6em rgba(0, 0, 0, 0.8);
+}
+.sl-plate .sub {
+  margin-top: 0.7em;
+  text-align: center;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.66em;
+  letter-spacing: 0.26em;
+  text-transform: uppercase;
+  color: #c9a961;
+}
+
+/* ---- image / vidéo ---- */
+.sl-image,
+.sl-video {
+  background: #05080a;
+}
+
+/* grain partagé, très léger */
+.slide::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background-image: radial-gradient(rgba(255, 255, 255, 0.055) 0.5px, transparent 0.5px);
+  background-size: 3px 3px;
+  opacity: 0.45;
+  mix-blend-mode: overlay;
+}
+
+/* ============================================================
+   Pions et pointeur — posés sur la diapositive, aux trois échelles
+   ============================================================ */
+
+/**
+ * Les tailles sont en unités de conteneur : un pion réglé à 6 % fait 6 % de
+ * la largeur, que ce soit dans le moniteur de 254 px ou sur un écran de 1080p.
+ */
+.pion-layer {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  pointer-events: none;
+  z-index: 5;
+}
+/* Le calque reste transparent aux événements même côté MJ : sinon il
+   masquerait les cases du collage, qui doivent recevoir l'image lâchée.
+   Seuls les pions eux-mêmes se saisissent. */
+.pion-layer.live .pion {
+  pointer-events: auto;
+}
+
+.pion {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  /* `--pz` est l'agrandissement de la carte : le pion lui est accroché, donc
+     il grossit avec elle et garde sa taille par rapport au plan. */
+  width: calc(var(--ps, 6) * var(--pz, 1) * 1cqw);
+  aspect-ratio: 1;
+  border-radius: 99px;
+  display: grid;
+  place-items: center;
+  overflow: visible;
+  border: calc(var(--ps, 6) * var(--pz, 1) * 0.055cqw + 1px) solid var(--pion-ring, #d8a94a);
+  background: var(--pion-fill, #2b2318);
+  color: var(--pion-ink, #f0d193);
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 500;
+  font-size: calc(var(--ps, 6) * var(--pz, 1) * 0.34cqw);
+  box-shadow:
+    0 calc(var(--ps, 6) * var(--pz, 1) * 0.06cqw) calc(var(--ps, 6) * var(--pz, 1) * 0.2cqw) rgba(0, 0, 0, 0.75),
+    0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.pion-layer.live .pion {
+  cursor: grab;
+}
+.pion-layer.live .pion:active {
+  cursor: grabbing;
+}
+/* Tourner un pion veut dire deux choses selon ce qu'il représente.
+
+   Un **objet** — une image de la bibliothèque posée sur la carte, un canapé,
+   une porte, une voiture — se tourne pour de vrai : son image pivote dans le
+   jeton. Le jeton, lui, est rond ; le faire tourner ne se verrait pas.
+
+   Un **personnage** ne se penche pas. Un visage incliné, ou des initiales de
+   travers, ce n'est pas « il regarde par là », c'est une image cassée. On lui
+   pose donc un nez sur le bord du jeton — la pointe d'une figurine — et son
+   portrait reste droit. Rien à 0° : un pion sans orientation n'en affiche pas. */
+.pion.objet img {
+  transform: rotate(var(--rot, 0deg));
+}
+.pion .nez {
+  position: absolute;
+  inset: 0;
+  border-radius: 99px;
+  transform: rotate(var(--rot, 0deg));
+  pointer-events: none;
+}
+.pion .nez::before {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  margin-bottom: calc(var(--ps, 6) * var(--pz, 1) * 0.03cqw);
+  transform: translateX(-50%);
+  border-left: calc(var(--ps, 6) * var(--pz, 1) * 0.13cqw) solid transparent;
+  border-right: calc(var(--ps, 6) * var(--pz, 1) * 0.13cqw) solid transparent;
+  border-bottom: calc(var(--ps, 6) * var(--pz, 1) * 0.19cqw) solid var(--pion-ring, #d8a94a);
+  filter: drop-shadow(0 0 1px rgba(8, 12, 15, 0.9));
+}
+/* Le portrait est **sorti du flux**, et ce n'est pas un détail.
+   En flux, son `height: 100%` se résout contre la hauteur du jeton — laquelle
+   vient de `aspect-ratio`, donc du contenu : la hauteur dépendait d'elle-même.
+   Chromium abandonne et rend l'image à ses proportions naturelles ; un portrait
+   plus haut que large mesurait alors 48 × 72 et **ovalisait le jeton**. Hors du
+   flux, il ne peut plus le pousser : le rond tient, et `cover` recadre. */
+.pion img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 99px;
+  object-fit: cover;
+  display: block;
+}
+
+/* Le rôdeur embusqué — **visible du MJ seul**, et seulement sur sa scène de
+   travail : un pion caché n'entre pas dans l'état de diffusion, donc il n'est
+   ni sur l'écran des joueurs, ni sur leur téléphone, ni dans le moniteur du
+   rail, qui continue ainsi de dire vrai. Le trait discontinu et la
+   transparence disent « posé, mais pas là pour eux ». */
+.pion.embusque {
+  opacity: 0.6;
+  border-style: dashed;
+}
+.pion.embusque img,
+.pion.embusque .ini {
+  filter: saturate(0.5);
+}
+.pion .lab {
+  position: absolute;
+  top: calc(100% + 0.4cqw);
+  left: 50%;
+  transform: translateX(-50%);
+  font-family: Archivo, system-ui, sans-serif;
+  font-size: calc(var(--ps, 6) * var(--pz, 1) * 0.2cqw);
+  color: #f2f5f6;
+  background: rgba(8, 12, 15, 0.75);
+  border-radius: 99px;
+  padding: 0 0.5cqw;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.pion .kill {
+  position: absolute;
+  top: -0.5cqw;
+  right: -0.5cqw;
+  width: calc(var(--ps, 6) * var(--pz, 1) * 0.34cqw);
+  height: calc(var(--ps, 6) * var(--pz, 1) * 0.34cqw);
+  min-width: 14px;
+  min-height: 14px;
+  border-radius: 99px;
+  background: #c0564d;
+  color: #fff;
+  border: 1px solid rgba(0, 0, 0, 0.45);
+  font-size: calc(var(--ps, 6) * var(--pz, 1) * 0.24cqw);
+  line-height: 1;
+  display: grid;
+  place-items: center;
+  opacity: 0;
+  cursor: pointer;
+}
+.pion:hover .kill {
+  opacity: 1;
+}
+
+/*
+ * L'état du personnage, lu sur son pion.
+ *
+ * Des traces de sang à même le jeton, pas un anneau : l'anneau disait l'état
+ * dans le langage de l'interface, les éclaboussures le disent dans celui de la
+ * table. La couleur du joueur reste intacte dessous — c'est à elle qu'on le
+ * reconnaît d'un bout à l'autre de la partie.
+ *
+ * La tache est un masque, pas une image : la forme est dessinée une fois, la
+ * couleur reste un jeton du thème. Et comme tout y est en pourcentages, la
+ * même éclaboussure tombe au même endroit sur la vignette de la Régie et sur
+ * le mur du salon.
+ */
+.pion.blesse::before,
+.pion.ko::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 99px;
+  pointer-events: none;
+  background: var(--sang);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M30 11c7 3 10 10 8 17-2 6-9 8-14 6-6-3-8-12-4-18 2-4 6-6 10-5z'/%3E%3Cpath d='M33 33c3 5 3 12 1 19-1 6-5 10-6 7-2-4 0-9 1-15 0-4 1-9 4-11z'/%3E%3Cpath d='M25 48c2 3 2 6 0 8-1 2-4 1-4-1 0-3 2-6 4-7z'/%3E%3Cpath d='M67 11c2 4 4 6 4 8a4 4 0 0 1-8 0c0-2 2-4 4-8z'/%3E%3Cpath d='M78 46c3 5 6 8 6 11a6 6 0 0 1-12 0c0-3 3-6 6-11z'/%3E%3Cpath d='M52 71c2 3 3 4 3 6a3 3 0 0 1-6 0c0-2 1-3 3-6z'/%3E%3Ccircle cx='19' cy='67' r='2.1'/%3E%3Ccircle cx='86' cy='31' r='1.7'/%3E%3Ccircle cx='59' cy='43' r='1.3'/%3E%3Ccircle cx='71' cy='73' r='1.5'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M30 11c7 3 10 10 8 17-2 6-9 8-14 6-6-3-8-12-4-18 2-4 6-6 10-5z'/%3E%3Cpath d='M33 33c3 5 3 12 1 19-1 6-5 10-6 7-2-4 0-9 1-15 0-4 1-9 4-11z'/%3E%3Cpath d='M25 48c2 3 2 6 0 8-1 2-4 1-4-1 0-3 2-6 4-7z'/%3E%3Cpath d='M67 11c2 4 4 6 4 8a4 4 0 0 1-8 0c0-2 2-4 4-8z'/%3E%3Cpath d='M78 46c3 5 6 8 6 11a6 6 0 0 1-12 0c0-3 3-6 6-11z'/%3E%3Cpath d='M52 71c2 3 3 4 3 6a3 3 0 0 1-6 0c0-2 1-3 3-6z'/%3E%3Ccircle cx='19' cy='67' r='2.1'/%3E%3Ccircle cx='86' cy='31' r='1.7'/%3E%3Ccircle cx='59' cy='43' r='1.3'/%3E%3Ccircle cx='71' cy='73' r='1.5'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+.pion.blesse {
+  --sang: #9d241c;
+}
+
+/* À terre : le sang a séché, le pion s'éteint, et une barre le raye. */
+.pion.ko {
+  --sang: #7a1712;
+}
+.pion.ko .ini,
+.pion.ko img {
+  opacity: 0.4;
+  filter: grayscale(1);
+}
+.pion.ko::after {
+  content: '';
+  position: absolute;
+  left: -14%;
+  right: -14%;
+  top: 50%;
+  height: calc(var(--ps, 6) * var(--pz, 1) * 0.075cqw + 1px);
+  border-radius: 99px;
+  background: var(--blood, #c0564d);
+  box-shadow: 0 0 0 1px rgba(8, 12, 15, 0.6);
+  transform: rotate(-30deg);
+  pointer-events: none;
+}
+
+/*
+ * Le pion que l'écran suit — un viseur, chez le MJ et nulle part ailleurs.
+ *
+ * À la table, une caméra qui se voit n'est plus une caméra : le calque des
+ * joueurs n'a pas la classe `live`, la marque n'y entre donc jamais. Et elle a
+ * une raison d'être même chez le MJ : au cadrage neutre, l'image entre entière
+ * dans son cadre, il n'y a rien à décaler — prendre un pion en filature ne
+ * *montre* rien tant qu'on n'a pas agrandi. Le viseur dit que c'est armé.
+ *
+ * Tout est en `cqw` comme le reste du jeton : le même anneau, à la même place,
+ * sur la vignette du rail comme sur la grande prévisualisation.
+ */
+.pion-layer.live .pion.suivi > .viseur {
+  position: absolute;
+  inset: calc(var(--ps, 6) * var(--pz, 1) * -0.3cqw);
+  border-radius: 99px;
+  border: calc(var(--ps, 6) * var(--pz, 1) * 0.045cqw + 1px) dashed var(--pion-ring, #d8a94a);
+  opacity: 0.85;
+  pointer-events: none;
+}
+/* Les couleurs des pions viennent des jetons du thème. */
+/*
+ * La correspondance nom de couleur → anneau et fond, en un seul endroit pour
+ * tout ce qui porte une teinte : le pion sur l'écran, la pastille de la fiche,
+ * celle de la liste des joueurs. Ajouter une couleur, c'est ajouter une ligne
+ * ici, un jeton dans tokens.css et une entrée dans PION_COULEURS.
+ */
+.c-brass {
+  --pion-ring: var(--brass);
+  --pion-fill: var(--brass-wash);
+}
+.c-blood {
+  --pion-ring: var(--blood);
+  --pion-fill: var(--blood-wash);
+}
+.c-iris {
+  --pion-ring: var(--iris);
+  --pion-fill: var(--iris-wash);
+}
+.c-moss {
+  --pion-ring: var(--moss);
+  --pion-fill: var(--moss-wash);
+}
+.c-azur {
+  --pion-ring: var(--azur);
+  --pion-fill: var(--azur-wash);
+}
+.c-jade {
+  --pion-ring: var(--jade);
+  --pion-fill: var(--jade-wash);
+}
+.c-olive {
+  --pion-ring: var(--olive);
+  --pion-fill: var(--olive-wash);
+}
+.c-orange {
+  --pion-ring: var(--orange);
+  --pion-fill: var(--orange-wash);
+}
+.c-prune {
+  --pion-ring: var(--prune);
+  --pion-fill: var(--prune-wash);
+}
+.c-fougere {
+  --pion-ring: var(--fougere);
+  --pion-fill: var(--fougere-wash);
+}
+.c-outremer {
+  --pion-ring: var(--outremer);
+  --pion-fill: var(--outremer-wash);
+}
+.c-amethyste {
+  --pion-ring: var(--amethyste);
+  --pion-fill: var(--amethyste-wash);
+}
+.c-bruyere {
+  --pion-ring: var(--bruyere);
+  --pion-fill: var(--bruyere-wash);
+}
+.c-argile {
+  --pion-ring: var(--argile);
+  --pion-fill: var(--argile-wash);
+}
+.c-ardoise {
+  --pion-ring: var(--ardoise);
+  --pion-fill: var(--ardoise-wash);
+}
+.c-neutral {
+  --pion-ring: var(--text-faint);
+  --pion-fill: var(--neutral-wash);
+}
+
+/* Le pointeur : ce que le MJ montre du doigt. */
+.laser {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 3cqw;
+  aspect-ratio: 1;
+  border-radius: 99px;
+  pointer-events: none;
+  z-index: 6;
+  background: radial-gradient(
+    circle,
+    rgba(224, 74, 58, 0.95) 0 22%,
+    rgba(224, 74, 58, 0.42) 34%,
+    rgba(224, 74, 58, 0) 70%
+  );
+}
+
+/* ============================================================
+   Collages — plusieurs images sur le même écran
+   ============================================================ */
+.sl-collage {
+  display: grid;
+  gap: 0.35em;
+  padding: 0.35em;
+  background: #05080a;
+}
+.sl-collage .cell {
+  position: relative;
+  overflow: hidden;
+  border-radius: 0.25em;
+  background: #0a1013;
+}
+.sl-collage .cell.empty {
+  border: 1px dashed rgba(231, 226, 212, 0.18);
+}
+/* Une case de texte : ce qu'aucune image ne dit mieux — un nom, une date, une
+   réplique. Le fond reste celui de la case, l'encre se choisit en régie, et le
+   corps vient de `corpsDeCase()`, donc de la longueur du texte. Les retours à
+   la ligne tapés dans le champ sont respectés. */
+.sl-collage .cell-texte {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 0.9em 1em;
+  text-align: center;
+  font-family: Fraunces, Georgia, serif;
+  line-height: 1.25;
+  white-space: pre-wrap;
+  overflow: hidden;
+  text-shadow: 0 0.06em 0.18em rgba(0, 0, 0, 0.6);
+}
+.sl-collage .cell-texte > span {
+  max-width: 100%;
+}
+
+/* La légende d'une case : le carton sous le tableau. Elle tient au bas de sa
+   case, sur toute sa largeur, et ne déborde jamais ailleurs — c'est ce qui la
+   distingue d'un texte libre posé à la main sur l'écran. */
+.sl-collage .cell-cap {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  padding: 0.34em 0.6em;
+  font-family: Archivo, system-ui, sans-serif;
+  font-size: 0.95em;
+  line-height: 1.25;
+  text-align: center;
+  color: #f2ece0;
+  background: linear-gradient(to top, rgba(6, 9, 12, 0.88), rgba(6, 9, 12, 0.62) 62%, transparent);
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* La case sous le curseur pendant un glisser. */
+.sl-collage .cell.over {
+  outline: 0.16em solid var(--brass, #d8a94a);
+  outline-offset: -0.16em;
+  background: rgba(216, 169, 74, 0.12);
+}
+/* Le numéro et le cadre de visée n'existent que côté MJ. */
+.sl-collage .cell-n {
+  position: absolute;
+  top: 0.3em;
+  left: 0.3em;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 0.7em;
+  line-height: 1;
+  padding: 0.2em 0.4em;
+  border-radius: 99px;
+  color: #f4f7f8;
+  background: rgba(8, 12, 15, 0.7);
+}
+.sl-collage .cell.active {
+  outline: 0.14em solid var(--brass, #d8a94a);
+  outline-offset: -0.14em;
+}
+.sl-collage .cell.active .cell-n {
+  background: var(--brass, #d8a94a);
+  color: #10161a;
+}
+
+.sl-collage.lay-2h {
+  grid-template-columns: 1fr 1fr;
+}
+.sl-collage.lay-2v {
+  grid-template-rows: 1fr 1fr;
+}
+.sl-collage.lay-3g {
+  grid-template-columns: 1.6fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.sl-collage.lay-3g .cell:first-child {
+  grid-row: 1 / span 2;
+}
+.sl-collage.lay-3h {
+  grid-template-columns: 1fr 1fr 1fr;
+}
+.sl-collage.lay-3b {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1.5fr 1fr;
+}
+.sl-collage.lay-3b .cell:first-child {
+  grid-column: 1 / span 2;
+}
+.sl-collage.lay-4 {
+  grid-template-columns: 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+.sl-collage.lay-4l {
+  grid-template-columns: 1.8fr 1fr;
+  grid-template-rows: repeat(3, 1fr);
+}
+.sl-collage.lay-4l .cell:first-child {
+  grid-row: 1 / span 3;
+}
+.sl-collage.lay-4b {
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1.7fr 1fr;
+}
+.sl-collage.lay-4b .cell:first-child {
+  grid-column: 1 / span 3;
+}
+.sl-collage.lay-6 {
+  grid-template-columns: 1fr 1fr 1fr;
+  grid-template-rows: 1fr 1fr;
+}
+
+/* ============================================================
+   Le texte posé sur l'écran
+   ============================================================ */
+
+/* Nom choisi avec soin : `over` est déjà la surbrillance d'une case pendant un
+   glisser (`.cell.over`). Appeler le texte ainsi le faisait hériter de
+   `position: absolute`, et toute case survolée sortait de sa grille.
+   Comme le calque des pions : transparent aux événements, sauf le texte
+   lui-même côté MJ, pour qu'on puisse encore lâcher une image dessous. */
+.legendes {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  pointer-events: none;
+  z-index: 6;
+}
+.legende {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  max-width: 86%;
+  font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
+  font-size: calc(var(--os, 4) * 1cqw);
+  line-height: 1.22;
+  text-align: center;
+  text-wrap: balance;
+  white-space: pre-wrap;
+  /* Sans cartouche, le texte tient quand même sur une image claire. */
+  text-shadow:
+    0 calc(var(--os, 4) * 0.03cqw) calc(var(--os, 4) * 0.1cqw) rgba(0, 0, 0, 0.85),
+    0 0 calc(var(--os, 4) * 0.05cqw) rgba(0, 0, 0, 0.6);
+}
+.legende.plate {
+  padding: calc(var(--os, 4) * 0.3cqw) calc(var(--os, 4) * 0.6cqw);
+  border-radius: calc(var(--os, 4) * 0.12cqw);
+  background: rgba(6, 10, 12, 0.72);
+  box-shadow: inset 0 0 0 1px rgba(244, 240, 228, 0.14);
+  text-shadow: none;
+}
+.legendes.live .legende {
+  pointer-events: auto;
+  cursor: grab;
+}
+.legendes.live .legende:active {
+  cursor: grabbing;
+}
+.legendes.live .legende::after {
+  content: '';
+  position: absolute;
+  inset: calc(var(--os, 4) * -0.12cqw);
+  border: 1px dashed rgba(216, 169, 74, 0.5);
+  border-radius: calc(var(--os, 4) * 0.16cqw);
+  pointer-events: none;
+  opacity: 0;
+}
+.legendes.live .legende:hover::after {
+  opacity: 1;
+}
+/* Celui qu'on est en train de modifier, quand il y en a plusieurs. */
+.legendes.live .legende.actif::after {
+  opacity: 1;
+  border-style: solid;
+  border-color: rgba(216, 169, 74, 0.9);
+}
+
+/* ============================================================
+   Les points de vie : sous le pion, et dans l'encart des joueurs
+   ============================================================ */
+
+/* Sous le pion, comme le nom : en `cqw`, donc identique dans le moniteur,
+   dans la régie et chez les joueurs. */
+.pion .pv {
+  position: absolute;
+  top: calc(100% + 0.2em);
+  left: 50%;
+  transform: translateX(-50%);
+  margin-top: 1.15em;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.15cqw;
+  line-height: 1.2;
+  white-space: nowrap;
+  padding: 0.15em 0.45em;
+  border-radius: 0.35em;
+  color: #fff;
+  background: rgba(6, 10, 12, 0.78);
+  border: 1px solid var(--pion-ring, #d8a94a);
+}
+.pion .pv i {
+  font-style: normal;
+  opacity: 0.6;
+}
+/* Sans le nom, les PV remontent à sa place. */
+.pion-layer:not(.avec-noms) .pv {
+  margin-top: 0;
+}
+
+/*
+ * L'encart se pose où le MJ l'a mis, à la taille qu'il a tirée. Position en
+ * fractions de l'écran, dimensions en pourcentage de l'écran : le même réglage
+ * donne la même image dans le moniteur, dans la régie et chez les joueurs.
+ *
+ * Il devient lui-même un conteneur : tout ce qu'il porte se mesure en `cqh` de
+ * sa propre hauteur, donc tirer la poignée grossit le contenu avec la boîte,
+ * sans un seul calcul en JavaScript.
+ */
+.encart-zone {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  pointer-events: none;
+  z-index: 6;
+}
+.encart {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  gap: calc(var(--u) * 5);
+  padding: calc(var(--u) * 5);
+  border-radius: calc(var(--u) * 6);
+  background: rgba(6, 10, 12, 0.82);
+  border: 1px solid rgba(233, 227, 211, 0.16);
+  box-shadow: 0 1.2cqw 3cqw -1cqw rgba(0, 0, 0, 0.7);
+  overflow: hidden;
+}
+/* En ligne, chacun prend sa part de la largeur ; en colonne, de la hauteur. */
+.encart.sens-horizontal {
+  flex-direction: row;
+}
+.encart.sens-vertical {
+  flex-direction: column;
+}
+.encart.live {
+  pointer-events: auto;
+  cursor: grab;
+}
+.encart.live:active {
+  cursor: grabbing;
+}
+
+/* `--u` est posée au rendu, en pixels : voir `EncartJoueurs`. */
+
+.ejoueur {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 6);
+  flex: 1 1 0;
+  min-width: 0;
+  min-height: 0;
+}
+.ejoueur .face {
+  height: calc(var(--u) * 58);
+  aspect-ratio: 1;
+  flex: none;
+  border-radius: 99px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: calc(var(--u) * 4) solid var(--pion-ring, #d8a94a);
+  background: var(--pion-fill, #2b2318);
+}
+.ejoueur .face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.ejoueur .face .ini {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: calc(var(--u) * 22);
+  font-weight: 600;
+  color: #f2ece0;
+}
+.ejoueur .jauges {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: calc(var(--u) * 5);
+  min-width: 0;
+  flex: 1;
+}
+
+/* Un cœur pour la vie, un cerveau pour l'esprit : pas de mot à lire de loin. */
+.ejauge {
+  display: flex;
+  align-items: center;
+  gap: calc(var(--u) * 5);
+}
+.ejauge .ico {
+  display: flex;
+  flex: none;
+}
+.ejauge .ico svg {
+  width: calc(var(--u) * 20);
+  height: calc(var(--u) * 20);
+  fill: currentColor;
+  stroke: none;
+}
+.ejauge.vie .ico {
+  color: #c0564d;
+}
+.ejauge.esprit .ico {
+  color: #8f7fc9;
+}
+.ejauge .barre {
+  flex: 1;
+  min-width: calc(var(--u) * 20);
+  height: calc(var(--u) * 9);
+  border-radius: 99px;
+  background: rgba(233, 227, 211, 0.18);
+  overflow: hidden;
+}
+.ejauge .barre::after {
+  content: '';
+  display: block;
+  width: var(--part, 0%);
+  height: 100%;
+  border-radius: 99px;
+  transition: width 0.25s;
+}
+.ejauge.vie .barre::after {
+  background: #c0564d;
+}
+.ejauge.esprit .barre::after {
+  background: #8f7fc9;
+}
+.ejauge .chiffres {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: calc(var(--u) * 17);
+  color: #f2ece0;
+  white-space: nowrap;
+  flex: none;
+}
+.ejauge .chiffres i {
+  font-style: normal;
+  opacity: 0.55;
+}
+
+/*
+ * Le moins et le plus, côté MJ : en bout de ligne, pas par-dessus. Ils gardent
+ * leur place en permanence — seule leur visibilité change au survol — pour que
+ * le chiffre reste lisible à l'instant même où on le fait varier, et pour que
+ * la mise en page ne saute pas sous le curseur.
+ */
+.ejauge .pas {
+  display: flex;
+  gap: 2px;
+  flex: none;
+  visibility: hidden;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.ejauge:hover .pas {
+  visibility: visible;
+  opacity: 1;
+}
+.ejauge .pas button {
+  pointer-events: auto;
+  width: calc(var(--u) * 24);
+  height: calc(var(--u) * 24);
+  min-width: 15px;
+  min-height: 15px;
+  border-radius: 3px;
+  display: grid;
+  place-items: center;
+  font-size: calc(var(--u) * 18);
+  line-height: 1;
+  color: #f2ece0;
+  background: rgba(6, 10, 12, 0.92);
+  border: 1px solid rgba(233, 227, 211, 0.3);
+}
+.ejauge .pas button:hover {
+  border-color: #d8a94a;
+  color: #d8a94a;
+}
+
+/* La poignée du coin : côté MJ seulement, pour tirer les dimensions. */
+.encart .poignee {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 14px;
+  height: 14px;
+  cursor: nwse-resize;
+  pointer-events: auto;
+  background: linear-gradient(
+    135deg,
+    transparent 0 55%,
+    rgba(233, 227, 211, 0.45) 55% 70%,
+    transparent 70% 80%,
+    rgba(233, 227, 211, 0.45) 80% 95%,
+    transparent 95%
+  );
+}
+
+/* ============================================================
+   Les ondes — ce qu'un joueur montre du doigt
+   Trois anneaux qui s'ouvrent depuis le point et s'effacent, à la couleur de
+   celui qui montre. Rien ne reste : un geste de table vaut le temps qu'il
+   dure, et deux secondes après l'écran est comme avant.
+   ============================================================ */
+.onde-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 7;
+  overflow: hidden;
+}
+.onde {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 0;
+  height: 0;
+}
+.onde i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12cqw;
+  aspect-ratio: 1;
+  margin: -6cqw 0 0 -6cqw;
+  border-radius: 50%;
+  border: 0.45cqw solid var(--pion-ring, #d8a94a);
+  opacity: 0;
+  animation: onde-ouvre 2s cubic-bezier(0.16, 0.8, 0.3, 1) forwards;
+}
+/* Les trois anneaux partent en retard l'un sur l'autre : c'est le décalage
+   qui fait lire un radar plutôt qu'un simple cercle qui grandit. */
+.onde i:nth-child(2) {
+  animation-delay: 0.22s;
+}
+.onde i:nth-child(3) {
+  animation-delay: 0.44s;
+}
+/* Le point d'origine reste net pendant que les anneaux s'en vont : sans lui,
+   l'œil arrive trop tard et ne sait plus d'où c'est parti. */
+.onde::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1.8cqw;
+  aspect-ratio: 1;
+  margin: -0.9cqw 0 0 -0.9cqw;
+  border-radius: 50%;
+  background: var(--pion-ring, #d8a94a);
+  box-shadow: 0 0 1.4cqw var(--pion-ring, #d8a94a);
+  animation: onde-point 2s ease-out forwards;
+}
+@keyframes onde-ouvre {
+  0% {
+    transform: scale(0.12);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+@keyframes onde-point {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  10% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onde i,
+  .onde::after {
+    animation-duration: 0.01s;
+    opacity: 0;
+  }
+}
+

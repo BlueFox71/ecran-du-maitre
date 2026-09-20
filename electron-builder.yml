@@ -1,0 +1,28 @@
+appId: fr.julescannet.ecrandumaitre
+productName: Ecran du Maitre
+# Pas de serveur de mise à jour pour l'instant : on n'émet pas de métadonnées.
+publish: null
+
+directories:
+  buildResources: resources
+  output: dist
+files:
+  - out/**
+  - package.json
+  - '!**/*.map'
+asarUnpack:
+  - '**/node_modules/better-sqlite3/**'
+# L'icône des fenêtres est lue à l'exécution : elle doit voyager avec l'application.
+extraResources:
+  - from: resources/icon.ico
+    to: icon.ico
+win:
+  target:
+    - target: nsis
+      arch: [x64]
+  artifactName: ${productName}-${version}-setup.${ext}
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: always
+  shortcutName: Ecran du Maitre

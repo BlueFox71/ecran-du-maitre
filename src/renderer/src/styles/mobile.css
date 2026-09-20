@@ -1,0 +1,1396 @@
+/* ============================================================
+   Écran du Maître — le portable des joueurs
+
+   Un téléphone tenu en main, dans une pièce sombre, pendant qu'on joue :
+   des cibles larges, des chiffres lisibles à bout de bras, et rien qui
+   bouge sous le pouce. Le thème est celui de l'application, sans variante
+   claire — on ne joue pas en plein soleil.
+   ============================================================ */
+:root {
+  color-scheme: dark;
+  --ground: #0f1518;
+  --surface: #161f23;
+  --raised: #1e292e;
+  --sunk: #0a1013;
+  --line: #2b383d;
+  --line-soft: #222d32;
+  --text: #e7e2d4;
+  --text-dim: #93a3a7;
+  --text-faint: #6b7b80;
+  --brass: #d8a94a;
+  --brass-ink: #f0d193;
+  --brass-wash: #3a2f16;
+  --brass-line: #6b5526;
+  --tint: #1a262b;
+  --label: #9a8a63;
+  --blood: #c0564d;
+  --iris: #8f7fc9;
+  --moss: #6aa87c;
+  --azur: #5aa9c9;
+  --jade: #4fb3a3;
+  --olive: #a3a63f;
+  --orange: #e0813c;
+  --prune: #a0628f;
+  --fougere: #6fae4e;
+  --outremer: #5f7ad0;
+  --amethyste: #a06fd0;
+  --bruyere: #d0708f;
+  --argile: #9d6b4c;
+  --ardoise: #708a9c;
+  --neutral: #6b7b80;
+  --blood-wash: #2e1512;
+  --iris-wash: #221d33;
+  --moss-wash: #16271d;
+  --azur-wash: #12242b;
+  --jade-wash: #10261f;
+  --olive-wash: #23260f;
+  --orange-wash: #2e1c0d;
+  --prune-wash: #281429;
+  --fougere-wash: #182611;
+  --outremer-wash: #151a2e;
+  --amethyste-wash: #241833;
+  --bruyere-wash: #2e151d;
+  --argile-wash: #261a12;
+  --ardoise-wash: #171f24;
+  --neutral-wash: #131b1e;
+}
+
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
+}
+
+body {
+  margin: 0;
+  background: var(--ground);
+  color: var(--text);
+  font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+  font-size: 15px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  /* Le pouce fait défiler la page, pas le navigateur qui la tire vers le bas :
+     un geste de trop déplacerait un pion au lieu de le poser. */
+  overscroll-behavior: none;
+  -webkit-tap-highlight-color: transparent;
+}
+
+h1,
+h2 {
+  margin: 0;
+  font-weight: 600;
+  text-wrap: balance;
+}
+button {
+  font: inherit;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+img {
+  max-width: 100%;
+}
+:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+
+.m-eyebrow {
+  display: block;
+  font-family: ui-monospace, 'SF Mono', Menlo, monospace;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--label);
+  margin-bottom: 7px;
+}
+
+.m-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  min-height: 46px;
+  padding: 12px 18px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--raised);
+  color: var(--text-dim);
+  font-size: 15px;
+  font-weight: 500;
+}
+.m-btn:disabled {
+  opacity: 0.4;
+}
+.m-btn-brass {
+  background: var(--brass-wash);
+  border-color: var(--brass-line);
+  color: var(--brass-ink);
+}
+
+.m-note {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--text-faint);
+  line-height: 1.5;
+  text-align: center;
+}
+.m-note.m-gauche {
+  text-align: left;
+}
+.m-erreur {
+  margin: 0;
+  font-size: 13px;
+  color: var(--blood);
+  background: var(--blood-wash);
+  border: 1px solid var(--blood);
+  border-radius: 8px;
+  padding: 9px 12px;
+  text-align: center;
+}
+.m-pastille {
+  width: 18px;
+  height: 18px;
+  flex: none;
+  border-radius: 50%;
+  border: 3px solid var(--pion-ring, var(--text-faint));
+  background: var(--pion-fill, var(--sunk));
+}
+
+/* --- rien à cette adresse ----------------------------------------------- */
+.m-vide {
+  height: 100%;
+  display: grid;
+  align-content: center;
+  justify-items: center;
+  gap: 14px;
+  padding: 32px 24px;
+  text-align: center;
+}
+.m-vide p {
+  margin: 0;
+  color: var(--text-dim);
+  font-size: 14px;
+  max-width: 34ch;
+}
+
+/* --- qui êtes-vous ------------------------------------------------------- */
+.m-accueil {
+  min-height: 100%;
+  display: grid;
+  align-content: start;
+  gap: 18px;
+  padding: max(30px, env(safe-area-inset-top)) 20px calc(24px + env(safe-area-inset-bottom));
+}
+.m-marque {
+  display: grid;
+  /* `text-align` centre la phrase mais pas l'icône, qui est un élément de
+     grille dessiné à sa largeur depuis le bord de départ : il faut le dire à
+     la grille elle-même. */
+  justify-items: center;
+  gap: 11px;
+  text-align: center;
+}
+/* L'icône porte l'identité : elle se reconnaît d'un coup d'œil là où un titre
+   se lirait, et le joueur n'ouvre pas cette page pour lire un nom. */
+.m-marque svg,
+.m-vide svg {
+  border-radius: 18px;
+  box-shadow: var(--shadow-lift, 0 10px 30px -14px rgba(0, 0, 0, 0.8));
+}
+.m-marque span {
+  font-size: 13px;
+  color: var(--text-faint);
+}
+.m-choix {
+  display: grid;
+  gap: 9px;
+}
+/* Une ligne par personne, assez haute pour se viser sans regarder. */
+.m-joueur {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+  width: 100%;
+  text-align: left;
+  min-height: 62px;
+  padding: 13px 15px;
+  border: 1px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface);
+}
+.m-joueur:disabled {
+  opacity: 0.45;
+}
+.m-joueur:active:not(:disabled) {
+  background: var(--raised);
+  border-color: var(--brass);
+}
+.m-qui {
+  min-width: 0;
+}
+.m-nom {
+  display: block;
+  font-size: 16px;
+}
+.m-perso {
+  display: block;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.m-plein {
+  margin-left: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--blood);
+}
+
+/* --- la coquille de l'application --------------------------------------- */
+.m-app {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.m-tete {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+  padding: calc(11px + env(safe-area-inset-top)) 15px 11px;
+  background: var(--tint);
+  border-bottom: 1px solid var(--line-soft);
+}
+.m-tete .m-nom {
+  font-size: 15px;
+  font-weight: 500;
+}
+.m-sortir {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-faint);
+  padding: 8px 4px;
+}
+.m-corps {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.m-onglets {
+  flex: none;
+  display: grid;
+  /* Autant de colonnes que d'onglets : le sac en a fait un cinquième, et la
+     rangée passait à la ligne sous « Pochette ». */
+  grid-auto-flow: column;
+  grid-auto-columns: 1fr;
+  background: var(--sunk);
+  border-top: 1px solid var(--line);
+  padding-bottom: env(safe-area-inset-bottom);
+}
+.m-onglets button {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 11px 2px 13px;
+  /* Cinq intitulés sur un écran de téléphone : un point de moins, et « Pochette »
+     ne se coupe toujours pas. */
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.m-onglets .m-ic {
+  font-size: 17px;
+  line-height: 1;
+}
+.m-onglets button[aria-selected='true'] {
+  color: var(--brass);
+  background: var(--ground);
+}
+
+.m-vue {
+  display: grid;
+  gap: 17px;
+  align-content: start;
+  padding: 15px 15px 26px;
+}
+
+/* --- la fiche ------------------------------------------------------------ */
+.m-identite {
+  display: flex;
+  align-items: center;
+  gap: 13px;
+}
+.m-portrait {
+  width: 62px;
+  height: 62px;
+  flex: none;
+  border-radius: 11px;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  background: var(--pion-fill, var(--sunk));
+  border: 2px solid var(--pion-ring, var(--line));
+  color: var(--pion-ring, var(--text-dim));
+  font-family: ui-monospace, monospace;
+  font-size: 19px;
+  font-weight: 600;
+}
+.m-portrait img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.m-identite h2 {
+  font-size: 18px;
+  line-height: 1.2;
+}
+.m-occ {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+.m-jauges {
+  display: grid;
+  gap: 11px;
+}
+.m-jauge {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 4px 10px;
+}
+.m-jn {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.m-jv {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  font-variant-numeric: tabular-nums;
+}
+.m-piste {
+  grid-column: 1 / -1;
+  height: 8px;
+  border-radius: 4px;
+  background: var(--sunk);
+  overflow: hidden;
+}
+.m-piste i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--text-faint);
+  transition: width 0.25s;
+}
+.m-piste i.g-blood { background: var(--blood); }
+.m-piste i.g-iris { background: var(--iris); }
+.m-piste i.g-moss { background: var(--moss); }
+.m-piste i.g-brass { background: var(--brass); }
+
+.m-caracs {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(74px, 1fr));
+  gap: 7px;
+}
+.m-cc {
+  background: var(--sunk);
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  padding: 9px 4px;
+  text-align: center;
+}
+.m-cc b {
+  display: block;
+  font-family: ui-monospace, monospace;
+  font-size: 20px;
+  font-variant-numeric: tabular-nums;
+}
+.m-cc span {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  color: var(--label);
+}
+
+.m-comps {
+  display: grid;
+  gap: 3px;
+}
+.m-cp {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 14px;
+  padding: 5px 2px;
+}
+.m-pts {
+  flex: 1;
+  border-bottom: 1px dotted var(--line);
+}
+.m-cp b {
+  font-family: ui-monospace, monospace;
+  color: var(--brass);
+}
+
+.m-teintes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 9px;
+}
+.m-tt {
+  width: 34px;
+  height: 34px;
+  flex: none;
+  border-radius: 50%;
+  background: var(--p);
+  border: 2px solid transparent;
+  box-shadow: 0 0 0 1px var(--line);
+}
+.m-tt[aria-pressed='true'] {
+  border-color: var(--ground);
+  box-shadow: 0 0 0 2px var(--brass);
+}
+
+.m-lecture {
+  margin: 0;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.5;
+  border-top: 1px solid var(--line-soft);
+  padding-top: 12px;
+}
+
+/* --- le jet -------------------------------------------------------------- */
+.m-surquoi {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+}
+.m-sq {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 8px 14px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  font-size: 14.5px;
+  color: var(--text-dim);
+}
+.m-sq b {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+.m-sq[aria-pressed='true'] {
+  background: var(--brass-wash);
+  border-color: var(--brass);
+  color: var(--brass-ink);
+}
+.m-sq[aria-pressed='true'] b {
+  color: var(--brass);
+}
+
+/* Vingt cibles au pouce : cinq par rangée, jamais moins de 52 px de haut. */
+.m-des {
+  display: grid;
+  grid-template-columns: repeat(5, 1fr);
+  gap: 7px;
+}
+.m-de {
+  height: 52px;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface);
+  font-family: ui-monospace, monospace;
+  font-size: 18px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+}
+.m-de[aria-checked='true'] {
+  background: var(--brass-wash);
+  border-color: var(--brass);
+  color: var(--brass);
+  font-weight: 600;
+}
+
+.m-somme {
+  text-align: center;
+  font-family: ui-monospace, monospace;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-dim);
+  padding: 13px;
+  border: 1px dashed var(--line);
+  border-radius: 10px;
+}
+.m-somme b {
+  color: var(--brass);
+  font-size: 22px;
+}
+.m-somme .m-pt {
+  font-family: inherit;
+  font-size: 13px;
+  color: var(--text-faint);
+}
+
+/*
+ * Le bouton et sa confirmation occupent la même place et la même hauteur :
+ * entre l'envoi et le jet suivant, rien ne bouge sous le pouce.
+ */
+.m-envoyer,
+.m-envoye {
+  width: 100%;
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  border-radius: 10px;
+  font-size: 15px;
+  margin: 0;
+}
+.m-envoye {
+  color: var(--moss);
+  background: var(--moss-wash);
+  border: 1px solid var(--moss);
+  animation: m-parait 0.2s ease;
+}
+@keyframes m-parait {
+  from {
+    opacity: 0;
+  }
+}
+
+/* --- le pion -------------------------------------------------------------- */
+.m-lieu-nom {
+  font-size: 17px;
+}
+/*
+ * L'onglet du pion tient en un écran.
+ *
+ * Il y a maintenant une chose de plus à loger — le pupitre — et un plan qu'il
+ * faut faire défiler pour atteindre le disque ne sert à rien. Les espaces s'y
+ * resserrent, et la carte se donne une hauteur maximale.
+ */
+.m-vue-pion {
+  gap: 11px;
+  padding-bottom: 14px;
+}
+.m-plan {
+  container-type: size;
+  position: relative;
+  /* La carte garde **exactement** ses proportions : c'est dans son repère que
+     les murs sont écrits, et une carte étirée ferait tomber l'ombre à côté.
+     On borne donc la hauteur en rognant la largeur, jamais l'inverse — d'où
+     ce `min()` plutôt qu'un simple `max-height`, qui aurait aplati le cadre
+     sous une carte en hauteur. */
+  width: min(100%, calc(44svh * var(--ratio, 1.6)));
+  margin-inline: auto;
+  /* Les proportions viennent du plan lui-même : c'est dans son repère que les
+     murs sont écrits, et une carte étirée ferait tomber l'ombre à côté. Le
+     16/10 n'est plus qu'un pis-aller, le temps que l'image arrive. */
+  aspect-ratio: 16 / 10;
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  background: var(--sunk);
+  /* Le doigt montre un point ; il ne fait ni défiler ni zoomer. */
+  touch-action: none;
+}
+/*
+ * Le plan se lit, maintenant.
+ *
+ * Il s'effaçait à 30 % parce qu'on ne cherchait que les pions dessus, et que
+ * deux images de même force se seraient disputé l'œil. L'ombre a changé cela :
+ * elle n'en laisse voir que ce que son personnage voit, alors ce qui reste
+ * clair mérite d'être regardé — c'est la carte de la table, pas un fond.
+ */
+.m-plan-fond {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  pointer-events: none;
+}
+
+/* L'ombre des murs se colle sur la carte, et ne prend aucun doigt. */
+.m-ombre {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.brouillard {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+/* Ce qu'il n'a jamais vu : du noir, pas une teinte. Un joueur ne devine pas
+   le plan d'une pièce où son personnage n'est jamais entré. */
+.br-noir {
+  fill: #000;
+}
+/* Ce qu'il a vu et ne regarde plus : la carte s'en souvient, en sombre. */
+.br-vu {
+  fill: rgba(0, 0, 0, 0.82);
+}
+/* Un seuil, là où il voit. Fermé il barre, ouvert il s'efface en pointillé. */
+.br-porte {
+  stroke: #d9b878;
+  stroke-linecap: round;
+  opacity: 0.9;
+}
+.br-porte.ouverte {
+  opacity: 0.4;
+  stroke-dasharray: 3 7;
+}
+.m-pion {
+  position: absolute;
+  width: 40px;
+  height: 40px;
+  margin: -20px 0 0 -20px;
+  border-radius: 50%;
+  /* Le nez et la barre des inconscients sortent du jeton : c'est voulu, et
+     c'est ce que fait l'écran de la table. Le portrait, lui, reste rond. */
+  overflow: visible;
+  display: grid;
+  place-items: center;
+  border: 3px solid var(--pion-ring, var(--text-faint));
+  background: var(--pion-fill, var(--sunk));
+  color: var(--pion-ring, var(--text-dim));
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  font-weight: 600;
+  /* Les autres s'effacent : on les situe du coin de l'œil, on ne les manipule
+     pas. Le sien reste plein, et c'est à ça qu'on le reconnaît sans chercher. */
+  opacity: 0.4;
+}
+.m-pion img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+.m-mien {
+  opacity: 1;
+  z-index: 3;
+  touch-action: none;
+  box-shadow: 0 0 0 2px rgba(216, 169, 74, 0.3);
+}
+
+/*
+ * L'état du personnage, le même langage qu'à l'écran de la table : la même
+ * éclaboussure à même le jeton, et une barre en travers pour qui ne tient
+ * plus debout.
+ */
+.m-pion.blesse,
+.m-pion.ko {
+  /* Un blessé se remarque, même quand ce n'est pas le sien. */
+  opacity: 0.8;
+}
+.m-pion.blesse {
+  --sang: #9d241c;
+}
+.m-pion.ko {
+  --sang: #7a1712;
+}
+.m-mien.blesse,
+.m-mien.ko {
+  opacity: 1;
+}
+.m-pion.blesse::before,
+.m-pion.ko::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  pointer-events: none;
+  background: var(--sang);
+  -webkit-mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M30 11c7 3 10 10 8 17-2 6-9 8-14 6-6-3-8-12-4-18 2-4 6-6 10-5z'/%3E%3Cpath d='M33 33c3 5 3 12 1 19-1 6-5 10-6 7-2-4 0-9 1-15 0-4 1-9 4-11z'/%3E%3Cpath d='M25 48c2 3 2 6 0 8-1 2-4 1-4-1 0-3 2-6 4-7z'/%3E%3Cpath d='M67 11c2 4 4 6 4 8a4 4 0 0 1-8 0c0-2 2-4 4-8z'/%3E%3Cpath d='M78 46c3 5 6 8 6 11a6 6 0 0 1-12 0c0-3 3-6 6-11z'/%3E%3Cpath d='M52 71c2 3 3 4 3 6a3 3 0 0 1-6 0c0-2 1-3 3-6z'/%3E%3Ccircle cx='19' cy='67' r='2.1'/%3E%3Ccircle cx='86' cy='31' r='1.7'/%3E%3Ccircle cx='59' cy='43' r='1.3'/%3E%3Ccircle cx='71' cy='73' r='1.5'/%3E%3C/svg%3E");
+  mask-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Cpath d='M30 11c7 3 10 10 8 17-2 6-9 8-14 6-6-3-8-12-4-18 2-4 6-6 10-5z'/%3E%3Cpath d='M33 33c3 5 3 12 1 19-1 6-5 10-6 7-2-4 0-9 1-15 0-4 1-9 4-11z'/%3E%3Cpath d='M25 48c2 3 2 6 0 8-1 2-4 1-4-1 0-3 2-6 4-7z'/%3E%3Cpath d='M67 11c2 4 4 6 4 8a4 4 0 0 1-8 0c0-2 2-4 4-8z'/%3E%3Cpath d='M78 46c3 5 6 8 6 11a6 6 0 0 1-12 0c0-3 3-6 6-11z'/%3E%3Cpath d='M52 71c2 3 3 4 3 6a3 3 0 0 1-6 0c0-2 1-3 3-6z'/%3E%3Ccircle cx='19' cy='67' r='2.1'/%3E%3Ccircle cx='86' cy='31' r='1.7'/%3E%3Ccircle cx='59' cy='43' r='1.3'/%3E%3Ccircle cx='71' cy='73' r='1.5'/%3E%3C/svg%3E");
+  -webkit-mask-size: 100% 100%;
+  mask-size: 100% 100%;
+}
+.m-pion.ko::after {
+  content: '';
+  position: absolute;
+  left: -10%;
+  right: -10%;
+  top: 50%;
+  height: 3px;
+  border-radius: 99px;
+  background: var(--blood);
+  transform: rotate(-30deg);
+}
+
+/*
+ * Le nez : de quel côté il regarde.
+ *
+ * Le jeton ne se penche pas — un visage reste droit, même quand on se retourne.
+ * C'est une pointe posée sur l'anneau qui tourne, comme à la table.
+ */
+.m-nez {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  transform: rotate(var(--cap, 0deg));
+  pointer-events: none;
+}
+.m-nez::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  bottom: 100%;
+  margin-bottom: 2px;
+  transform: translateX(-50%);
+  border-left: 5px solid transparent;
+  border-right: 5px solid transparent;
+  border-bottom: 7px solid var(--pion-ring, var(--text-faint));
+  filter: drop-shadow(0 0 1px rgba(8, 12, 15, 0.9));
+}
+
+/* --- le pupitre : marcher et se tourner --------------------------------- */
+/*
+ * Deux gestes dans un seul objet : l'anneau donne le cap, le disque qu'il
+ * entoure donne le pas. Un pouce les atteint tous les deux sans lâcher le
+ * téléphone — c'est la raison de les emboîter plutôt que de les poser côte
+ * à côte.
+ */
+.m-pupitre {
+  display: grid;
+  place-items: center;
+  padding: 2px 0;
+}
+.m-anneau {
+  position: relative;
+  width: 158px;
+  height: 158px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, transparent 0 48px, var(--raised) 48px 100%);
+  border: 1px solid var(--line);
+  box-shadow: inset 0 0 0 1px var(--sunk);
+  touch-action: none;
+}
+.m-anneau:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 3px;
+}
+/* Le secteur du regard, redit sur l'anneau : on voit où l'on regarde sans
+   quitter la carte des yeux. Cent vingt degrés, comme le calcul. */
+.m-anneau::after {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from calc(var(--cap, 0deg) - 60deg),
+    rgba(216, 169, 74, 0.26) 0deg 120deg,
+    transparent 120deg 360deg
+  );
+  -webkit-mask: radial-gradient(circle at 50% 50%, transparent 0 52px, #000 52px);
+  mask: radial-gradient(circle at 50% 50%, transparent 0 52px, #000 52px);
+  pointer-events: none;
+}
+.m-cran {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: rotate(var(--cap, 0deg));
+  pointer-events: none;
+}
+.m-cran::after {
+  content: '';
+  position: absolute;
+  left: -7px;
+  top: -76px;
+  border: 7px solid transparent;
+  border-bottom-color: var(--brass);
+}
+.m-rose {
+  position: absolute;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.m-rose-n {
+  top: 7px;
+}
+.m-rose-s {
+  bottom: 7px;
+}
+.m-manche {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 94px;
+  height: 94px;
+  border-radius: 50%;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  touch-action: none;
+}
+.m-pouce {
+  width: 46px;
+  height: 46px;
+  border-radius: 50%;
+  background: var(--raised);
+  border: 2px solid var(--brass);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  color: var(--brass-ink);
+  font-size: 16px;
+  transform: translate(var(--dx, 0px), var(--dy, 0px));
+  /* Le pouce levé revient au centre ; le pouce posé ne traîne pas derrière lui. */
+  transition: transform 0.12s ease-out;
+}
+.m-pouce.m-pris {
+  transition: none;
+}
+
+/* Un réglage à lui, gardé dans son téléphone : le guetteur qui recule sans
+   quitter la porte des yeux existe aussi. */
+.m-coche {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+  border-top: 1px solid var(--line-soft);
+  padding-top: 12px;
+}
+.m-coche input {
+  width: 20px;
+  height: 20px;
+  accent-color: var(--brass);
+  flex: none;
+}
+
+/* Les teintes des pions, comme sur l'écran des joueurs. */
+.c-brass { --pion-ring: var(--brass); --pion-fill: var(--brass-wash); }
+.c-blood { --pion-ring: var(--blood); --pion-fill: var(--blood-wash); }
+.c-iris { --pion-ring: var(--iris); --pion-fill: var(--iris-wash); }
+.c-moss { --pion-ring: var(--moss); --pion-fill: var(--moss-wash); }
+.c-azur { --pion-ring: var(--azur); --pion-fill: var(--azur-wash); }
+.c-jade { --pion-ring: var(--jade); --pion-fill: var(--jade-wash); }
+.c-olive { --pion-ring: var(--olive); --pion-fill: var(--olive-wash); }
+.c-orange { --pion-ring: var(--orange); --pion-fill: var(--orange-wash); }
+.c-prune { --pion-ring: var(--prune); --pion-fill: var(--prune-wash); }
+.c-fougere { --pion-ring: var(--fougere); --pion-fill: var(--fougere-wash); }
+.c-outremer { --pion-ring: var(--outremer); --pion-fill: var(--outremer-wash); }
+.c-amethyste { --pion-ring: var(--amethyste); --pion-fill: var(--amethyste-wash); }
+.c-bruyere { --pion-ring: var(--bruyere); --pion-fill: var(--bruyere-wash); }
+.c-argile { --pion-ring: var(--argile); --pion-fill: var(--argile-wash); }
+.c-ardoise { --pion-ring: var(--ardoise); --pion-fill: var(--ardoise-wash); }
+.c-neutral { --pion-ring: var(--text-faint); --pion-fill: var(--neutral-wash); }
+
+@media (prefers-reduced-motion: reduce) {
+  * {
+    animation: none !important;
+    transition: none !important;
+  }
+}
+
+/* ============================================================
+   Les ondes — ce qu'un joueur montre du doigt
+   Trois anneaux qui s'ouvrent depuis le point et s'effacent, à la couleur de
+   celui qui montre. Rien ne reste : un geste de table vaut le temps qu'il
+   dure, et deux secondes après l'écran est comme avant.
+   ============================================================ */
+.onde-layer {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 7;
+  overflow: hidden;
+}
+.onde {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 0;
+  height: 0;
+}
+.onde i {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 12cqw;
+  aspect-ratio: 1;
+  margin: -6cqw 0 0 -6cqw;
+  border-radius: 50%;
+  border: 0.45cqw solid var(--pion-ring, #d8a94a);
+  opacity: 0;
+  animation: onde-ouvre 2s cubic-bezier(0.16, 0.8, 0.3, 1) forwards;
+}
+/* Les trois anneaux partent en retard l'un sur l'autre : c'est le décalage
+   qui fait lire un radar plutôt qu'un simple cercle qui grandit. */
+.onde i:nth-child(2) {
+  animation-delay: 0.22s;
+}
+.onde i:nth-child(3) {
+  animation-delay: 0.44s;
+}
+/* Le point d'origine reste net pendant que les anneaux s'en vont : sans lui,
+   l'œil arrive trop tard et ne sait plus d'où c'est parti. */
+.onde::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 1.8cqw;
+  aspect-ratio: 1;
+  margin: -0.9cqw 0 0 -0.9cqw;
+  border-radius: 50%;
+  background: var(--pion-ring, #d8a94a);
+  box-shadow: 0 0 1.4cqw var(--pion-ring, #d8a94a);
+  animation: onde-point 2s ease-out forwards;
+}
+@keyframes onde-ouvre {
+  0% {
+    transform: scale(0.12);
+    opacity: 0;
+  }
+  12% {
+    opacity: 0.95;
+  }
+  100% {
+    transform: scale(1);
+    opacity: 0;
+  }
+}
+@keyframes onde-point {
+  0% {
+    transform: scale(0.4);
+    opacity: 0;
+  }
+  10% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .onde i,
+  .onde::after {
+    animation-duration: 0.01s;
+    opacity: 0;
+  }
+}
+
+
+/* --- la pochette ---------------------------------------------------------- */
+/* Ce que le maître du jeu lui a mis en main : un plan, une lettre, une photo,
+   un film. Des cartes larges, lisibles à bout de bras dans une pièce sombre. */
+
+/* Le point qui dit « il y a du neuf ». Posé sur l'onglet, il ne compte pas :
+   à la table on veut savoir qu'il s'est passé quelque chose, pas combien. */
+.m-onglets button {
+  position: relative;
+}
+.m-neuf {
+  position: absolute;
+  top: 7px;
+  left: 50%;
+  margin-left: 11px;
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  background: var(--brass);
+  box-shadow: 0 0 0 3px var(--sunk);
+}
+.m-onglets button[aria-selected='true'] .m-neuf {
+  box-shadow: 0 0 0 3px var(--ground);
+}
+
+/* Les rangements, quand il a de quoi en remplir plus d'un. Une bande qui
+   glisse sous le pouce : mieux vaut pousser la bande que rétrécir les mots
+   jusqu'à ce qu'ils ne se lisent plus. */
+.m-rangs {
+  display: flex;
+  gap: 6px;
+  overflow-x: auto;
+  margin: 0 -15px;
+  padding: 0 15px 1px;
+  scrollbar-width: none;
+}
+.m-rangs::-webkit-scrollbar {
+  display: none;
+}
+.m-rang {
+  flex: none;
+  padding: 8px 15px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  font-size: 13px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.m-rang[aria-selected='true'] {
+  background: var(--brass-wash);
+  border-color: var(--brass-line);
+  color: var(--brass-ink);
+}
+.m-rang .pt {
+  display: inline-block;
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--brass);
+  margin-left: 7px;
+  vertical-align: 2px;
+}
+
+.m-poche {
+  display: grid;
+  gap: 13px;
+}
+/* La carte est un bouton, sauf pour un PDF : là, c'est un lien, qui ouvre le
+   lecteur du navigateur. D'où la couleur et le soulignement remis à zéro. */
+.m-doc {
+  display: block;
+  width: 100%;
+  padding: 0;
+  text-align: left;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  overflow: hidden;
+  color: inherit;
+  text-decoration: none;
+}
+.m-doc:active {
+  border-color: var(--brass);
+}
+.m-doc .vig {
+  display: grid;
+  place-items: center;
+  position: relative;
+  aspect-ratio: 16 / 10;
+  background: var(--sunk);
+}
+/*
+ * L'image est posée dans le cadre, non dedans.
+ *
+ * Laissée en écoulement normal, elle imposait sa propre hauteur à la grille et
+ * le cadre perdait sa proportion : la première page d'un PDF, qui est debout,
+ * faisait une carte deux fois trop haute. Sortie du flux, elle ne commande
+ * plus rien.
+ *
+ * Et c'est le **haut** de la page qu'on garde : le titre, l'en-tête, la
+ * première ligne — ce par quoi on reconnaît un document. Son milieu ne dit
+ * rien.
+ */
+.m-doc .vig img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  object-position: top center;
+  display: block;
+}
+.m-doc .sans {
+  font-size: 30px;
+  color: var(--text-faint);
+}
+.m-doc .lire-film {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-size: 30px;
+  color: #fff;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.7);
+}
+/* La flèche des PDF : il quitte l'application, autant le dire d'un signe. */
+.m-doc .nature i {
+  font-style: normal;
+  margin-left: 4px;
+  opacity: 0.8;
+}
+.m-doc .nature {
+  position: absolute;
+  inset: 8px auto auto 8px;
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  padding: 3px 8px;
+  border-radius: 99px;
+  background: rgba(4, 8, 10, 0.72);
+  color: #fff;
+}
+.m-doc .dit {
+  display: grid;
+  gap: 5px;
+  padding: 11px 13px 13px;
+}
+.m-doc .t {
+  display: block;
+  font-size: 15px;
+  font-weight: 500;
+  line-height: 1.3;
+}
+.m-doc .sous {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+/* Ce qui n'est qu'à lui se dit, et se voit : c'est le sel du procédé. */
+.m-doc .sien {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  padding: 2px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--brass-line);
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
+.m-doc .rang-dit {
+  font-family: ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.m-doc .point {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--brass);
+  flex: none;
+}
+.m-doc .h {
+  margin-left: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+}
+
+/* La lecture, par-dessus tout le reste : une lettre se lit, elle ne se
+   consulte pas du coin de l'œil. */
+.m-lire {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  flex-direction: column;
+  background: #05090b;
+}
+.m-lire-tete {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: calc(11px + env(safe-area-inset-top)) 14px 11px;
+  background: var(--tint);
+  border-bottom: 1px solid var(--line-soft);
+}
+.m-lire-tete .t {
+  font-size: 14px;
+  font-weight: 500;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-lire-tete button {
+  margin-left: auto;
+  flex: none;
+  font-size: 13px;
+  color: var(--text-dim);
+  padding: 8px 6px;
+}
+.m-lire-corps {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  place-items: center;
+  padding: 10px;
+}
+/* Une image se déroule sur toute la largeur : le pincement du navigateur fait
+   le reste, comme sur une feuille qu'on rapproche des yeux. */
+.m-lire-corps img {
+  width: 100%;
+  height: auto;
+  display: block;
+  border-radius: 6px;
+}
+/* Une vidéo apporte son propre lecteur : on ne lui superpose rien, on lui
+   donne la place. */
+.m-lire-corps video {
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}
+.m-lire-pied {
+  flex: none;
+  padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
+  font-size: 11.5px;
+  color: var(--text-faint);
+  text-align: center;
+  border-top: 1px solid var(--line-soft);
+  background: var(--ground);
+}
+
+/* --- son sac, et ce qu'il porte ------------------------------------------ */
+/* Pas de poupée sur un téléphone : une liste, lue au pouce. Chaque affaire
+   porte l'endroit du corps où elle est ; on tapote pour la déplacer. */
+.m-titre {
+  margin: 0 0 -8px;
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.m-objets {
+  display: grid;
+  gap: 7px;
+}
+.m-objet {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 12px 13px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  color: inherit;
+  text-align: left;
+}
+.m-objet:active {
+  border-color: var(--brass);
+}
+.m-o-pastille {
+  width: 10px;
+  height: 10px;
+  border-radius: 99px;
+  background: var(--pion-ring, var(--text-faint));
+}
+.m-o-nom {
+  font-size: 14.5px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.m-o-nom b {
+  font-size: 12px;
+  color: var(--text-faint);
+  font-weight: 500;
+}
+/* Porté sur le corps, ou simplement dans le sac : la seule chose qu'on cherche
+   dans cette liste se lit en laiton. */
+.m-o-ou {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.m-objet.porte .m-o-ou {
+  color: var(--brass-ink);
+}
+
+/* La feuille qui monte du bas : le pouce y arrive sans traverser l'écran. */
+.m-feuille-fond {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
+  background: rgba(5, 8, 10, 0.72);
+  display: flex;
+  align-items: flex-end;
+}
+.m-feuille {
+  width: 100%;
+  max-height: 78vh;
+  overflow: auto;
+  background: var(--surface);
+  border-top: 1px solid var(--line);
+  border-radius: 14px 14px 0 0;
+  padding: 14px 14px calc(18px + env(safe-area-inset-bottom, 0px));
+  display: grid;
+  gap: 12px;
+}
+.m-f-tete {
+  display: grid;
+  gap: 2px;
+}
+.m-f-tete b {
+  font-size: 16px;
+}
+.m-f-tete span {
+  font-size: 12.5px;
+  color: var(--text-faint);
+}
+.m-f-choix {
+  display: grid;
+  gap: 6px;
+}
+.m-f-choix button {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  padding: 13px 14px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  color: var(--text-dim);
+  font-size: 14.5px;
+  text-align: left;
+}
+.m-f-choix button.on {
+  border-color: var(--brass);
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
+/* Ce qu'un autre objet occupe déjà : dit, pas caché — le choisir déplacera
+   l'autre, autant le savoir avant de tapoter. */
+.m-f-choix button i {
+  margin-left: auto;
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 45%;
+}
+.m-f-sac {
+  border-style: dashed !important;
+}
