@@ -11,19 +11,52 @@ gauche montre l'écran joueurs en direct, dans tous les modules.
 npm install          # installe et recompile better-sqlite3 pour Electron
 npm run dev          # développement, rechargement à chaud
 npm run typecheck    # vérification TypeScript
-npm run dist         # produit dist/Ecran du Maitre-<version>-setup.exe
+npm run dist         # produit l'installeur et l'exe autonome dans dist/
+npm run publier      # idem, et pousse le tout en GitHub Release
 ```
 
-### Fabriquer l'installeur
+### Fabriquer les exécutables
 
-`npm run dist` produit `dist/Ecran du Maitre-<version>-setup.exe`. **Il n'est pas signé**, et il ne
-le sera pas : c'est une décision, pas un reste à faire.
+`npm run dist` produit **deux fichiers** dans `dist/`, et ils ne servent pas au même usage :
+
+| Fichier | Pour qui |
+| --- | --- |
+| `Ecran du Maitre-<version>-setup.exe` | l'installeur, pour une installation normale sur un poste |
+| `Ecran-du-Maitre-<version>.exe` | l'**exécutable autonome**, celui que Le Grenier télécharge et lance tel quel |
+
+Le second ne s'installe pas : il se décompresse dans le dossier temporaire au premier
+lancement — comptez une bonne quinzaine de secondes cette fois-là — puis réutilise ce dossier
+ensuite. Les deux écrivent leurs données au même endroit (voir « Où sont mes données »), donc
+passer de l'un à l'autre ne perd rien.
+
+**Ni l'un ni l'autre n'est signé**, et ils ne le seront pas : c'est une décision, pas un reste à faire.
 
 Ce que ça change, une fois : au premier lancement du fichier, Windows affiche un écran bleu
 « Windows a protégé votre ordinateur ». Il faut cliquer **Informations complémentaires**, puis
 **Exécuter quand même**. Ce n'est pas un signe que le fichier est douteux — SmartScreen dit
 seulement qu'il ne connaît pas encore l'éditeur. L'avertissement s'espace à mesure que le fichier
 circule, et disparaît sur une machine où l'application est déjà installée.
+
+### Publier une version
+
+L'application est au catalogue du **Grenier**, le launcher maison : il lit la dernière GitHub
+Release de ce dépôt, compare son tag à la version installée, et télécharge l'exécutable autonome.
+Publier une version tient donc en trois gestes :
+
+```bash
+# 1. le numéro dans package.json, puis
+npm run publier        # construit et crée la release (demande GH_TOKEN)
+git tag v1.0.0 && git push --tags
+```
+
+Deux contraintes viennent du Grenier, et **rien ne les signale** si on les enfreint :
+
+- l'asset doit être l'**exécutable autonome**, jamais l'installeur — d'où la cible `portable` ;
+- son nom doit **porter la version**, sans espace : c'est là-dessus que le motif du catalogue
+  (`^Ecran[ .-]du[ .-]Maitre[ .-][0-9][0-9.]*[.]exe$`) fait sa correspondance, et GitHub
+  remplace les espaces d'un nom de fichier par des tirets à l'upload.
+
+L'application n'a pas d'updater à elle : c'est le Grenier qui décide quand mettre à jour.
 
 Si `better-sqlite3` refuse de se charger après une mise à jour d'Electron :
 

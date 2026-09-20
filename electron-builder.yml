@@ -1,7 +1,13 @@
 appId: fr.julescannet.ecrandumaitre
 productName: Ecran du Maitre
-# Pas de serveur de mise à jour pour l'instant : on n'émet pas de métadonnées.
-publish: null
+# L'application n'a pas d'updater à elle : c'est Le Grenier qui compare le tag de la
+# dernière release à la version installée. Le fournisseur ne sert donc qu'à `--publish`,
+# qui crée la release et y joint les exécutables.
+publish:
+  provider: github
+  owner: BlueFox71
+  repo: ecran-du-maitre
+  releaseType: release
 
 directories:
   buildResources: resources
@@ -20,9 +26,17 @@ win:
   target:
     - target: nsis
       arch: [x64]
-  artifactName: ${productName}-${version}-setup.${ext}
+    # Le Grenier télécharge l'asset et le lance tel quel : il lui faut un exécutable
+    # autonome, jamais l'installeur, qui ouvrirait un assistant à chaque lancement.
+    - target: portable
+      arch: [x64]
 nsis:
+  artifactName: ${productName}-${version}-setup.${ext}
   oneClick: false
   allowToChangeInstallationDirectory: true
   createDesktopShortcut: always
   shortcutName: Ecran du Maitre
+# Le nom porte la version — c'est là-dessus que le motif du Grenier fait sa
+# correspondance — et s'écrit sans espace, que GitHub remplacerait par des tirets.
+portable:
+  artifactName: Ecran-du-Maitre-${version}.${ext}

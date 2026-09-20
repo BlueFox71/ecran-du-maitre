@@ -12,7 +12,8 @@
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "rebuild": "electron-rebuild -f -w better-sqlite3",
     "postinstall": "electron-builder install-app-deps",
-    "dist": "electron-vite build && electron-builder --win --publish never"
+    "dist": "electron-vite build && electron-builder --win --publish never",
+    "publier": "electron-vite build && electron-builder --win --publish always"
   },
   "devDependencies": {
     "@electron/rebuild": "^3.7.2",
