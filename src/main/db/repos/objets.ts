@@ -11,7 +11,7 @@
  * la garantie tient à la forme des données, pas à un drapeau qu'on penserait
  * à vérifier.
  */
-import { activeCampaignId, getDb } from '../index'
+import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { UNITE_VALEUR_PAR_DEFAUT } from '@shared/types'
 import type { EffetObjet, Objet, ObjetFamille, ObjetPlacement, PortObjet } from '@shared/types'
 
@@ -190,9 +190,10 @@ function placementsOf(objetIds: number[]): Map<number, ObjetPlacement[]> {
          LEFT JOIN place l     ON l.id = p.place_id
          LEFT JOIN character c ON c.id = p.character_id
         WHERE p.objet_id IN (${objetIds.map(() => '?').join(',')})
+          AND (p.session_id = ? OR p.session_id IS NULL)
         ORDER BY p.ord, p.id`
     )
-    .all(...objetIds) as any[]
+    .all(...objetIds, activeSessionId()) as any[]
   for (const r of rows) {
     const ligne: ObjetPlacement = {
       id: r.id,
@@ -353,10 +354,12 @@ export function poser(input: {
         .get(input.objetId) as any
     )?.m ?? -1) + 1
   db.prepare(
-    `INSERT INTO objet_placement (objet_id, port, place_id, character_id, detail, qte, etat, emplacement, ord)
-     VALUES (@objetId, @port, @placeId, @characterId, @precision, @qte, @etat, @emplacement, @ord)`
+    `INSERT INTO objet_placement (objet_id, session_id, port, place_id, character_id, detail, qte, etat, emplacement, ord)
+     VALUES (@objetId, @sid, @port, @placeId, @characterId, @precision, @qte, @etat, @emplacement, @ord)`
   ).run({
     objetId: input.objetId,
+    /* Un exemplaire vit dans une séance : celle où on le pose. */
+    sid: activeSessionId(),
     port: input.port,
     placeId: input.port === 'lieu' ? (input.placeId ?? null) : null,
     characterId: input.port === 'lieu' ? null : (input.characterId ?? null),
@@ -394,9 +397,12 @@ export function equiper(input: {
     const occupant = db
       .prepare(
         `SELECT id, objet_id AS objetId FROM objet_placement
-          WHERE character_id = ? AND emplacement = ?`
+          WHERE character_id = ? AND emplacement = ? AND (session_id = ? OR session_id IS NULL)`
       )
-      .all(input.characterId, input.emplacement) as { id: number; objetId: number }[]
+      .all(input.characterId, input.emplacement, activeSessionId()) as {
+      id: number
+      objetId: number
+    }[]
     for (const o of occupant) {
       db.prepare(`UPDATE objet_placement SET emplacement = NULL WHERE id = ?`).run(o.id)
       touches.add(o.objetId)
@@ -409,10 +415,10 @@ export function equiper(input: {
     const sien = db
       .prepare(
         `SELECT id FROM objet_placement
-          WHERE character_id = ? AND objet_id = ?
+          WHERE character_id = ? AND objet_id = ? AND (session_id = ? OR session_id IS NULL)
           ORDER BY (emplacement IS NULL) DESC, id LIMIT 1`
       )
-      .get(input.characterId, input.objetId) as { id: number } | undefined
+      .get(input.characterId, input.objetId, activeSessionId()) as { id: number } | undefined
 
     if (sien) {
       db.prepare(`UPDATE objet_placement SET emplacement = ? WHERE id = ?`).run(
@@ -425,9 +431,9 @@ export function equiper(input: {
           .prepare(`SELECT MAX(ord) AS m FROM objet_placement WHERE objet_id = ?`)
           .get(input.objetId) as any)?.m ?? -1) + 1
       db.prepare(
-        `INSERT INTO objet_placement (objet_id, port, character_id, qte, etat, emplacement, ord)
-         VALUES (?, 'pj', ?, 1, 'porte', ?, ?)`
-      ).run(input.objetId, input.characterId, input.emplacement, ord)
+        `INSERT INTO objet_placement (objet_id, session_id, port, character_id, qte, etat, emplacement, ord)
+         VALUES (?, ?, 'pj', ?, 1, 'porte', ?, ?)`
+      ).run(input.objetId, activeSessionId(), input.characterId, input.emplacement, ord)
     }
     touches.add(input.objetId)
   })()
@@ -463,10 +469,10 @@ export function objetsDe(characterId: number): {
            FROM objet_placement p
            JOIN objet o ON o.id = p.objet_id
            LEFT JOIN objet_famille f ON f.id = o.famille_id
-          WHERE p.character_id = ?
+          WHERE p.character_id = ? AND (p.session_id = ? OR p.session_id IS NULL)
           ORDER BY (p.emplacement IS NULL), p.emplacement, o.nom`
       )
-      .all(characterId) as any[]
+      .all(characterId, activeSessionId()) as any[]
   ).map((r) => ({
     placementId: r.placementId,
     objetId: r.objetId,

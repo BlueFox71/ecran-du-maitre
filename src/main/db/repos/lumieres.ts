@@ -10,7 +10,7 @@
  * **pénombre**, jusqu'où la lueur porte encore. Le second est le bord extérieur
  * — jamais plus petit que le premier, sans quoi la lampe n'aurait pas de sens.
  */
-import { getDb } from '../index'
+import { activeSessionId, getDb } from '../index'
 import type { Lumiere } from '@shared/types'
 
 const SELECT = `
@@ -142,9 +142,10 @@ export function porteursDeLumiere(): { characterId: number; rayon: number; objet
       `SELECT p.character_id AS characterId, o.nom AS nom, o.effets AS effets
          FROM objet_placement p
          JOIN objet o ON o.id = p.objet_id
-        WHERE p.port = 'pj' AND p.character_id IS NOT NULL AND p.etat = 'porte'`
+        WHERE p.port = 'pj' AND p.character_id IS NOT NULL AND p.etat = 'porte'
+          AND (p.session_id = ? OR p.session_id IS NULL)`
     )
-    .all() as { characterId: number; nom: string; effets: string | null }[]
+    .all(activeSessionId()) as { characterId: number; nom: string; effets: string | null }[]
 
   const out: { characterId: number; rayon: number; objet: string }[] = []
   for (const l of lignes) {

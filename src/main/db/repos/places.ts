@@ -1,4 +1,5 @@
-import { activeCampaignId, getDb } from '../index'
+import { activeCampaignId, activeSessionId, getDb } from '../index'
+import { copierLigne } from '../copie'
 import * as reglages from './reglages'
 import { lireCampagne } from '@shared/reglages'
 import type { Place, PlaceTier, PointMur } from '@shared/types'
@@ -61,15 +62,24 @@ function toPlace(r: any): Place {
 }
 
 /**
+ * Les lieux d'une séance — la séance en cours si on n'en nomme pas.
+ *
+ * Un lieu sans séance est commun : il vient d'une séance qu'on a supprimée,
+ * et on le montre partout plutôt que de le perdre. La migration 42 dit le
+ * reste.
+ *
  * La liste sort déjà dans l'ordre de l'arbre : chaque espace suivi de ses
  * niveaux, chaque niveau suivi de ses lieux, et à la fin ce qui n'est rangé
  * nulle part. Les interfaces n'ont plus qu'à lire — voir `arbreDesLieux`.
  */
-export function listPlaces(): Place[] {
+export function listPlaces(sessionId: number = activeSessionId()): Place[] {
   const plat = (
     getDb()
-      .prepare(`${SELECT} WHERE p.campaign_id = ? ORDER BY p.ord, p.id`)
-      .all(activeCampaignId()) as any[]
+      .prepare(
+        `${SELECT} WHERE p.campaign_id = ? AND (p.session_id = ? OR p.session_id IS NULL)
+          ORDER BY p.ord, p.id`
+      )
+      .all(activeCampaignId(), sessionId) as any[]
   ).map(toPlace)
 
   const enfants = (pid: number | null, tier: PlaceTier): Place[] =>
@@ -115,10 +125,26 @@ function rangSuivant(tier: PlaceTier, parentId: number | null): number {
   const r = getDb()
     .prepare(
       `SELECT COALESCE(MAX(ord), -1) + 1 AS n FROM place
-        WHERE campaign_id = ? AND tier = ? AND parent_id IS ?`
+        WHERE campaign_id = ? AND tier = ? AND parent_id IS ?
+          AND (session_id = ? OR session_id IS NULL)`
     )
-    .get(activeCampaignId(), tier, parentId) as { n: number }
+    .get(activeCampaignId(), tier, parentId, activeSessionId()) as { n: number }
   return r.n
+}
+
+/**
+ * La séance où naît un lieu : celle de son contenant s'il en a un — une
+ * pièce ajoutée à un étage commun reste commune avec lui —, la séance en
+ * cours sinon.
+ */
+function seanceDeNaissance(parentId: number | null): number | null {
+  if (parentId) {
+    const r = getDb().prepare(`SELECT session_id AS s FROM place WHERE id = ?`).get(parentId) as
+      | { s: number | null }
+      | undefined
+    if (r) return r.s
+  }
+  return activeSessionId()
 }
 
 export function upsertPlace(input: {
@@ -171,17 +197,18 @@ export function upsertPlace(input: {
       const parentId = input.parentId ?? null
       const info = db
         .prepare(
-          `INSERT INTO place (campaign_id, tier, parent_id, ord, name, summary, notes,
+          `INSERT INTO place (campaign_id, session_id, tier, parent_id, ord, name, summary, notes,
                                map_item_id, ambience_item_id,
                                zone_pts, ancre_x, ancre_y, seen,
                                regard_portee, lum_garde)
-           VALUES (@cid, @tier, @parentId, @ord, @name, @summary, @notes,
+           VALUES (@cid, @sid, @tier, @parentId, @ord, @name, @summary, @notes,
                    @mapItemId, @ambienceItemId,
                    @zonePts, @ancreX, @ancreY, @seen,
                    @regardPortee, @lumGarde)`
         )
         .run({
           cid: activeCampaignId(),
+          sid: seanceDeNaissance(parentId),
           tier,
           parentId,
           ord: rangSuivant(tier, parentId),
@@ -335,9 +362,10 @@ export function movePlace(id: number, parentId: number | null, beforeId: number 
         .prepare(
           `SELECT id FROM place
             WHERE campaign_id = ? AND tier = ? AND parent_id IS ? AND id <> ?
+              AND (session_id = ? OR session_id IS NULL)
             ORDER BY ord, id`
         )
-        .all(activeCampaignId(), p.tier, parentId, id) as { id: number }[]
+        .all(activeCampaignId(), p.tier, parentId, id, activeSessionId()) as { id: number }[]
     ).map((r) => r.id)
 
     const at = beforeId === null ? freres.length : freres.indexOf(beforeId)
@@ -362,4 +390,73 @@ export function removePlace(id: number): void {
     for (const p of [...sous].reverse()) del.run(p.id)
     del.run(id)
   })()
+}
+
+/**
+ * Reprendre un lieu d'une autre séance : une copie, jamais un partage.
+ *
+ * Le lieu arrive avec tout ce qu'il tient — ses étages et ses pièces, et pour
+ * chacun le plan, le découpage, les murs et leurs ouvertures, les lumières,
+ * les repères du MJ, les chapitres et les objets posés. Il arrive **pas encore
+ * découvert** : la table qui entre à la scierie n'y est jamais venue, même si
+ * celle d'avant avait tout visité. Les pions restent là-bas ; ceux des
+ * joueurs se posent au moment d'entrer.
+ *
+ * Rend l'identifiant de la copie, rangée à la racine de l'arbre.
+ */
+export function duplicatePlace(id: number): number {
+  const db = getDb()
+  const racine = getPlace(id)
+  if (!racine) throw new Error('Lieu introuvable')
+  const sid = activeSessionId()
+  const nouveau = new Map<number, number>()
+  const ids = (sql: string, p: number): number[] =>
+    (db.prepare(sql).all(p) as { id: number }[]).map((r) => r.id)
+
+  db.transaction(() => {
+    for (const p of [racine, ...descendantsDe(id)]) {
+      const neuf = copierLigne('place', p.id, {
+        session_id: sid,
+        parent_id: p.id === id ? null : (nouveau.get(p.parentId!) ?? null),
+        seen: 0,
+        ...(p.id === id ? { ord: rangSuivant(p.tier, null) } : {})
+      })
+      nouveau.set(p.id, neuf)
+
+      db.prepare(
+        `INSERT INTO place_chapter (place_id, chapter_id)
+           SELECT ?, chapter_id FROM place_chapter WHERE place_id = ?`
+      ).run(neuf, p.id)
+
+      for (const m of ids(`SELECT id FROM mur WHERE place_id = ?`, p.id)) {
+        const mur = copierLigne('mur', m, { place_id: neuf })
+        for (const o of ids(`SELECT id FROM ouverture WHERE mur_id = ?`, m))
+          copierLigne('ouverture', o, { mur_id: mur })
+      }
+      for (const l of ids(`SELECT id FROM lumiere WHERE place_id = ?`, p.id))
+        copierLigne('lumiere', l, { place_id: neuf })
+      for (const a of ids(`SELECT id FROM annotation WHERE place_id = ?`, p.id))
+        copierLigne('annotation', a, { place_id: neuf })
+
+      /* Un objet déjà trouvé là-bas est de nouveau à trouver ici. */
+      for (const o of ids(`SELECT id FROM objet_placement WHERE place_id = ?`, p.id))
+        copierLigne('objet_placement', o, { place_id: neuf, session_id: sid, etat: 'cache' })
+    }
+  })()
+
+  return nouveau.get(id)!
+}
+
+/** Tout ce qu'un lieu tient, parents avant enfants, quelle que soit la séance. */
+function descendantsDe(id: number): Place[] {
+  const out: Place[] = []
+  const pile = [id]
+  while (pile.length) {
+    const enfants = (
+      getDb().prepare(`${SELECT} WHERE p.parent_id = ? ORDER BY p.ord, p.id`).all(pile.shift()!) as any[]
+    ).map(toPlace)
+    out.push(...enfants)
+    pile.push(...enfants.map((e) => e.id))
+  }
+  return out
 }

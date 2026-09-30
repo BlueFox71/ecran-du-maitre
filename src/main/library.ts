@@ -449,8 +449,26 @@ export function renameEntry(rel: string, name: string): string {
   if (!insideRoot(dest)) throw new Error('Hors du dossier de campagne.')
   if (dest === abs) return rel
   renameSync(abs, dest)
+  const neuf = toRel(campaignRoot()!, dest)
+  if (!ext) suivreDossierDeSeance(rel, neuf)
   scan()
-  return toRel(campaignRoot()!, dest)
+  return neuf
+}
+
+/**
+ * Une séance désigne son dossier par son chemin : renommé ou déplacé depuis
+ * l'application, il l'emporte avec lui — lui et tout ce qui est dessous. Un
+ * renommage fait dans l'explorateur, lui, laisse la séance sur un chemin qui
+ * n'existe plus, et l'interface le dit.
+ */
+function suivreDossierDeSeance(ancien: string, neuf: string): void {
+  getDb()
+    .prepare(
+      `UPDATE game_session
+          SET folder_rel = ? || substr(folder_rel, length(?) + 1)
+        WHERE campaign_id = ? AND (folder_rel = ? OR substr(folder_rel, 1, length(?) + 1) = ? || '/')`
+    )
+    .run(neuf, ancien, activeCampaignId(), ancien, ancien, ancien)
 }
 
 export function moveEntry(rel: string, destFolderRel: string): string {
@@ -466,8 +484,10 @@ export function moveEntry(rel: string, destFolderRel: string): string {
   const ext = statSync(abs).isDirectory() ? '' : extname(abs)
   const dest = freePath(destDir, basename(abs, ext), ext)
   renameSync(abs, dest)
+  const neuf = toRel(campaignRoot()!, dest)
+  if (!ext) suivreDossierDeSeance(rel, neuf)
   scan()
-  return toRel(campaignRoot()!, dest)
+  return neuf
 }
 
 /** Corbeille de Windows, jamais d'effacement définitif. */

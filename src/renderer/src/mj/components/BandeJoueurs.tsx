@@ -66,7 +66,7 @@ export function chargeTexte(dt: DataTransfer): { quoi: 'objet' | 'exemplaire'; i
 
 export function BandeJoueurs(): JSX.Element | null {
   const s = useStore()
-  const joueurs = s.characters.filter((c) => c.kind !== 'pnj')
+  const joueurs = s.characters.filter((c) => c.kind !== 'pnj' && c.present)
   const [survole, setSurvole] = useState<number | null>(null)
 
   if (joueurs.length === 0) return null

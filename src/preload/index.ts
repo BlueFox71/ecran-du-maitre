@@ -122,6 +122,8 @@ const api = {
   /** Les joueurs : le carnet de l'application, et les inscrits de la campagne. */
   players: {
     carnet: () => call<CarnetPlayer[]>('players:carnet'),
+    /** Masquer quelqu'un dans le carnet, ou l'y remettre. */
+    masquer: (uid: string, masque: boolean) => call<void>('players:masquer', uid, masque),
     list: () => call<CampaignPlayer[]>('players:list'),
     create: (name: string) => call<CampaignPlayer>('players:create', name),
     enroll: (uid: string) => call<CampaignPlayer>('players:enroll', uid),
@@ -130,7 +132,10 @@ const api = {
     setCharacter: (id: number, characterId: number | null) =>
       call<CampaignPlayer | null>('players:setCharacter', id, characterId),
     remove: (id: number) => call<void>('players:remove', id),
-    deleteFromCarnet: (uid: string) => call<void>('players:deleteFromCarnet', uid)
+    deleteFromCarnet: (uid: string) => call<void>('players:deleteFromCarnet', uid),
+    /** Renommer une personne du carnet qui n'est pas inscrite à la campagne ouverte. */
+    renameCarnet: (uid: string, name: string) =>
+      call<CarnetPlayer | null>('players:renameCarnet', uid, name)
   },
 
   /** Le dossier de campagne : c'est lui qui fait foi. */
@@ -283,6 +288,10 @@ const api = {
 
   places: {
     list: () => call<Place[]>('places:list'),
+    /** Les lieux d'une autre séance, pour en reprendre un. */
+    ofSession: (sessionId: number) => call<Place[]>('places:ofSession', sessionId),
+    /** Copie un lieu et tout ce qu'il tient dans la séance en cours ; rend l'id de la copie. */
+    duplicate: (id: number) => call<number>('places:duplicate', id),
     get: (id: number) => call<Place | null>('places:get', id),
     upsert: (input: Partial<Place> & { name: string }) => call<Place>('places:upsert', input),
     remove: (id: number) => call<void>('places:remove', id),
@@ -507,7 +516,10 @@ const api = {
     createSession: (label: string, date?: string) =>
       call<GameSession>('timeline:createSession', label, date),
     setActiveSession: (id: number) => call<void>('timeline:setActiveSession', id),
-    updateSession: (id: number, patch: { label?: string; date?: string; notes?: string | null }) =>
+    updateSession: (
+      id: number,
+      patch: { label?: string; date?: string; notes?: string | null; folderRel?: string | null }
+    ) =>
       call<GameSession | null>('timeline:updateSession', id, patch),
     deleteSession: (id: number) =>
       call<{ ok: boolean; raison?: string }>('timeline:deleteSession', id),
@@ -525,7 +537,9 @@ const api = {
     removeBeat: (id: number) => call<void>('timeline:removeBeat', id),
     reorderBeats: (ids: number[]) => call<void>('timeline:reorderBeats', ids),
     attach: (beatId: number, itemId: number) => call<void>('timeline:attach', beatId, itemId),
-    detach: (beatId: number, itemId: number) => call<void>('timeline:detach', beatId, itemId)
+    detach: (beatId: number, itemId: number) => call<void>('timeline:detach', beatId, itemId),
+    /** Les PNJ que ce moment met en scène, donnés en entier. */
+    setPnjs: (beatId: number, ids: number[]) => call<void>('timeline:setPnjs', beatId, ids)
   },
 
   templates: {
@@ -601,6 +615,16 @@ const api = {
 
   characters: {
     list: () => call<Character[]>('characters:list'),
+    /** Les PNJ d'une autre séance, pour en reprendre un. */
+    pnjOf: (sessionId: number) => call<Character[]>('characters:pnjOf', sessionId),
+    /** Copie un PNJ dans la séance en cours ; rend l'id de la copie. */
+    duplicate: (id: number) => call<number>('characters:duplicate', id),
+    /** Hors-jeu à partir de la séance en cours, ou de retour. */
+    setHorsJeu: (id: number, horsJeu: boolean) =>
+      call<Character | null>('characters:horsJeu', id, horsJeu),
+    /** Présent ou absent à la séance en cours. */
+    setPresent: (id: number, present: boolean) =>
+      call<Character | null>('characters:present', id, present),
     get: (id: number) => call<Character | null>('characters:get', id),
     upsert: (input: {
       id?: number

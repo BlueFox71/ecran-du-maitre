@@ -14,19 +14,27 @@ import { Pastille } from './Pastille'
 export function Ident(): JSX.Element {
   const s = useStore()
   const seance = s.session
+  /* Les gens autour de la table ce soir : ceux dont le personnage manque à
+     la séance n'y sont pas. Un joueur sans personnage ne peut pas être noté
+     absent — il reste, puisqu'on ne sait rien de lui. */
+  const absents = new Set(s.characters.filter((c) => !c.present).map((c) => c.id))
+  const presents = s.players.filter((p) => p.characterId === null || !absents.has(p.characterId))
 
   return (
     <div className="ident plaque">
-      <div className="ident-gens" title="Les joueurs de cette campagne — menu Campagne pour les inscrire">
+      <div
+        className="ident-gens"
+        title="Les joueurs présents à cette séance — menu Séance › Configurer la séance pour noter les absents"
+      >
         <span className="seats">
-          {s.players.slice(0, 8).map((p) => (
+          {presents.slice(0, 8).map((p) => (
             <Pastille key={p.id} nom={p.name} couleur={p.color} />
           ))}
         </span>
         <span className="lbl">
-          {s.players.length === 0
+          {presents.length === 0
             ? 'aucun joueur'
-            : `${s.players.length} joueur${s.players.length > 1 ? 's' : ''}`}
+            : `${presents.length} joueur${presents.length > 1 ? 's' : ''}`}
         </span>
       </div>
 

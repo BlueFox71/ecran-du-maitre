@@ -949,7 +949,7 @@ function PanneauPoser({
 }): JSX.Element {
   const s = useStore()
   const pnjs = s.characters.filter((c) => c.kind === 'pnj')
-  const pjs = s.characters.filter((c) => c.kind !== 'pnj')
+  const pjs = s.characters.filter((c) => c.kind !== 'pnj' && c.present)
 
   const poser = async (
     port: PortObjet,

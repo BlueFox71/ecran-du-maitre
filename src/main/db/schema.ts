@@ -1189,5 +1189,117 @@ export const MIGRATIONS: { id: number; sql: string }[] = [
        de Jules commencent tires, ce qui est l'etat qu'ils avaient hier. */
     UPDATE mur SET ouverte = 0;
     `
+  },
+  {
+    id: 41,
+    sql: `
+    /* Une seance a son dossier.
+
+       Une campagne rassemble souvent plusieurs seances sous un meme toit —
+       « Seance 3 - La maison pleureuse », « Seance 4 - La scierie ». Pendant
+       qu'on en joue une, les fichiers des autres encombrent : on les range
+       ici, par le chemin du dossier relatif a la racine de la campagne. Nul,
+       la seance voit toute la campagne, comme avant. */
+    ALTER TABLE game_session ADD COLUMN folder_rel TEXT;
+    `
+  },
+  {
+    id: 42,
+    sql: `
+    /* Chaque seance a ses lieux, ses PNJ, et l'etat de ses personnages.
+
+       Une campagne se joue en seances qui ne se ressemblent pas : la maison
+       pleureuse n'est pas la scierie. On range donc les lieux et les PNJ dans
+       la seance qui les a vus naitre ; une autre seance peut en tirer une
+       copie, jamais les partager — ce qu'on abime a la scierie ne doit pas
+       l'etre a la maison.
+
+       Les personnages joueurs, eux, traversent la campagne : leur nom, leur
+       joueur, leur portrait ne bougent pas. Ce qui change d'une seance a
+       l'autre — jauges, caracteristiques, competences, affaires — vit dans
+       character_seance et dans objet_placement.session_id. Une seance neuve
+       part d'une copie de la precedente.
+
+       Supprimer une seance ne detruit pas ses lieux ni ses PNJ : ils perdent
+       leur seance et deviennent communs, visibles partout. L'etat des PJ et
+       les affaires de la seance, eux, s'en vont avec elle.
+
+       Ce qui existe deja va a la seance active de sa campagne. */
+    ALTER TABLE place ADD COLUMN session_id INTEGER REFERENCES game_session(id) ON DELETE SET NULL;
+    ALTER TABLE character ADD COLUMN session_id INTEGER REFERENCES game_session(id) ON DELETE SET NULL;
+    ALTER TABLE objet_placement ADD COLUMN session_id INTEGER REFERENCES game_session(id) ON DELETE CASCADE;
+    CREATE INDEX idx_place_session ON place(session_id);
+    CREATE INDEX idx_placement_session ON objet_placement(session_id, character_id);
+
+    CREATE TABLE character_seance (
+      character_id INTEGER NOT NULL REFERENCES character(id) ON DELETE CASCADE,
+      session_id   INTEGER NOT NULL REFERENCES game_session(id) ON DELETE CASCADE,
+      data         TEXT NOT NULL,
+      PRIMARY KEY (character_id, session_id)
+    );
+
+    UPDATE place SET session_id = (
+      SELECT s.id FROM game_session s WHERE s.campaign_id = place.campaign_id
+       ORDER BY s.active DESC, s.date DESC, s.id DESC LIMIT 1);
+    UPDATE character SET session_id = (
+      SELECT s.id FROM game_session s WHERE s.campaign_id = character.campaign_id
+       ORDER BY s.active DESC, s.date DESC, s.id DESC LIMIT 1)
+     WHERE kind = 'pnj';
+    UPDATE objet_placement SET session_id = (
+      SELECT s.id FROM objet o JOIN game_session s ON s.campaign_id = o.campaign_id
+       WHERE o.id = objet_placement.objet_id
+       ORDER BY s.active DESC, s.date DESC, s.id DESC LIMIT 1);
+    INSERT INTO character_seance (character_id, session_id, data)
+      SELECT c.id, s.id, c.data FROM character c
+        JOIN game_session s ON s.id = (
+          SELECT x.id FROM game_session x WHERE x.campaign_id = c.campaign_id
+           ORDER BY x.active DESC, x.date DESC, x.id DESC LIMIT 1)
+       WHERE c.kind = 'pj';
+    `
+  },
+  {
+    id: 43,
+    sql: `
+    /* Qui manque a la seance.
+
+       Tout le monde est la par defaut : on note l'absent, pas le present. Un
+       joueur qu'on inscrit en cours de campagne est donc attendu partout, et
+       une seance neuve n'a rien a cocher. L'absent sort des fiches, de la
+       bande des joueurs, du jet rapide, de l'encart de l'ecran et des pions
+       a poser ; il reste inscrit a la campagne. */
+    CREATE TABLE seance_absent (
+      session_id   INTEGER NOT NULL REFERENCES game_session(id) ON DELETE CASCADE,
+      character_id INTEGER NOT NULL REFERENCES character(id) ON DELETE CASCADE,
+      PRIMARY KEY (session_id, character_id)
+    );
+    `
+  },
+  {
+    id: 44,
+    sql: `
+    /* Hors-jeu : le personnage ne revient plus.
+
+       Mort, parti, remplace — il quitte la campagne a partir d'une seance, et
+       seulement a partir d'elle : rouvrir une seance d'avant le montre tel
+       qu'il etait, present a la table. On retient donc la seance de sa sortie,
+       pas un simple drapeau. Nulle, il est en jeu. */
+    ALTER TABLE character ADD COLUMN sortie_session_id INTEGER REFERENCES game_session(id) ON DELETE SET NULL;
+    `
+  },
+  {
+    id: 45,
+    sql: `
+    /* Les PNJ d'un moment.
+
+       Quand la table entre dans la cuisine, c'est la cuisiniere qu'on cherche,
+       pas les vingt autres. Un moment nomme les PNJ qu'il met en scene ; la
+       Regie et le Pupitre les rangent devant, juste apres les joueurs, et
+       gardent les autres a portee, plus discrets. */
+    CREATE TABLE beat_pnj (
+      beat_id      INTEGER NOT NULL REFERENCES beat(id) ON DELETE CASCADE,
+      character_id INTEGER NOT NULL REFERENCES character(id) ON DELETE CASCADE,
+      PRIMARY KEY (beat_id, character_id)
+    );
+    `
   }
 ]

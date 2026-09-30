@@ -29,7 +29,7 @@ export function MenuDonner({
 }): JSX.Element {
   const s = useStore()
   const pnjs = s.characters.filter((c) => c.kind === 'pnj' && c.id !== p.characterId)
-  const pjs = s.characters.filter((c) => c.kind !== 'pnj' && c.id !== p.characterId)
+  const pjs = s.characters.filter((c) => c.kind !== 'pnj' && c.present && c.id !== p.characterId)
   const lieux = s.places.filter((l) => l.id !== p.placeId)
 
   const donner = async (

@@ -72,8 +72,8 @@ export function ChoixDansArbre({
 
   const racine = useMemo(() => s.orphans.filter(retenu), [s.orphans, mot, kinds.join()])
   const total = useMemo(
-    () => s.allItems.filter(retenu).length,
-    [s.allItems, mot, kinds.join()]
+    () => s.fichiers.filter(retenu).length,
+    [s.fichiers, mot, kinds.join()]
   )
 
   const basculer = (rel: string): void =>
@@ -154,7 +154,7 @@ export function ChoixDansArbre({
 
   /* Un mot cherché aplatit l'arbre : on veut le fichier, pas son rangement. */
   const aplati = mot !== ''
-  const trouves = aplati ? s.allItems.filter(retenu) : []
+  const trouves = aplati ? s.fichiers.filter(retenu) : []
 
   return (
     /* `par-dessus` : ce choix s'ouvre souvent depuis une fenêtre déjà ouverte

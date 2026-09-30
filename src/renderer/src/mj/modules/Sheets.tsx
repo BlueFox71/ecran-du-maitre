@@ -13,6 +13,7 @@ import {
   kindIcon
 } from '../components/Icons'
 import { ChoixDansArbre } from '../components/ChoixDansArbre'
+import { ReprendreDUneSeance } from '../components/ReprendreDUneSeance'
 import { jaugeSanite } from '@shared/types'
 import type { CharacterKind, Sexe } from '@shared/types'
 import { FicheCampagne } from './FicheCampagne'
@@ -43,6 +44,10 @@ export function Sheets(): JSX.Element {
   const tpl = templateOf(s, ch)
   const [creating, setCreating] = useState<CharacterKind | null>(null)
   const [reglage, setReglage] = useState(false)
+  const [reprise, setReprise] = useState(false)
+  /* Les absents de la séance ne sont pas sur la table : on les range, sans
+     les cacher tout à fait — on peut vouloir retoucher une fiche entre deux. */
+  const [voirAbsents, setVoirAbsents] = useState(false)
   /* Deux rayons sur la même étagère : ceux que les joueurs mènent, et ceux que
      le MJ mène lui-même. Le rayon suit le personnage ouvert, sans quoi on
      cliquerait un PNJ et la liste sauterait sur les joueurs. */
@@ -52,7 +57,10 @@ export function Sheets(): JSX.Element {
      la feuille, et la colonne « qui il est » reste, parce qu'on équipe
      quelqu'un, pas un numéro. */
   const [onglet, setOnglet] = useState<'fiche' | 'equipement'>('fiche')
-  const joueurs = s.characters.filter((c) => c.kind !== 'pnj')
+  const absents = s.characters.filter((c) => c.kind !== 'pnj' && !c.present)
+  const nHorsJeu = absents.filter((c) => c.horsJeu).length
+  const nAbsents = absents.length - nHorsJeu
+  const joueurs = s.characters.filter((c) => c.kind !== 'pnj' && (c.present || voirAbsents))
   const pnjs = s.characters.filter((c) => c.kind === 'pnj')
   const rayonne = rayon === 'pnj' ? pnjs : joueurs
 
@@ -181,6 +189,7 @@ export function Sheets(): JSX.Element {
                       personne, et pour qui un tiret ne dit rien. */}
                   <span className="p">
                     {c.kind === 'pnj' ? (c.occupation ?? 'sans rôle noté') : (c.player ?? '—')}
+                    {c.horsJeu ? ' · hors-jeu' : c.present ? '' : ' · absent'}
                   </span>
                 </span>
               </button>
@@ -193,6 +202,27 @@ export function Sheets(): JSX.Element {
             <IconPlus />
             {rayon === 'pnj' ? 'PNJ' : 'Personnage'}
           </button>
+          {rayon === 'pj' && absents.length ? (
+            <button className="pc-neuf" onClick={() => setVoirAbsents(!voirAbsents)}>
+              {voirAbsents
+                ? 'Ranger les absents'
+                : [
+                    nAbsents ? `${nAbsents} absent${nAbsents > 1 ? 's' : ''}` : '',
+                    nHorsJeu ? `${nHorsJeu} hors-jeu` : ''
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')}
+            </button>
+          ) : null}
+          {rayon === 'pnj' && s.sessions.length > 1 ? (
+            <button
+              className="pc-neuf"
+              onClick={() => setReprise(true)}
+              title="Copier dans cette séance un PNJ écrit pour une autre"
+            >
+              Reprendre d’une autre séance…
+            </button>
+          ) : null}
         </div>
 
         {ch && tpl ? (
@@ -204,6 +234,13 @@ export function Sheets(): JSX.Element {
 
       {creating && <FormFiche kind={creating} onClose={() => setCreating(null)} />}
       {reglage && <FicheCampagne onClose={() => setReglage(false)} />}
+      {reprise && (
+        <ReprendreDUneSeance
+          nature="pnj"
+          onRepris={(id) => s.setCurrentCharacter(id)}
+          onClose={() => setReprise(false)}
+        />
+      )}
     </section>
   )
 }
@@ -433,6 +470,8 @@ function SheetBody({
               deux blocs ne sont jamais diffusés. */}
           {ch.kind === 'pnj' ? <NotesPnj ch={ch} /> : null}
           {ch.kind === 'pnj' ? <ButinPnj ch={ch} /> : null}
+
+          <Sortie ch={ch} />
         </div>
 
         {onglet === 'equipement' ? <Equipement ch={ch} /> : null}
@@ -954,6 +993,64 @@ function ButinPnj({ ch }: { ch: Character }): JSX.Element {
   )
 }
 
+/**
+ * Faire sortir un personnage — au pied de sa colonne, là où l'œil arrive en
+ * dernier. Deux gestes de force inégale : **hors-jeu**, il ne revient plus
+ * mais les séances passées le gardent ; **supprimer**, il n'a jamais existé.
+ * Le second demande confirmation, le premier se défait d'un clic.
+ */
+function Sortie({ ch }: { ch: Character }): JSX.Element {
+  const s = useStore()
+  const [confirme, setConfirme] = useState(false)
+
+  const horsJeu = async (): Promise<void> => {
+    const on = !ch.horsJeu
+    await window.jdr.characters.setHorsJeu(ch.id, on)
+    await Promise.all([s.refreshCharacters(), s.refreshPlayers()])
+    s.toast(on ? `${ch.name} est hors-jeu à partir de cette séance` : `${ch.name} revient en jeu`)
+  }
+  const supprimer = async (): Promise<void> => {
+    await window.jdr.characters.remove(ch.id)
+    await s.refreshCharacters()
+  }
+
+  return (
+    <div className="fiche-sortie">
+      {confirme ? (
+        <>
+          <span className="avert">Supprimer {ch.name} et son journal ?</span>
+          <button className="btn btn-sm btn-ghost" onClick={() => setConfirme(false)}>
+            Non
+          </button>
+          <button className="btn btn-sm btn-danger" onClick={() => void supprimer()}>
+            Supprimer
+          </button>
+        </>
+      ) : (
+        <>
+          {ch.kind === 'pj' ? (
+            <button
+              className="btn btn-sm btn-ghost"
+              onClick={() => void horsJeu()}
+              title={
+                ch.horsJeu
+                  ? 'Il revient dans la campagne à partir de cette séance'
+                  : 'Il ne revient plus : il quitte la campagne à partir de cette séance, les précédentes le gardent'
+              }
+            >
+              {ch.horsJeu ? 'Faire revenir' : 'Déclarer hors-jeu'}
+            </button>
+          ) : null}
+          <button className="btn btn-sm btn-ghost btn-danger" onClick={() => setConfirme(true)}>
+            <IconTrash />
+            Supprimer
+          </button>
+        </>
+      )}
+    </div>
+  )
+}
+
 function FormFiche({
   ch,
   kind,
@@ -1070,6 +1167,14 @@ function FormFiche({
     await s.refreshPlayers()
     await s.refreshCharacters()
     if (!ch) s.setCurrentCharacter(c.id)
+    onClose()
+  }
+
+  const horsJeu = async (on: boolean): Promise<void> => {
+    if (!ch) return
+    await window.jdr.characters.setHorsJeu(ch.id, on)
+    await Promise.all([s.refreshCharacters(), s.refreshPlayers()])
+    s.toast(on ? `${ch.name} est hors-jeu à partir de cette séance` : `${ch.name} revient en jeu`)
     onClose()
   }
 
@@ -1352,10 +1457,27 @@ function FormFiche({
                 </button>
               </>
             ) : (
-              <button className="btn btn-danger" onClick={() => setConfirme(true)}>
-                <IconTrash />
-                Supprimer
-              </button>
+              <>
+                <button className="btn btn-danger" onClick={() => setConfirme(true)}>
+                  <IconTrash />
+                  Supprimer
+                </button>
+                {/* Moins que supprimer : il ne revient plus, mais les
+                    séances passées le gardent, et son journal aussi. */}
+                {ch.kind === 'pj' ? (
+                  <button
+                    className="btn btn-ghost"
+                    onClick={() => void horsJeu(!ch.horsJeu)}
+                    title={
+                      ch.horsJeu
+                        ? 'Il revient dans la campagne à partir de cette séance'
+                        : 'Il ne revient plus : il quitte la campagne à partir de cette séance, les précédentes le gardent'
+                    }
+                  >
+                    {ch.horsJeu ? 'Faire revenir' : 'Déclarer hors-jeu'}
+                  </button>
+                ) : null}
+              </>
             )
           ) : null}
           {!confirme ? (

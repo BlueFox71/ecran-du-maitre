@@ -236,6 +236,8 @@ export interface Beat {
   chapterId: number | null
   placeId: number | null
   items: Item[]
+  /** Les PNJ que ce moment met en scène : la Régie les range devant les autres. */
+  pnjIds: number[]
 }
 
 export interface GameSession {
@@ -243,6 +245,11 @@ export interface GameSession {
   label: string
   date: string
   notes: string | null
+  /**
+   * Le dossier de la séance, relatif à la racine de la campagne. Posé, les
+   * fichiers des autres séances s'effacent des listes ; nul, on voit tout.
+   */
+  folderRel: string | null
 }
 
 /* ---------- Projets : une campagne est un dossier ---------- */
@@ -272,6 +279,8 @@ export interface CarnetPlayer {
   name: string
   color: string | null
   notes: string | null
+  /** Rangée hors de la vue du carnet — elle garde ses inscriptions et ses personnages. */
+  masque: boolean
 }
 
 /** Une personne inscrite à la campagne ouverte, et le personnage qu'elle mène. */
@@ -452,6 +461,13 @@ export interface Character {
   id: number
   templateId: number
   kind: CharacterKind
+  /**
+   * Là à la séance en cours. Un PNJ l'est toujours ; un joueur absent sort
+   * des fiches, de la bande, de l'encart et des pions à poser.
+   */
+  present: boolean
+  /** Sorti de la campagne à cette séance ou avant : il ne revient plus. */
+  horsJeu: boolean
   /**
    * Ce que le MJ sait de lui : ce qu'il cache, ce qui le fait céder. **Les
    * PNJ seulement** — un joueur a sa propre feuille pour ça. Jamais diffusé.

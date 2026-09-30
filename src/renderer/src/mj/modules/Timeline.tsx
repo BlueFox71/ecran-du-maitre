@@ -12,6 +12,7 @@ import {
   IconSearch,
   IconTrash
 } from '../components/Icons'
+import { SelecteurHeure } from '../components/SelecteurHeure'
 import type { UiFolder, UiItem } from '../../../../preload/index'
 import type { Beat, Place } from '@shared/types'
 
@@ -330,6 +331,17 @@ function BeatReading({
     await s.refreshTimeline()
   }
 
+  /* Les PNJ que la scène met en jeu : la Régie les range devant les autres. */
+  const pnjs = s.characters.filter((c) => c.kind === 'pnj')
+  const enScene = pnjs.filter((c) => beat.pnjIds.includes(c.id))
+  const basculePnj = async (id: number): Promise<void> => {
+    const ids = beat.pnjIds.includes(id)
+      ? beat.pnjIds.filter((x) => x !== id)
+      : [...beat.pnjIds, id]
+    await window.jdr.timeline.setPnjs(beat.id, ids)
+    await s.refreshTimeline()
+  }
+
   const save = async (patch: Partial<Beat>): Promise<void> => {
     await window.jdr.timeline.upsertBeat({
       id: beat.id,
@@ -388,14 +400,10 @@ function BeatReading({
 
       {editing ? (
         <div className="lect-edit">
-          <label className="field">
+          <div className="field">
             <span>Heure</span>
-            <input
-              defaultValue={beat.atTime ?? ''}
-              placeholder="21h30"
-              onBlur={(e) => void save({ atTime: e.target.value || null })}
-            />
-          </label>
+            <SelecteurHeure value={beat.atTime} onChange={(v) => void save({ atTime: v })} />
+          </div>
           <label className="field grow">
             <span>Titre</span>
             <input defaultValue={beat.title} onBlur={(e) => void save({ title: e.target.value })} />
@@ -432,6 +440,25 @@ function BeatReading({
               ))}
             </select>
           </label>
+          <div className="field full">
+            <span>PNJ en scène</span>
+            {pnjs.length ? (
+              <div className="tagbar">
+                {pnjs.map((c) => (
+                  <button
+                    key={c.id}
+                    className="chip"
+                    aria-pressed={beat.pnjIds.includes(c.id)}
+                    onClick={() => void basculePnj(c.id)}
+                  >
+                    {c.name}
+                  </button>
+                ))}
+              </div>
+            ) : (
+              <p className="vide">Aucun PNJ dans cette séance — ils se créent dans Fiches.</p>
+            )}
+          </div>
           <label className="field grow full">
             <span>Ce que je dis, ou ce que je dois retenir</span>
             <textarea
@@ -444,6 +471,12 @@ function BeatReading({
       ) : null}
 
       <div className="lect-body">
+        {enScene.length ? (
+          <p className="pnj-en-scene">
+            <span className="eyebrow">En scène</span>
+            {enScene.map((c) => c.name).join(' · ')}
+          </p>
+        ) : null}
         {beat.note ? <p className="mine">{beat.note}</p> : null}
 
         {docs.map((d) => (
@@ -595,7 +628,7 @@ function ChoixDoc({
   }
 
   const mot = q.trim().toLowerCase()
-  const liste = s.allItems
+  const liste = s.fichiers
     .filter((i) => i.kind === 'doc' && !exclure.includes(i.id))
     .filter((i) => !mot || `${i.title} ${i.relPath ?? ''}`.toLowerCase().includes(mot))
     .slice(0, 200)

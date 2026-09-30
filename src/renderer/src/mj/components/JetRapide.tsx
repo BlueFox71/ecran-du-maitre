@@ -30,7 +30,7 @@ export function JetRapide(): JSX.Element {
 
   /* Ce bloc dit « Joueur », et il le dit exprès : un jet de PNJ se tiendrait
      ailleurs, et Jules a laissé la question ouverte. */
-  const joueurs = s.characters.filter((c) => c.kind !== 'pnj')
+  const joueurs = s.characters.filter((c) => c.kind !== 'pnj' && c.present)
   if (joueurs.length === 0) {
     return (
       <div className="jet-rapide vide" id="jet-rapide">

@@ -25,8 +25,11 @@ const EXTENSIONS = [
 
 export function Editor(): JSX.Element {
   const s = useStore()
-  const docs = s.allItems.filter((i) => i.kind === 'doc')
-  const current = docs.find((d) => d.id === s.editingItemId) ?? docs[0] ?? null
+  /* La liste suit la séance ; le document ouvert, lui, reste ouvert même s'il
+     vient d'ailleurs — on y est arrivé par un lien, pas en le cherchant. */
+  const docs = s.fichiers.filter((i) => i.kind === 'doc')
+  const current =
+    s.allItems.find((d) => d.kind === 'doc' && d.id === s.editingItemId) ?? docs[0] ?? null
 
   const [title, setTitle] = useState(current?.title ?? '')
   const [saved, setSaved] = useState<'saved' | 'dirty' | 'saving'>('saved')

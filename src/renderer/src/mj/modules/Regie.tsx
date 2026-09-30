@@ -41,6 +41,7 @@ import {
 import type {
   CalqueBrouillard,
   Annotation,
+  Character,
   CollageLayout,
   Frame,
   Pion,
@@ -707,9 +708,17 @@ export function Regie(): JSX.Element {
   /* La réserve porte les deux : un PNJ se pose sur la carte comme un joueur.
      Les joueurs d'abord, cependant — ils sont trois, les PNJ peuvent être
      vingt, et ce sont les trois qu'on cherche en pleine partie. */
+  /* Puis, parmi les PNJ, ceux que le moment en cours met en scène : ce sont
+     eux qu'on cherche. Les autres restent là, en retrait. */
+  const enScene = useMemo(
+    () => new Set(s.beats.find((b) => b.id === s.activeBeatId)?.pnjIds ?? []),
+    [s.beats, s.activeBeatId]
+  )
+  const rang = (c: Character): number => (c.kind !== 'pnj' ? 0 : enScene.has(c.id) ? 1 : 2)
   const reservePions = useMemo(
-    () => [...s.characters].sort((a, b) => Number(a.kind === 'pnj') - Number(b.kind === 'pnj')),
-    [s.characters]
+    () => s.characters.filter((c) => c.present).sort((a, b) => rang(a) - rang(b)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [s.characters, enScene]
   )
 
   const placedChars = new Set(edit.pions.map((p) => p.characterId).filter(Boolean))
@@ -720,7 +729,7 @@ export function Regie(): JSX.Element {
   const matches = (i: UiItem): boolean =>
     i.kind !== 'other' && (q === '' || i.title.toLowerCase().includes(q))
 
-  const flat = useMemo(() => s.allItems.filter(matches), [s.allItems, q])
+  const flat = useMemo(() => s.fichiers.filter(matches), [s.fichiers, q])
 
   const out = s.screens.find((x) => x.id === display?.outputDisplayId)
 
@@ -1129,6 +1138,8 @@ Clic : préparer`
                     /* La couleur du personnage, ici comme sur son pion à
                        l'écran : la réserve et la table parlent la même langue. */
                     className={`tok teinte c-${c.color ?? 'neutral'}${placed ? ' placed' : ''}${
+                      enScene.size && rang(c) === 2 ? ' en-retrait' : ''
+                    }${
                       photo ? ' photo' : ''
                     }`}
                     draggable={!placed}

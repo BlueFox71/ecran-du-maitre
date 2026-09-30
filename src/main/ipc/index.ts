@@ -1,7 +1,7 @@
 import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron'
 import { writeFileSync } from 'node:fs'
 import { join } from 'node:path'
-import { activeCampaignId, dataRoot, getDb, isDbOpen } from '../db'
+import { activeCampaignId, activeSessionId, dataRoot, getDb, isDbOpen } from '../db'
 import * as lib from '../db/repos/library'
 import * as places from '../db/repos/places'
 import * as ouvertures from '../db/repos/ouvertures'
@@ -285,6 +285,8 @@ export function registerIpc(): void {
   /* ---------------- lieux ---------------- */
 
   on('places:list', () => places.listPlaces())
+  on('places:ofSession', (sessionId: number) => places.listPlaces(sessionId))
+  on('places:duplicate', (id: number) => places.duplicatePlace(id))
   on('places:get', (id: number) => places.getPlace(id))
   on('places:upsert', (input: any) => places.upsertPlace(input))
   on('places:remove', (id: number) => places.removePlace(id))
@@ -405,10 +407,30 @@ export function registerIpc(): void {
 
   on('timeline:sessions', () => timeline.listSessions())
   on('timeline:currentSession', () => timeline.currentSession())
-  on('timeline:createSession', (label: string, date?: string) => timeline.createSession(label, date))
-  on('timeline:setActiveSession', (id: number) => timeline.setActiveSession(id))
+  /* Entrer dans une séance, c'est y faire entrer les joueurs : chacun y reçoit
+     son état de la séance d'avant, et l'écran comme les téléphones changent de
+     fiche avec le MJ. */
+  const entrerDansLaSeance = (id: number): void => {
+    chars.preparerSeance(id)
+    display.refreshJoueurs()
+    mobile.broadcast()
+  }
+  on('timeline:createSession', (label: string, date?: string) => {
+    const s = timeline.createSession(label, date)
+    entrerDansLaSeance(s.id)
+    return s
+  })
+  on('timeline:setActiveSession', (id: number) => {
+    timeline.setActiveSession(id)
+    entrerDansLaSeance(id)
+  })
   on('timeline:updateSession', (id: number, patch: any) => timeline.updateSession(id, patch))
-  on('timeline:deleteSession', (id: number) => timeline.deleteSession(id))
+  on('timeline:deleteSession', (id: number) => {
+    const r = timeline.deleteSession(id)
+    /* Supprimer la séance en cours fait entrer dans la suivante. */
+    if (r.ok) entrerDansLaSeance(activeSessionId())
+    return r
+  })
   on('timeline:beats', (sessionId?: number) =>
     timeline.listBeats(sessionId).map((b) => ({ ...b, items: withUrls(b.items) }))
   )
@@ -420,6 +442,7 @@ export function registerIpc(): void {
   on('timeline:reorderBeats', (ids: number[]) => timeline.reorderBeats(ids))
   on('timeline:attach', (beatId: number, itemId: number) => timeline.attachToBeat(beatId, itemId))
   on('timeline:detach', (beatId: number, itemId: number) => timeline.detachFromBeat(beatId, itemId))
+  on('timeline:setPnjs', (beatId: number, ids: number[]) => timeline.setBeatPnjs(beatId, ids))
 
   /* ---------------- documents annexes ---------------- */
 
@@ -529,6 +552,7 @@ export function registerIpc(): void {
      nom et la couleur d'un pion en dépendent. */
 
   on('players:carnet', () => carnet.listCarnet())
+  on('players:masquer', (uid: string, masque: boolean) => carnet.setCarnetMasque(uid, masque))
   on('players:list', () => players.listPlayers())
 
   on('players:create', (name: string) => {
@@ -566,10 +590,26 @@ export function registerIpc(): void {
   })
 
   on('players:deleteFromCarnet', (uid: string) => carnet.deleteCarnetPlayer(uid))
+  on('players:renameCarnet', (uid: string, name: string) =>
+    carnet.updateCarnetPlayer(uid, { name })
+  )
 
   /* ---------------- personnages ---------------- */
 
   on('characters:list', () => chars.listCharacters())
+  on('characters:pnjOf', (sessionId: number) => chars.listPnjDe(sessionId))
+  on('characters:duplicate', (id: number) => chars.duplicatePnj(id))
+  on('characters:horsJeu', (id: number, horsJeu: boolean) => {
+    const c = chars.setHorsJeu(id, horsJeu)
+    display.refreshJoueurs()
+    return c
+  })
+  on('characters:present', (id: number, present: boolean) => {
+    const c = chars.setPresent(id, present)
+    /* L'absent quitte l'encart de l'écran joueurs sur-le-champ. */
+    display.refreshJoueurs()
+    return c
+  })
   on('characters:get', (id: number) => chars.getCharacter(id))
   on('characters:upsert', (input: any) => {
     const c = chars.upsertCharacter(input)

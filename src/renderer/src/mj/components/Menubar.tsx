@@ -107,8 +107,7 @@ export function Menubar({
             on={async () => {
               if (x.id === seance?.id) return
               await window.jdr.timeline.setActiveSession(x.id)
-              await s.refreshTimeline()
-              await s.refreshRolls()
+              await s.refreshSeance()
             }}
           />
         ))}
@@ -118,8 +117,7 @@ export function Menubar({
           label="Nouvelle séance…"
           on={async () => {
             await window.jdr.timeline.createSession('Séance ' + (s.sessions.length + 1))
-            await s.refreshTimeline()
-            await s.refreshRolls()
+            await s.refreshSeance()
             onFiche('seance')
           }}
         />

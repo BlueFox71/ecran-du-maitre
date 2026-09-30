@@ -32,6 +32,7 @@ import {
   kindIcon
 } from '../components/Icons'
 import { ChoixDansArbre } from '../components/ChoixDansArbre'
+import { ReprendreDUneSeance } from '../components/ReprendreDUneSeance'
 import { ObjetsDuLieu } from '../components/ObjetsDuLieu'
 import { Annotations, CadreAnnote, type OutilAnnotation } from '../components/Annotations'
 import { AideMurs, BarreMurs, CalqueMurs, VoletMurs, useMurs } from '../components/Murs'
@@ -94,6 +95,7 @@ export function Places(): JSX.Element {
    */
   const [bascules, setBascules] = useState<Set<number>>(new Set())
   const [rafale, setRafale] = useState<Rafale | null>(null)
+  const [reprise, setReprise] = useState(false)
 
   const place = (id: number | null): Place | null =>
     id === null ? null : (s.places.find((p) => p.id === id) ?? null)
@@ -378,11 +380,27 @@ export function Places(): JSX.Element {
             </button>
           ))}
         </div>
+        {s.sessions.length > 1 ? (
+          <button
+            className="btn btn-ghost"
+            onClick={() => setReprise(true)}
+            title="Copier dans cette séance un lieu préparé pour une autre"
+          >
+            Reprendre d’une autre séance…
+          </button>
+        ) : null}
         <button className="btn" onClick={() => setRafale({ parentId: null, tier: 'espace' })}>
           <IconPlus />
           Nouvel espace
         </button>
       </div>
+      {reprise ? (
+        <ReprendreDUneSeance
+          nature="lieu"
+          onRepris={(id) => setChoisi(id)}
+          onClose={() => setReprise(false)}
+        />
+      ) : null}
 
       <div className="lieux-grille">
         <div className="arbre-lieux">
@@ -1119,7 +1137,9 @@ function Volet({
   }
 
   const carte = s.allItems.find((i) => i.id === f.mapItemId)
-  const sons = s.allItems.filter((i) => i.kind === 'audio')
+  /* Le son déjà choisi reste dans la liste, même venu d'une autre séance :
+     sans lui, le menu s'afficherait vide et mentirait sur ce qui joue. */
+  const sons = s.fichiers.filter((i) => i.kind === 'audio' || i.id === f.ambienceItemId)
   const attendu = PARENT_TIER[f.tier]
   const contenants = attendu ? s.places.filter((q) => q.tier === attendu && q.id !== f.id) : []
   const route = cheminDe(f, s.places)

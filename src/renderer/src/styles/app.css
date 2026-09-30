@@ -1165,6 +1165,16 @@ input[type='range']::-webkit-slider-thumb {
 .tray .tok:active {
   cursor: grabbing;
 }
+/* Un PNJ que le moment en cours ne met pas en scène : à portée, en retrait. */
+.tray .tok.en-retrait {
+  width: 26px;
+  height: 26px;
+  font-size: 9px;
+  opacity: 0.6;
+}
+.tray .tok.en-retrait:hover {
+  opacity: 1;
+}
 .tray .tok.placed {
   opacity: 0.35;
   cursor: default;
@@ -4114,6 +4124,20 @@ input[type='range']::-webkit-slider-thumb {
 /* Les états : une bascule par ligne, lisible d'un coup d'œil à travers la
    table — et non plus quatre étiquettes minuscules qui se cassaient sur deux
    rangs à côté du nom. */
+/* Au pied de la colonne d'identité : hors-jeu, supprimer. */
+.fiche-sortie {
+  margin-top: auto;
+  padding-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.fiche-sortie .avert {
+  flex-basis: 100%;
+  font-size: 12px;
+  color: var(--text-dim);
+}
 .etats {
   display: grid;
   gap: 4px;
@@ -5975,6 +5999,80 @@ input[type='range']::-webkit-slider-thumb {
   border-color: var(--brass);
 }
 
+/* Le sélecteur d'heure d'un moment : un bouton, et deux grilles qui s'ouvrent. */
+.selheure {
+  position: relative;
+}
+.selheure-val {
+  min-width: 78px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 5px 8px;
+  font-size: 13px;
+  color: var(--text);
+  text-align: left;
+  cursor: pointer;
+}
+.selheure-val:hover,
+.selheure-val:focus-visible,
+.selheure-val.on {
+  outline: none;
+  border-color: var(--brass);
+}
+.selheure-pop {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 40;
+  display: grid;
+  gap: 6px;
+  width: 264px;
+  padding: 10px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow-lift);
+}
+.selheure-leg {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.selheure-grille {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 3px;
+}
+.selheure-grille button {
+  padding: 5px 0;
+  font-size: 12px;
+  color: var(--text-dim);
+  background: var(--sunk);
+  border: 1px solid var(--line-soft);
+  border-radius: 3px;
+  cursor: pointer;
+}
+.selheure-grille button:hover {
+  color: var(--text);
+  border-color: var(--brass-line);
+}
+.selheure-grille button.on {
+  color: var(--brass-ink);
+  background: var(--brass-wash);
+  border-color: var(--brass);
+}
+.selheure-pop footer {
+  display: flex;
+  align-items: center;
+  padding-top: 2px;
+}
+.selheure-pop footer .spacer {
+  flex: 1 0 0;
+}
+
 .lect-body {
   flex: 1;
   min-height: 0;
@@ -5983,6 +6081,14 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 /* Ce que le MJ s'est noté pour lui : à distinguer du texte préparé. */
+.lect-body .pnj-en-scene {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 10px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
 .lect-body .mine {
   margin: 0 0 18px;
   padding: 12px 14px;
@@ -7161,7 +7267,8 @@ input[type='range']::-webkit-slider-thumb {
 .fiche-projet .body {
   gap: 14px;
 }
-.fiche-projet .expli {
+.fiche-projet .expli,
+.modal .expli {
   margin: 0;
   font-size: 12.5px;
   color: var(--text-dim);
@@ -7222,10 +7329,10 @@ input[type='range']::-webkit-slider-thumb {
   border-bottom: 1px solid var(--line-soft);
 }
 .ligne-joueur {
-  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) minmax(0, 1.1fr);
 }
 .ligne-carnet {
-  grid-template-columns: auto minmax(0, 1fr) auto;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
 }
 .ligne-joueur:last-child,
 .ligne-carnet:last-child {
@@ -7274,9 +7381,31 @@ input[type='range']::-webkit-slider-thumb {
   gap: 1px;
   min-width: 0;
 }
-.ligne-carnet .qui b {
+/* Le nom se lit comme un texte, et se corrige en cliquant dedans. */
+.ligne-carnet .qui input.nom {
+  font: inherit;
   font-weight: 500;
   font-size: 13.5px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 1px 4px;
+  margin-left: -5px;
+  width: 100%;
+  user-select: text;
+}
+.ligne-carnet .qui input.nom:hover {
+  border-color: var(--line);
+}
+.ligne-carnet .qui input.nom:focus {
+  outline: none;
+  border-color: var(--brass);
+  background: var(--ground);
+}
+.ligne-carnet .suppr {
+  display: flex;
+  gap: 4px;
 }
 .ligne-carnet .qui span {
   font-size: 11px;
@@ -7285,7 +7414,7 @@ input[type='range']::-webkit-slider-thumb {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
-.ligne-carnet.dehors .qui b {
+.ligne-carnet.dehors .qui input.nom {
   color: var(--text-dim);
 }
 .ajout-joueur {

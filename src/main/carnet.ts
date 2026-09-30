@@ -71,6 +71,15 @@ function db(): Database.Database {
     );
     CREATE UNIQUE INDEX IF NOT EXISTS idx_modele_nom ON sheet_model (name COLLATE NOCASE);
   `)
+  /* Une personne masquée ne se montre plus dans le carnet, sans rien perdre :
+     ni ses inscriptions, ni les personnages qu'elle mène. Le carnet n'a pas de
+     suite de migrations — il pousse par colonnes, qu'on ajoute si elles
+     manquent. */
+  const colonnes = (app.prepare(`PRAGMA table_info(carnet_player)`).all() as { name: string }[]).map(
+    (c) => c.name
+  )
+  if (!colonnes.includes('masque'))
+    app.exec(`ALTER TABLE carnet_player ADD COLUMN masque INTEGER NOT NULL DEFAULT 0`)
   garnir(app)
   return app
 }
@@ -234,9 +243,16 @@ export function closeCarnet(): void {
    ============================================================ */
 
 export function listCarnet(): CarnetPlayer[] {
-  return db()
-    .prepare(`SELECT uid, name, color, notes FROM carnet_player ORDER BY name COLLATE NOCASE`)
-    .all() as CarnetPlayer[]
+  return (
+    db()
+      .prepare(`SELECT uid, name, color, notes, masque FROM carnet_player ORDER BY name COLLATE NOCASE`)
+      .all() as any[]
+  ).map((r) => ({ uid: r.uid, name: r.name, color: r.color, notes: r.notes, masque: !!r.masque }))
+}
+
+/** Ranger quelqu'un hors de la vue du carnet, ou l'y remettre. Rien d'autre ne bouge. */
+export function setCarnetMasque(uid: string, masque: boolean): void {
+  db().prepare(`UPDATE carnet_player SET masque = ? WHERE uid = ?`).run(masque ? 1 : 0, uid)
 }
 
 /**
@@ -249,7 +265,7 @@ export function createCarnetPlayer(name: string, color?: string | null): CarnetP
   db()
     .prepare(`INSERT INTO carnet_player (uid, name, color) VALUES (?, ?, ?)`)
     .run(uid, name.trim(), teinte)
-  return { uid, name: name.trim(), color: teinte, notes: null }
+  return { uid, name: name.trim(), color: teinte, notes: null, masque: false }
 }
 
 export function updateCarnetPlayer(
@@ -268,7 +284,7 @@ export function updateCarnetPlayer(
   db()
     .prepare(`UPDATE carnet_player SET name = ?, color = ?, notes = ? WHERE uid = ?`)
     .run(next.name, next.color, next.notes, uid)
-  return { uid, ...next }
+  return { uid, ...next, masque: !!(cur as any).masque }
 }
 
 /**

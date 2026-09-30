@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { Pastille } from './Pastille'
-import { IconClose, IconFolder, IconPeople, IconPen, IconPlus, IconTrash } from './Icons'
+import { IconFolder, IconPeople, IconPen, IconPlus, IconTrash } from './Icons'
 import { PION_COULEURS } from '@shared/types'
 import type { CampaignPlayer, CarnetPlayer } from '@shared/types'
+import type { UiFolder } from '../../../../preload/index'
 
 /* ============================================================
    La campagne : son identité, son dossier, ses joueurs
@@ -173,15 +174,6 @@ function LigneJoueur({
         ))}
       </select>
 
-      <button
-        className="btn btn-sm btn-ghost"
-        title="Retirer de la campagne — son personnage reste"
-        aria-label={`Retirer ${p.name} de la campagne`}
-        onClick={() => void onGeste(() => window.jdr.players.remove(p.id))}
-      >
-        <IconClose />
-      </button>
-
       {teintes ? (
         /* La couleur suit la personne d'une campagne à l'autre, et cercle le
            pion de son personnage sur l'écran des joueurs. */
@@ -226,9 +218,26 @@ export function FicheSeance({ onClose }: { onClose: () => void }): JSX.Element {
     label?: string
     date?: string
     notes?: string | null
+    folderRel?: string | null
   }): Promise<void> => {
     await window.jdr.timeline.updateSession(seance.id, patch)
     await s.refreshTimeline()
+  }
+
+  /* Les dossiers de séance se rangent d'ordinaire à la racine de la campagne,
+     parfois un cran plus bas : au-delà, on proposerait tous les sous-dossiers
+     de bruitages, et on ne trouverait plus rien. */
+  const dossiers = dossiersDeSeance(s.arbreComplet)
+  const pris = new Map(
+    s.sessions.filter((x) => x.id !== seance.id && x.folderRel).map((x) => [x.folderRel!, x.label])
+  )
+  const perdu = !!seance.folderRel && !dossiers.some((d) => d.rel === seance.folderRel)
+
+  const joueurs = s.characters.filter((c) => c.kind === 'pj' && !c.horsJeu)
+  const presents = joueurs.filter((c) => c.present).length
+  const basculer = async (id: number, present: boolean): Promise<void> => {
+    await window.jdr.characters.setPresent(id, present)
+    await s.refreshCharacters()
   }
 
   const supprimer = async (): Promise<void> => {
@@ -237,8 +246,7 @@ export function FicheSeance({ onClose }: { onClose: () => void }): JSX.Element {
       s.toast(r.raison ?? 'Suppression impossible', true)
       return
     }
-    await s.refreshTimeline()
-    await s.refreshRolls()
+    await s.refreshSeance()
     onClose()
   }
 
@@ -272,6 +280,55 @@ export function FicheSeance({ onClose }: { onClose: () => void }): JSX.Element {
       </div>
 
       <div className="field">
+        <label htmlFor="fs-dossier">Dossier de la séance</label>
+        <select
+          id="fs-dossier"
+          value={seance.folderRel ?? ''}
+          onChange={(e) => void poser({ folderRel: e.target.value || null })}
+        >
+          <option value="">— toute la campagne —</option>
+          {perdu ? <option value={seance.folderRel!}>{seance.folderRel} (introuvable)</option> : null}
+          {dossiers.map((d) => (
+            <option key={d.rel} value={d.rel}>
+              {d.libelle}
+              {pris.has(d.rel) ? ` · ${pris.get(d.rel)}` : ''}
+            </option>
+          ))}
+        </select>
+        <p className="expli">
+          {perdu
+            ? 'Ce dossier a été renommé ou déplacé hors de l’application : choisis-le de nouveau.'
+            : 'Les dossiers des autres séances disparaissent de la bibliothèque et des choix de fichiers ; ce qui est rangé à la racine de la campagne reste là.'}
+        </p>
+      </div>
+
+      {joueurs.length ? (
+        <div className="field">
+          <label>
+            Présents à cette séance · {presents} sur {joueurs.length}
+          </label>
+          <div className="tagbar">
+            {joueurs.map((c) => (
+              <button
+                key={c.id}
+                className="chip"
+                aria-pressed={c.present}
+                onClick={() => void basculer(c.id, !c.present)}
+                title={c.present ? 'Présent — cliquer pour le noter absent' : 'Absent — cliquer pour le noter présent'}
+              >
+                {c.name}
+                {c.player ? ` · ${c.player}` : ''}
+              </button>
+            ))}
+          </div>
+          <p className="expli">
+            Un absent sort des fiches, de la bande des joueurs, du jet rapide, de l’écran et des
+            pions à poser. Il reste inscrit à la campagne, et retrouve sa fiche à la séance suivante.
+          </p>
+        </div>
+      ) : null}
+
+      <div className="field">
         <label htmlFor="fs-notes">Notes du maître de jeu</label>
         <textarea
           id="fs-notes"
@@ -297,6 +354,18 @@ export function FicheSeance({ onClose }: { onClose: () => void }): JSX.Element {
   )
 }
 
+function dossiersDeSeance(
+  arbre: UiFolder[],
+  prefixe = '',
+  reste = 2
+): { rel: string; libelle: string }[] {
+  if (!reste) return []
+  return arbre.flatMap((f) => [
+    { rel: f.relPath, libelle: prefixe + f.name },
+    ...dossiersDeSeance(f.children, prefixe + '   ', reste - 1)
+  ])
+}
+
 /* ============================================================
    Le carnet de joueurs — hors projet
    ============================================================ */
@@ -304,8 +373,11 @@ export function FicheSeance({ onClose }: { onClose: () => void }): JSX.Element {
 export function Carnet({ onClose }: { onClose: () => void }): JSX.Element {
   const s = useStore()
   const [nouveau, setNouveau] = useState('')
+  const [voirMasques, setVoirMasques] = useState(false)
 
   const inscrits = new Map(s.players.map((p) => [p.uid, p]))
+  const masques = s.carnet.filter((c) => c.masque).length
+  const vus = s.carnet.filter((c) => voirMasques || !c.masque)
 
   const geste = async (fn: () => Promise<unknown>): Promise<void> => {
     try {
@@ -331,11 +403,18 @@ export function Carnet({ onClose }: { onClose: () => void }): JSX.Element {
       </p>
 
       <div className="lignes">
-        {s.carnet.map((c) => (
+        {vus.map((c) => (
           <LigneCarnet key={c.uid} c={c} inscrit={inscrits.get(c.uid) ?? null} onGeste={geste} />
         ))}
         {s.carnet.length === 0 ? <p className="rien">Le carnet est vide.</p> : null}
       </div>
+      {masques ? (
+        <button className="btn btn-sm btn-ghost" onClick={() => setVoirMasques(!voirMasques)}>
+          {voirMasques
+            ? 'Ranger les masqués'
+            : `Voir les masqués · ${masques}`}
+        </button>
+      ) : null}
 
       <div className="ajout-joueur">
         <input
@@ -368,12 +447,45 @@ function LigneCarnet({
 }): JSX.Element {
   const s = useStore()
   const perso = inscrit ? s.characters.find((x) => x.id === inscrit.characterId) : null
+  const [nom, setNom] = useState(c.name)
+  const [confirme, setConfirme] = useState(false)
+  useEffect(() => setNom(c.name), [c.name])
+
+  /* Inscrite, on la renomme par la campagne : son personnage reprend le nom
+     aussitôt. Sinon, le carnet seul. */
+  const renommer = (): void => {
+    const n = nom.trim()
+    if (!n || n === c.name) return setNom(c.name)
+    void onGeste(() =>
+      inscrit ? window.jdr.players.update(inscrit.id, { name: n }) : window.jdr.players.renameCarnet(c.uid, n)
+    )
+  }
+
+  /* On ne supprime que quelqu'un qui ne tient rien : sans personnage, elle
+     n'a laissé de trace dans aucune séance. Celle qui mène quelqu'un se
+     masque — ou se voit d'abord retirer son personnage, dans la fiche. */
+  const supprimer = (): void =>
+    void onGeste(async () => {
+      if (inscrit) await window.jdr.players.remove(inscrit.id)
+      await window.jdr.players.deleteFromCarnet(c.uid)
+    })
 
   return (
-    <div className={`ligne-carnet${inscrit ? '' : ' dehors'}`}>
+    <div className={`ligne-carnet${inscrit && !c.masque ? '' : ' dehors'}`}>
       <Pastille nom={c.name} couleur={c.color} grand />
       <span className="qui">
-        <b>{c.name}</b>
+        <input
+          className="nom"
+          type="text"
+          value={nom}
+          aria-label={`Nom de ${c.name}`}
+          onChange={(e) => setNom(e.target.value)}
+          onBlur={renommer}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+            if (e.key === 'Escape') setNom(c.name)
+          }}
+        />
         <span>
           {inscrit
             ? perso
@@ -382,12 +494,15 @@ function LigneCarnet({
             : 'pas inscrit à cette campagne'}
         </span>
       </span>
+      {/* Masquer range la personne hors de la vue : ses personnages restent
+          les siens. */}
       {inscrit ? (
         <button
           className="btn btn-sm btn-ghost"
-          onClick={() => void onGeste(() => window.jdr.players.remove(inscrit.id))}
+          title={c.masque ? 'La remettre dans la liste' : 'La ranger hors de la liste — elle garde ses inscriptions et ses personnages'}
+          onClick={() => void onGeste(() => window.jdr.players.masquer(c.uid, !c.masque))}
         >
-          Retirer
+          {c.masque ? 'Afficher' : 'Masquer'}
         </button>
       ) : (
         <button
@@ -395,6 +510,30 @@ function LigneCarnet({
           onClick={() => void onGeste(() => window.jdr.players.enroll(c.uid))}
         >
           Inscrire
+        </button>
+      )}
+      {confirme ? (
+        <span className="suppr">
+          <button className="btn btn-sm btn-ghost" onClick={() => setConfirme(false)}>
+            Non
+          </button>
+          <button className="btn btn-sm btn-danger" onClick={supprimer}>
+            Supprimer
+          </button>
+        </span>
+      ) : (
+        <button
+          className="btn btn-sm btn-ghost"
+          disabled={!!perso}
+          title={
+            perso
+              ? `${c.name} mène ${perso.name} : retire-lui d’abord son personnage, ou masque-la`
+              : `Supprimer ${c.name} du carnet`
+          }
+          aria-label={`Supprimer ${c.name}`}
+          onClick={() => setConfirme(true)}
+        >
+          <IconTrash />
         </button>
       )}
     </div>

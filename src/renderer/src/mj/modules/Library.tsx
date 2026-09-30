@@ -115,6 +115,13 @@ export function Library(): JSX.Element {
   const folderAt = (rel: string): UiFolder | null =>
     rel ? (folders.find((f) => f.relPath === rel) ?? null) : null
 
+  /* Le dossier où l'on se tenait vient de sortir de la vue — on a changé de
+     séance, ou rabattu « Toute la campagne » : on remonte à la racine plutôt
+     que de rester devant une page vide. */
+  useEffect(() => {
+    if (cwd && !folderAt(cwd)) setCwd('')
+  }, [folders])
+
   const childFolders = (rel: string): UiFolder[] =>
     rel ? (folderAt(rel)?.children ?? []) : s.tree
   const childFiles = (rel: string): UiItem[] => (rel ? (folderAt(rel)?.items ?? []) : s.orphans)
@@ -162,6 +169,12 @@ export function Library(): JSX.Element {
       await s.refreshLibrary()
       if (it) s.openInEditor(it.id)
     }, 'Document créé')
+
+  // Un texte se lit et s'écrit dans l'éditeur ; le reste part à l'écran.
+  const ouvrir = (i: UiItem): void => {
+    if (i.kind === 'doc') s.openInEditor(i.id)
+    else void window.jdr.display.showItem(i.id)
+  }
 
   const importHere = (folderRel: string): void =>
     void guard(async () => {
@@ -412,7 +425,7 @@ export function Library(): JSX.Element {
         draggable
         onDragStart={() => (dragged.current = { kind: 'file', item: i })}
         onClick={() => setSel({ kind: 'file', id: i.id })}
-        onDoubleClick={() => void window.jdr.display.showItem(i.id)}
+        onDoubleClick={() => ouvrir(i)}
       >
         <span className="caret" />
         <span className="fico dim">{kindIcon(i.kind, 'ico')}</span>
@@ -546,7 +559,7 @@ export function Library(): JSX.Element {
         draggable
         onDragStart={() => (dragged.current = { kind: 'file', item: i })}
         onClick={() => setSel({ kind: 'file', id: i.id })}
-        onDoubleClick={() => void window.jdr.display.showItem(i.id)}
+        onDoubleClick={() => ouvrir(i)}
       >
         <div className="shot">{shot(i)}</div>
         <div>
@@ -564,7 +577,7 @@ export function Library(): JSX.Element {
   }
 
   const tableRows = useMemo(() => {
-    const rows = s.allItems.filter(matches).map((i) => ({
+    const rows = s.fichiers.filter(matches).map((i) => ({
       i,
       folder: i.relPath ? (parentOf(i.relPath).split('/').pop() ?? '—') : '—'
     }))
@@ -583,7 +596,7 @@ export function Library(): JSX.Element {
       return a.i.title.localeCompare(b.i.title, 'fr') * dir
     })
     return rows
-  }, [s.allItems, sort, q])
+  }, [s.fichiers, sort, q])
 
   const COLS: { id: string; label: string; right?: boolean }[] = [
     { id: 'title', label: 'Nom' },
@@ -628,6 +641,25 @@ export function Library(): JSX.Element {
           <span className="live">Lié</span>
         )}
         <div className="spacer" />
+        {s.session?.folderRel ? (
+          <div
+            className="seg"
+            title="Quand la séance a son dossier, ceux des autres séances sont mis de côté"
+          >
+            <button
+              className={s.toutLaCampagne ? '' : 'on'}
+              onClick={() => s.setToutLaCampagne(false)}
+            >
+              {s.session.label}
+            </button>
+            <button
+              className={s.toutLaCampagne ? 'on' : ''}
+              onClick={() => s.setToutLaCampagne(true)}
+            >
+              Toute la campagne
+            </button>
+          </div>
+        ) : null}
         <span className="eyebrow">
           {s.root.folders} dossiers · {s.root.files} fichiers
         </span>
@@ -775,7 +807,7 @@ export function Library(): JSX.Element {
                       draggable
                       onDragStart={() => (dragged.current = { kind: 'file', item: i })}
                       onClick={() => setSel({ kind: 'file', id: i.id })}
-                      onDoubleClick={() => void window.jdr.display.showItem(i.id)}
+                      onDoubleClick={() => ouvrir(i)}
                     >
                       <td className="nm">
                         <span>

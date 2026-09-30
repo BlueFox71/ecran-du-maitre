@@ -5,7 +5,7 @@ import type { Beat, GameSession, Item } from '@shared/types'
 export function listSessions(): GameSession[] {
   return getDb()
     .prepare(
-      `SELECT id, label, date, notes FROM game_session WHERE campaign_id = ? ORDER BY date DESC, id DESC`
+      `SELECT id, label, date, notes, folder_rel AS folderRel FROM game_session WHERE campaign_id = ? ORDER BY date DESC, id DESC`
     )
     .all(activeCampaignId()) as GameSession[]
 }
@@ -36,27 +36,28 @@ export function setActiveSession(id: number): void {
 export function currentSession(): GameSession {
   const id = activeSessionId()
   return getDb()
-    .prepare(`SELECT id, label, date, notes FROM game_session WHERE id = ?`)
+    .prepare(`SELECT id, label, date, notes, folder_rel AS folderRel FROM game_session WHERE id = ?`)
     .get(id) as GameSession
 }
 
 /** Renommer, redater, annoter. Un champ absent du patch ne bouge pas. */
 export function updateSession(
   id: number,
-  patch: { label?: string; date?: string; notes?: string | null }
+  patch: { label?: string; date?: string; notes?: string | null; folderRel?: string | null }
 ): GameSession | null {
   const db = getDb()
-  const cur = db.prepare(`SELECT id, label, date, notes FROM game_session WHERE id = ?`).get(id) as
+  const cur = db.prepare(`SELECT id, label, date, notes, folder_rel AS folderRel FROM game_session WHERE id = ?`).get(id) as
     | GameSession
     | undefined
   if (!cur) return null
-  db.prepare(`UPDATE game_session SET label = ?, date = ?, notes = ? WHERE id = ?`).run(
+  db.prepare(`UPDATE game_session SET label = ?, date = ?, notes = ?, folder_rel = ? WHERE id = ?`).run(
     patch.label !== undefined ? patch.label.trim() || cur.label : cur.label,
     patch.date !== undefined ? patch.date : cur.date,
     patch.notes !== undefined ? patch.notes : cur.notes,
+    patch.folderRel !== undefined ? patch.folderRel || null : cur.folderRel,
     id
   )
-  return db.prepare(`SELECT id, label, date, notes FROM game_session WHERE id = ?`).get(id) as GameSession
+  return db.prepare(`SELECT id, label, date, notes, folder_rel AS folderRel FROM game_session WHERE id = ?`).get(id) as GameSession
 }
 
 /**
@@ -102,7 +103,26 @@ export function listBeats(sessionId?: number): Beat[] {
          FROM beat WHERE session_id = ? ORDER BY ord, id`
     )
     .all(sid) as any[]
-  return rows.map((r) => ({ ...r, done: !!r.done, items: beatItems(r.id) }))
+  const pnj = getDb().prepare(`SELECT character_id AS id FROM beat_pnj WHERE beat_id = ?`)
+  return rows.map((r) => ({
+    ...r,
+    done: !!r.done,
+    items: beatItems(r.id),
+    pnjIds: (pnj.all(r.id) as { id: number }[]).map((x) => x.id)
+  }))
+}
+
+/** Les PNJ que ce moment met en scène, donnés en entier. */
+export function setBeatPnjs(beatId: number, ids: number[]): void {
+  const db = getDb()
+  db.transaction(() => {
+    db.prepare(`DELETE FROM beat_pnj WHERE beat_id = ?`).run(beatId)
+    const ins = db.prepare(
+      `INSERT OR IGNORE INTO beat_pnj (beat_id, character_id)
+         SELECT ?, id FROM character WHERE id = ? AND kind = 'pnj'`
+    )
+    for (const id of ids) ins.run(beatId, id)
+  })()
 }
 
 export function upsertBeat(input: {

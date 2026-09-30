@@ -146,7 +146,7 @@ export function App(): JSX.Element {
             <NavItem id="pupitre" label="Pupitre" icon={<IconPupitre />} />
           </Group>
           <Group label="Matière">
-            <NavItem id="lib" label="Bibliothèque" count={s.allItems.length} icon={<IconFolder />} />
+            <NavItem id="lib" label="Bibliothèque" count={s.fichiers.length} icon={<IconFolder />} />
             {/* L'Éditeur n'est plus dans le rail : on n'y va jamais pour lui-même, toujours
                 pour un document précis — depuis la Bibliothèque, la Chronologie ou un moment. */}
             <NavItem id="places" label="Lieux" count={s.places.length} icon={<IconPlace />} />
@@ -315,10 +315,10 @@ function NavItem({
 /* ---------------- sous-titres de la barre du haut ---------------- */
 
 function diffusableCount(s: ReturnType<typeof useStore.getState>): number {
-  return s.allItems.filter((i) => i.kind !== 'other').length
+  return s.fichiers.filter((i) => i.kind !== 'other').length
 }
 function docCount(s: ReturnType<typeof useStore.getState>): number {
-  return s.allItems.filter((i) => i.kind === 'doc').length
+  return s.fichiers.filter((i) => i.kind === 'doc').length
 }
 
 function subtitle(s: ReturnType<typeof useStore.getState>): string {

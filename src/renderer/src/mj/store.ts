@@ -105,9 +105,20 @@ interface State {
 
   chapters: Chapter[]
   root: LibraryRoot | null
+  /**
+   * Ce qu'on parcourt : l'arborescence et les fichiers de la séance. Quand la
+   * séance a son dossier, ceux des autres séances n'y sont plus — ni dans la
+   * Bibliothèque, ni dans les choix de la Régie et du Pupitre. Voir `focaliser`.
+   */
   tree: UiFolder[]
   orphans: UiItem[]
+  fichiers: UiItem[]
+  /** Toute la campagne, elle : pour retrouver par son identifiant ce qui est déjà attaché. */
   allItems: UiItem[]
+  arbreComplet: UiFolder[]
+  orphelinsComplets: UiItem[]
+  /** La bascule « Toute la campagne » de la Bibliothèque. Retombe à chaque changement de séance. */
+  toutLaCampagne: boolean
   places: Place[]
 
   /**
@@ -179,10 +190,13 @@ interface State {
 
   boot: () => Promise<void>
   refreshLibrary: () => Promise<void>
+  setToutLaCampagne: (on: boolean) => void
   refreshPlaces: () => Promise<void>
   refreshObjets: () => Promise<void>
   setCurrentObjet: (id: number | null) => void
   refreshTimeline: () => Promise<void>
+  /** Tout ce qui appartient à une séance, relu d'un coup quand on en change. */
+  refreshSeance: () => Promise<void>
   refreshAnnexes: () => Promise<void>
   refreshPochette: () => Promise<void>
   setPochette: (p: { onglets: PochetteOnglet[]; docs: PochetteDoc[] }) => void
@@ -224,7 +238,11 @@ export const useStore = create<State>((set, get) => ({
   root: null,
   tree: [],
   orphans: [],
+  fichiers: [],
   allItems: [],
+  arbreComplet: [],
+  orphelinsComplets: [],
+  toutLaCampagne: false,
   places: [],
 
   objets: [],
@@ -375,7 +393,13 @@ export const useStore = create<State>((set, get) => ({
       api.library.root(),
       api.items.list({})
     ])
-    set({ chapters, tree: treeRes.tree, orphans: treeRes.orphans, root, allItems })
+    set({ chapters, root, allItems, arbreComplet: treeRes.tree, orphelinsComplets: treeRes.orphans })
+    set(focaliser(get()))
+  },
+
+  setToutLaCampagne: (on) => {
+    set({ toutLaCampagne: on })
+    set(focaliser(get()))
   },
 
   refreshPlaces: async () => set({ places: await window.jdr.places.list() }),
@@ -406,6 +430,16 @@ export const useStore = create<State>((set, get) => ({
      quelle plutôt que d'aller recoudre une ligne dans un tableau. */
   setPochette: (p) => set({ pochette: p.docs, pochetteOnglets: p.onglets }),
 
+  refreshSeance: async () => {
+    await get().refreshTimeline()
+    await Promise.all([
+      get().refreshRolls(),
+      get().refreshPlaces(),
+      get().refreshCharacters(),
+      get().refreshObjets()
+    ])
+  },
+
   refreshTimeline: async () => {
     const api = window.jdr
     const [session, sessions, beats] = await Promise.all([
@@ -415,12 +449,15 @@ export const useStore = create<State>((set, get) => ({
     ])
     const active = get().activeBeatId
     const stillThere = beats.some((b) => b.id === active)
+    const autreSeance = get().session?.id !== session?.id
     set({
       session,
       sessions,
       beats,
-      activeBeatId: stillThere ? active : (beats.find((b) => !b.done)?.id ?? beats[0]?.id ?? null)
+      activeBeatId: stillThere ? active : (beats.find((b) => !b.done)?.id ?? beats[0]?.id ?? null),
+      toutLaCampagne: autreSeance ? false : get().toutLaCampagne
     })
+    set(focaliser(get()))
   },
 
   refreshCharacters: async () => {
@@ -481,6 +518,46 @@ export const useStore = create<State>((set, get) => ({
  * bâtie sur `[data-theme]`, et le clair y dormait depuis le début sans que
  * personne puisse l'allumer.
  */
+/**
+ * La campagne vue depuis la séance en cours.
+ *
+ * On n'y montre pas « le dossier de la séance et rien d'autre » : ce qui est
+ * posé à la racine de la campagne, ou dans un dossier qu'aucune séance ne
+ * réclame, sert à toutes — le profil d'un personnage, une fiche vierge. On en
+ * retire seulement les dossiers **des autres séances**. Une séance sans
+ * dossier voit donc tout, comme avant ; et un dossier de séance rangé dans
+ * celui d'une autre reste atteignable, on ne cache pas ses ancêtres.
+ */
+function focaliser(
+  s: Pick<
+    State,
+    'session' | 'sessions' | 'toutLaCampagne' | 'arbreComplet' | 'orphelinsComplets' | 'allItems'
+  >
+): Pick<State, 'tree' | 'orphans' | 'fichiers'> {
+  const ici = s.session?.folderRel
+  const dedans = (rel: string, dossier: string): boolean =>
+    rel === dossier || rel.startsWith(dossier + '/')
+  const caches =
+    ici && !s.toutLaCampagne
+      ? s.sessions
+          .map((x) => x.folderRel)
+          .filter((r): r is string => !!r && !dedans(ici, r))
+      : []
+  if (!caches.length)
+    return { tree: s.arbreComplet, orphans: s.orphelinsComplets, fichiers: s.allItems }
+
+  const cache = (rel: string | null): boolean => !!rel && caches.some((c) => dedans(rel, c))
+  const elaguer = (dossiers: UiFolder[]): UiFolder[] =>
+    dossiers
+      .filter((f) => !cache(f.relPath))
+      .map((f) => ({ ...f, children: elaguer(f.children) }))
+  return {
+    tree: elaguer(s.arbreComplet),
+    orphans: s.orphelinsComplets,
+    fichiers: s.allItems.filter((i) => !cache(i.relPath))
+  }
+}
+
 function appliquerTheme(p: ReglagesPoste): void {
   document.documentElement.dataset.theme = p.theme === 'clair' ? 'light' : 'dark'
 }
