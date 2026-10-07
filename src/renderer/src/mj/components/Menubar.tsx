@@ -22,7 +22,7 @@ export function Menubar({
   onFiche,
   onParametres
 }: {
-  onFiche: (q: 'campagne' | 'seance' | 'carnet' | 'fiche' | 'chapitres') => void
+  onFiche: (q: 'campagne' | 'seance' | 'carnet' | 'fiche' | 'dupliquer') => void
   onParametres: (r?: Rubrique) => void
 }): JSX.Element {
   const s = useStore()
@@ -47,11 +47,27 @@ export function Menubar({
   }, [ouvert])
 
   const cmd = (nom: string) => (): void => void window.jdr.app.commande(nom)
+  /* Le champ où l'on écrivait avant d'ouvrir le menu : cliquer la barre lui
+     prend le focus, alors on le note au moment du clic. */
+  const champ = useRef<HTMLElement | null>(null)
+  const noterChamp = (): void => {
+    const a = document.activeElement
+    champ.current =
+      a instanceof HTMLElement &&
+      (a.isContentEditable || ['INPUT', 'TEXTAREA', 'SELECT'].includes(a.tagName))
+        ? a
+        : null
+  }
+  /* Annuler dans le texte : on lui rend le focus, puis l'ordre natif. */
+  const texte = (nom: string): void => {
+    champ.current?.focus()
+    void window.jdr.app.commande(nom)
+  }
   const seance = s.session
   const recentes = s.recents.filter((r) => r.path !== s.project?.dir).slice(0, 6)
 
   return (
-    <div className="menubar" ref={barre} role="menubar">
+    <div className="menubar" ref={barre} role="menubar" onPointerDownCapture={noterChamp}>
       <Menu nom="Fichier" id="fichier" ouvert={ouvert} onOuvrir={setOuvert}>
         <Mi label="Nouvelle campagne…" acc="Ctrl N" on={() => void window.jdr.project.create()} />
         <Mi label="Ouvrir une campagne…" acc="Ctrl O" on={() => void window.jdr.project.open()} />
@@ -62,8 +78,25 @@ export function Menubar({
       </Menu>
 
       <Menu nom="Édition" id="edition" ouvert={ouvert} onOuvrir={setOuvert}>
-        <Mi label="Annuler" acc="Ctrl Z" on={cmd('annuler')} />
-        <Mi label="Rétablir" acc="Ctrl Y" on={cmd('retablir')} />
+        {/* Dans un champ, le texte ; ailleurs, la préparation — comme au clavier. */}
+        <Mi
+          label={
+            champ.current || !s.defaireEtat.defaire
+              ? 'Annuler'
+              : `Défaire — ${s.defaireEtat.defaire}`
+          }
+          acc="Ctrl Z"
+          on={() => (champ.current ? texte('annuler') : void s.defaire())}
+        />
+        <Mi
+          label={
+            champ.current || !s.defaireEtat.refaire
+              ? 'Rétablir'
+              : `Refaire — ${s.defaireEtat.refaire}`
+          }
+          acc="Ctrl Y"
+          on={() => (champ.current ? texte('retablir') : void s.refaire())}
+        />
         <hr />
         <Mi label="Couper" acc="Ctrl X" on={cmd('couper')} />
         <Mi label="Copier" acc="Ctrl C" on={cmd('copier')} />
@@ -121,11 +154,7 @@ export function Menubar({
             onFiche('seance')
           }}
         />
-        <hr />
-        {/* Les chapitres sont l'ossature du récit, pas de la soirée — mais
-            c'est en préparant une séance qu'on les écrit, et c'est là qu'on
-            vient les chercher. */}
-        <Mi label="Gérer les chapitres…" on={() => onFiche('chapitres')} />
+        <Mi label="Dupliquer une séance…" on={() => onFiche('dupliquer')} />
       </Menu>
 
       <Menu nom="Écran joueurs" id="ecranj" ouvert={ouvert} onOuvrir={setOuvert}>

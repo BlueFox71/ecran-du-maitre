@@ -2,7 +2,7 @@ import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { copierLigne } from '../copie'
 import * as reglages from './reglages'
 import { lireCampagne } from '@shared/reglages'
-import type { Place, PlaceTier, PointMur } from '@shared/types'
+import { PARENT_TIERS, type Place, type PlaceTier, type PointMur } from '@shared/types'
 
 const SELECT = `
   SELECT p.id, p.tier, p.parent_id AS parentId, p.ord, p.name, p.summary, p.notes,
@@ -11,7 +11,6 @@ const SELECT = `
          p.zone_pts AS zonePts, p.ancre_x AS ancreX, p.ancre_y AS ancreY,
          p.seen, p.ouv_largeur AS ouvLargeur, p.lum_garde AS lumGarde,
          p.regard_portee AS regardPortee,
-         (SELECT group_concat(pc.chapter_id, ',') FROM place_chapter pc WHERE pc.place_id = p.id) AS chapters,
          (SELECT COUNT(*) FROM item i WHERE i.place_id = p.id) AS docCount
     FROM place p`
 
@@ -56,7 +55,6 @@ function toPlace(r: any): Place {
     lumGarde: !!r.lumGarde,
     regardPortee:
       r.regardPortee === null || r.regardPortee === undefined ? null : Number(r.regardPortee),
-    chapterIds: r.chapters ? String(r.chapters).split(',').map(Number) : [],
     docCount: r.docCount
   }
 }
@@ -99,8 +97,13 @@ export function listPlaces(sessionId: number = activeSessionId()): Place[] {
     if (vus.has(p.id)) return
     vus.add(p.id)
     out.push(p)
-    if (p.tier === 'espace') for (const n of enfants(p.id, 'niveau')) poser(n)
+    if (p.tier === 'espace') {
+      for (const n of enfants(p.id, 'niveau')) poser(n)
+      for (const b of enfants(p.id, 'lieu')) poser(b)
+    }
     if (p.tier === 'niveau') for (const l of enfants(p.id, 'lieu')) poser(l)
+    /* Un bâtiment : la chapelle tient ses propres étages. */
+    if (p.tier === 'lieu') for (const n of enfants(p.id, 'niveau')) poser(n)
   }
 
   for (const e of enfants(null, 'espace')) poser(e)
@@ -111,8 +114,20 @@ export function listPlaces(sessionId: number = activeSessionId()): Place[] {
 /** Tout ce qu'un contenant tient, à tous les étages en dessous de lui. */
 export function descendants(id: number): Place[] {
   const tous = listPlaces()
-  const directs = tous.filter((p) => p.parentId === id)
-  return [...directs, ...directs.flatMap((d) => tous.filter((p) => p.parentId === d.id))]
+  /* Pas de profondeur fixe : un bâtiment ajoute deux étages sous sa pièce. */
+  const out: Place[] = []
+  const vus = new Set<number>([id])
+  const pile = [id]
+  while (pile.length) {
+    const pid = pile.shift()!
+    for (const p of tous)
+      if (p.parentId === pid && !vus.has(p.id)) {
+        vus.add(p.id)
+        out.push(p)
+        pile.push(p.id)
+      }
+  }
+  return out
 }
 
 export function getPlace(id: number): Place | null {
@@ -159,7 +174,6 @@ export function upsertPlace(input: {
   ancre?: PointMur | null
   ambienceItemId?: number | null
   seen?: boolean
-  chapterIds?: number[]
 }): Place {
   const db = getDb()
   const neufs = lireCampagne(reglages.tous())
@@ -229,14 +243,6 @@ export function upsertPlace(input: {
           lumGarde: neufs.mursGarde ? 1 : 0
         })
       id = Number(info.lastInsertRowid)
-    }
-
-    if (input.chapterIds) {
-      db.prepare(`DELETE FROM place_chapter WHERE place_id = ?`).run(id)
-      const ins = db.prepare(
-        `INSERT OR IGNORE INTO place_chapter (place_id, chapter_id) VALUES (?, ?)`
-      )
-      for (const c of input.chapterIds) ins.run(id, c)
     }
   })()
 
@@ -346,6 +352,10 @@ export function movePlace(id: number, parentId: number | null, beforeId: number 
   const db = getDb()
   const p = getPlace(id)
   if (!p) return listPlaces()
+  /* Un niveau rangé dans un bâtiment qu'il tient lui-même : une boucle, et
+     tout l'arbre disparaîtrait de la liste. */
+  if (parentId !== null && (parentId === id || descendants(id).some((d) => d.id === parentId)))
+    return listPlaces()
 
   db.transaction(() => {
     const changeDeContenant = p.parentId !== parentId
@@ -397,7 +407,7 @@ export function removePlace(id: number): void {
  *
  * Le lieu arrive avec tout ce qu'il tient — ses étages et ses pièces, et pour
  * chacun le plan, le découpage, les murs et leurs ouvertures, les lumières,
- * les repères du MJ, les chapitres et les objets posés. Il arrive **pas encore
+ * les repères du MJ et les objets posés. Il arrive **pas encore
  * découvert** : la table qui entre à la scierie n'y est jamais venue, même si
  * celle d'avant avait tout visité. Les pions restent là-bas ; ceux des
  * joueurs se posent au moment d'entrer.
@@ -405,46 +415,248 @@ export function removePlace(id: number): void {
  * Rend l'identifiant de la copie, rangée à la racine de l'arbre.
  */
 export function duplicatePlace(id: number): number {
-  const db = getDb()
   const racine = getPlace(id)
   if (!racine) throw new Error('Lieu introuvable')
-  const sid = activeSessionId()
+  let nouveau = new Map<number, number>()
+  getDb().transaction(() => {
+    nouveau = copierLieu(id, activeSessionId(), { parentId: null, ord: rangSuivant(racine.tier, null) })
+  })()
+  return nouveau.get(id)!
+}
+
+/**
+ * Le cœur de la reprise, sans transaction : un lieu et tout ce qu'il tient,
+ * recopiés dans la séance `sid`. La racine prend `parentId` et `ord` s'ils
+ * sont donnés, garde les siens sinon. `jumeaux` raccroche le plan et
+ * l'ambiance au double d'un fichier quand le dossier a été recopié avec la
+ * séance. Rend la correspondance des identifiants, original → copie.
+ */
+export function copierLieu(
+  id: number,
+  sid: number,
+  racine: { parentId?: number | null; ord?: number } = {},
+  jumeaux: Map<number, number> = new Map()
+): Map<number, number> {
+  const db = getDb()
+  const depart = getPlace(id)
+  if (!depart) throw new Error('Lieu introuvable')
   const nouveau = new Map<number, number>()
   const ids = (sql: string, p: number): number[] =>
     (db.prepare(sql).all(p) as { id: number }[]).map((r) => r.id)
+  const fichier = (v: number | null): number | null => (v == null ? null : (jumeaux.get(v) ?? v))
+
+  for (const p of [depart, ...descendantsDe(id)]) {
+    const brut = db
+      .prepare(`SELECT map_item_id AS m, ambience_item_id AS a FROM place WHERE id = ?`)
+      .get(p.id) as { m: number | null; a: number | null }
+    const neuf = copierLigne('place', p.id, {
+      session_id: sid,
+      parent_id:
+        p.id === id
+          ? racine.parentId !== undefined
+            ? racine.parentId
+            : p.parentId
+          : (nouveau.get(p.parentId!) ?? null),
+      seen: 0,
+      map_item_id: fichier(brut.m),
+      ambience_item_id: fichier(brut.a),
+      ...(p.id === id && racine.ord !== undefined ? { ord: racine.ord } : {})
+    })
+    nouveau.set(p.id, neuf)
+
+    for (const m of ids(`SELECT id FROM mur WHERE place_id = ?`, p.id)) {
+      const mur = copierLigne('mur', m, { place_id: neuf })
+      for (const o of ids(`SELECT id FROM ouverture WHERE mur_id = ?`, m))
+        copierLigne('ouverture', o, { mur_id: mur })
+    }
+    for (const l of ids(`SELECT id FROM lumiere WHERE place_id = ?`, p.id))
+      copierLigne('lumiere', l, { place_id: neuf })
+    for (const a of ids(`SELECT id FROM annotation WHERE place_id = ?`, p.id))
+      copierLigne('annotation', a, { place_id: neuf })
+
+    /* Un objet déjà trouvé là-bas est de nouveau à trouver ici. */
+    for (const o of ids(`SELECT id FROM objet_placement WHERE place_id = ?`, p.id))
+      copierLigne('objet_placement', o, { place_id: neuf, session_id: sid, etat: 'cache' })
+  }
+
+  return nouveau
+}
+
+/**
+ * Après un rognage : le lieu prend l'image rognée, et tout ce qui était posé
+ * sur l'ancienne est recalé sur la nouvelle.
+ *
+ * Tout se tient en fractions de la carte : un point (x, y) devient
+ * ((x − cx) / cw, (y − cy) / ch), et une longueur — rayon d'une lampe,
+ * largeur d'une porte, portée du regard, taille des pions — se compte en part
+ * de la **largeur**, donc se divise par cw. Ce qui tombe hors du cadre reste
+ * hors du cadre : on ne détruit rien.
+ *
+ * Les pièces découpées sur ce plan, et les niveaux de bâtiment qui le
+ * cadrent, suivent : ils partageaient l'image, ils partagent la nouvelle.
+ */
+export function recalerApresRognage(
+  id: number,
+  ancienne: number,
+  nouvelle: number,
+  c: { x: number; y: number; w: number; h: number }
+): void {
+  const db = getDb()
+  const px = (x: number): number => (x - c.x) / c.w
+  const py = (y: number): number => (y - c.y) / c.h
+  const pt = (p: PointMur): PointMur => [px(p[0]), py(p[1])]
+  const touches = [getPlace(id), ...descendantsDe(id)].filter(
+    (p): p is Place => !!p && (p.id === id || p.mapItemId === ancienne)
+  )
 
   db.transaction(() => {
-    for (const p of [racine, ...descendantsDe(id)]) {
-      const neuf = copierLigne('place', p.id, {
-        session_id: sid,
-        parent_id: p.id === id ? null : (nouveau.get(p.parentId!) ?? null),
-        seen: 0,
-        ...(p.id === id ? { ord: rangSuivant(p.tier, null) } : {})
-      })
-      nouveau.set(p.id, neuf)
-
+    for (const p of touches) {
       db.prepare(
-        `INSERT INTO place_chapter (place_id, chapter_id)
-           SELECT ?, chapter_id FROM place_chapter WHERE place_id = ?`
-      ).run(neuf, p.id)
+        `UPDATE place SET map_item_id = ?,
+                          ouv_largeur = ouv_largeur / ?,
+                          regard_portee = regard_portee / ?,
+                          pion_size = MIN(24, MAX(2, pion_size / ?))
+          WHERE id = ?`
+      ).run(nouvelle, c.w, c.w, c.w, p.id)
+      if (p.zone)
+        db.prepare(
+          `UPDATE place SET zone_pts = ?, ancre_x = ?, ancre_y = ? WHERE id = ?`
+        ).run(
+          JSON.stringify(p.zone.map(pt)),
+          p.ancre ? px(p.ancre[0]) : null,
+          p.ancre ? py(p.ancre[1]) : null,
+          p.id
+        )
 
-      for (const m of ids(`SELECT id FROM mur WHERE place_id = ?`, p.id)) {
-        const mur = copierLigne('mur', m, { place_id: neuf })
-        for (const o of ids(`SELECT id FROM ouverture WHERE mur_id = ?`, m))
-          copierLigne('ouverture', o, { mur_id: mur })
+      const mursIci = db.prepare(`SELECT id, pts FROM mur WHERE place_id = ?`).all(p.id) as {
+        id: number
+        pts: string
+      }[]
+      for (const m of mursIci) {
+        try {
+          const pts = (JSON.parse(m.pts) as PointMur[]).map(pt)
+          db.prepare(`UPDATE mur SET pts = ? WHERE id = ?`).run(JSON.stringify(pts), m.id)
+        } catch {
+          /* Un trait illisible le restait déjà : on le laisse tel quel. */
+        }
       }
-      for (const l of ids(`SELECT id FROM lumiere WHERE place_id = ?`, p.id))
-        copierLigne('lumiere', l, { place_id: neuf })
-      for (const a of ids(`SELECT id FROM annotation WHERE place_id = ?`, p.id))
-        copierLigne('annotation', a, { place_id: neuf })
-
-      /* Un objet déjà trouvé là-bas est de nouveau à trouver ici. */
-      for (const o of ids(`SELECT id FROM objet_placement WHERE place_id = ?`, p.id))
-        copierLigne('objet_placement', o, { place_id: neuf, session_id: sid, etat: 'cache' })
+      db.prepare(
+        `UPDATE ouverture SET largeur = largeur / ?
+          WHERE mur_id IN (SELECT id FROM mur WHERE place_id = ?)`
+      ).run(c.w, p.id)
+      db.prepare(
+        `UPDATE lumiere SET x = (x - @cx) / @cw, y = (y - @cy) / @ch,
+                            clair = clair / @cw, penombre = penombre / @cw
+          WHERE place_id = @id`
+      ).run({ cx: c.x, cy: c.y, cw: c.w, ch: c.h, id: p.id })
+      for (const t of ['pion', 'annotation'])
+        db.prepare(
+          `UPDATE ${t} SET x = (x - @cx) / @cw, y = (y - @cy) / @ch WHERE place_id = @id`
+        ).run({ cx: c.x, cy: c.y, cw: c.w, ch: c.h, id: p.id })
     }
   })()
+}
 
-  return nouveau.get(id)!
+/** Ce qui se pose sur la carte d'un lieu et le suit quand il change de rôle. */
+const CALQUES = ['mur', 'lumiere', 'annotation', 'pion'] as const
+
+/** Les réglages de carte qu'un étage tient pour ses pièces. */
+const REGLAGES_CARTE = 'pion_size, lum_garde, regard_portee, ouv_largeur'
+
+/** Le premier contenant, en remontant, dont l'étage est admis au-dessus de `tier`. */
+function contenantAdmis(depart: number | null, tier: PlaceTier): number | null {
+  const admis = PARENT_TIERS[tier]
+  const vus = new Set<number>()
+  let cur = depart === null ? null : getPlace(depart)
+  while (cur && !vus.has(cur.id)) {
+    if (admis.includes(cur.tier)) return cur.id
+    vus.add(cur.id)
+    cur = cur.parentId === null ? null : getPlace(cur.parentId)
+  }
+  return null
+}
+
+/**
+ * Changer un niveau en bâtiment, ou un bâtiment en niveau — sans rien perdre.
+ *
+ * **Niveau → bâtiment.** S'il tient des pièces ou des tracés, ils passent dans
+ * un niveau neuf, « Rez-de-chaussée », rangé dans le bâtiment avec la même
+ * image : les murs, les lampes, les repères et les pions vont avec les pièces
+ * qu'ils bordent. Le bâtiment garde son image pour qu'on le reconnaisse.
+ *
+ * **Bâtiment → niveau.** Un seul niveau dedans : il se fond dans le nouveau
+ * niveau, pièces et tracés compris. Plusieurs : on refuse, il faudrait
+ * choisir lequel garder.
+ *
+ * Dans les deux cas, le lieu remonte jusqu'au premier contenant qui l'admet.
+ */
+export function changerEtage(id: number, tier: 'niveau' | 'lieu'): void {
+  const db = getDb()
+  const x = getPlace(id)
+  if (!x || x.tier === tier || (x.tier !== 'niveau' && x.tier !== 'lieu')) return
+  const enfantsDe = (pid: number): Place[] =>
+    (db.prepare(`${SELECT} WHERE p.parent_id = ? ORDER BY p.ord, p.id`).all(pid) as any[]).map(
+      toPlace
+    )
+  const deplacerCalques = (de: number, vers: number): void => {
+    for (const t of CALQUES) db.prepare(`UPDATE ${t} SET place_id = ? WHERE place_id = ?`).run(vers, de)
+  }
+  const aDesCalques = (pid: number): boolean =>
+    CALQUES.some(
+      (t) => !!db.prepare(`SELECT 1 FROM ${t} WHERE place_id = ? LIMIT 1`).get(pid)
+    )
+
+  const enfants = enfantsDe(id)
+  if (tier === 'niveau') {
+    const niveaux = enfants.filter((q) => q.tier === 'niveau')
+    if (niveaux.length > 1)
+      throw new Error(
+        `« ${x.name} » a ${niveaux.length} niveaux : range-les ailleurs, ou garde-le en bâtiment`
+      )
+  }
+
+  db.transaction(() => {
+    const parent = contenantAdmis(x.parentId, tier)
+    const garderZone = parent === x.parentId
+
+    if (tier === 'lieu' && (enfants.length || aDesCalques(id))) {
+      const n = upsertPlace({
+        tier: 'niveau',
+        parentId: id,
+        name: 'Rez-de-chaussée',
+        mapItemId: x.mapItemId,
+        zone: x.zone,
+        seen: x.seen
+      })
+      db.prepare(
+        `UPDATE place SET (${REGLAGES_CARTE}) = (SELECT ${REGLAGES_CARTE} FROM place WHERE id = ?)
+          WHERE id = ?`
+      ).run(id, n.id)
+      db.prepare(`UPDATE place SET parent_id = ? WHERE parent_id = ? AND id <> ?`).run(n.id, id, n.id)
+      deplacerCalques(id, n.id)
+    }
+
+    if (tier === 'niveau') {
+      const n = enfants.find((q) => q.tier === 'niveau')
+      if (n) {
+        db.prepare(`UPDATE place SET parent_id = ? WHERE parent_id = ?`).run(id, n.id)
+        deplacerCalques(n.id, id)
+        if (!x.mapItemId)
+          db.prepare(
+            `UPDATE place SET map_item_id = ?, zone_pts = ?,
+                              (${REGLAGES_CARTE}) = (SELECT ${REGLAGES_CARTE} FROM place WHERE id = ?)
+              WHERE id = ?`
+          ).run(n.mapItemId, n.zone ? JSON.stringify(n.zone) : null, n.id, id)
+        db.prepare(`DELETE FROM place WHERE id = ?`).run(n.id)
+      }
+    }
+
+    db.prepare(
+      `UPDATE place SET tier = ?, parent_id = ?, ord = ?
+                        ${garderZone ? '' : ', zone_pts = NULL, ancre_x = NULL, ancre_y = NULL'}
+        WHERE id = ?`
+    ).run(tier, parent, rangSuivant(tier, parent), id)
+  })()
 }
 
 /** Tout ce qu'un lieu tient, parents avant enfants, quelle que soit la séance. */

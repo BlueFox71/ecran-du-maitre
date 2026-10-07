@@ -249,9 +249,6 @@ export function seedProject(db: Database.Database, nom: string): void {
     )
     FAMILLES_LIVREES.forEach((f, i) => fam.run(cid, f.nom, f.teinte, f.glyphe, i))
 
-    const chap = db.prepare(`INSERT INTO chapter (campaign_id, ord, title) VALUES (?, ?, ?)`)
-    ;['I — Ouverture', 'II — Enquête', 'III — Révélation'].forEach((t, i) => chap.run(cid, i, t))
-
     db.prepare(`INSERT INTO game_session (campaign_id, label, active) VALUES (?, ?, 1)`).run(
       cid,
       'Séance 1'

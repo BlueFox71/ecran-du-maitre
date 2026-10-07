@@ -62,6 +62,7 @@ export function Monitor(): JSX.Element {
             pionPv={display?.pionPv ?? false}
             joueurs={display?.joueurs}
             encart={display?.encart}
+            fenetres={display?.fenetres}
           />
           {/* Pendant un gel, rien ne part vers les joueurs : une onde n'aurait
               pas lieu d'apparaître sur ce qu'ils voient encore. */}

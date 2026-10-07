@@ -89,6 +89,8 @@ export interface ReglagesPoste {
   adresse: string | null
   /** Combien d'appareils un même joueur peut appairer. */
   appareils: number
+  /** La loupe du texte dans l'Éditeur : 1, la taille d'usine. */
+  editeurZoom: number
 }
 
 export const POSTE_DEFAUT: ReglagesPoste = {
@@ -97,8 +99,13 @@ export const POSTE_DEFAUT: ReglagesPoste = {
   vignette: 154,
   port: 7777,
   adresse: null,
-  appareils: 2
+  appareils: 2,
+  editeurZoom: 1
 }
+
+/** Les bornes de la loupe du texte : en deçà on ne lit plus, au-delà une ligne ne tient plus. */
+export const ZOOM_MIN = 0.7
+export const ZOOM_MAX = 2.5
 
 export function lirePoste(b: Brut): ReglagesPoste {
   return {
@@ -107,7 +114,8 @@ export function lirePoste(b: Brut): ReglagesPoste {
     vignette: nombre(b, 'biblio.vignette', POSTE_DEFAUT.vignette, 90, 340),
     port: Math.round(nombre(b, 'portable.port', POSTE_DEFAUT.port, 1024, 65535)),
     adresse: b['portable.adresse']?.trim() || null,
-    appareils: Math.round(nombre(b, 'portable.appareils', POSTE_DEFAUT.appareils, 1, 8))
+    appareils: Math.round(nombre(b, 'portable.appareils', POSTE_DEFAUT.appareils, 1, 8)),
+    editeurZoom: nombre(b, 'editeur.zoom', POSTE_DEFAUT.editeurZoom, ZOOM_MIN, ZOOM_MAX)
   }
 }
 

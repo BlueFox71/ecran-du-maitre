@@ -4,6 +4,7 @@ import { existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { MIGRATIONS } from './schema'
 import { seedProject } from './seed'
+import * as defaire from '../defaire'
 
 /**
  * La base d'un projet. Il n'y en a qu'une d'ouverte à la fois, et elle vit
@@ -54,6 +55,10 @@ export function openDbAt(file: string, nomSiNeuf: string): Database.Database {
   const n = db.prepare(`SELECT COUNT(*) AS n FROM campaign`).get() as { n: number }
   if (n.n === 0) seedProject(db, nomSiNeuf)
 
+  /* La mémoire de Ctrl+Z : des déclencheurs temporaires, propres à cette
+     connexion. Rien n'en reste dans le fichier de la campagne. */
+  defaire.installer(db)
+
   return db
 }
 
@@ -68,6 +73,7 @@ export function getDb(): Database.Database {
 
 export function closeDb(): void {
   if (!db) return
+  defaire.oublier()
   try {
     db.pragma('wal_checkpoint(TRUNCATE)')
     db.close()

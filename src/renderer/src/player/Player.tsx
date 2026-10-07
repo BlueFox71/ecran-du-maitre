@@ -113,6 +113,7 @@ export function Player(): JSX.Element {
                 pionPv={state.pionPv}
                 joueurs={state.joueurs}
                 encart={state.encart}
+                fenetres={state.fenetres}
                 pointer={pointer}
               />
             </div>

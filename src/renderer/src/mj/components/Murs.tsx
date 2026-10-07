@@ -39,8 +39,10 @@ import {
   couperTrace,
   cheminDesInconnues,
   distanceAuSegment,
+  carreDAngle,
   gommerTrace,
   grille,
+  mettreDEquerre,
   piecesDesPortesOuvertes,
   murSous,
   pasContraint,
@@ -48,6 +50,7 @@ import {
   soustraireTrace,
   type Pt
 } from '@shared/murs'
+import { BoutonEquerre } from './BoutonEquerre'
 import {
   IconAimant,
   IconCheck,
@@ -219,6 +222,9 @@ export function useMurs(placeId: number): {
   setNoir: (v: number | null) => void
   choisi: number | null
   setChoisi: (id: number | null) => void
+  /** On attend le second mur à joindre en coin au trait choisi. */
+  joindre: boolean
+  setJoindre: (v: boolean) => void
   essai: EssaiPion | null
   setEssai: (e: EssaiPion | null) => void
   /** L'ouverture visée dans le volet, s'il y en a une. */
@@ -304,15 +310,14 @@ export function useMurs(placeId: number): {
   const [gomme, setGomme] = useState(GOMME.rayon)
   const [noir, setNoir] = useState<number | null>(null)
   const [choisi, setChoisi] = useState<number | null>(null)
+  const [joindre, setJoindre] = useState(false)
   const [essai, setEssai] = useState<EssaiPion | null>(null)
   /*
-   * Défaire, c'est rejouer le geste inverse — pas restaurer un instantané.
-   * Un trait remis en place reçoit donc un nouvel identifiant : c'est le même
-   * mur, pas la même ligne. Personne ne s'en aperçoit, et la base reste la
-   * seule source.
+   * Défaire, c'est la pile commune de Ctrl+Z (main/defaire.ts) : la base
+   * rejoue elle-même ce qu'un geste a changé, portes et lumières comprises,
+   * même identifiants. Un geste en plusieurs appels se regroupe en un pas.
    */
-  const pile = useRef<(() => Promise<void>)[]>([])
-  const [profondeur, setProfondeur] = useState(0)
+  const peutDefaire = useStore((st) => st.defaireEtat.defaire !== null)
 
   const relire = async (): Promise<void> => {
     setListe(await window.jdr.murs.of(placeId))
@@ -350,15 +355,28 @@ export function useMurs(placeId: number): {
     setPourPiece(null)
     setAttenteDepart(false)
     setEssai(null)
-    pile.current = []
-    setProfondeur(0)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [placeId])
 
-  const memoriser = (inverse: () => Promise<void>): void => {
-    pile.current.push(inverse)
-    if (pile.current.length > 30) pile.current.shift()
-    setProfondeur(pile.current.length)
+  /* Un Ctrl+Z, d'ici ou d'ailleurs : on relit le plan tel que la base le rend. */
+  useEffect(() => {
+    const h = (): void => {
+      setChoisi(null)
+      void relire()
+    }
+    window.addEventListener('jdr:defait', h)
+    return () => window.removeEventListener('jdr:defait', h)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeId])
+
+  /** Un geste en plusieurs appels ne fait qu'un pas de Ctrl+Z. */
+  const enUnGeste = async <R,>(faire: () => Promise<R>): Promise<R> => {
+    await window.jdr.defaire.ouvrirGroupe()
+    try {
+      return await faire()
+    } finally {
+      await window.jdr.defaire.fermerGroupe()
+    }
   }
 
   /**
@@ -384,20 +402,6 @@ export function useMurs(placeId: number): {
     return ajoutes
   }
 
-  /** Le geste inverse : on efface ce qui est né, on rend aux autres leur forme. */
-  const defaireRetraits =
-    (avant: Mur[], nes: number[], retraits: Retrait[]) => async (): Promise<void> => {
-      for (const id of nes) await window.jdr.murs.remove(id)
-      for (const a of avant) {
-        const r = retraits.find((x) => x.id === a.id)
-        if (r && !r.pieces.length) {
-          await window.jdr.murs.add({ placeId, nature: a.nature, pts: a.pts })
-        } else {
-          await window.jdr.murs.update(a.id, { pts: a.pts })
-        }
-      }
-    }
-
   /**
    * Poser un ou plusieurs traits d'un même geste, et retirer aux autres ce
    * qu'ils recouvrent.
@@ -417,13 +421,14 @@ export function useMurs(placeId: number): {
       .filter((x): x is Mur => !!x)
 
     const nes: number[] = []
-    for (const pts of traces) {
-      const m = await window.jdr.murs.add({ placeId, nature: n, pts })
-      if (m) nes.push(m.id)
-    }
+    await enUnGeste(async () => {
+      for (const pts of traces) {
+        const m = await window.jdr.murs.add({ placeId, nature: n, pts })
+        if (m) nes.push(m.id)
+      }
+      if (nes.length) await appliquer(retraits, avant)
+    })
     if (!nes.length) return
-    const ajoutes = await appliquer(retraits, avant)
-    memoriser(defaireRetraits(avant, [...ajoutes, ...nes], retraits))
     setChoisi(nes[0])
     await relire()
   }
@@ -436,8 +441,7 @@ export function useMurs(placeId: number): {
     const avant = liste.find((x) => x.id === id)
     if (!avant || pieces.length < 2) return
     const retraits = [{ id, pieces }]
-    const ajoutes = await appliquer(retraits, [avant])
-    memoriser(defaireRetraits([avant], ajoutes, retraits))
+    await enUnGeste(() => appliquer(retraits, [avant]))
     setChoisi(id)
     await relire()
   }
@@ -451,22 +455,19 @@ export function useMurs(placeId: number): {
     const avant = retraits
       .map((r) => liste.find((x) => x.id === r.id))
       .filter((x): x is Mur => !!x)
-    const ajoutes = await appliquer(retraits, avant)
-    memoriser(defaireRetraits(avant, ajoutes, retraits))
+    await enUnGeste(() => appliquer(retraits, avant))
     setChoisi(null)
     await relire()
   }
 
   const deplacer = async (id: number, pts: PointMur[]): Promise<void> => {
     const avant = liste.find((m) => m.id === id)
-    if (avant) memoriser(async () => void (await window.jdr.murs.update(id, { pts: avant.pts })))
     await window.jdr.murs.update(id, { pts })
     await relire()
   }
 
   const changerNature = async (id: number, n: NatureMur): Promise<void> => {
     const avant = liste.find((m) => m.id === id)
-    if (avant) memoriser(async () => void (await window.jdr.murs.update(id, { nature: avant.nature })))
     await window.jdr.murs.update(id, { nature: n })
     await relire()
   }
@@ -514,7 +515,6 @@ export function useMurs(placeId: number): {
       penombre: LAMPE_NEUVE.penombre
     })
     if (!l) return
-    memoriser(async () => void (await window.jdr.lumieres.remove(l.id)))
     setLumChoisie(l.id)
     setChoisi(null)
     setOuvChoisie(null)
@@ -549,36 +549,26 @@ export function useMurs(placeId: number): {
     const av = lumieres.find((l) => l.id === id)
     if (!av) return
     const ecart = 0.045
-    const copie = await window.jdr.lumieres.add({
-      placeId,
-      x: av.x + ecart > 0.98 ? Math.max(0.02, av.x - ecart) : av.x + ecart,
-      y: av.y + ecart > 0.98 ? Math.max(0.02, av.y - ecart) : av.y + ecart,
-      clair: av.clair,
-      penombre: av.penombre,
-      teinte: av.teinte
+    const copie = await enUnGeste(async () => {
+      const c = await window.jdr.lumieres.add({
+        placeId,
+        x: av.x + ecart > 0.98 ? Math.max(0.02, av.x - ecart) : av.x + ecart,
+        y: av.y + ecart > 0.98 ? Math.max(0.02, av.y - ecart) : av.y + ecart,
+        clair: av.clair,
+        penombre: av.penombre,
+        teinte: av.teinte
+      })
+      /* Une bougie soufflée se duplique soufflée : on copie la lampe, pas son état d'usine. */
+      if (c && !av.allumee) await window.jdr.lumieres.update(c.id, { allumee: false })
+      return c
     })
     if (!copie) return
-    /* Une bougie soufflée se duplique soufflée : on copie la lampe, pas son état d'usine. */
-    if (!av.allumee) await window.jdr.lumieres.update(copie.id, { allumee: false })
-    memoriser(async () => void (await window.jdr.lumieres.remove(copie.id)))
     setLumChoisie(copie.id)
     await relire()
   }
 
   const oterLumiere = async (id: number): Promise<void> => {
-    const avant = lumieres.find((l) => l.id === id)
     await window.jdr.lumieres.remove(id)
-    if (avant)
-      memoriser(async () => {
-        const remis = await window.jdr.lumieres.add({
-          placeId,
-          x: avant.x,
-          y: avant.y,
-          clair: avant.clair,
-          penombre: avant.penombre
-        })
-        if (remis && !avant.allumee) await window.jdr.lumieres.update(remis.id, { allumee: false })
-      })
     setLumChoisie((c) => (c === id ? null : c))
     await relire()
   }
@@ -606,7 +596,6 @@ export function useMurs(placeId: number): {
       largeur: largeurDefaut ?? undefined
     })
     if (!o) return
-    memoriser(async () => void (await window.jdr.ouvertures.remove(o.id)))
     setOuvChoisie(o.id)
     setChoisi(null)
     await relire()
@@ -621,28 +610,14 @@ export function useMurs(placeId: number): {
   }
 
   const oterOuverture = async (id: number): Promise<void> => {
-    const avant = ouvertures.find((o) => o.id === id)
-    if (avant)
-      memoriser(async () => {
-        const remis = await window.jdr.ouvertures.add({
-          murId: avant.murId,
-          nature: avant.nature,
-          d: avant.d,
-          largeur: avant.largeur
-        })
-        if (remis && (avant.ouverte || avant.verrouillee))
-          await window.jdr.ouvertures.update(remis.id, {
-            ouverte: avant.ouverte,
-            verrouillee: avant.verrouillee
-          })
-      })
     await window.jdr.ouvertures.remove(id)
     setOuvChoisie(null)
     await relire()
   }
 
   /* Ouvrir une porte n'est pas une modification du plan : ça ne s'annule pas,
-     ça se referme. La pile n'en entend pas parler. */
+     ça se referme. La pile n'en entend pas parler — main/defaire.ts écarte
+     la colonne « ouverte ». */
   const basculerPorte = async (id: number): Promise<void> => {
     const o = ouvertures.find((x) => x.id === id)
     if (!o || o.nature !== 'porte' || o.verrouillee) return
@@ -717,27 +692,15 @@ export function useMurs(placeId: number): {
   }
 
   const effacer = async (id: number): Promise<void> => {
-    const avant = liste.find((m) => m.id === id)
-    /* Les ouvertures posées dessus partent avec lui : la base s'en charge
-       (ON DELETE CASCADE), et les remettre demanderait de les retrouver — ce
-       que « Défaire » ne promet pas pour un trait effacé. */
-    if (avant)
-      memoriser(async () => {
-        await window.jdr.murs.add({ placeId, nature: avant.nature, pts: avant.pts })
-      })
+    /* Les ouvertures posées dessus partent avec lui (ON DELETE CASCADE) — et
+       reviennent avec lui au Ctrl+Z : la base les a notées en partant. */
     await window.jdr.murs.remove(id)
     setChoisi(null)
     await relire()
   }
 
-  const defaire = async (): Promise<void> => {
-    const geste = pile.current.pop()
-    setProfondeur(pile.current.length)
-    if (!geste) return
-    await geste()
-    setChoisi(null)
-    await relire()
-  }
+  /* Le bouton « Défaire » de la barre : le même que Ctrl+Z. */
+  const defaire = (): Promise<void> => useStore.getState().defaire()
 
   return {
     liste,
@@ -770,6 +733,8 @@ export function useMurs(placeId: number): {
     setNoir,
     choisi,
     setChoisi,
+    joindre,
+    setJoindre,
     essai,
     setEssai,
     poser,
@@ -799,7 +764,7 @@ export function useMurs(placeId: number): {
     arreterEssai,
     effacer,
     defaire,
-    peutDefaire: profondeur > 0
+    peutDefaire
   }
 }
 
@@ -824,7 +789,7 @@ const OUTILS: {
   {
     cle: 'selection',
     label: 'Sélection',
-    aide: 'Attraper un trait, une ouverture ou une pièce ; recliquer un trait le coupe en deux',
+    aide: 'Glisser un trait déplace le côté visé ; double-clic dessus ajoute un sommet ; Alt + clic le coupe en deux',
     icone: <IconSouris />
   },
   {
@@ -884,7 +849,9 @@ function FormerPiece({
 }): JSX.Element {
   const [nom, setNom] = useState<string | null>(null)
   const champ = useRef<HTMLInputElement>(null)
-  const enEssai = m.essai !== null
+  /* Le test commence dès qu'on l'arme : tant que le pion attend sa place,
+     on ne désigne pas de murs. */
+  const enEssai = m.essai !== null || m.attenteDepart
   const choisis = m.pourPiece?.length ?? 0
 
   useEffect(() => {
@@ -1046,27 +1013,6 @@ export function BarreMurs({
         Défaire
       </button>
 
-      <div className="spacer" />
-
-      {/* Entrer dans le test et en sortir sont deux gestes contraires : ils ne
-          se ressemblent pas. Vert on essaie, rouge on s'arrête. */}
-      <button
-        className={`btn btn-sm ${enEssai ? 'btn-sortie' : 'btn-essai'}`}
-        title={
-          enEssai
-            ? 'Ranger le pion et revenir au tracé des murs'
-            : 'Poser un pion d’essai : il ne traverse pas, et il ne voit que ce que les murs lui laissent voir'
-        }
-        onClick={() => {
-          if (enEssai) {
-            m.arreterEssai()
-            return
-          }
-          void m.commencerEssai()
-        }}
-      >
-        {enEssai ? 'Quitter le test' : 'Tester'}
-      </button>
     </>
   )
 }
@@ -1104,6 +1050,8 @@ export function CalqueMurs({
   onCouper,
   onDeplacer,
   onEffacer,
+  joindre = false,
+  onJoindreFini,
   onBasculerPorte,
   onVerrouiller,
   onAccorder,
@@ -1112,6 +1060,7 @@ export function CalqueMurs({
   onBrouillard,
   essai,
   onEssai,
+  traitsCaches = false,
   largeurOuv = LARGEUR_DEFAUT,
   lumieres = [],
   lumChoisie = null,
@@ -1183,10 +1132,15 @@ export function CalqueMurs({
   onGommeTaille?: (rayon: number) => void
   onDeplacer?: (id: number, pts: PointMur[]) => void
   onEffacer?: (id: number) => void
+  /** Le prochain trait cliqué se joint en coin au trait choisi. */
+  joindre?: boolean
+  onJoindreFini?: () => void
   onBasculerPorte?: (id: number) => void
   onVerrouiller?: (id: number, v: boolean) => void
   onAccorder?: (id: number) => void
   essai?: EssaiPion | null
+  /** Pendant le test : la carte comme les joueurs la voient, sans les traits. */
+  traitsCaches?: boolean
   onEssai?: (e: EssaiPion) => void
 }): JSX.Element {
   const hote = useRef<HTMLDivElement>(null)
@@ -1220,7 +1174,15 @@ export function CalqueMurs({
   const [encours, setEncours] = useState<Pt[] | null>(null)
   const [survol, setSurvol] = useState<Pt | null>(null)
   const [rect, setRect] = useState<{ a: Pt; b: Pt } | null>(null)
-  const [apercu, setApercu] = useState<{ id: number; pts: Pt[] } | null>(null)
+  /**
+   * Les traits qu'on remue en tirant un sommet, déjà déplacés — par
+   * identifiant. Un sommet partagé emporte tous les bouts qui le touchent :
+   * le coin d'une pièce tracée en « Quatre murs » est fait de deux traits, et
+   * il ne doit pas se déchirer.
+   */
+  const [apercu, setApercu] = useState<Record<number, Pt[]> | null>(null)
+  /** Le sommet qu'on a pris en dernier : c'est lui que l'équerre redresse. */
+  const [sommet, setSommet] = useState<{ id: number; i: number } | null>(null)
   /* Le geste de gomme : les ronds semés depuis le début du glisser. Rien n'est
      écrit tant qu'on n'a pas relâché — un coup de gomme est un geste, pas
      trente écritures. */
@@ -1230,7 +1192,186 @@ export function CalqueMurs({
   const [refus, setRefus] = useState<number | null>(null)
   /** La lumière qu'on traîne : on la suit à l'écran avant de l'écrire. */
   const [lumGlissee, setLumGlissee] = useState<{ id: number; x: number; y: number } | null>(null)
-  const prise = useRef<{ quoi: 'poignee' | 'pion' | 'lum'; id: number; i: number } | null>(null)
+  const prise = useRef<{
+    quoi: 'poignee' | 'pion' | 'lum' | 'trait'
+    id: number
+    i: number
+    /** Pour un trait : là où on l'a attrapé. */
+    de?: Pt
+    /** Pour une poignée : tous les points posés au même endroit. */
+    liens?: { id: number; i: number }[]
+  } | null>(null)
+
+  /* Un autre trait choisi : le sommet d'avant ne le concerne plus. */
+  useEffect(() => {
+    setSommet((s) => (s && s.id === choisi ? s : null))
+  }, [choisi])
+
+  /** Tous les points, de tous les traits, posés au même endroit que `v`. */
+  const liesA = (v: Pt): { id: number; i: number }[] => {
+    const out: { id: number; i: number }[] = []
+    for (const m of murs)
+      m.pts.forEach((q, i) => {
+        const r = enPx(q)
+        if (Math.hypot(r.x - v.x, r.y - v.y) < 1.5) out.push({ id: m.id, i })
+      })
+    return out
+  }
+
+  /**
+   * Les deux voisins d'un sommet — dans son trait, ou dans le trait qui le
+   * prolonge. Sans exactement deux, il n'y a pas d'angle à redresser.
+   */
+  const voisinsDe = (v: Pt, liens: { id: number; i: number }[]): [Pt, Pt] | null => {
+    const vus: Pt[] = []
+    const ajouter = (q: Pt): void => {
+      if (Math.hypot(q.x - v.x, q.y - v.y) < 1.5) return
+      if (vus.some((r) => Math.hypot(r.x - q.x, r.y - q.y) < 1.5)) return
+      vus.push(q)
+    }
+    for (const l of liens) {
+      const m = murs.find((x) => x.id === l.id)
+      if (!m) continue
+      const pts = m.pts.map(enPx)
+      if (l.i > 0) ajouter(pts[l.i - 1])
+      if (l.i < pts.length - 1) ajouter(pts[l.i + 1])
+    }
+    return vus.length === 2 ? [vus[0], vus[1]] : null
+  }
+
+  /**
+   * Ce que deviendraient les traits si l'on retirait le sommet choisi — ou
+   * `null` si on ne peut pas.
+   *
+   * - au milieu d'un trait : ses deux côtés n'en font plus qu'un ;
+   * - au coin d'un trait fermé : le contour se referme sur le voisin ;
+   * - à la jonction de deux traits, bout à bout : **ils fusionnent** en un
+   *   seul, qui garde la nature du premier ;
+   * - au bout d'un trait seul : le bout recule d'un sommet.
+   *
+   * Un trait réduit à un point, ou une jonction de trois traits, ne se défait
+   * pas ainsi.
+   */
+  const sansLeSommet = (): { garder: { id: number; pts: Pt[] }; effacer: number | null } | null => {
+    if (!sommet) return null
+    const m = murs.find((x) => x.id === sommet.id)
+    if (!m || !m.pts[sommet.i]) return null
+    const v = enPx(m.pts[sommet.i])
+    const liens = liesA(v)
+    const ids = [...new Set(liens.map((l) => l.id))]
+
+    if (ids.length === 1) {
+      const pts = m.pts.map(enPx)
+      const idx = liens.map((l) => l.i).sort((a, b) => a - b)
+      const n = pts.length
+      const ferme = idx.length === 2 && idx[0] === 0 && idx[1] === n - 1
+      if (ferme) {
+        if (n < 5) return null
+        const reste = pts.slice(1, n - 1)
+        return { garder: { id: m.id, pts: [...reste, reste[0]] }, effacer: null }
+      }
+      if (idx.length !== 1 || n < 3) return null
+      return { garder: { id: m.id, pts: pts.filter((_, i) => i !== idx[0]) }, effacer: null }
+    }
+
+    if (ids.length === 2 && liens.length === 2) {
+      const [la, lb] = liens
+      const a = murs.find((x) => x.id === la.id)!
+      const b = murs.find((x) => x.id === lb.id)!
+      const bout = (mur: Mur, i: number): boolean => i === 0 || i === mur.pts.length - 1
+      if (!bout(a, la.i) || !bout(b, lb.i)) return null
+      /* Le premier finit sur le sommet, le second en part. */
+      const pa = a.pts.map(enPx)
+      const pb = b.pts.map(enPx)
+      const debut = la.i === 0 ? [...pa].reverse() : pa
+      const suite = lb.i === 0 ? pb : [...pb].reverse()
+      const fusion = [...debut.slice(0, -1), ...suite.slice(1)]
+      if (fusion.length < 2) return null
+      return { garder: { id: a.id, pts: fusion }, effacer: b.id }
+    }
+    return null
+  }
+
+  /**
+   * Joindre deux murs en un coin : chacun est prolongé — ou raccourci —
+   * jusqu'au point où leurs directions se croisent, et ils n'ont plus qu'un
+   * sommet en commun.
+   *
+   * On essaie les quatre façons d'apparier leurs bouts et l'on garde celle
+   * qui bouge le moins : c'est le coin qu'on voulait, pas celui d'en face.
+   * Deux murs parallèles ne se croisent pas : rien ne se passe.
+   */
+  const joindreEnCoin = (idA: number, idB: number): boolean => {
+    const a = murs.find((x) => x.id === idA)
+    const b = murs.find((x) => x.id === idB)
+    if (!a || !b || a.pts.length < 2 || b.pts.length < 2) return false
+    const pa = a.pts.map(enPx)
+    const pb = b.pts.map(enPx)
+    /* Un bout, et le point qui donne sa direction. */
+    const bouts = (pts: Pt[]): { i: number; dir: Pt }[] => [
+      { i: 0, dir: pts[1] },
+      { i: pts.length - 1, dir: pts[pts.length - 2] }
+    ]
+    const croise = (p1: Pt, p2: Pt, p3: Pt, p4: Pt): Pt | null => {
+      const d = (p1.x - p2.x) * (p3.y - p4.y) - (p1.y - p2.y) * (p3.x - p4.x)
+      if (Math.abs(d) < 1e-9) return null
+      const u = p1.x * p2.y - p1.y * p2.x
+      const v = p3.x * p4.y - p3.y * p4.x
+      return {
+        x: (u * (p3.x - p4.x) - (p1.x - p2.x) * v) / d,
+        y: (u * (p3.y - p4.y) - (p1.y - p2.y) * v) / d
+      }
+    }
+    let mieux: { ia: number; ib: number; x: Pt; cout: number } | null = null
+    for (const ea of bouts(pa))
+      for (const eb of bouts(pb)) {
+        const x = croise(pa[ea.i], ea.dir, pb[eb.i], eb.dir)
+        if (!x) continue
+        const cout =
+          Math.hypot(x.x - pa[ea.i].x, x.y - pa[ea.i].y) +
+          Math.hypot(x.x - pb[eb.i].x, x.y - pb[eb.i].y)
+        if (!mieux || cout < mieux.cout) mieux = { ia: ea.i, ib: eb.i, x, cout }
+      }
+    if (!mieux) return false
+    const na = pa.map((q, i) => (i === mieux!.ia ? mieux!.x : q))
+    const nb = pb.map((q, i) => (i === mieux!.ib ? mieux!.x : q))
+    onDeplacer?.(a.id, na.map(enFrac))
+    onDeplacer?.(b.id, nb.map(enFrac))
+    retirerSousDeplaces({ [a.id]: na, [b.id]: nb })
+    setSommet({ id: a.id, i: mieux.ia })
+    return true
+  }
+
+  const supprimerSommet = (): void => {
+    const r = sansLeSommet()
+    if (!r) return
+    onDeplacer?.(r.garder.id, r.garder.pts.map(enFrac))
+    if (r.effacer != null) onEffacer?.(r.effacer)
+    setSommet(null)
+    onChoisir?.(r.garder.id)
+  }
+
+  /** Redresser le sommet choisi à angle droit, et tout ce qui le touche avec lui. */
+  const equerrer = (): void => {
+    if (!sommet) return
+    const m = murs.find((x) => x.id === sommet.id)
+    if (!m || !m.pts[sommet.i]) return
+    const v = enPx(m.pts[sommet.i])
+    const liens = liesA(v)
+    const vois = voisinsDe(v, liens)
+    if (!vois) return
+    const q = enFrac(mettreDEquerre(v, vois[0], vois[1]))
+    const deplaces: Record<number, Pt[]> = {}
+    for (const id of new Set(liens.map((l) => l.id))) {
+      const mur = murs.find((x) => x.id === id)
+      if (!mur) continue
+      const idx = new Set(liens.filter((l) => l.id === id).map((l) => l.i))
+      const pts = mur.pts.map((r, i) => (idx.has(i) ? q : r))
+      onDeplacer?.(id, pts)
+      deplaces[id] = pts.map(enPx)
+    }
+    retirerSousDeplaces(deplaces)
+  }
 
   /* Le pointeur arrive en pixels d'écran ; on passe par la fraction pour
      retomber dans la mise en page, même quand la carte est agrandie. */
@@ -1271,6 +1412,36 @@ export function CalqueMurs({
       }
     }
     if (sur) return { p: sur, lignes: [], equerre: null }
+
+    /*
+     * Puis le mur lui-même : un trait qui part du milieu d'une cloison doit
+     * tomber **dessus**, pas à côté — sinon il ne la touche pas, et la pièce
+     * qu'il devait couper ne se referme jamais. On ne colle pas aux traits
+     * qu'on est en train de tirer.
+     */
+    const tenus = apercu ? new Set(Object.keys(apercu).map(Number)) : null
+    let surMur: Pt | null = null
+    let ecart = COLLE
+    for (const m of murs) {
+      if (tenus?.has(m.id)) continue
+      const pts = m.pts.map(enPx)
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i]
+        const b = pts[i + 1]
+        const dx = b.x - a.x
+        const dy = b.y - a.y
+        const l2 = dx * dx + dy * dy
+        if (!l2) continue
+        const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2))
+        const q = { x: a.x + t * dx, y: a.y + t * dy }
+        const d = Math.hypot(p.x - q.x, p.y - q.y)
+        if (d < ecart) {
+          ecart = d
+          surMur = q
+        }
+      }
+    }
+    if (surMur) return { p: surMur, lignes: [], equerre: null }
 
     let ecartX = ALIGNE
     let ecartY = ALIGNE
@@ -1351,6 +1522,38 @@ export function CalqueMurs({
     )
   }
 
+  /**
+   * Deux murs ne se superposent jamais.
+   *
+   * Ce qu'on vient de déplacer reste entier ; aux autres traits, on retire
+   * ce qu'il recouvre — la même règle qu'à la pose, avec la même tolérance.
+   * Sans elle, un côté glissé contre une cloison la doublait : deux traits
+   * l'un sur l'autre, trois voisins au lieu de deux, plus d'équerre possible.
+   */
+  const retirerSousDeplaces = (deplaces: Record<number, Pt[]>): void => {
+    const traces = Object.values(deplaces).filter((t) => t.length >= 2)
+    if (!traces.length) return
+    const retraits: Retrait[] = []
+    for (const m of murs) {
+      if (deplaces[m.id]) continue
+      let pieces: Pt[][] = [m.pts.map(enPx)]
+      let touche = false
+      for (const t of traces) {
+        const suite: Pt[][] = []
+        for (const piece of pieces) {
+          const reste = soustraireTrace(piece, t, 7)
+          if (reste) {
+            touche = true
+            suite.push(...reste)
+          } else suite.push(piece)
+        }
+        pieces = suite
+      }
+      if (touche) retraits.push({ id: m.id, pieces: pieces.map((l) => l.map(enFrac)) })
+    }
+    if (retraits.length) onGommer?.(retraits)
+  }
+
   const finirTrace = (): void => {
     const pts = encours
     setEncours(null)
@@ -1374,6 +1577,10 @@ export function CalqueMurs({
         if (lumChoisie != null) {
           e.preventDefault()
           onOterLumiere?.(lumChoisie)
+        } else if (sommet && sommet.id === choisi) {
+          /* Un sommet pris : c'est lui qui part, pas le trait entier. */
+          e.preventDefault()
+          supprimerSommet()
         } else if (choisi != null) {
           e.preventDefault()
           onEffacer?.(choisi)
@@ -1735,26 +1942,45 @@ export function CalqueMurs({
       onChoisir?.(null)
       return
     }
-    /* Puis une poignée du trait déjà choisi — sinon on ne pourrait jamais
-       rattraper un point posé de travers. */
-    const m = murs.find((x) => x.id === choisi)
-    if (m) {
+    /* Puis un sommet — celui du trait déjà choisi d'abord, puis n'importe
+       lequel : tous se voient, tous s'attrapent. */
+    const candidats = [
+      ...murs.filter((x) => x.id === choisi),
+      ...murs.filter((x) => x.id !== choisi)
+    ]
+    for (const m of candidats) {
       for (let i = 0; i < m.pts.length; i++) {
         const q = enPx(m.pts[i])
-        if (Math.hypot(p.x - q.x, p.y - q.y) < 13) {
-          prise.current = { quoi: 'poignee', id: m.id, i }
-          setApercu({ id: m.id, pts: m.pts.map(enPx) })
+        if (Math.hypot(p.x - q.x, p.y - q.y) < (m.id === choisi ? 13 : 9)) {
+          onOuvChoisie?.(null)
+          onLumChoisie?.(null)
+          onChoisir?.(m.id)
+          const liens = liesA(q)
+          prise.current = { quoi: 'poignee', id: m.id, i, liens }
+          const a: Record<number, Pt[]> = {}
+          for (const l of liens) {
+            const mur = murs.find((x) => x.id === l.id)
+            if (mur) a[l.id] = mur.pts.map(enPx)
+          }
+          setApercu(a)
+          setSommet({ id: m.id, i })
           e.currentTarget.setPointerCapture(e.pointerId)
           return
         }
       }
     }
     const sous = murSous(murs, p, enPx, 12)
-    /* Recliquer le trait déjà choisi le coupe en deux au point visé : c'est
-       comme ça qu'on donne une nature différente à la moitié d'un mur, sans
-       le refaire. Trop près d'un bout, on ne coupe pas — un moignon ne sert
-       à rien. */
-    if (sous && sous.id === choisi && onCouper) {
+    /* Maj + clic sur un second trait — ou le mode « Joindre en coin » armé
+       depuis le volet : les deux se rejoignent en un coin. */
+    if (sous && choisi != null && sous.id !== choisi && (e.shiftKey || joindre)) {
+      joindreEnCoin(choisi, sous.id)
+      onJoindreFini?.()
+      return
+    }
+    /* Alt + clic coupe le trait en deux au point visé : c'est comme ça qu'on
+       donne une nature différente à la moitié d'un mur, sans le refaire. Trop
+       près d'un bout, on ne coupe pas — un moignon ne sert à rien. */
+    if (sous && e.altKey && onCouper) {
       const coupe = couperTrace(sous.pts.map(enPx), p)
       if (coupe) {
         onCouper(
@@ -1767,6 +1993,70 @@ export function CalqueMurs({
     onOuvChoisie?.(null)
     onLumChoisie?.(null)
     onChoisir?.(sous ? sous.id : null)
+    setSommet(null)
+    /* Attraper un trait, c'est tenir **le côté visé** : ses deux sommets
+       suivent le pointeur, et tout ce qui touche ces sommets vient avec — une
+       cloison qu'on décale ne laisse pas de trou dans les coins. Une pièce
+       tracée d'un seul trait ne bouge donc pas en bloc : seul son mur visé
+       glisse. */
+    if (sous) {
+      const px = sous.pts.map(enPx)
+      let k = 0
+      let court = Infinity
+      for (let i = 0; i < px.length - 1; i++) {
+        const d = distanceAuSegment(p, px[i], px[i + 1])
+        if (d < court) {
+          court = d
+          k = i
+        }
+      }
+      const liens: { id: number; i: number }[] = []
+      for (const q of [px[k], px[k + 1]])
+        for (const l of liesA(q))
+          if (!liens.some((x) => x.id === l.id && x.i === l.i)) liens.push(l)
+      prise.current = { quoi: 'trait', id: sous.id, i: 0, liens, de: p }
+      const a: Record<number, Pt[]> = {}
+      for (const l of liens) {
+        const mur = murs.find((x) => x.id === l.id)
+        if (mur) a[l.id] = mur.pts.map(enPx)
+      }
+      setApercu(a)
+      e.currentTarget.setPointerCapture(e.pointerId)
+    }
+  }
+
+  /**
+   * Double-clic sur un trait : un sommet de plus, là où l'on vise. On le
+   * prend aussitôt — on l'ajoute pour le tirer, ou pour le mettre d'équerre.
+   */
+  const ajouterSommet = (p: Pt): boolean => {
+    const m = murSous(murs, p, enPx, 12)
+    if (!m) return false
+    const pts = m.pts.map(enPx)
+    let k = -1
+    let court = Infinity
+    for (let i = 0; i < pts.length - 1; i++) {
+      const d = distanceAuSegment(p, pts[i], pts[i + 1])
+      if (d < court) {
+        court = d
+        k = i
+      }
+    }
+    if (k < 0) return false
+    const a = pts[k]
+    const b = pts[k + 1]
+    const dx = b.x - a.x
+    const dy = b.y - a.y
+    const l2 = dx * dx + dy * dy || 1
+    const t = Math.max(0, Math.min(1, ((p.x - a.x) * dx + (p.y - a.y) * dy) / l2))
+    const q = { x: a.x + t * dx, y: a.y + t * dy }
+    /* Trop près d'un sommet existant : c'est celui-là qu'on voulait. */
+    if (Math.hypot(q.x - a.x, q.y - a.y) < 6 || Math.hypot(q.x - b.x, q.y - b.y) < 6) return false
+    const suite = [...pts.slice(0, k + 1), q, ...pts.slice(k + 1)]
+    onDeplacer?.(m.id, suite.map(enFrac))
+    onChoisir?.(m.id)
+    setSommet({ id: m.id, i: k + 1 })
+    return true
   }
 
   const surPointerMove = (e: React.PointerEvent): void => {
@@ -1797,9 +2087,30 @@ export function CalqueMurs({
       setLumGlissee({ id: t.id, x: Math.max(0, Math.min(w, p.x)), y: Math.max(0, Math.min(h, p.y)) })
       return
     }
+    if (t?.quoi === 'trait' && apercu && t.de) {
+      const dx = p.x - t.de.x
+      const dy = p.y - t.de.y
+      const suite: Record<number, Pt[]> = {}
+      for (const id of Object.keys(apercu).map(Number)) {
+        const mur = murs.find((x) => x.id === id)
+        if (!mur) continue
+        const idx = new Set((t.liens ?? []).filter((l) => l.id === id).map((l) => l.i))
+        suite[id] = mur.pts.map((r, i) => {
+          const q = enPx(r)
+          return idx.has(i) ? { x: q.x + dx, y: q.y + dy } : q
+        })
+      }
+      setApercu(suite)
+      return
+    }
     if (t?.quoi === 'poignee' && apercu) {
       const q = aimante(p)
-      setApercu({ id: t.id, pts: apercu.pts.map((r, i) => (i === t.i ? q : r)) })
+      const suite: Record<number, Pt[]> = {}
+      for (const [id, pts] of Object.entries(apercu)) {
+        const idx = new Set((t.liens ?? []).filter((l) => l.id === Number(id)).map((l) => l.i))
+        suite[Number(id)] = pts.map((r, i) => (idx.has(i) ? q : r))
+      }
+      setApercu(suite)
       return
     }
     if (rect) setRect({ ...rect, b: p })
@@ -1826,8 +2137,23 @@ export function CalqueMurs({
       setLumGlissee(null)
       return
     }
-    if (t?.quoi === 'poignee') {
-      if (apercu) onDeplacer?.(t.id, apercu.pts.map(enFrac))
+    if (t?.quoi === 'poignee' || t?.quoi === 'trait') {
+      e.currentTarget.releasePointerCapture?.(e.pointerId)
+      if (apercu) {
+        const deplaces: Record<number, Pt[]> = {}
+        for (const [id, pts] of Object.entries(apercu)) {
+          const avant = murs.find((x) => x.id === Number(id))
+          const bouge = !avant || pts.some((r, i) => {
+            const q = enPx(avant.pts[i])
+            return Math.hypot(r.x - q.x, r.y - q.y) > 0.5
+          })
+          if (bouge) {
+            onDeplacer?.(Number(id), pts.map(enFrac))
+            deplaces[Number(id)] = pts
+          }
+        }
+        retirerSousDeplaces(deplaces)
+      }
       setApercu(null)
       return
     }
@@ -1948,10 +2274,80 @@ export function CalqueMurs({
     return meilleure ? meilleure.o : null
   }
 
+  /**
+   * Le bouton d'équerre, posé à côté du sommet choisi. Il ne se montre que
+   * s'il y a un angle à redresser — deux voisins — et qu'il n'est pas déjà
+   * droit.
+   */
+  const boutonEquerre = (): JSX.Element | null => {
+    if (!edition || outil !== 'selection' || !sommet || apercu || sommet.id !== choisi) return null
+    const m = murs.find((x) => x.id === sommet.id)
+    if (!m || !m.pts[sommet.i]) return null
+    const v = enPx(m.pts[sommet.i])
+    const vois = voisinsDe(v, liesA(v))
+    let droit: boolean | null = null
+    if (vois) {
+      const ax = vois[0].x - v.x
+      const ay = vois[0].y - v.y
+      const bx = vois[1].x - v.x
+      const by = vois[1].y - v.y
+      droit =
+        Math.abs((ax * bx + ay * by) / (Math.hypot(ax, ay) * Math.hypot(bx, by) || 1)) < 0.002
+    }
+    return (
+      <BoutonEquerre
+        hote={hote}
+        sommet={v}
+        droit={droit}
+        onEquerre={equerrer}
+        onSupprimer={sansLeSommet() ? supprimerSommet : undefined}
+      />
+    )
+  }
+
+  /**
+   * Les angles droits des murs, marqués d'un petit carré.
+   *
+   * Un sommet compte s'il a exactement deux voisins — dans son trait, ou dans
+   * le trait qui le prolonge bout à bout. Pendant qu'on tire un sommet ou un
+   * côté, on lit les traits tels qu'ils se dessinent : le carré apparaît au
+   * moment où l'angle tombe droit.
+   */
+  const anglesDroits = (): JSX.Element | null => {
+    if (!edition) return null
+    const tous: { pts: Pt[] }[] = murs.map((m) => ({ pts: apercu?.[m.id] ?? m.pts.map(enPx) }))
+    const pres = (a: Pt, b: Pt): boolean => Math.hypot(a.x - b.x, a.y - b.y) < 1.5
+    const faits: Pt[] = []
+    const chemins: string[] = []
+    for (const t of tous)
+      for (const v of t.pts) {
+        if (faits.some((f) => pres(f, v))) continue
+        faits.push(v)
+        const vois: Pt[] = []
+        for (const u of tous)
+          u.pts.forEach((q, i) => {
+            if (!pres(q, v)) return
+            for (const r of [u.pts[i - 1], u.pts[i + 1]])
+              if (r && !pres(r, v) && !vois.some((x) => pres(x, r))) vois.push(r)
+          })
+        if (vois.length !== 2) continue
+        const d = carreDAngle(v, vois[0], vois[1])
+        if (d) chemins.push(d)
+      }
+    if (!chemins.length) return null
+    return (
+      <g className="murs-angles" pointerEvents="none">
+        {chemins.map((d, i) => (
+          <path key={i} d={d} />
+        ))}
+      </g>
+    )
+  }
+
   /** Les traits posés. Dessinés deux fois : sur la carte, et dans la loupe. */
   const traits = (): JSX.Element[] =>
     murs.map((m) => {
-      const pts = apercu?.id === m.id ? apercu.pts : m.pts.map(enPx)
+      const pts = apercu?.[m.id] ?? m.pts.map(enPx)
       if (pts.length < 2) return <g key={m.id} />
       /* Sous la gomme, le trait se montre déjà tel qu'il restera : on efface
          en voyant le résultat, pas en devinant. */
@@ -1970,9 +2366,17 @@ export function CalqueMurs({
           <path d={d} className="halo" />
           <path d={d} className="trait" />
           {choisi === m.id ? <path d={d} className="liseré" /> : null}
-          {choisi === m.id && edition && outil === 'selection'
+          {edition && outil === 'selection'
             ? pts.map((p, i) => (
-                <rect key={i} x={p.x - 4.5} y={p.y - 4.5} width={9} height={9} className="poignee" />
+                <circle
+                  key={i}
+                  cx={p.x}
+                  cy={p.y}
+                  r={choisi === m.id ? 5.5 : 3.5}
+                  className={`poignee${choisi === m.id ? '' : ' discrete'}${
+                    sommet?.id === m.id && sommet.i === i ? ' on' : ''
+                  }`}
+                />
               ))
             : null}
         </g>
@@ -2141,9 +2545,13 @@ export function CalqueMurs({
       onPointerUp={edition || essai ? surPointerUp : undefined}
       onPointerLeave={() => setSurvol(null)}
       onDoubleClick={(e) => {
-        if (!edition || !encours) return
-        e.preventDefault()
-        finirTrace()
+        if (!edition) return
+        if (encours) {
+          e.preventDefault()
+          finirTrace()
+          return
+        }
+        if (outil === 'selection' && !pourPiece && ajouterSommet(position(e))) e.preventDefault()
       }}
       onContextMenu={(e) => {
         if (!edition || !encours) return
@@ -2291,8 +2699,13 @@ export function CalqueMurs({
         {contourPropose && contourPropose.length > 2 ? (
           <polygon points={polygone(contourPropose.map(enPx))} className="piece-propose" />
         ) : null}
-        {traits()}
-        {ouverturesSvg()}
+        {traitsCaches ? null : (
+          <>
+            {traits()}
+            {anglesDroits()}
+            {ouverturesSvg()}
+          </>
+        )}
         {guidesSvg()}
         {apercuOuverture()}
         {/* La lampe qu'on s'apprête à poser : on voit son rond avant de le
@@ -2360,6 +2773,14 @@ export function CalqueMurs({
           </g>
         ) : null}
       </svg>
+      {boutonEquerre()}
+      {/* Tant que le pion n'est pas posé, rien ne se passe : on le dit sur la
+          carte même, là où l'on regarde, pas seulement dans la barre. */}
+      {attenteDepart ? (
+        <div className="depart-invite" role="status">
+          Place un pion pour tester — clique sur la carte là où commence la visite
+        </div>
+      ) : null}
     </div>
   )
 }
@@ -2877,6 +3298,13 @@ export function VoletMurs({
                   </div>
                   <div className="murs-rangee">
                     <button
+                      className={`btn btn-sm${m.joindre ? ' btn-on' : ''}`}
+                      title="Puis clique un second mur : les deux se prolongent jusqu’à se rejoindre en un coin (raccourci : Maj + clic)"
+                      onClick={() => m.setJoindre(!m.joindre)}
+                    >
+                      ⌐ {m.joindre ? 'Clique le second mur…' : 'Joindre en coin'}
+                    </button>
+                    <button
                       className="btn btn-sm btn-danger"
                       onClick={() => void m.effacer(trait.id)}
                     >
@@ -2888,7 +3316,7 @@ export function VoletMurs({
               ) : (
                 <p className="vide">
                   {m.outil === 'selection'
-                    ? 'Clique un trait ou une ouverture sur la carte. Recliquer un trait le coupe en deux ; Suppr l’efface en entier.'
+                    ? 'Clique un trait ou une ouverture sur la carte. Glisser un trait déplace le côté visé, double-clic ajoute un sommet, Alt + clic le coupe en deux, Maj + clic sur un second trait les joint en coin ; Suppr l’efface en entier.'
                     : m.liste.length
                       ? 'Passe en « Sélection » et clique un trait sur la carte.'
                       : 'Arme « + Mur » et clique sur la carte pour poser le premier point.'}
@@ -3117,7 +3545,8 @@ export function AideMurs({ m }: { m: ReturnType<typeof useMurs> }): JSX.Element 
   if (m.attenteDepart)
     return (
       <span className="note">
-        Clique sur la carte : <b>la visite commencera là</b>, portes closes et maison noire.
+        <b>Place un pion pour tester</b> : clique sur la carte là où commence la visite — portes
+        closes, maison noire.
       </span>
     )
   if (m.essai)
@@ -3143,8 +3572,8 @@ export function AideMurs({ m }: { m: ReturnType<typeof useMurs> }): JSX.Element 
   if (m.outil === 'selection')
     return (
       <span className="note">
-        Clique un trait ou une ouverture — puis tire ses poignées, change sa nature, ou{' '}
-        <b>Suppr</b>.
+        Glisse un côté pour le déplacer, tire ses poignées, <b>double-clic</b> pour ajouter un
+        sommet, <b>Alt + clic</b> pour le couper, ou <b>Suppr</b>.
       </span>
     )
   if (m.outil === 'lumiere')

@@ -330,6 +330,8 @@ img {
   gap: 13px;
 }
 .m-portrait {
+  /* Positionné : le carré taillé dans le portrait se pose sur lui. */
+  position: relative;
   width: 62px;
   height: 62px;
   flex: none;

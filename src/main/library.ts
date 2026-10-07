@@ -7,7 +7,7 @@
  * remonte dans l'application dès qu'il change, même pendant la partie.
  *
  * La base ne garde que ce que le système de fichiers ne sait pas porter :
- * l'icône et la couleur d'un dossier, le chapitre et le lieu d'un fichier.
+ * l'icône et la couleur d'un dossier, le lieu d'un fichier.
  * Ces attaches suivent l'élément par son identifiant, donc un fichier renommé
  * ou déplacé — ici ou dans l'explorateur — ne les perd pas.
  */
@@ -22,10 +22,12 @@ import {
   writeFileSync
 } from 'node:fs'
 import { watch, type FSWatcher } from 'node:fs'
+import { copyFile } from 'node:fs/promises'
 import { basename, dirname, extname, join, sep } from 'node:path'
-import { BrowserWindow, shell } from 'electron'
+import { BrowserWindow, nativeImage, shell } from 'electron'
 import { activeCampaignId, getDb } from './db'
 import { kindOf, mimeOf } from './kinds'
+import { htmlEnTexte } from '@shared/texteBrut'
 import type { ItemKind, LibraryRoot } from '@shared/types'
 
 /* ============================================================
@@ -292,7 +294,7 @@ export function scan(): { folders: number; files: number } {
     const gone = rows.filter((r) => !diskFiles.has(r.rel_path))
     const born = files.filter((f) => !known.has(f.rel))
 
-    // Un fichier qui a bougé garde son identifiant, donc son chapitre, son lieu
+    // Un fichier qui a bougé garde son identifiant, donc son lieu
     // et sa place dans la chronologie. On le reconnaît d'abord à son nom s'il a
     // changé de dossier, ensuite à son poids s'il a changé de nom.
     const claimed = new Set<string>()
@@ -490,6 +492,91 @@ export function moveEntry(rel: string, destFolderRel: string): string {
   return neuf
 }
 
+/**
+ * Recopier un dossier à côté de lui, sous un autre nom, en disant où on en est.
+ *
+ * La copie se fait fichier par fichier, et la progression se compte en octets :
+ * une vidéo de deux gigas pèse plus lourd que cent fiches. La surveillance est
+ * coupée le temps de la copie — sinon chaque fichier posé relancerait une
+ * relecture du dossier — puis on relit une fois, à la fin. Ce qu'ignore la
+ * lecture (fichiers cachés, `desktop.ini`) n'est pas recopié non plus.
+ *
+ * Les icônes et couleurs des dossiers suivent leur jumeau. Rend le chemin de
+ * la copie et, pour chaque fichier, l'identifiant de l'original et celui de
+ * son double — de quoi raccrocher plans, portraits et textes à la copie.
+ */
+export async function copierDossier(
+  srcRel: string,
+  nom: string,
+  progres: (fait: number, total: number) => void
+): Promise<{ rel: string; jumeaux: Map<number, number> }> {
+  if (!srcRel) throw new Error('Le dossier de campagne lui-même ne se duplique pas.')
+  const src = absOf(srcRel)
+  if (!insideRoot(src) || !existsSync(src) || !statSync(src).isDirectory())
+    throw new Error('Le dossier à dupliquer est introuvable.')
+  const dest = freePath(dirname(src), safeName(nom))
+  if (!insideRoot(dest)) throw new Error('Hors du dossier de campagne.')
+
+  const dossiers: string[] = []
+  const fichiers: { de: string; vers: string; octets: number }[] = []
+  const lister = (de: string, vers: string): void => {
+    dossiers.push(vers)
+    for (const e of readdirSync(de, { withFileTypes: true })) {
+      if (skip(e.name)) continue
+      if (e.isDirectory()) lister(join(de, e.name), join(vers, e.name))
+      else fichiers.push({ de: join(de, e.name), vers: join(vers, e.name), octets: statSync(join(de, e.name)).size })
+    }
+  }
+  lister(src, dest)
+
+  const total = fichiers.reduce((n, f) => n + f.octets, 0) || 1
+  let fait = 0
+  progres(0, total)
+  stopWatch()
+  try {
+    for (const d of dossiers) mkdirSync(d, { recursive: true })
+    for (const f of fichiers) {
+      await copyFile(f.de, f.vers)
+      fait += f.octets
+      progres(fait, total)
+    }
+  } finally {
+    startWatch()
+  }
+
+  const root = campaignRoot()!
+  const rel = toRel(root, dest)
+  scan()
+
+  const db = getDb()
+  const cid = activeCampaignId()
+  const jumeaux = new Map<number, number>()
+  db.transaction(() => {
+    const items = db
+      .prepare(
+        `SELECT id, rel_path AS rel FROM item
+          WHERE campaign_id = ? AND substr(rel_path, 1, length(?) + 1) = ? || '/'`
+      )
+      .all(cid, srcRel, srcRel) as { id: number; rel: string }[]
+    const parChemin = db.prepare(`SELECT id FROM item WHERE campaign_id = ? AND rel_path = ?`)
+    for (const it of items) {
+      const double = parChemin.get(cid, rel + it.rel.slice(srcRel.length)) as { id: number } | undefined
+      if (double) jumeaux.set(it.id, double.id)
+    }
+    const decor = db.prepare(
+      `UPDATE folder SET icon = (SELECT icon FROM folder WHERE campaign_id = @cid AND rel_path = @de),
+                         color = (SELECT color FROM folder WHERE campaign_id = @cid AND rel_path = @de)
+        WHERE campaign_id = @cid AND rel_path = @vers`
+    )
+    for (const d of dossiers) {
+      const vers = toRel(root, d)
+      decor.run({ cid, de: srcRel + vers.slice(rel.length), vers })
+    }
+  })()
+  announce()
+  return { rel, jumeaux }
+}
+
 /** Corbeille de Windows, jamais d'effacement définitif. */
 export async function trashEntry(rel: string): Promise<void> {
   if (!rel) throw new Error('Le dossier de campagne lui-même ne se supprime pas ici.')
@@ -520,11 +607,151 @@ export function writeDoc(rel: string, html: string): void {
   writeFileSync(abs, html, 'utf8')
 }
 
+/**
+ * La version texte d'un document, posée à côté de lui sous le même nom en
+ * `.txt` : de quoi relire le texte d'un moment hors de l'application. Elle est
+ * réécrite à chaque enregistrement ; c'est le `.html` qui fait foi.
+ */
+export function writeTexteBrut(rel: string, html: string): void {
+  const abs = absOf(rel)
+  const txt = join(dirname(abs), basename(abs, extname(abs)) + '.txt')
+  if (!insideRoot(txt)) throw new Error('Hors du dossier de campagne.')
+  writeFileSync(txt, htmlEnTexte(html), 'utf8')
+}
+
+/** Le dossier où se rangent les textes des moments, dans celui de leur séance. */
+export const DOSSIER_MOMENTS = 'Moments'
+
+/**
+ * Migration des fichiers, une fois par campagne : les textes des moments
+ * écrits avant le dossier « Moments » vont l'y rejoindre — celui de leur
+ * séance — et reçoivent leur version .txt. Le dossier naît s'il manque, avec
+ * son sablier. Le déplacement passe par `moveEntry` : le fichier garde son
+ * identifiant, donc son moment, ses annexes et ses rattachements.
+ *
+ * Une seule fois, notée dans `setting` : un texte que le MJ range ailleurs
+ * ensuite y reste.
+ */
+export function rangerTextesDesMoments(): void {
+  const db = getDb()
+  const cid = activeCampaignId()
+  const CLE = 'migration.textes-des-moments'
+  if (db.prepare(`SELECT 1 FROM setting WHERE key = ?`).get(CLE)) return
+
+  const textes = db
+    .prepare(
+      `SELECT i.id, i.rel_path AS rel, MIN(COALESCE(g.folder_rel, '')) AS base
+         FROM beat_item bi
+         JOIN beat b ON b.id = bi.beat_id
+         JOIN game_session g ON g.id = b.session_id
+         JOIN item i ON i.id = bi.item_id
+        WHERE i.campaign_id = ? AND i.kind = 'doc' AND i.rel_path IS NOT NULL
+        GROUP BY i.id`
+    )
+    .all(cid) as { id: number; rel: string; base: string }[]
+
+  const dossiers = new Set<string>()
+  for (const t of textes) {
+    const dest = t.base ? `${t.base}/${DOSSIER_MOMENTS}` : DOSSIER_MOMENTS
+    dossiers.add(dest)
+    try {
+      if (!existsSync(absOf(dest))) mkdirSync(absOf(dest), { recursive: true })
+      const ici = t.rel.includes('/') ? t.rel.slice(0, t.rel.lastIndexOf('/')) : ''
+      const rel = ici === dest ? t.rel : moveEntry(t.rel, dest)
+      const html = absOf(rel)
+      if (!existsSync(join(dirname(html), basename(html, extname(html)) + '.txt')))
+        writeTexteBrut(rel, readFileSync(html, 'utf8'))
+      console.log(`[moments] ${t.rel} -> ${rel}`)
+    } catch (e) {
+      console.error(`[moments] ${t.rel} laissé en place : ${(e as Error).message}`)
+    }
+  }
+  scan()
+  for (const d of dossiers)
+    db.prepare(
+      `UPDATE folder SET icon = 'moments' WHERE campaign_id = ? AND rel_path = ? AND icon IS NULL`
+    ).run(cid, d)
+  db.prepare(`INSERT INTO setting (key, value) VALUES (?, '1')`).run(CLE)
+}
+
+/** Le dossier des notes du Bloc-notes, à la racine de la campagne : une note, un fichier. */
+export const DOSSIER_NOTES = 'Bloc-notes'
+
+/**
+ * Le Bloc-notes a d'abord été un seul fichier, `Bloc-notes.html` à la racine.
+ * Il est devenu un dossier de notes : l'ancien fichier y entre comme première
+ * note — ou part à la corbeille s'il n'a jamais rien contenu. Sa version .txt
+ * le suit.
+ */
+export function rangerAncienBlocNotes(): void {
+  const html = absOf('Bloc-notes.html')
+  if (!existsSync(html)) return
+  const txt = absOf('Bloc-notes.txt')
+  const vide = readFileSync(html, 'utf8').replace(/<[^>]+>|\s|&nbsp;/g, '') === ''
+  try {
+    if (vide) {
+      void shell.trashItem(html)
+      if (existsSync(txt)) void shell.trashItem(txt)
+      console.log('[bloc-notes] ancien Bloc-notes vide mis à la corbeille')
+      return
+    }
+    if (!existsSync(absOf(DOSSIER_NOTES))) mkdirSync(absOf(DOSSIER_NOTES))
+    moveEntry('Bloc-notes.html', DOSSIER_NOTES)
+    if (existsSync(txt)) moveEntry('Bloc-notes.txt', DOSSIER_NOTES)
+    getDb()
+      .prepare(
+        `UPDATE folder SET icon = 'notes' WHERE campaign_id = ? AND rel_path = ? AND icon IS NULL`
+      )
+      .run(activeCampaignId(), DOSSIER_NOTES)
+    console.log('[bloc-notes] ancien Bloc-notes rangé comme première note')
+  } catch (e) {
+    console.error(`[bloc-notes] ancien Bloc-notes laissé en place : ${(e as Error).message}`)
+  }
+}
+
+/**
+ * Un document renommé emmène sa version .txt avec lui, s'il en a une : les
+ * deux fichiers portent toujours le même nom.
+ */
+export function renommerJumeauTxt(ancienRel: string, nom: string): void {
+  const txt = ancienRel.replace(/\.html?$/i, '.txt')
+  if (txt !== ancienRel && existsSync(absOf(txt))) renameEntry(txt, nom)
+}
+
 export function readDoc(rel: string): string {
   return readText(absOf(rel))
 }
 
 /** Copie des fichiers venus d'ailleurs dans le dossier de campagne. */
+/**
+ * Rogner une image : une **copie** rognée, posée à côté de l'originale.
+ *
+ * On ne touche jamais au fichier d'origine — d'autres lieux peuvent le
+ * montrer, et un mauvais cadrage doit pouvoir se refaire. Le cadre est en
+ * fractions de l'image. Rend le chemin de la copie, déjà connue de la
+ * bibliothèque.
+ */
+export function rognerImage(
+  rel: string,
+  cadre: { x: number; y: number; w: number; h: number }
+): string {
+  const abs = absOf(rel)
+  const img = nativeImage.createFromPath(abs)
+  if (img.isEmpty()) throw new Error('Image illisible')
+  const { width, height } = img.getSize()
+  const x = Math.max(0, Math.min(width - 1, Math.round(cadre.x * width)))
+  const y = Math.max(0, Math.min(height - 1, Math.round(cadre.y * height)))
+  const w = Math.max(1, Math.min(width - x, Math.round(cadre.w * width)))
+  const h = Math.max(1, Math.min(height - y, Math.round(cadre.h * height)))
+  const rogne = img.crop({ x, y, width: w, height: h })
+  const ext = extname(abs).toLowerCase()
+  const jpeg = ext === '.jpg' || ext === '.jpeg'
+  const dest = freePath(dirname(abs), `${basename(abs, extname(abs))} (rognée)`, jpeg ? ext : '.png')
+  writeFileSync(dest, jpeg ? rogne.toJPEG(92) : rogne.toPNG())
+  scan()
+  return toRel(campaignRoot()!, dest)
+}
+
 export function importInto(folderRel: string, sources: string[]): string[] {
   const dir = absOf(folderRel)
   const made: string[] = []

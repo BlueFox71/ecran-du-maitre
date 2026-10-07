@@ -22,7 +22,17 @@ import { useMemo, useState } from 'react'
 import { dansForme, formesDesMurs, type Forme } from '@shared/pieces'
 import { bordsOuverture } from '@shared/ouvertures'
 import type { CalqueBrouillard, Lumiere, Mur, Ouverture, Place } from '@shared/types'
-import { IconCheck, IconFenetre, IconPorte, IconRideau, IconSoleil, IconVerrou } from './Icons'
+import {
+  IconCheck,
+  IconClose,
+  IconEye,
+  IconEyeOff,
+  IconFenetre,
+  IconPorte,
+  IconRideau,
+  IconSoleil,
+  IconVerrou
+} from './Icons'
 
 /** Ce que le survol met en évidence sur la carte, en fractions de l'image. */
 export type Surbrillance =
@@ -364,6 +374,29 @@ export function TableauDeScene({
                     onClick={() => void basculer(l, !l.allumee)}
                   >
                     {l.allumee ? 'Allumée' : 'Éteinte'}
+                  </button>
+                  {/* L'icône chez les joueurs : une lampe posée sur la table se
+                      montre ; une bougie qu'on allume, la lueur suffit. */}
+                  <button
+                    className={`tb-oeil${l.icone ? ' on' : ''}`}
+                    aria-pressed={l.icone}
+                    title={
+                      l.icone
+                        ? 'Les joueurs voient l’icône de cette lampe — cliquer pour la leur cacher'
+                        : 'Les joueurs ne voient que la lueur — cliquer pour leur montrer l’icône'
+                    }
+                    onClick={() => void window.jdr.lumieres.update(l.id, { icone: !l.icone })}
+                  >
+                    {l.icone ? <IconEye /> : <IconEyeOff />}
+                  </button>
+                  {/* La lanterne qu'un joueur emporte s'en va de la pièce. */}
+                  <button
+                    className="tb-oter"
+                    title="Retirer cette lampe"
+                    aria-label="Retirer cette lampe"
+                    onClick={() => void window.jdr.lumieres.remove(l.id)}
+                  >
+                    <IconClose />
                   </button>
                 </div>
               ))}

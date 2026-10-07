@@ -14,7 +14,6 @@ import type {
   Beat,
   CampaignPlayer,
   CarnetPlayer,
-  Chapter,
   Character,
   CharacterLogEntry,
   DisplayState,
@@ -43,6 +42,8 @@ export type ViewId =
   | 'places'
   | 'objets'
   | 'timeline'
+  | 'annexes'
+  | 'notes'
   | 'sheets'
   | 'pochette'
   | 'dice'
@@ -103,7 +104,6 @@ interface State {
   reglagesBrut: Brut
   posteBrut: Brut
 
-  chapters: Chapter[]
   root: LibraryRoot | null
   /**
    * Ce qu'on parcourt : l'arborescence et les fichiers de la séance. Quand la
@@ -185,6 +185,12 @@ interface State {
   /** Écrit un réglage du poste. */
   poserPoste: (cle: string, valeur: boolean | number | string | null) => Promise<void>
   refreshReglages: () => Promise<void>
+  /** Ce que Ctrl+Z et Ctrl+Y feraient : le module du dernier pas, ou null. */
+  defaireEtat: { defaire: string | null; refaire: string | null }
+  /** Défait le dernier geste de préparation, puis relit ce qu'il a touché. */
+  defaire: () => Promise<void>
+  /** Refait ce qu'on vient de défaire. */
+  refaire: () => Promise<void>
   toast: (msg: string, error?: boolean) => void
   dismissToast: (id: number) => void
 
@@ -214,10 +220,40 @@ interface State {
 
 let toastSeq = 1
 
+/**
+ * Rejoue un pas de Ctrl+Z ou Ctrl+Y, puis relit tout ce que la préparation
+ * peut avoir touché. Les modules qui tiennent leur propre copie — le calque
+ * des murs — écoutent `jdr:defait` pour se relire aussi. Rien ne s'annonce
+ * quand tout va bien : l'interface montre déjà ce qui a changé.
+ */
+async function rejouerPas(
+  get: () => State,
+  faire: () => Promise<string | null>
+): Promise<void> {
+  try {
+    const touche = await faire()
+    if (!touche) return
+    const s = get()
+    await Promise.all([
+      s.refreshTimeline(),
+      s.refreshPlaces(),
+      s.refreshObjets(),
+      s.refreshAnnexes(),
+      s.refreshCharacters()
+    ])
+    window.dispatchEvent(new CustomEvent('jdr:defait'))
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e)
+    get().toast(msg.replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), true)
+  }
+}
+
 export const useStore = create<State>((set, get) => ({
   ready: false,
-  view: 'regie',
+  // On ouvre sur le Paravent : c'est là qu'on joue la séance.
+  view: 'pupitre',
   toasts: [],
+  defaireEtat: { defaire: null, refaire: null },
 
   project: null,
   recents: [],
@@ -234,7 +270,6 @@ export const useStore = create<State>((set, get) => ({
   reglagesBrut: {},
   posteBrut: {},
 
-  chapters: [],
   root: null,
   tree: [],
   orphans: [],
@@ -302,6 +337,9 @@ export const useStore = create<State>((set, get) => ({
     appliquerTheme(lus)
   },
 
+  defaire: async () => rejouerPas(get, () => window.jdr.defaire.defaire()),
+  refaire: async () => rejouerPas(get, () => window.jdr.defaire.refaire()),
+
   refreshReglages: async () => {
     const api = window.jdr
     const [brut, brutPoste] = await Promise.all([api.reglages.campagne(), api.reglages.poste()])
@@ -351,6 +389,9 @@ export const useStore = create<State>((set, get) => ({
     set({ display, screens, visuel: display.liveSlot === 0 ? 1 : 0 })
 
     api.display.onState((d) => set({ display: d }))
+    /* La pile de Ctrl+Z vit côté base : elle dit ici ce qu'elle tient. */
+    set({ defaireEtat: await api.defaire.etat() })
+    api.defaire.onEtat((e) => set({ defaireEtat: e }))
     api.display.onScreens((s) => set({ screens: s }))
     // Le dossier de campagne a bougé sur le disque : on relit la bibliothèque.
     api.library.onChanged(() => {
@@ -387,13 +428,12 @@ export const useStore = create<State>((set, get) => ({
 
   refreshLibrary: async () => {
     const api = window.jdr
-    const [chapters, treeRes, root, allItems] = await Promise.all([
-      api.chapters.list(),
+    const [treeRes, root, allItems] = await Promise.all([
       api.folders.tree(),
       api.library.root(),
       api.items.list({})
     ])
-    set({ chapters, root, allItems, arbreComplet: treeRes.tree, orphelinsComplets: treeRes.orphans })
+    set({ root, allItems, arbreComplet: treeRes.tree, orphelinsComplets: treeRes.orphans })
     set(focaliser(get()))
   },
 

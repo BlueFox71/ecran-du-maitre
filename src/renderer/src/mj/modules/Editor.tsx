@@ -1,27 +1,20 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
-import StarterKit from '@tiptap/starter-kit'
-import Underline from '@tiptap/extension-underline'
-import TextAlign from '@tiptap/extension-text-align'
-import Table from '@tiptap/extension-table'
-import TableRow from '@tiptap/extension-table-row'
-import TableCell from '@tiptap/extension-table-cell'
-import TableHeader from '@tiptap/extension-table-header'
-import Placeholder from '@tiptap/extension-placeholder'
 import { DOMSerializer } from '@tiptap/pm/model'
+import { ZOOM_MAX, ZOOM_MIN } from '@shared/reglages'
 import { useStore } from '../store'
-import { IconPlus, IconScreen, IconTrash } from '../components/Icons'
-
-const EXTENSIONS = [
-  StarterKit.configure({ heading: { levels: [1, 2, 3] } }),
-  Underline,
-  TextAlign.configure({ types: ['heading', 'paragraph'] }),
-  Table.configure({ resizable: true }),
-  TableRow,
-  TableHeader,
-  TableCell,
-  Placeholder.configure({ placeholder: 'Écris ta scène…' })
-]
+import { IconChevron, IconPlus, IconScreen, IconTrash } from '../components/Icons'
+import { useRetourMoment } from '../retourMoment'
+import {
+  insererTag,
+  MenuTagPersonnage,
+  personnagesALaTable,
+  resynchroniserTags
+} from '../components/TagPersonnage'
+import { insererIntervention, LIBELLE_INTERVENTION } from '../components/Intervention'
+import { EXTENSIONS_TEXTE as EXTENSIONS } from '../components/extensionsTexte'
+import { MenuCommandesTexte } from '../components/CommandesTexte'
+import { Pastille } from '../components/Pastille'
 
 export function Editor(): JSX.Element {
   const s = useStore()
@@ -35,6 +28,41 @@ export function Editor(): JSX.Element {
   const [saved, setSaved] = useState<'saved' | 'dirty' | 'saving'>('saved')
   const saveTimer = useRef<number | null>(null)
   const loadedFor = useRef<number | null>(null)
+
+  /* La loupe du texte. Elle grossit les lettres, pas la page : la barre
+     d'outils et le volet gardent leur taille. C'est une habitude du poste —
+     on la garde d'un document à l'autre et d'une séance à l'autre. Ctrl +/−
+     restent au zoom de toute la fenêtre ; ici, c'est Ctrl + molette. */
+  const [zoom, setZoomLocal] = useState(s.poste.editeurZoom)
+  const zoomTimer = useRef<number | null>(null)
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const setZoom = useCallback(
+    (z: number) => {
+      const v = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 10) / 10
+      setZoomLocal(v)
+      if (zoomTimer.current) window.clearTimeout(zoomTimer.current)
+      zoomTimer.current = window.setTimeout(() => void s.poserPoste('editeur.zoom', v), 400)
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
+  useEffect(() => {
+    const el = scrollRef.current
+    if (!el) return
+    const h = (e: WheelEvent): void => {
+      if (!e.ctrlKey) return
+      e.preventDefault()
+      setZoomLocal((z) => {
+        const v = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z + (e.deltaY < 0 ? 0.1 : -0.1))) * 10) / 10
+        if (zoomTimer.current) window.clearTimeout(zoomTimer.current)
+        zoomTimer.current = window.setTimeout(() => void s.poserPoste('editeur.zoom', v), 400)
+        return v
+      })
+    }
+    el.addEventListener('wheel', h, { passive: false })
+    return () => el.removeEventListener('wheel', h)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [current?.id])
 
   const editor = useEditor({
     extensions: EXTENSIONS,
@@ -51,6 +79,11 @@ export function Editor(): JSX.Element {
     editor.commands.setContent(current.body ?? '<p></p>', false)
     setSaved('saved')
   }, [editor, current])
+
+  /* Un personnage renommé ou recoloré : ses tags suivent, ici comme ailleurs. */
+  useEffect(() => {
+    if (editor && loadedFor.current === current?.id) resynchroniserTags(editor, s.characters)
+  }, [editor, current?.id, s.characters])
 
   const doSave = useCallback(async () => {
     if (!editor || !current) return
@@ -122,7 +155,9 @@ export function Editor(): JSX.Element {
     )
   }
 
-  const chapterTitle = s.chapters.find((c) => c.id === current.chapterId)?.title
+  /* Arrivé ici depuis un moment de la Chronologie : on peut y retourner. */
+  const retour = useRetourMoment.getState()
+  const momentQuitte = retour.docId === current.id ? s.beats.find((b) => b.id === retour.beatId) : undefined
   const placeName = s.places.find((p) => p.id === current.placeId)?.name
 
   return (
@@ -133,6 +168,20 @@ export function Editor(): JSX.Element {
           <p>Sélectionne un passage puis « Diffuser la sélection » pour l’envoyer aux joueurs.</p>
         </div>
         <div className="spacer" />
+        {momentQuitte ? (
+          <button
+            className="btn btn-brass btn-sm"
+            title={`Revenir à « ${momentQuitte.title} » dans la Chronologie`}
+            onClick={async () => {
+              if (saveTimer.current) window.clearTimeout(saveTimer.current)
+              await doSave()
+              s.setView('timeline')
+            }}
+          >
+            <IconChevron className="retourne" />
+            Retour au moment
+          </button>
+        ) : null}
         <select
           className="out-pick"
           value={current.id}
@@ -301,10 +350,30 @@ export function Editor(): JSX.Element {
                 </>
               }
             />
+
+            <span className="tb-sep" />
+            <Tb
+              title="Réduire le texte"
+              onClick={() => setZoom(zoom - 0.1)}
+              icon={<path d="M6 12h12" />}
+            />
+            <button
+              className="tb txt tb-zoom"
+              title="Taille normale (Ctrl + molette pour zoomer)"
+              aria-label="Taille normale du texte"
+              onClick={() => setZoom(1)}
+            >
+              {Math.round(zoom * 100)} %
+            </button>
+            <Tb
+              title="Agrandir le texte"
+              onClick={() => setZoom(zoom + 0.1)}
+              icon={<path d="M6 12h12M12 6v12" />}
+            />
           </div>
 
-          <div className="doc-scroll">
-            <div className="doc-pad">
+          <div className="doc-scroll" ref={scrollRef}>
+            <div className="doc-pad" style={{ '--ed-zoom': zoom } as React.CSSProperties}>
               <input
                 className="doc-title-input"
                 value={title}
@@ -316,9 +385,11 @@ export function Editor(): JSX.Element {
                 aria-label="Titre du document"
               />
               <div className="doc-sub">
-                {[chapterTitle, placeName].filter(Boolean).join(' · ') || 'non rattaché'}
+                {placeName ?? 'non rattaché'}
               </div>
               <EditorContent editor={editor} />
+              <MenuTagPersonnage />
+              <MenuCommandesTexte />
             </div>
           </div>
         </div>
@@ -326,26 +397,6 @@ export function Editor(): JSX.Element {
         <aside className="props">
           <div className="card prop-block">
             <h4>Rattachements</h4>
-            <div className="field">
-              <label htmlFor="ed-chap">Chapitre</label>
-              <select
-                id="ed-chap"
-                value={current.chapterId ?? ''}
-                onChange={async (e) => {
-                  await window.jdr.items.update(current.id, {
-                    chapterId: e.target.value === '' ? null : Number(e.target.value)
-                  })
-                  await s.refreshLibrary()
-                }}
-              >
-                <option value="">— aucun —</option>
-                {s.chapters.map((c) => (
-                  <option key={c.id} value={c.id}>
-                    {c.title}
-                  </option>
-                ))}
-              </select>
-            </div>
             <div className="field">
               <label htmlFor="ed-place">Lieu</label>
               <select
@@ -388,6 +439,35 @@ export function Editor(): JSX.Element {
             </div>
           </div>
 
+          {/* Ce qu'on pose dans le texte d'un clic — « @ » fait la même chose au clavier. */}
+          <div className="card prop-block">
+            <h4>Tags</h4>
+            <div className="ed-tags">
+              {personnagesALaTable(s.characters).map((c) => (
+                <button
+                  key={c.id}
+                  className="ed-tag-pj"
+                  title={`Nommer ${c.name} dans le texte`}
+                  onClick={() => editor && insererTag(editor, c)}
+                >
+                  <Pastille nom={c.name} couleur={c.color} />
+                  <b className={`c-${c.color ?? 'neutral'}`}>{c.name}</b>
+                  {c.player && <span>{c.player}</span>}
+                </button>
+              ))}
+              {personnagesALaTable(s.characters).length === 0 && (
+                <p className="ed-tags-vide">Aucun joueur à la table.</p>
+              )}
+            </div>
+            <button
+              className="ed-tag-intervention"
+              title="Marquer l'endroit où la table doit prendre la main — invisible des joueurs"
+              onClick={() => editor && insererIntervention(editor)}
+            >
+              {LIBELLE_INTERVENTION}
+            </button>
+          </div>
+
           <div className="card prop-block">
             <h4>Diffusion</h4>
             <button
@@ -402,7 +482,7 @@ export function Editor(): JSX.Element {
                   type: 'text',
                   title: current.title,
                   html,
-                  kicker: chapterTitle ?? current.title
+                  kicker: current.title
                 })
                 s.toast('Passage diffusé aux joueurs')
               }}

@@ -2,21 +2,6 @@
 
 export type ItemKind = 'doc' | 'image' | 'video' | 'audio' | 'pdf' | 'other'
 
-export interface Chapter {
-  id: number
-  ord: number
-  title: string
-  notes: string | null
-  /**
-   * Ce qui le désigne. Un chapitre ne contient rien : ce sont les documents,
-   * les lieux et les moments qui pointent vers lui. Ces comptes sont là pour
-   * qu'on sache ce qu'on perd avant d'en effacer un.
-   */
-  items: number
-  places: number
-  beats: number
-}
-
 export interface Folder {
   id: number
   parentId: number | null
@@ -37,7 +22,6 @@ export interface FolderNode extends Folder {
 export interface Item {
   id: number
   folderId: number | null
-  chapterId: number | null
   placeId: number | null
   kind: ItemKind
   title: string
@@ -64,14 +48,20 @@ export interface Item {
  * Les trois étages du rangement des lieux : un espace (le manoir) tient des
  * niveaux (les étages), qui tiennent des lieux (les pièces). Les trois sont
  * des lieux à part entière — carte, ambiance, documents, pions.
+ *
+ * **Un lieu peut être un bâtiment** (7 octobre 2026) : la chapelle posée sur
+ * le plan de l'extérieur reçoit ses propres niveaux, qui tiennent ses pièces.
+ * On retrouve espace → niveau → lieu à l'intérieur ; aucun autre emboîtement.
  */
 export type PlaceTier = 'espace' | 'niveau' | 'lieu'
 
-/** Le contenant admis au-dessus de chaque étage ; `null`, c'est la racine. */
-export const PARENT_TIER: Record<PlaceTier, PlaceTier | null> = {
-  espace: null,
-  niveau: 'espace',
-  lieu: 'niveau'
+/** Les contenants admis au-dessus de chaque étage ; vide, c'est la racine. */
+export const PARENT_TIERS: Record<PlaceTier, PlaceTier[]> = {
+  espace: [],
+  niveau: ['espace', 'lieu'],
+  /* Un lieu posé à même l'espace est un bâtiment : le domaine tient la
+     chapelle et la grange à côté de son plan d'ensemble. */
+  lieu: ['niveau', 'espace']
 }
 
 export const TIER_LABEL: Record<PlaceTier, string> = {
@@ -101,7 +91,10 @@ export interface Zone {
 export interface Place {
   id: number
   tier: PlaceTier
-  /** Le contenant : un espace pour un niveau, un niveau pour un lieu. */
+  /**
+   * Le contenant : un espace — ou un lieu devenu bâtiment — pour un niveau,
+   * un niveau pour un lieu.
+   */
   parentId: number | null
   /** Le rang parmi ses frères. C'est lui qu'on remue en glissant une tuile. */
   ord: number
@@ -153,7 +146,6 @@ export interface Place {
    * carte elles se ressemblent toutes.
    */
   ouvLargeur: number | null
-  chapterIds: number[]
   docCount: number
 }
 
@@ -181,6 +173,11 @@ export interface Lumiere {
    * est vu : c'est de l'ambiance, pas une règle. Blanc par défaut.
    */
   teinte: string
+  /**
+   * Son icône se montre-t-elle aux joueurs ? Le MJ la voit toujours ; les
+   * joueurs ne voient que la lueur, sauf si le MJ leur montre l'objet.
+   */
+  icone: boolean
 }
 
 /** Les teintes proposées d'un clic — au-delà, on choisit la sienne. */
@@ -233,7 +230,6 @@ export interface Beat {
   title: string
   note: string | null
   done: boolean
-  chapterId: number | null
   placeId: number | null
   items: Item[]
   /** Les PNJ que ce moment met en scène : la Régie les range devant les autres. */
@@ -477,6 +473,8 @@ export interface Character {
   player: string | null
   occupation: string | null
   portraitItemId: number | null
+  /** Le carré qu'on taille dans son portrait pour le pion ; null, le centre. */
+  portraitCadre: CadreCarre | null
   age: string | null
   /**
    * Nom d'un jeton de couleur — la même liste que les pions. C'est elle qui
@@ -959,6 +957,33 @@ export const COLLAGE_CELLS: Record<CollageLayout, number> = {
 }
 
 /**
+ * Le carré taillé dans un portrait : c'est lui que montrent le pion, la face
+ * de l'encart, le téléphone. En fractions de l'image — `x`, `y` le coin haut
+ * gauche, `w` et `h` les côtés —, si bien qu'un écran n'a pas besoin de
+ * connaître les proportions du fichier pour le dessiner : `w` et `h` les
+ * portent déjà. Un portrait sans carré se montre au centre, comme avant.
+ */
+export interface CadreCarre {
+  x: number
+  y: number
+  w: number
+  h: number
+}
+
+/** Le carré relu depuis sa colonne ; un texte abîmé redevient « au centre ». */
+export function lisCadreCarre(txt: string | null | undefined): CadreCarre | null {
+  if (!txt) return null
+  try {
+    const c = JSON.parse(txt)
+    const ok = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+    if (!ok(c?.x) || !ok(c?.y) || !ok(c?.w) || !ok(c?.h) || c.w <= 0 || c.h <= 0) return null
+    return { x: c.x, y: c.y, w: Math.min(1, c.w), h: Math.min(1, c.h) }
+  } catch {
+    return null
+  }
+}
+
+/**
  * Cadrage d'une image : l'agrandissement et le décalage, en fractions du cadre.
  * `zoom` 1 et décalages nuls, c'est l'image telle qu'elle entre d'elle-même.
  */
@@ -1174,6 +1199,8 @@ export interface Pion {
   label: string
   /** Portrait ou image du pion, déjà servie en jdr://. */
   url: string | null
+  /** Le carré taillé dans le portrait ; jamais pour l'image d'un objet. */
+  cadre: CadreCarre | null
   initials: string
   /** Nom d'un jeton de couleur : brass, moss, iris, blood, neutral. */
   color: string
@@ -1210,6 +1237,7 @@ export interface PionJoueur {
   color: string
   /** Portrait du personnage, déjà servi en jdr:// ; null, on montre ses initiales. */
   url: string | null
+  cadre: CadreCarre | null
   initials: string
 }
 
@@ -1257,6 +1285,7 @@ export interface JoueurVu {
   color: string | null
   /** Portrait, déjà servi en jdr://. */
   url: string | null
+  cadre: CadreCarre | null
   initials: string
   /** La vie : première jauge du gabarit. */
   pv: JaugeVue | null
@@ -1290,6 +1319,23 @@ export const ENCART_NEUF: Encart = {
   largeur: 46,
   hauteur: 13,
   sm: false
+}
+
+/**
+ * Une image posée en fenêtre par-dessus l'écran en direct, sans remplacer ce
+ * qu'il montre : un portrait, un indice, une lettre qu'on tend un instant.
+ * `x` et `y` placent son centre en fractions de l'écran, `largeur` est un
+ * pourcentage de sa largeur ; la hauteur suit, au `ratio` de l'image.
+ */
+export interface FenetreImage {
+  itemId: number
+  url: string
+  title: string
+  x: number
+  y: number
+  largeur: number
+  /** Largeur sur hauteur, pour que la fenêtre garde la forme de l'image. */
+  ratio: number
 }
 
 /** Ce que le MJ montre du doigt, en fraction de l'écran. */
@@ -1350,6 +1396,11 @@ export interface DisplayState {
    * ancrés d'un côté de l'image et qui y restent tant qu'on les garde.
    */
   encart: Encart
+  /**
+   * Les images en fenêtre par-dessus le direct, de la plus ancienne à la plus
+   * récente — la dernière est au premier plan. Une image n'a qu'une fenêtre.
+   */
+  fenetres: FenetreImage[]
   /** Les personnages joueurs, tels que l'écran les montre. */
   joueurs: JoueurVu[]
   audio: AudioState
@@ -1403,7 +1454,6 @@ export interface ScreenInfo {
 
 export interface ItemFilter {
   folderId?: number | null
-  chapterId?: number | null
   placeId?: number | null
   kinds?: ItemKind[]
   search?: string

@@ -3,11 +3,13 @@ import { useStore } from '../store'
 import { MenuPion, type CiblePion } from '../components/MenuPion'
 import { TableauDeScene, type Surbrillance } from '../components/Tableau'
 import { Slide } from '../../shared/Slide'
+import { Visage } from '../../shared/Visage'
 import { Pings, usePings } from '../../shared/Pings'
 import { decorDossier, folderIcon } from '../components/FolderIcons'
 import { Annotations, CadreAnnote, type OutilAnnotation } from '../components/Annotations'
 import { slideLabel } from '../components/Monitor'
 import { IconPhone, Portables } from '../components/Portables'
+import { BoutonPoserLumiere, usePoseLumiere } from '../components/OutilsDeScene'
 import {
   IconAudio,
   IconChevron,
@@ -95,7 +97,8 @@ export function profondeur(p: Place, tous: Place[]): number {
     cur = tous.find((x) => x.id === cur!.parentId)
     if (cur) d++
   }
-  return Math.min(d, 2)
+  /* Cinq crans : espace, niveau, bâtiment, son niveau, sa pièce. */
+  return Math.min(d, 4)
 }
 
 export function Regie(): JSX.Element {
@@ -169,6 +172,17 @@ export function Regie(): JSX.Element {
   const idleSlot: 0 | 1 = liveSlot === 0 ? 1 : 0
   const prepSlide = display?.slots?.[idleSlot] ?? { type: 'black' as const }
   const onLive = visuel === liveSlot
+
+  /* En arrivant sur la page, on regarde ce que voient les joueurs : le direct,
+     toujours. Une fois seulement, dès que l'état de l'écran est connu — ensuite
+     on passe d'un visuel à l'autre comme on veut. */
+  const arrive = useRef(false)
+  useEffect(() => {
+    if (arrive.current || !display) return
+    arrive.current = true
+    setVisuel(display.liveSlot)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [display])
   const slide = display?.slots?.[visuel] ?? { type: 'black' as const }
 
   const frozen = display?.frozen ?? false
@@ -299,6 +313,9 @@ export function Regie(): JSX.Element {
       vivant = false
     }
   }, [editPlaceId, edit.pions, display?.pions, display?.calqueRev])
+
+  /* Une bougie qu'on allume, une lanterne qu'on pose : un clic dans la pièce. */
+  const lampe = usePoseLumiere(editPlaceId, calque)
 
   const refreshPresence = async (): Promise<void> => setPresence(await window.jdr.pions.presence())
   const refreshEdit = async (): Promise<void> => setEdit(await window.jdr.pions.of(editPlaceId))
@@ -990,6 +1007,9 @@ Clic : préparer`
                       void window.jdr.display.encart({ largeur, hauteur })
                     }
                     onAjuster={(id, key, d) => void ajusterJauge(id, key, d)}
+                    fenetres={onLive ? display?.fenetres : null}
+                    onFenetre={(id, patch) => void window.jdr.display.reglerFenetre(id, patch)}
+                    onFermerFenetre={(id) => void window.jdr.display.fermerFenetre(id)}
                     pointer={pointer}
                     onDropAt={(e, x, y, cell) => void dropOnStage(e, x, y, cell)}
                     onRemovePion={(id) => void removePion(id)}
@@ -1001,6 +1021,8 @@ Clic : préparer`
                     onMoveText={bougeTexte}
                     activeText={over?.id ?? null}
                     onPickText={choisitTexte}
+                    onPoserSurCarte={lampe.poser}
+                    lumieresMJ
                   />
                   {/* Par-dessus la scène, jamais dedans : le calque du MJ ne fait
                       pas partie de la diapositive, donc il ne part nulle part. */}
@@ -1539,6 +1561,7 @@ Clic : préparer`
                 <IconEye />
                 Voir ce qu’ils voient
               </button>
+              <BoutonPoserLumiere p={lampe} />
               <button
                 className={`btn${frozen ? ' btn-on' : ''}`}
                 onClick={() => void window.jdr.display.freeze(!frozen)}
@@ -1679,7 +1702,7 @@ Clic : préparer · glisser sur « À l’écran » : envoyer tout de suite`}
                               title={j.name}
                             >
                               {j.url ? (
-                                <img src={j.url} alt="" draggable={false} />
+                                <Visage url={j.url} cadre={j.cadre} />
                               ) : (
                                 j.initials
                               )}
@@ -1775,6 +1798,7 @@ Clic : préparer · glisser sur « À l’écran » : envoyer tout de suite`}
                     pionPv={display?.pionPv ?? false}
                     joueurs={display?.joueurs}
                     encart={display?.encart}
+                    fenetres={live ? display?.fenetres : null}
                   />
                 </div>
                 {pending ? (

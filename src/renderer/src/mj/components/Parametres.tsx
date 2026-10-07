@@ -311,7 +311,7 @@ function Ecran(): JSX.Element {
       </Ligne>
 
       <p className="pm-aparte">
-        Restent en Régie et au Pupitre : <b>noms</b> et <b>PV sous les pions</b>, l’
+        Restent en Régie et au Paravent : <b>noms</b> et <b>PV sous les pions</b>, l’
         <b>encart des joueurs</b> et sa santé mentale, le <b>volume de l’ambiance</b>. On les
         bascule en pleine scène — les deux pages en gardent donc chacune une copie, et c’est voulu.
       </p>

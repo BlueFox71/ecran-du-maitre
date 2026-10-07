@@ -279,6 +279,8 @@ export function FicheSeance({ onClose }: { onClose: () => void }): JSX.Element {
         </div>
       </div>
 
+      <PlaceDeLaSeance key={seance.id} id={seance.id} />
+
       <div className="field">
         <label htmlFor="fs-dossier">Dossier de la séance</label>
         <select
@@ -351,6 +353,217 @@ export function FicheSeance({ onClose }: { onClose: () => void }): JSX.Element {
         </button>
       </div>
     </Fenetre>
+  )
+}
+
+/* ============================================================
+   Dupliquer une séance
+   ============================================================ */
+
+/**
+ * Une séance neuve, copiée d'une autre : on choisit laquelle — la dernière
+ * créée d'abord —, le dossier qu'on recopie avec elle et le nom de sa copie,
+ * qui devient le dossier de la nouvelle séance. La fenêtre ne se ferme pas
+ * tant que la copie court : elle continuerait de toute façon, sans personne
+ * pour en voir la fin.
+ */
+export function DupliquerSeance({ onClose }: { onClose: () => void }): JSX.Element {
+  const s = useStore()
+  const derniere = [...s.sessions].sort((a, b) => b.id - a.id)[0]
+  const [srcId, setSrcId] = useState(derniere?.id ?? 0)
+  const [dossier, setDossier] = useState(derniere?.folderRel ?? '')
+  const [label, setLabel] = useState('Séance ' + (s.sessions.length + 1))
+  const [nomDossier, setNomDossier] = useState<string | null>(null)
+  const [prog, setProg] = useState<{ etape: 'fichiers' | 'seance'; fait: number; total: number } | null>(null)
+
+  /* Une fenêtre de dev lancée avant ce code a un preload qui ne connaît pas
+     encore la progression : sans le `?.`, tout l'écran tombait au noir. */
+  useEffect(() => window.jdr.timeline.onProgression?.(setProg), [])
+
+  const enCours = prog !== null
+  const nom = nomDossier ?? label
+  const dossiers = dossiersDeSeance(s.arbreComplet)
+  if (dossier && !dossiers.some((d) => d.rel === dossier)) dossiers.unshift({ rel: dossier, libelle: dossier })
+
+  const choisirSource = (id: number): void => {
+    setSrcId(id)
+    setDossier(s.sessions.find((x) => x.id === id)?.folderRel ?? '')
+  }
+
+  const dupliquer = async (): Promise<void> => {
+    if (!srcId || enCours) return
+    setProg({ etape: dossier ? 'fichiers' : 'seance', fait: 0, total: 1 })
+    try {
+      const neuve = await window.jdr.timeline.dupliquerSeance(srcId, label.trim(), dossier || null, nom.trim())
+      await s.refreshSeance()
+      s.toast(`« ${neuve.label} » est prête`)
+      onClose()
+    } catch (e) {
+      setProg(null)
+      s.toast(e instanceof Error ? e.message.replace(/^Error invoking remote method '[^']+': (Error: )?/, '') : 'Duplication impossible', true)
+    }
+  }
+
+  /* Les fichiers font l'essentiel du chemin ; la séance, en base, le dernier pas. */
+  const part = !prog
+    ? 0
+    : prog.etape === 'fichiers'
+      ? (prog.fait / (prog.total || 1)) * 0.95
+      : 0.95 + 0.05 * (prog.fait / (prog.total || 1))
+  const mo = (b: number): string => `${(b / 1024 / 1024).toFixed(1)} Mo`
+
+  return (
+    <Fenetre
+      titre="Dupliquer une séance"
+      icone={<IconPlus />}
+      onClose={() => {
+        if (!enCours) onClose()
+      }}
+      pied={
+        <>
+          <button className="btn" disabled={enCours} onClick={onClose}>
+            Annuler
+          </button>
+          <button
+            className="btn btn-primary"
+            disabled={enCours || !srcId || !label.trim() || (!!dossier && !nom.trim())}
+            onClick={() => void dupliquer()}
+          >
+            Dupliquer
+          </button>
+        </>
+      }
+    >
+      <div className="field">
+        <label htmlFor="ds-source">Séance à dupliquer</label>
+        <select
+          id="ds-source"
+          value={srcId}
+          disabled={enCours}
+          onChange={(e) => choisirSource(Number(e.target.value))}
+        >
+          {s.sessions.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.label}
+              {x.id === derniere?.id ? ' · la dernière créée' : ''}
+            </option>
+          ))}
+        </select>
+      </div>
+
+      <div className="field">
+        <label htmlFor="ds-nom">Nom de la nouvelle séance</label>
+        <input
+          id="ds-nom"
+          type="text"
+          value={label}
+          disabled={enCours}
+          onChange={(e) => setLabel(e.target.value)}
+        />
+      </div>
+
+      <div className="deux">
+        <div className="field">
+          <label htmlFor="ds-dossier">Dossier à dupliquer</label>
+          <select
+            id="ds-dossier"
+            value={dossier}
+            disabled={enCours}
+            onChange={(e) => setDossier(e.target.value)}
+          >
+            <option value="">— aucun, pas de fichiers —</option>
+            {dossiers.map((d) => (
+              <option key={d.rel} value={d.rel}>
+                {d.libelle}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div className="field">
+          <label htmlFor="ds-copie">Nom de la copie</label>
+          <input
+            id="ds-copie"
+            type="text"
+            value={nom}
+            disabled={enCours || !dossier}
+            onChange={(e) => setNomDossier(e.target.value)}
+          />
+        </div>
+      </div>
+      <p className="expli">
+        {dossier
+          ? `« ${dossier} » est recopié à côté de lui sous le nom « ${nom.trim() || '…'} », qui devient le dossier de la nouvelle séance. Plans, portraits et textes des moments pointent sur la copie.`
+          : 'Sans dossier, la nouvelle séance garde les mêmes fichiers que l’autre.'}{' '}
+        Lieux (non découverts, sans pions), PNJ, moments (aucun joué) et notes sont repris ; les
+        joueurs arrivent avec leur état le plus récent.
+      </p>
+
+      {prog ? (
+        <div className="dupli-avance" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(part * 100)}>
+          <div className="dupli-piste">
+            <span style={{ width: `${part * 100}%` }} />
+          </div>
+          <span className="dupli-etape">
+            {prog.etape === 'fichiers'
+              ? `Copie des fichiers · ${mo(prog.fait)} sur ${mo(prog.total)}`
+              : 'Copie des lieux, des PNJ et des moments…'}
+          </span>
+        </div>
+      ) : null}
+    </Fenetre>
+  )
+}
+
+/**
+ * Où la séance se range parmi les autres : juste avant ou juste après l'une
+ * d'elles. C'est l'ordre de la liste, et celui qui dit « la séance d'avant »
+ * — l'état des joueurs qu'on recopie en entrant, le hors-jeu.
+ */
+function PlaceDeLaSeance({ id }: { id: number }): JSX.Element | null {
+  const s = useStore()
+  const rang = s.sessions.findIndex((x) => x.id === id)
+  const autres = s.sessions.filter((x) => x.id !== id)
+  /* Par défaut, la position qu'elle occupe déjà : après celle qui la précède. */
+  const [sens, setSens] = useState<'avant' | 'apres'>(rang > 0 ? 'apres' : 'avant')
+  const [refId, setRefId] = useState(
+    (rang > 0 ? s.sessions[rang - 1]?.id : s.sessions[rang + 1]?.id) ?? 0
+  )
+  if (!autres.length) return null
+
+  const placer = async (): Promise<void> => {
+    if (!refId) return
+    await window.jdr.timeline.placerSeance(id, refId, sens)
+    await s.refreshTimeline()
+    await s.refreshCharacters()
+  }
+
+  return (
+    <div className="field">
+      <label htmlFor="fs-place">
+        Place dans la campagne · {rang + 1}
+        {rang === 0 ? 'ʳᵉ' : 'ᵉ'} sur {s.sessions.length}
+      </label>
+      <div className="place-seance">
+        <select value={sens} onChange={(e) => setSens(e.target.value as 'avant' | 'apres')}>
+          <option value="avant">Avant</option>
+          <option value="apres">Après</option>
+        </select>
+        <select id="fs-place" value={refId} onChange={(e) => setRefId(Number(e.target.value))}>
+          {autres.map((x) => (
+            <option key={x.id} value={x.id}>
+              {x.label}
+            </option>
+          ))}
+        </select>
+        <button className="btn btn-sm" onClick={() => void placer()}>
+          Placer
+        </button>
+      </div>
+      <p className="expli">
+        L’ordre de la liste est aussi celui qui dit quelle séance vient avant : c’est d’elle que les
+        joueurs reprennent leur état quand on entre dans une séance pour la première fois.
+      </p>
+    </div>
   )
 }
 
@@ -549,12 +762,15 @@ export function Fenetre({
   icone,
   large,
   onClose,
+  pied,
   children
 }: {
   titre: string
   icone: JSX.Element
   large?: boolean
   onClose: () => void
+  /** Les boutons du pied, à la place de « Terminé ». */
+  pied?: React.ReactNode
   children: React.ReactNode
 }): JSX.Element {
   useEffect(() => {
@@ -580,9 +796,11 @@ export function Fenetre({
         </header>
         <div className="body">{children}</div>
         <footer>
-          <button className="btn btn-primary" onClick={onClose}>
-            Terminé
-          </button>
+          {pied ?? (
+            <button className="btn btn-primary" onClick={onClose}>
+              Terminé
+            </button>
+          )}
         </footer>
       </div>
     </div>

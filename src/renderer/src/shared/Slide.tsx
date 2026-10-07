@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { COLLAGE_CELLS, FRAME_NEUTRE, corpsDeCase, etatDeVie } from '@shared/types'
 import { Brouillard } from './Brouillard'
+import { Visage } from './Visage'
 import { barrieres, pasContraint, type Pt } from '@shared/murs'
 import { bordsOuverture } from '@shared/ouvertures'
 import type { Surbrillance } from '../mj/components/Tableau'
@@ -9,6 +10,7 @@ import type {
   CollageCell,
   Encart,
   EtatPion,
+  FenetreImage,
   Frame,
   JaugeVue,
   JoueurVu,
@@ -120,6 +122,15 @@ export interface SlideExtras {
   onSizeEncart?: (largeur: number, hauteur: number) => void
   /** Fourni côté MJ : les jauges s'ajustent d'un clic depuis l'encart. */
   onAjuster?: (characterId: number, key: string, delta: number) => void
+  /** Les images en fenêtre par-dessus le direct, la dernière au premier plan. */
+  fenetres?: FenetreImage[] | null
+  /** Fourni côté MJ : une fenêtre se déplace, se retaille et passe devant à la souris. */
+  onFenetre?: (
+    itemId: number,
+    patch: { x?: number; y?: number; largeur?: number; devant?: boolean }
+  ) => void
+  /** Fourni côté MJ : la croix d'une fenêtre la ferme. */
+  onFermerFenetre?: (itemId: number) => void
   /** Case du collage que la prochaine image viendra remplir. */
   activeCell?: number
   onPickCell?: (index: number) => void
@@ -127,6 +138,17 @@ export interface SlideExtras {
   onFrame?: (cell: number | null, frame: Frame) => void
   /** Fourni côté MJ : les textes posés sur l'écran se déplacent à la souris. */
   onMoveText?: (id: number, x: number, y: number) => void
+  /**
+   * Fourni côté MJ, quand un outil est armé (poser une lumière) : un clic sur
+   * l'image rend le point visé **en fractions de la carte** — le repère des
+   * murs et des lampes —, et rien d'autre ne reçoit ce clic.
+   */
+  onPoserSurCarte?: (x: number, y: number) => void
+  /**
+   * Côté MJ : l'icône de **toutes** les lumières du calque. Sans cela — chez
+   * les joueurs —, seules celles que le MJ a choisi de montrer.
+   */
+  lumieresMJ?: boolean
   /** Texte en cours de modification dans la régie. */
   activeText?: number | null
   onPickText?: (id: number) => void
@@ -149,6 +171,9 @@ export function Slide({
   onMoveEncart,
   onSizeEncart,
   onAjuster,
+  fenetres,
+  onFenetre,
+  onFermerFenetre,
   pointer,
   onDropAt,
   onRemovePion,
@@ -159,9 +184,13 @@ export function Slide({
   onFrame,
   onMoveText,
   activeText,
-  onPickText
+  onPickText,
+  onPoserSurCarte,
+  lumieresMJ
 }: { slide: SlidePayload; animate?: boolean } & SlideExtras): JSX.Element {
-  const cls = `slide sl-${slide.type}${animate ? ' slide-fade' : ''}`
+  const cls = `slide sl-${slide.type}${animate ? ' slide-fade' : ''}${
+    onPoserSurCarte ? ' pose-point' : ''
+  }`
   /* Le repère de l'image, que `Framed` publie dès qu'il le connaît. C'est un
      état et non une référence : les pions se replacent avec lui. */
   const [repere, setRepere] = useState<Repere | null>(null)
@@ -276,11 +305,29 @@ export function Slide({
       }
     : {}
 
+  /* Un outil armé prend le clic avant tout le reste — pions, textes, cases. */
+  const hostProps = {
+    ...dropProps,
+    ...(onPoserSurCarte
+      ? {
+          onClickCapture: (e: React.MouseEvent) => {
+            if (!repere) return
+            const b = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            const p = repere.versCarte((e.clientX - b.left) / b.width, (e.clientY - b.top) / b.height)
+            e.stopPropagation()
+            e.preventDefault()
+            if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) return
+            onPoserSurCarte(p.x, p.y)
+          }
+        }
+      : {})
+  }
+
   /*
    * L'encart des joueurs se pose sur tout, y compris le voile noir : il dit
    * l'état du groupe, et cet état ne dépend pas de ce qu'on montre.
    */
-  const bandeau =
+  const encartJoueurs =
     encart?.on && joueurs?.length ? (
       <EncartJoueurs
         encart={encart}
@@ -290,6 +337,52 @@ export function Slide({
         onAjuster={onAjuster}
       />
     ) : null
+  /* La fenêtre d'image se pose, comme l'encart, par-dessus tout ce qu'on
+     montre — juste sous l'encart, qui reste lisible quoi qu'il arrive. */
+  /* Les lumières, en icône sur l'image : toutes pour le MJ, qui doit savoir
+     où sont ses lampes ; chez les joueurs, seulement celles qu'il leur montre.
+     Elles vivent dans la carte et suivent son cadrage, comme les murs. */
+  const lampes =
+    repere && brouillard && (slide.type === 'image' || slide.type === 'video')
+      ? brouillard.lumieres.filter((l) => lumieresMJ || l.icone)
+      : []
+  const iconesLumieres = lampes.length ? (
+    <div className="lampes-zone" aria-hidden="true">
+      {lampes.map((l) => {
+        const q = repere!.versEcran({ x: l.x, y: l.y })
+        return (
+          <span
+            key={l.id}
+            className={`lampe-icone${l.allumee ? '' : ' eteinte'}${
+              lumieresMJ && !l.icone ? ' mj-seul' : ''
+            }`}
+            style={{ left: `${q.x * 100}%`, top: `${q.y * 100}%` }}
+          >
+            <svg viewBox="0 0 24 24">
+              <circle cx="12" cy="12" r="4.2" />
+              <path d="M12 2.5v2.6M12 18.9v2.6M2.5 12h2.6M18.9 12h2.6M5.3 5.3l1.8 1.8M16.9 16.9l1.8 1.8M5.3 18.7l1.8-1.8M16.9 7.1l1.8-1.8" />
+            </svg>
+          </span>
+        )
+      })}
+    </div>
+  ) : null
+
+  const bandeau = (
+    <>
+      {iconesLumieres}
+      {(fenetres ?? []).map((f, i, toutes) => (
+        <FenetreSurEcran
+          key={f.itemId}
+          fenetre={f}
+          devant={i === toutes.length - 1}
+          onRegler={onFenetre ? (patch) => onFenetre(f.itemId, patch) : undefined}
+          onFermer={onFermerFenetre ? () => onFermerFenetre(f.itemId) : undefined}
+        />
+      ))}
+      {encartJoueurs}
+    </>
+  )
 
   // Les pions se posent sur une image, pas sur une carte à lire ni sur le noir.
   const visual = slide.type === 'image' || slide.type === 'video' || slide.type === 'collage'
@@ -350,7 +443,7 @@ export function Slide({
 
   if (slide.type === 'black') {
     return (
-      <div className={cls} key="black" {...dropProps}>
+      <div className={cls} key="black" {...hostProps}>
         <div className="sigil" />
         <div className="w">écran joueurs</div>
         {texte}
@@ -361,7 +454,7 @@ export function Slide({
 
   if (slide.type === 'image') {
     return (
-      <div className={cls} key={`img-${slide.itemId}`} {...dropProps}>
+      <div className={cls} key={`img-${slide.itemId}`} {...hostProps}>
         <div className="slide-media">
           <Framed
             url={slide.url}
@@ -389,7 +482,7 @@ export function Slide({
      à tenir d'accord. */
   if (slide.type === 'video') {
     return (
-      <div className={cls} key={`vid-${slide.itemId}`} {...dropProps}>
+      <div className={cls} key={`vid-${slide.itemId}`} {...hostProps}>
         <div className="slide-media">
           <Framed
             url={slide.url}
@@ -417,7 +510,7 @@ export function Slide({
       (_, i) => slide.cells[i] ?? null
     )
     return (
-      <div className={`${cls} lay-${slide.layout}`} key={`col-${slide.layout}`} {...dropProps}>
+      <div className={`${cls} lay-${slide.layout}`} key={`col-${slide.layout}`} {...hostProps}>
         {cases.map((c, i) => (
           <div
             key={i}
@@ -1077,6 +1170,123 @@ export function Framed({
 }
 
 /* ============================================================
+   L'image en fenêtre
+   ============================================================ */
+
+/**
+ * Une image tendue aux joueurs par-dessus le direct. Côté MJ — quand
+ * `onRegler` est fourni —, on la déplace en la tirant, on la retaille par la
+ * poignée du coin, et la croix la ferme. On n'enregistre qu'au relâchement,
+ * comme l'encart : les joueurs ne la voient pas trembler pendant qu'on la place.
+ */
+function FenetreSurEcran({
+  fenetre,
+  devant,
+  onRegler,
+  onFermer
+}: {
+  fenetre: FenetreImage
+  /** Déjà au premier plan : la prendre ne la fait pas repasser devant. */
+  devant: boolean
+  onRegler?: (patch: { x?: number; y?: number; largeur?: number; devant?: boolean }) => void
+  onFermer?: () => void
+}): JSX.Element {
+  const [pos, setPos] = useState({ x: fenetre.x, y: fenetre.y })
+  const [largeur, setLargeur] = useState(fenetre.largeur)
+  const drag = useRef<{ x: number; y: number; from: { x: number; y: number } } | null>(null)
+  const poigne = useRef<{ x: number; l: number } | null>(null)
+  const bouge = useRef(false)
+
+  useEffect(() => setPos({ x: fenetre.x, y: fenetre.y }), [fenetre.x, fenetre.y])
+  useEffect(() => setLargeur(fenetre.largeur), [fenetre.largeur])
+
+  const mj = !!onRegler
+  return (
+    <div className="fenetre-zone">
+      <div
+        className={`fenetre-image${mj ? ' live' : ''}`}
+        style={{
+          left: `${pos.x * 100}%`,
+          top: `${pos.y * 100}%`,
+          width: `${largeur}cqw`,
+          aspectRatio: String(fenetre.ratio)
+        }}
+        onPointerDown={(e) => {
+          if (!mj || e.button !== 0 || (e.target as HTMLElement).closest('.fen-geste')) return
+          e.preventDefault()
+          drag.current = { x: e.clientX, y: e.clientY, from: pos }
+          bouge.current = false
+          e.currentTarget.setPointerCapture(e.pointerId)
+          /* Celle qu'on prend passe au premier plan, comme une feuille qu'on
+             tire de la pile. */
+          if (!devant) onRegler?.({ devant: true })
+        }}
+        onPointerMove={(e) => {
+          const d = drag.current
+          const b = e.currentTarget.parentElement?.getBoundingClientRect()
+          if (!d || !b) return
+          if (Math.abs(e.clientX - d.x) > 3 || Math.abs(e.clientY - d.y) > 3) bouge.current = true
+          setPos({
+            x: clamp(d.from.x + (e.clientX - d.x) / b.width, 0, 1),
+            y: clamp(d.from.y + (e.clientY - d.y) / b.height, 0, 1)
+          })
+        }}
+        onPointerUp={(e) => {
+          if (!drag.current) return
+          drag.current = null
+          e.currentTarget.releasePointerCapture(e.pointerId)
+          if (bouge.current) onRegler?.({ x: pos.x, y: pos.y })
+        }}
+      >
+        <img src={fenetre.url} alt={fenetre.title} draggable={false} />
+
+        {mj && onFermer ? (
+          <button
+            className="fen-geste fen-fermer"
+            title="Retirer la fenêtre de l’écran des joueurs"
+            aria-label="Fermer la fenêtre"
+            onClick={(e) => {
+              e.stopPropagation()
+              onFermer()
+            }}
+          >
+            ×
+          </button>
+        ) : null}
+
+        {mj ? (
+          <span
+            className="fen-geste fen-poignee"
+            title="Tirer pour agrandir ou réduire la fenêtre"
+            onPointerDown={(e) => {
+              e.preventDefault()
+              e.stopPropagation()
+              poigne.current = { x: e.clientX, l: largeur }
+              e.currentTarget.setPointerCapture(e.pointerId)
+            }}
+            onPointerMove={(e) => {
+              const p = poigne.current
+              const b = (e.currentTarget.parentElement?.parentElement as HTMLElement | undefined)
+                ?.getBoundingClientRect()
+              if (!p || !b) return
+              /* Tirée depuis le centre : un pixel gagné d'un côté en gagne
+                 autant de l'autre. La hauteur suit, au ratio de l'image. */
+              setLargeur(clamp(p.l + ((e.clientX - p.x) / b.width) * 200, 8, 100))
+            }}
+            onPointerUp={(e) => {
+              if (!poigne.current) return
+              poigne.current = null
+              e.currentTarget.releasePointerCapture(e.pointerId)
+              onRegler?.({ largeur })
+            }}
+          />
+        ) : null}
+      </div>
+    </div>
+  )
+}
+
+/* ============================================================
    L'encart des joueurs
    ============================================================ */
 
@@ -1206,7 +1416,11 @@ function EncartJoueurs({
         {joueurs.map((j) => (
           <div key={j.id} className={`ejoueur c-${j.color ?? 'neutral'}`}>
             <span className="face">
-              {j.url ? <img src={j.url} alt={j.name} /> : <span className="ini">{j.initials}</span>}
+              {j.url ? (
+                <Visage url={j.url} cadre={j.cadre} alt={j.name} />
+              ) : (
+                <span className="ini">{j.initials}</span>
+              )}
             </span>
             <span className="jauges">
               {j.pv ? (
@@ -1499,7 +1713,7 @@ function PionLayer({
               terre tiennent déjà les deux pseudo-éléments du jeton. */}
           {p.id === focusPionId ? <span className="viseur" /> : null}
           {p.url ? (
-            <img src={p.url} alt="" draggable={false} />
+            <Visage url={p.url} cadre={p.cadre} />
           ) : (
             <span className="ini">{p.initials}</span>
           )}

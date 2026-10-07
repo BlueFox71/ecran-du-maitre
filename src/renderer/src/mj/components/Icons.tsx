@@ -77,6 +77,17 @@ export const IconDoc = (p: P = {}): JSX.Element =>
     p
   )
 
+/** Le bloc-notes : une feuille à spirale, une case cochée, deux lignes. */
+export const IconNotes = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M5.5 5h13v16h-13z" />
+      <path d="M8.5 3v4M12 3v4M15.5 3v4" />
+      <path d="M8.5 11.5l1.3 1.3 2.4-2.6M13.5 12h2.5M8.5 17h7.5" />
+    </>,
+    p
+  )
+
 export const IconPlace = (p: P = {}): JSX.Element =>
   box(
     <>
@@ -201,6 +212,24 @@ export const IconSearch = (p: P = {}): JSX.Element =>
   )
 
 export const IconChevron = (p: P = {}): JSX.Element => box(<path d="M9 6l6 6-6 6" />, p)
+
+/** Les flèches de l'historique, dans la barre du haut. */
+export const IconPrecedent = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M19 12H5" />
+      <path d="M11 6l-6 6 6 6" />
+    </>,
+    p
+  )
+export const IconSuivant = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M5 12h14" />
+      <path d="M13 6l6 6-6 6" />
+    </>,
+    p
+  )
 
 export const IconPen = (p: P = {}): JSX.Element =>
   box(

@@ -621,6 +621,13 @@
   --pion-fill: var(--neutral-wash);
 }
 
+/* Le tag de personnage écrit dans un texte : son nom, en gras, dans sa
+   couleur. Ici plutôt que dans app.css, l'écran des joueurs le reçoit aussi. */
+.pj-tag {
+  font-weight: 700;
+  color: var(--pion-ring, inherit);
+}
+
 /* Le pointeur : ce que le MJ montre du doigt. */
 .laser {
   position: absolute;
@@ -921,6 +928,8 @@
   min-height: 0;
 }
 .ejoueur .face {
+  /* Positionnée : le carré taillé dans le portrait se pose sur elle. */
+  position: relative;
   height: calc(var(--u) * 58);
   aspect-ratio: 1;
   flex: none;
@@ -1157,3 +1166,156 @@
   }
 }
 
+
+/* « Intervention des joueurs » est une indication pour le MJ : elle ne
+   s'affiche pas sur l'écran des joueurs (app.css la montre chez le MJ). */
+.intervention {
+  display: none;
+}
+
+/* Les cases à cocher d'un texte diffusé : sans puce, la case devant. */
+ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0;
+}
+ul[data-type='taskList'] li {
+  display: flex;
+  gap: 0.5em;
+}
+ul[data-type='taskList'] li > div p {
+  margin: 0;
+}
+
+/* ============================================================
+   L'image en fenêtre, par-dessus le direct — sous l'encart.
+   ============================================================ */
+.fenetre-zone {
+  position: absolute;
+  inset: 0;
+  container-type: size;
+  pointer-events: none;
+  z-index: 5;
+}
+.fenetre-image {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  max-height: 100cqh;
+  border-radius: 0.5cqw;
+  overflow: hidden;
+  background: rgba(6, 10, 12, 0.9);
+  border: 1px solid rgba(233, 227, 211, 0.22);
+  box-shadow: 0 1.4cqw 3.4cqw -1cqw rgba(0, 0, 0, 0.75);
+}
+.fenetre-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  user-select: none;
+}
+.fenetre-image.live {
+  pointer-events: auto;
+  cursor: grab;
+}
+.fenetre-image.live:active {
+  cursor: grabbing;
+}
+.fen-fermer {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 4px;
+  background: rgba(6, 10, 12, 0.8);
+  color: rgba(233, 227, 211, 0.85);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+  opacity: 0;
+  transition: opacity 0.12s;
+}
+.fenetre-image.live:hover .fen-fermer {
+  opacity: 1;
+}
+.fen-fermer:hover {
+  color: #fff;
+  background: rgba(150, 40, 30, 0.9);
+}
+.fen-poignee {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  width: 16px;
+  height: 16px;
+  cursor: nwse-resize;
+  background: linear-gradient(
+    135deg,
+    transparent 0 55%,
+    rgba(233, 227, 211, 0.55) 55% 70%,
+    transparent 70% 80%,
+    rgba(233, 227, 211, 0.55) 80% 95%,
+    transparent 95%
+  );
+}
+
+/* Un outil armé côté MJ (poser une lumière) : la visée se voit au curseur. */
+.slide.pose-point,
+.slide.pose-point * {
+  cursor: crosshair !important;
+}
+
+/* ============================================================
+   Les icônes des lumières, posées sur l'image. Le MJ les voit toutes ;
+   celles que les joueurs ne voient pas sont en pointillé chez lui.
+   ============================================================ */
+.lampes-zone {
+  position: absolute;
+  inset: 0;
+  /* La taille des icônes se mesure sur l'écran lui-même, à toutes les échelles. */
+  container-type: size;
+  pointer-events: none;
+  z-index: 4;
+}
+.lampe-icone {
+  position: absolute;
+  width: 2.2cqw;
+  min-width: 14px;
+  max-width: 34px;
+  aspect-ratio: 1;
+  transform: translate(-50%, -50%);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: rgba(20, 16, 8, 0.72);
+  border: 1px solid rgba(245, 217, 138, 0.85);
+  box-shadow: 0 0 0.8cqw rgba(245, 200, 90, 0.55);
+}
+.lampe-icone svg {
+  width: 72%;
+  height: 72%;
+  fill: none;
+  stroke: #f5d98a;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.lampe-icone svg circle {
+  fill: #f5d98a;
+}
+.lampe-icone.eteinte {
+  border-color: rgba(233, 227, 211, 0.4);
+  box-shadow: none;
+}
+.lampe-icone.eteinte svg {
+  stroke: rgba(233, 227, 211, 0.5);
+}
+.lampe-icone.eteinte svg circle {
+  fill: none;
+}
+/* Chez le MJ : cette icône-là, les joueurs ne la voient pas. */
+.lampe-icone.mj-seul {
+  border-style: dashed;
+  opacity: 0.8;
+}

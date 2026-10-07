@@ -175,6 +175,41 @@ export function centreDe(pts: PointMur[]): PointMur {
   return [x / a, y / a]
 }
 
+/**
+ * Un point **à l'intérieur** du contour, là où poser son nom et son ancre.
+ *
+ * Le centre de gravité suffit pour une pièce carrée ; pour un couloir en L
+ * ou en U, il tombe dehors — et le nom, qui reconnaît sa pièce par ce
+ * point, ne la retrouvait plus : on baptisait « couloir », et le couloir
+ * restait à nommer. On garde donc le centre s'il est dedans ; sinon on
+ * balaie le contour d'horizontales et l'on prend le milieu du plus large
+ * passage intérieur.
+ */
+export function pointInterieur(pts: PointMur[]): PointMur {
+  const c = centreDe(pts)
+  if (pts.length < 3 || dansForme(c, pts)) return c
+  const ys = pts.map((q) => q[1])
+  const haut = Math.min(...ys)
+  const bas = Math.max(...ys)
+  const lignes = [c[1]]
+  for (let k = 1; k < 24; k++) lignes.push(haut + ((bas - haut) * k) / 24)
+  let mieux: { x: number; y: number; large: number } | null = null
+  for (const y of lignes) {
+    const xs: number[] = []
+    for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+      const a = pts[i]
+      const b = pts[j]
+      if (a[1] > y !== b[1] > y) xs.push(a[0] + ((y - a[1]) * (b[0] - a[0])) / (b[1] - a[1]))
+    }
+    xs.sort((u, v) => u - v)
+    for (let i = 0; i + 1 < xs.length; i += 2) {
+      const large = xs[i + 1] - xs[i]
+      if (!mieux || large > mieux.large) mieux = { x: (xs[i] + xs[i + 1]) / 2, y, large }
+    }
+  }
+  return mieux ? [mieux.x, mieux.y] : c
+}
+
 /** Le point tombe-t-il dans ce contour ? */
 export function dansForme(pt: PointMur, pts: PointMur[]): boolean {
   let dedans = false
@@ -229,7 +264,7 @@ export function formesDesMurs(murs: Mur[]): Forme[] {
     const pts = cycle.map((x) => x.de.p)
     const aire = aireSignee(pts)
     if (aire <= MIETTE) continue
-    out.push({ pts, aire, centre: centreDe(pts) })
+    out.push({ pts, aire, centre: pointInterieur(pts) })
   }
 
   return out.sort((a, b) => b.aire - a.aire)

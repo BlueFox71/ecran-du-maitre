@@ -21,6 +21,7 @@
  */
 import { useState } from 'react'
 import { itemById, useStore } from '../store'
+import { Visage } from '../../shared/Visage'
 import { IconClose, glypheObjet } from './Icons'
 import { initials } from '../modules/Sheets'
 import { nomEmplacement } from '@shared/types'
@@ -136,7 +137,7 @@ export function BandeJoueurs(): JSX.Element | null {
                   le reconnaît comme partout ailleurs dans l'application. */}
               <div className="bj-tete">
                 <span className="bj-visage">
-                  {url ? <img src={url} alt="" /> : initials(ch.name)}
+                  {url ? <Visage url={url} cadre={ch.portraitCadre} /> : initials(ch.name)}
                 </span>
                 <span className="bj-qui">
                   <b>{ch.name}</b>

@@ -1301,5 +1301,47 @@ export const MIGRATIONS: { id: number; sql: string }[] = [
       PRIMARY KEY (beat_id, character_id)
     );
     `
+  },
+  {
+    id: 46,
+    sql: `
+    /* L'ordre des seances, pose par le MJ.
+
+       Jusqu'ici la date faisait l'ordre, et la plus recente passait en tete.
+       Une seance neuve se range desormais en bas de la liste, et le MJ la
+       place avant ou apres une autre. Cet ordre est aussi celui qui dit
+       « la seance d'avant » : l'etat des joueurs, le hors-jeu. On part de
+       l'ordre d'hier, date puis creation. */
+    ALTER TABLE game_session ADD COLUMN ord INTEGER NOT NULL DEFAULT 0;
+    UPDATE game_session SET ord = (
+      SELECT COUNT(*) FROM game_session g
+       WHERE g.campaign_id = game_session.campaign_id
+         AND (g.date < game_session.date OR (g.date = game_session.date AND g.id < game_session.id)));
+    `
+  },
+  {
+    id: 47,
+    sql: `
+    /* Le carre taille dans le portrait, pour le pion.
+
+       Un portrait est souvent plus haut que large ; le pion, la face de
+       l'encart et le telephone le montrent rond, et le centre tombe sur le
+       menton ou le front. Le MJ y taille son carre, en fractions de l'image,
+       en JSON. NULL veut dire « au centre », comme avant. Il appartient au
+       personnage, comme le cadrage de sa fiche. */
+    ALTER TABLE character ADD COLUMN portrait_cadre TEXT;
+    `
+  },
+  {
+    id: 48,
+    sql: `
+    /* L'icone d'une lumiere, montree aux joueurs ou non.
+
+       Le MJ voit toujours ou sont ses lampes. Les joueurs, eux, ne voient que
+       la lueur — sauf si le MJ decide de leur montrer l'objet : une lampe
+       posee sur la table, oui ; une bougie qu'on vient d'allumer, la lueur
+       suffit. 0 par defaut : rien ne change pour les lampes du decor. */
+    ALTER TABLE lumiere ADD COLUMN icone INTEGER NOT NULL DEFAULT 0;
+    `
   }
 ]

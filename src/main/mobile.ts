@@ -445,6 +445,7 @@ function etatJoueur(playerId: number) {
           occupation: perso.occupation,
           age: perso.age,
           portrait: httpMedia(portraitDe(perso.portraitItemId)),
+          cadre: perso.portraitCadre,
           jauges: fiche.spec.gauges.map((g) => ({
             key: g.key,
             label: g.label,
@@ -527,6 +528,7 @@ function etatJoueur(playerId: number) {
         rotation: p.rotation,
         characterId: p.characterId,
         url: httpMedia(relDeUrl(p.url)),
+        cadre: p.cadre,
         mien: perso != null && p.characterId === perso.id,
         etat: etatDeVie(vie && sien ? sien.data.gauges[vie.key] : null)
       }

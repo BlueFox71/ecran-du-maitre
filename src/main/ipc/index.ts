@@ -21,6 +21,7 @@ import * as reglages from '../db/repos/reglages'
 import * as rolls from '../db/repos/rolls'
 import * as pions from '../db/repos/pions'
 import * as display from '../display'
+import * as defaire from '../defaire'
 import * as fsLib from '../library'
 import * as examen from '../examen'
 import { mediaUrl, vignetteUrl } from '../vault'
@@ -62,8 +63,26 @@ function withUrls(items: Item[]): (Item & { url: string | null; poster: string |
 
 export function registerIpc(): void {
   const on = <A extends unknown[], R>(channel: string, fn: (...args: A) => R): void => {
-    ipcMain.handle(channel, (_e, ...args) => fn(...(args as A)))
+    /* Ce qu'un échange de préparation écrit en base devient un pas de Ctrl+Z. */
+    ipcMain.handle(channel, (_e, ...args) => defaire.envelopper(channel, () => fn(...(args as A))))
   }
+
+  /* ---------------- défaire, refaire ---------------- */
+
+  /* Après un pas rejoué, l'écran des joueurs relit ce qui a pu bouger sous
+     lui : les murs d'un lieu, les fiches des joueurs. */
+  const apresPas = (libelle: string | null): string | null => {
+    if (libelle) {
+      display.refreshJoueurs()
+      display.calqueABouge()
+    }
+    return libelle
+  }
+  on('defaire:defaire', () => apresPas(defaire.defaire()))
+  on('defaire:refaire', () => apresPas(defaire.refaire()))
+  on('defaire:etat', () => defaire.etat())
+  on('defaire:ouvrirGroupe', () => defaire.ouvrirGroupe())
+  on('defaire:fermerGroupe', () => defaire.fermerGroupe())
 
   /* ---------------- application ---------------- */
 
@@ -170,29 +189,6 @@ export function registerIpc(): void {
   })
   on('library:openRoot', () => fsLib.openFolderInExplorer(''))
 
-  /* ---------------- chapitres ---------------- */
-
-  /* Chaque geste rend la liste entière : les comptes de ce qui s'y rattache
-     bougent en même temps que les chapitres, et l'interface les relit d'un
-     coup plutôt que d'aller recoudre une ligne. */
-  on('chapters:list', () => lib.listChapters())
-  on('chapters:create', (title: string) => {
-    lib.createChapter(title)
-    return lib.listChapters()
-  })
-  on('chapters:update', (id: number, patch: any) => {
-    lib.updateChapter(id, patch)
-    return lib.listChapters()
-  })
-  on('chapters:remove', (id: number) => {
-    lib.removeChapter(id)
-    return lib.listChapters()
-  })
-  on('chapters:reorder', (ids: number[]) => {
-    lib.reorderChapters(ids)
-    return lib.listChapters()
-  })
-
   /* ---------------- dossiers ---------------- */
 
   on('folders:tree', () => {
@@ -293,6 +289,17 @@ export function registerIpc(): void {
   on('places:move', (id: number, parentId: number | null, beforeId: number | null) =>
     places.movePlace(id, parentId, beforeId)
   )
+  on('places:etage', (id: number, tier: 'niveau' | 'lieu') => places.changerEtage(id, tier))
+  on('places:rogner', (id: number, cadre: { x: number; y: number; w: number; h: number }) => {
+    const p = places.getPlace(id)
+    const item = p?.mapItemId ? lib.getItem(p.mapItemId) : null
+    if (!p || !item?.relPath) throw new Error('Ce lieu n’a pas d’image à rogner')
+    const rel = fsLib.rognerImage(item.relPath, cadre)
+    const neuf = lib.itemByPath(rel)
+    if (!neuf) throw new Error('L’image rognée n’a pas été retrouvée')
+    places.recalerApresRognage(id, item.id, neuf.id, cadre)
+    return places.getPlace(id)
+  })
   on('places:zone', (id: number, zone: PointMur[] | null, ancre?: PointMur | null) =>
     places.setZone(id, zone, ancre)
   )
@@ -395,13 +402,23 @@ export function registerIpc(): void {
   })
 
   on('lumieres:of', (placeId: number | null) => lumieres.listLumieres(placeId))
-  on('lumieres:add', (input: any) => lumieres.addLumiere(input))
+  /* Une lampe posée ou retirée en pleine partie — une bougie qu'on allume, une
+     lanterne qu'on emporte — doit se voir tout de suite chez les joueurs. */
+  on('lumieres:add', (input: any) => {
+    const l = lumieres.addLumiere(input)
+    display.calqueABouge()
+    return l
+  })
   on('lumieres:update', (id: number, patch: any) => {
     const l = lumieres.updateLumiere(id, patch)
     display.calqueABouge()
     return l
   })
-  on('lumieres:remove', (id: number) => lumieres.removeLumiere(id))
+  on('lumieres:remove', (id: number) => {
+    const r = lumieres.removeLumiere(id)
+    display.calqueABouge()
+    return r
+  })
 
   /* ---------------- chronologie ---------------- */
 
@@ -424,7 +441,39 @@ export function registerIpc(): void {
     timeline.setActiveSession(id)
     entrerDansLaSeance(id)
   })
+  /* Dupliquer une séance : d'abord le dossier sur le disque — c'est le long,
+     et la fenêtre suit sa progression —, puis la base, en une transaction. */
+  ipcMain.handle(
+    'timeline:dupliquerSeance',
+    async (e, srcId: number, label: string, dossier: string | null, nomDossier: string) => {
+      const dire = (etape: string, fait: number, total: number): void => {
+        if (!e.sender.isDestroyed()) e.sender.send('timeline:progression', { etape, fait, total })
+      }
+      let rel: string | null = null
+      let jumeaux = new Map<number, number>()
+      if (dossier) {
+        const copie = await fsLib.copierDossier(dossier, nomDossier || label, (fait, total) =>
+          dire('fichiers', fait, total)
+        )
+        rel = copie.rel
+        jumeaux = copie.jumeaux
+      }
+      dire('seance', 0, 1)
+      const s = timeline.dupliquerSeance(srcId, label, rel, jumeaux)
+      entrerDansLaSeance(s.id)
+      dire('seance', 1, 1)
+      return s
+    }
+  )
   on('timeline:updateSession', (id: number, patch: any) => timeline.updateSession(id, patch))
+  /* Déplacer une séance change qui est « d'avant » : le hors-jeu peut en
+     dépendre, l'écran et les téléphones relisent leurs joueurs. */
+  on('timeline:placerSeance', (id: number, refId: number, sens: 'avant' | 'apres') => {
+    const r = timeline.placerSeance(id, refId, sens)
+    display.refreshJoueurs()
+    mobile.broadcast()
+    return r
+  })
   on('timeline:deleteSession', (id: number) => {
     const r = timeline.deleteSession(id)
     /* Supprimer la séance en cours fait entrer dans la suivante. */
@@ -744,6 +793,9 @@ export function registerIpc(): void {
   on('display:pionLabels', (on2: boolean) => display.setPionLabels(on2))
   on('display:pionPv', (on2: boolean) => display.setPionPv(on2))
   on('display:encart', (patch: any) => display.setEncart(patch))
+  on('display:fenetre', (itemId: number) => display.ouvrirFenetre(itemId))
+  on('display:reglerFenetre', (itemId: number, patch: any) => display.reglerFenetre(itemId, patch))
+  on('display:fermerFenetre', (itemId?: number) => display.fermerFenetre(itemId))
   on('display:setOutput', (id: number | null) => display.setOutput(id))
   on('display:openPlayer', () => display.openPlayer())
   on('display:closePlayer', () => display.closePlayer())

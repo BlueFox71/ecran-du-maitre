@@ -1,6 +1,7 @@
 import { getDb } from '../index'
 import { mediaUrl } from '../../vault'
 import { upsertCharacter } from './characters'
+import { lisCadreCarre } from '@shared/types'
 import type { Pion, PionsDuLieu } from '@shared/types'
 
 /**
@@ -36,6 +37,7 @@ interface Row {
   char_name: string | null
   char_color: string | null
   portrait_path: string | null
+  portrait_cadre: string | null
   item_title: string | null
   item_path: string | null
 }
@@ -46,6 +48,7 @@ const SELECT = `
          c.name        AS char_name,
          c.color       AS char_color,
          pi.rel_path   AS portrait_path,
+         c.portrait_cadre,
          i.title       AS item_title,
          i.rel_path    AS item_path
     FROM pion p
@@ -62,6 +65,8 @@ function toPion(r: Row): Pion {
     itemId: r.item_id,
     label,
     url: mediaUrl(r.item_path ?? r.portrait_path),
+    /* Le carré ne vaut que pour le portrait : l'image d'un objet entre entière. */
+    cadre: r.item_path ? null : lisCadreCarre(r.portrait_cadre),
     initials: initialsOf(label),
     /* La couleur choisie sur la fiche l'emporte ; sans elle, on la déduit de
        l'identifiant, pour que deux pions voisins ne se ressemblent pas. */
@@ -271,6 +276,7 @@ export function pionsParLieu(): Record<number, PionsDuLieu> {
       name: pion.label,
       color: pion.color,
       url: pion.url,
+      cadre: pion.cadre,
       initials: pion.initials
     })
   }

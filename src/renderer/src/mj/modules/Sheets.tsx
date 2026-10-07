@@ -19,10 +19,13 @@ import type { CharacterKind, Sexe } from '@shared/types'
 import { FicheCampagne } from './FicheCampagne'
 import { Equipement } from './Equipement'
 import { Framed } from '../../shared/Slide'
+import { Visage } from '../../shared/Visage'
+import { RognageCarre } from '../components/RognageCarre'
 import type { UiItem } from '../../../../preload/index'
 import { PION_COULEURS } from '@shared/types'
 import type {
   ButinLigne,
+  CadreCarre,
   Character,
   CharacterData,
   Frame,
@@ -259,12 +262,13 @@ function SheetBody({
   const portrait = itemById(s.allItems, ch.portraitItemId)
   const fiche = itemById(s.allItems, ch.sheetItemId)
   /** Ce qui est ouvert par-dessus la fiche : le choix d'une image, d'un PDF, ou sa lecture. */
-  const [fenetre, setFenetre] = useState<'portrait' | 'fiche' | 'lecture' | 'identite' | null>(
-    null
-  )
+  const [fenetre, setFenetre] = useState<
+    'portrait' | 'carre' | 'fiche' | 'lecture' | 'identite' | null
+  >(null)
 
   const rattacher = async (patch: {
     portraitItemId?: number | null
+    portraitCadre?: CadreCarre | null
     sheetItemId?: number | null
     sheetFrame?: Frame | null
   }) => {
@@ -336,6 +340,19 @@ function SheetBody({
         />
       )}
 
+      {fenetre === 'carre' && portrait?.url && (
+        <RognageCarre
+          titre={`Le carré du pion — ${ch.name}`}
+          url={portrait.url}
+          cadre={ch.portraitCadre}
+          onValider={async (c) => {
+            setFenetre(null)
+            await rattacher({ portraitCadre: c })
+          }}
+          onClose={() => setFenetre(null)}
+        />
+      )}
+
       {fenetre === 'fiche' && (
         <ChoixDansArbre
           titre={`Fiche de compétences — ${ch.name}`}
@@ -398,6 +415,32 @@ function SheetBody({
                 changer
               </span>
             </button>
+
+            {/* Le carré que montrent le pion, l'encart et le téléphone : le
+                portrait est plus haut que large, le pion est rond, et le
+                centre tombe souvent sur le menton. On le voit ici, on le
+                retaille d'un clic. */}
+            {portrait?.url ? (
+              <div className="rc-fiche">
+                <button
+                  className="rc-vignette"
+                  onClick={() => setFenetre('carre')}
+                  title="Recadrer le carré du pion"
+                  aria-label="Recadrer le carré du pion"
+                >
+                  <Visage url={portrait.url} cadre={ch.portraitCadre} />
+                </button>
+                <span className="rc-dit">
+                  <span className="eyebrow">Son pion</span>
+                  <span className="rc-etat">
+                    {ch.portraitCadre ? 'carré choisi' : 'au centre du portrait'}
+                  </span>
+                </span>
+                <button className="btn btn-sm btn-ghost" onClick={() => setFenetre('carre')}>
+                  Recadrer…
+                </button>
+              </div>
+            ) : null}
 
             <h3>
               {ch.name}
@@ -1107,11 +1150,19 @@ function FormFiche({
   }))
   const auCarnet = s.carnet.filter((c) => !s.players.some((x) => x.uid === c.uid))
 
-  /** Qui détient déjà cette teinte, fiche ou personne — personne, si elle est libre. */
+  /**
+   * Qui détient déjà cette teinte, fiche ou personne — personne, si elle est libre.
+   *
+   * L'unicité ne vaut **qu'entre joueurs** : c'est à sa couleur qu'un joueur
+   * reconnaît son pion. Un PNJ prend la teinte qu'il veut, même celle d'un
+   * joueur, et ne retient la sienne pour personne.
+   */
   const detenteur = (key: string): string | null =>
-    s.characters.find((x) => x.id !== ch?.id && x.color === key)?.name ??
-    s.players.find((x) => x.color === key && `p:${x.id}` !== choixJoueur)?.name ??
-    null
+    pnj
+      ? null
+      : (s.characters.find((x) => x.kind !== 'pnj' && x.id !== ch?.id && x.color === key)?.name ??
+        s.players.find((x) => x.color === key && `p:${x.id}` !== choixJoueur)?.name ??
+        null)
 
   /** Créer la personne pour de bon : elle entre au carnet et à la campagne. */
   const creerJoueur = async (): Promise<void> => {
@@ -1419,8 +1470,8 @@ function FormFiche({
                   à la table, on reconnaît le sien à sa couleur. */}
               <div className="couleurs">
                 {PION_COULEURS.map((c) => {
-                  /* Une couleur ne sert qu'une fois : celle d'un autre se voit,
-                     mais ne se prend pas. « Un autre », c'est aussi bien une
+                  /* Entre joueurs, une couleur ne sert qu'une fois : celle d'un
+                     autre se voit, mais ne se prend pas. Les PNJ n'y sont pas tenus. « Un autre », c'est aussi bien une
                      fiche qu'une personne inscrite sans personnage — sinon on
                      choisirait une teinte déjà retenue ailleurs. */
                   const par = detenteur(c.key)

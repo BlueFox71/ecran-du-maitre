@@ -13,7 +13,18 @@ import type { Character, GameSession, Place } from '@shared/types'
 
 type Nature = 'lieu' | 'pnj'
 
-const RETRAIT: Record<Place['tier'], number> = { espace: 0, niveau: 1, lieu: 2 }
+/** Le cran d'un lieu dans son arbre — un bâtiment en ajoute deux sous sa pièce. */
+function retrait(p: Place, tous: Place[]): number {
+  let d = 0
+  let cur: Place | undefined = p
+  const vus = new Set<number>()
+  while (cur?.parentId != null && !vus.has(cur.id)) {
+    vus.add(cur.id)
+    cur = tous.find((x) => x.id === cur!.parentId)
+    if (cur) d++
+  }
+  return Math.min(d, 4)
+}
 
 export function ReprendreDUneSeance({
   nature,
@@ -102,10 +113,10 @@ export function ReprendreDUneSeance({
                         key={p.id}
                         className="doc-row"
                         disabled={occupe}
-                        style={{ paddingLeft: 8 + RETRAIT[p.tier] * 18 }}
+                        style={{ paddingLeft: 8 + retrait(p, lieux) * 18 }}
                         onClick={() => void reprendre(p.id)}
                         title={
-                          p.tier === 'lieu'
+                          p.tier === 'lieu' && !lieux.some((q) => q.parentId === p.id)
                             ? 'Reprendre cette pièce'
                             : 'Reprendre, avec tout ce qu’il contient'
                         }

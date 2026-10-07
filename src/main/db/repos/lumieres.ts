@@ -14,7 +14,8 @@ import { activeSessionId, getDb } from '../index'
 import type { Lumiere } from '@shared/types'
 
 const SELECT = `
-  SELECT l.id, l.place_id AS placeId, l.x, l.y, l.clair, l.penombre, l.allumee, l.teinte
+  SELECT l.id, l.place_id AS placeId, l.x, l.y, l.clair, l.penombre, l.allumee, l.teinte,
+         l.icone
     FROM lumiere l`
 
 /** Une couleur qu'on accepte d'écrire : #rgb ou #rrggbb, et rien d'autre. */
@@ -40,7 +41,8 @@ function toLumiere(r: any): Lumiere {
     /* La pénombre est le bord extérieur : elle ne rentre jamais dans le clair. */
     penombre: Math.max(clair, borne(r.penombre, RAYON.min, RAYON.max)),
     allumee: !!r.allumee,
-    teinte: teinteSure(r.teinte)
+    teinte: teinteSure(r.teinte),
+    icone: !!r.icone
   }
 }
 
@@ -92,6 +94,7 @@ export function updateLumiere(
     penombre?: number
     allumee?: boolean
     teinte?: string
+    icone?: boolean
   }
 ): Lumiere | null {
   const av = getLumiere(id)
@@ -103,7 +106,7 @@ export function updateLumiere(
     .prepare(
       `UPDATE lumiere
           SET x = @x, y = @y, clair = @clair, penombre = @penombre,
-              allumee = @allumee, teinte = @teinte
+              allumee = @allumee, teinte = @teinte, icone = @icone
         WHERE id = @id`
     )
     .run({
@@ -113,7 +116,8 @@ export function updateLumiere(
       clair,
       penombre: Math.max(clair, penombre),
       allumee: (patch.allumee === undefined ? av.allumee : patch.allumee) ? 1 : 0,
-      teinte: patch.teinte === undefined ? av.teinte : teinteSure(patch.teinte, av.teinte)
+      teinte: patch.teinte === undefined ? av.teinte : teinteSure(patch.teinte, av.teinte),
+      icone: (patch.icone === undefined ? av.icone : patch.icone) ? 1 : 0
     })
   return getLumiere(id)
 }

@@ -2,8 +2,9 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { PION_COULEURS } from '@shared/types'
 import { Pings, usePings } from '../shared/Pings'
 import { Brouillard } from '../shared/Brouillard'
+import { Visage } from '../shared/Visage'
 import { barrieres, pasContraint, type Pt } from '@shared/murs'
-import type { CalqueBrouillard, MobilePing, PointMur } from '@shared/types'
+import type { CadreCarre, CalqueBrouillard, MobilePing, PointMur } from '@shared/types'
 
 /**
  * L'application du joueur, sur son téléphone.
@@ -43,6 +44,7 @@ interface PionVu {
   /** La fiche derrière le jeton, ou `null` : un pion sans personnage n'a pas d'yeux. */
   characterId: number | null
   url: string | null
+  cadre: CadreCarre | null
   mien: boolean
   /* Blessé, à terre, ou rien à signaler. */
   etat: 'blesse' | 'ko' | null
@@ -84,6 +86,7 @@ interface Etat {
     occupation: string | null
     age: string | null
     portrait: string | null
+    cadre: CadreCarre | null
     jauges: Jauge[]
     caracs: Carac[]
     comps: Comp[]
@@ -457,7 +460,7 @@ function Fiche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
       <div className="m-identite" style={teinte(etat.joueur?.couleur ?? null)}>
         <span className="m-portrait">
           {p.portrait ? (
-            <img src={API + p.portrait} alt="" draggable={false} />
+            <Visage url={API + p.portrait} cadre={p.cadre} />
           ) : (
             initiales(p.nom)
           )}
@@ -1430,7 +1433,7 @@ function Plan({
               }}
               title={p.etat ? `${p.label} — ${p.etat === 'ko' ? 'inconscient' : 'blessé'}` : p.label}
             >
-              {p.url ? <img src={API + p.url} alt="" draggable={false} /> : p.initials}
+              {p.url ? <Visage url={API + p.url} cadre={p.cadre} /> : p.initials}
               {/* Le nez dit de quel côté il regarde. Le sien le porte toujours,
                   les autres seulement quand ils sont tournés — comme à la table. */}
               {p.characterId != null && (p.mien || q.cap) ? <span className="m-nez" /> : null}

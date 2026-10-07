@@ -95,6 +95,8 @@ export function openProject(dir: string): ProjectInfo {
   display.setOutput(lireCampagne(reglages.tous()).sortieEcran)
 
   fsLib.scan()
+  fsLib.rangerTextesDesMoments()
+  fsLib.rangerAncienBlocNotes()
   fsLib.startWatch()
   /* Si cette campagne avait ouvert l'accès aux portables, il se rallume : ses
      téléphones sont toujours appairés et n'ont rien à refaire. */
@@ -111,6 +113,8 @@ export function openProject(dir: string): ProjectInfo {
 export function switchTo(dir: string): ProjectInfo {
   const info = openProject(dir)
   display.refreshJoueurs()
+  /* Les fenêtres d'image montraient des images de l'autre campagne. */
+  display.fermerFenetre()
   for (const w of BrowserWindow.getAllWindows()) w.webContents.reload()
   return info
 }

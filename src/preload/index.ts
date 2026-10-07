@@ -10,7 +10,7 @@ import type {
   CatalogueEntry,
   CollageLayout,
   Frame,
-  Chapter,
+  CadreCarre,
   Character,
   ExamenFait,
   ExamenJob,
@@ -168,17 +168,6 @@ const api = {
     }
   },
 
-  /** Les chapitres de la campagne. Chaque geste rend la liste entière. */
-  chapters: {
-    list: () => call<Chapter[]>('chapters:list'),
-    create: (title: string) => call<Chapter[]>('chapters:create', title),
-    update: (id: number, patch: { title?: string; notes?: string }) =>
-      call<Chapter[]>('chapters:update', id, patch),
-    remove: (id: number) => call<Chapter[]>('chapters:remove', id),
-    /** L'ordre, donné en entier : les rangs se renumérotent de zéro. */
-    reorder: (ids: number[]) => call<Chapter[]>('chapters:reorder', ids)
-  },
-
   folders: {
     tree: () => call<{ tree: UiFolder[]; orphans: UiItem[] }>('folders:tree'),
     create: (parentRel: string, name: string) => call<string>('folders:create', parentRel, name),
@@ -239,7 +228,7 @@ const api = {
     get: (id: number) => call<UiItem | null>('items:get', id),
     update: (
       id: number,
-      patch: Partial<Pick<Item, 'title' | 'body' | 'folderId' | 'chapterId' | 'placeId'>>
+      patch: Partial<Pick<Item, 'title' | 'body' | 'folderId' | 'placeId'>>
     ) => call<UiItem | null>('items:update', id, patch),
     createDoc: (folderRel: string, title: string) =>
       call<UiItem | null>('items:createDoc', folderRel, title),
@@ -308,6 +297,14 @@ const api = {
      */
     zone: (id: number, zone: [number, number][] | null, ancre?: [number, number] | null) =>
       call<Place | null>('places:zone', id, zone, ancre),
+    /**
+     * Rogner le plan du lieu : une copie rognée de l'image, à côté de
+     * l'originale, et tout ce qui était posé dessus recalé.
+     */
+    /** Un niveau devient bâtiment, ou l'inverse — pièces et tracés suivent. */
+    etage: (id: number, tier: 'niveau' | 'lieu') => call<void>('places:etage', id, tier),
+    rogner: (id: number, cadre: { x: number; y: number; w: number; h: number }) =>
+      call<Place | null>('places:rogner', id, cadre),
     /** Le groupe y est entre, ou on s'etait trompe. */
     seen: (id: number, seen: boolean) => call<Place | null>('places:seen', id, seen),
     /**
@@ -505,6 +502,8 @@ const api = {
         penombre?: number
         allumee?: boolean
         teinte?: string
+        /** L'icône se montre-t-elle aux joueurs. */
+        icone?: boolean
       }
     ) => call<Lumiere | null>('lumieres:update', id, patch),
     remove: (id: number) => call<void>('lumieres:remove', id)
@@ -516,6 +515,20 @@ const api = {
     createSession: (label: string, date?: string) =>
       call<GameSession>('timeline:createSession', label, date),
     setActiveSession: (id: number) => call<void>('timeline:setActiveSession', id),
+    /** Placer une séance juste avant ou juste après une autre ; rend la liste. */
+    placerSeance: (id: number, refId: number, sens: 'avant' | 'apres') =>
+      call<GameSession[]>('timeline:placerSeance', id, refId, sens),
+    /** Recopie `dossier` sous `nomDossier`, puis la séance, qui devient celle en cours. */
+    dupliquerSeance: (srcId: number, label: string, dossier: string | null, nomDossier: string) =>
+      call<GameSession>('timeline:dupliquerSeance', srcId, label, dossier, nomDossier),
+    /** Où en est la duplication : les fichiers (en octets), puis la séance. */
+    onProgression: (cb: (p: { etape: 'fichiers' | 'seance'; fait: number; total: number }) => void) => {
+      const h = (_e: unknown, p: { etape: 'fichiers' | 'seance'; fait: number; total: number }): void => cb(p)
+      ipcRenderer.on('timeline:progression', h)
+      return (): void => {
+        ipcRenderer.removeListener('timeline:progression', h)
+      }
+    },
     updateSession: (
       id: number,
       patch: { label?: string; date?: string; notes?: string | null; folderRel?: string | null }
@@ -531,7 +544,6 @@ const api = {
       title: string
       note?: string | null
       done?: boolean
-      chapterId?: number | null
       placeId?: number | null
     }) => call<Beat & { items: UiItem[] }>('timeline:upsertBeat', input),
     removeBeat: (id: number) => call<void>('timeline:removeBeat', id),
@@ -643,6 +655,8 @@ const api = {
       /** La silhouette de sa poupée d'équipement — homme ou femme. */
       sexe?: Sexe | null
       portraitItemId?: number | null
+      /** Le carré taillé dans le portrait pour le pion ; null le remet au centre. */
+      portraitCadre?: CadreCarre | null
       sheetItemId?: number | null
       sheetFrame?: Frame | null
       data?: CharacterData
@@ -691,6 +705,27 @@ const api = {
     exportCsv: () => call<string | null>('rolls:exportCsv')
   },
 
+  /**
+   * Ctrl+Z, Ctrl+Y : la préparation se défait et se refait. Chaque fonction
+   * rend le nom du module touché (« Lieux », « Murs »…), ou null s'il n'y
+   * avait rien à faire. Un geste en plusieurs appels se regroupe entre
+   * `ouvrirGroupe` et `fermerGroupe` : il se défait d'un seul coup.
+   */
+  defaire: {
+    defaire: () => call<string | null>('defaire:defaire'),
+    refaire: () => call<string | null>('defaire:refaire'),
+    etat: () => call<{ defaire: string | null; refaire: string | null }>('defaire:etat'),
+    ouvrirGroupe: () => call<void>('defaire:ouvrirGroupe'),
+    fermerGroupe: () => call<void>('defaire:fermerGroupe'),
+    onEtat: (cb: (e: { defaire: string | null; refaire: string | null }) => void) => {
+      const h = (_e: unknown, e: { defaire: string | null; refaire: string | null }): void => cb(e)
+      ipcRenderer.on('defaire:etat', h)
+      return (): void => {
+        ipcRenderer.removeListener('defaire:etat', h)
+      }
+    }
+  },
+
   display: {
     state: () => call<DisplayState>('display:state'),
     screens: () => call<ScreenInfo[]>('display:screens'),
@@ -725,6 +760,15 @@ const api = {
     pionLabels: (on: boolean) => call<DisplayState>('display:pionLabels', on),
     pionPv: (on: boolean) => call<DisplayState>('display:pionPv', on),
     encart: (patch: Partial<Encart>) => call<DisplayState>('display:encart', patch),
+    /** Pose une image en fenêtre par-dessus le direct ; déjà ouverte, la ramène devant. */
+    fenetre: (itemId: number) => call<DisplayState>('display:fenetre', itemId),
+    /** Déplace, retaille ou ramène devant une fenêtre : centre en fractions, largeur en %. */
+    reglerFenetre: (
+      itemId: number,
+      patch: { x?: number; y?: number; largeur?: number; devant?: boolean }
+    ) => call<DisplayState>('display:reglerFenetre', itemId, patch),
+    /** Ferme la fenêtre d'une image ; sans image, toutes. */
+    fermerFenetre: (itemId?: number) => call<DisplayState>('display:fermerFenetre', itemId),
     setOutput: (displayId: number | null) => call<DisplayState>('display:setOutput', displayId),
     openPlayer: () => call<DisplayState>('display:openPlayer'),
     closePlayer: () => call<DisplayState>('display:closePlayer'),

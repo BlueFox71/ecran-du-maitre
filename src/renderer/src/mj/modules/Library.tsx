@@ -60,7 +60,10 @@ const quand = (iso: string): string => {
 export function Library(): JSX.Element {
   const s = useStore()
   const [view, setView] = useState<ViewMode>('grid')
-  const [cwd, setCwd] = useState('')
+  /* On entre dans la Bibliothèque par le dossier de la séance : c'est là qu'on
+     travaille. La racine reste à un clic, dans le fil d'Ariane. */
+  const dossierDeSeance = s.toutLaCampagne ? '' : (s.session?.folderRel ?? '')
+  const [cwd, setCwd] = useState(dossierDeSeance)
   const [sel, setSel] = useState<Sel>(null)
   /* La taille des vignettes est un réglage du poste : elle se retenait le
      temps d'une page, et repartait à zéro dès qu'on en changeait. */
@@ -119,8 +122,14 @@ export function Library(): JSX.Element {
      séance, ou rabattu « Toute la campagne » : on remonte à la racine plutôt
      que de rester devant une page vide. */
   useEffect(() => {
-    if (cwd && !folderAt(cwd)) setCwd('')
+    // (l'arbre encore vide, c'est qu'il n'est pas lu : on attend)
+    if (cwd && folders.length && !folderAt(cwd)) setCwd(folderAt(dossierDeSeance) ? dossierDeSeance : '')
   }, [folders])
+
+  // Autre séance, ou retour de « Toute la campagne » : on rentre dans son dossier.
+  useEffect(() => {
+    setCwd(dossierDeSeance)
+  }, [dossierDeSeance])
 
   const childFolders = (rel: string): UiFolder[] =>
     rel ? (folderAt(rel)?.children ?? []) : s.tree
@@ -959,7 +968,7 @@ export function Library(): JSX.Element {
               {doomed.n} fichier{doomed.n > 1 ? 's' : ''}
             </b>{' '}
             ?<br />
-            Leurs rattachements de chapitre et de lieu seront perdus. Rien n’est effacé
+            Leurs rattachements à un lieu seront perdus. Rien n’est effacé
             définitivement.
           </p>
           <div className="acts">
@@ -1149,25 +1158,6 @@ function FileCard({ item }: { item: UiItem }): JSX.Element {
       <div className="card">
         <h4>Rattachements</h4>
         <label className="field">
-          <span>Chapitre</span>
-          <select
-            value={item.chapterId ?? ''}
-            onChange={async (e) => {
-              await window.jdr.items.update(item.id, {
-                chapterId: e.target.value === '' ? null : Number(e.target.value)
-              })
-              await s.refreshLibrary()
-            }}
-          >
-            <option value="">— aucun —</option>
-            {s.chapters.map((c) => (
-              <option key={c.id} value={c.id}>
-                {c.title}
-              </option>
-            ))}
-          </select>
-        </label>
-        <label className="field">
           <span>Lieu</span>
           <select
             value={item.placeId ?? ''}
@@ -1187,8 +1177,8 @@ function FileCard({ item }: { item: UiItem }): JSX.Element {
           </select>
         </label>
         <p className="note">
-          Chapitre et lieu vivent dans la base, <b>suivis par le fichier</b> : renommé ou déplacé
-          dans l’explorateur, il les garde.
+          Le lieu vit dans la base, <b>suivi par le fichier</b> : renommé ou déplacé
+          dans l’explorateur, le fichier le garde.
         </p>
       </div>
 

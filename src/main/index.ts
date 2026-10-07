@@ -56,27 +56,6 @@ function createMainWindow(): void {
     mainWindow.webContents.on('did-fail-load', (_e, code, desc, url) => {
       console.error(`[interface] chargement échoué ${code} ${desc} — ${url}`)
     })
-
-    /* Les deux fenêtres tournent côte à côte (voir `userData` plus bas) : celle
-       de développement se signale dans sa barre de titre et par un liseré, pour
-       qu'on ne prépare jamais sa séance dans la mauvaise. */
-    mainWindow.on('page-title-updated', (e, titre) => {
-      e.preventDefault()
-      mainWindow?.setTitle(`${titre} — DEV`)
-    })
-    mainWindow.webContents.on('did-finish-load', () => {
-      mainWindow?.webContents.insertCSS(`
-        html::after {
-          content: 'DEV'; position: fixed; right: 10px; bottom: 10px; z-index: 2147483647;
-          padding: 2px 8px; border-radius: 4px; pointer-events: none;
-          font: 700 11px/1.4 system-ui, sans-serif; letter-spacing: .08em;
-          color: #1a1000; background: #f0a020;
-        }
-        html::before {
-          content: ''; position: fixed; inset: 0; z-index: 2147483647; pointer-events: none;
-          box-shadow: inset 0 0 0 3px #f0a020;
-        }`)
-    })
   }
 
   // Les liens externes s'ouvrent dans le navigateur, jamais dans l'application.

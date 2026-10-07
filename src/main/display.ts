@@ -16,6 +16,7 @@ import type {
   ScreenInfo,
   Transition,
   Encart,
+  FenetreImage,
   JaugeVue,
   JoueurVu,
   SlidePayload,
@@ -38,6 +39,7 @@ const state: DisplayState = {
   pionLabels: true,
   pionPv: false,
   encart: ENCART_NEUF,
+  fenetres: [],
   joueurs: [],
   audio: { itemId: null, url: null, title: null, playing: false, loop: true, volume: 0.35 },
   outputDisplayId: null,
@@ -438,6 +440,66 @@ export function setPionPv(on: boolean): DisplayState {
   return state
 }
 
+/** Ce qu'on peut régler d'une fenêtre ; `devant` la ramène au premier plan. */
+export type ReglageFenetre = Partial<Pick<FenetreImage, 'x' | 'y' | 'largeur'>> & { devant?: boolean }
+
+/**
+ * Pose une image en fenêtre par-dessus le direct. Une image n'a qu'une
+ * fenêtre : la redemander ramène la sienne au premier plan. Une nouvelle se
+ * pose en cascade sur la précédente, à sa taille, pour ne pas la cacher tout
+ * à fait.
+ */
+export function ouvrirFenetre(itemId: number): DisplayState {
+  const deja = state.fenetres.find((f) => f.itemId === itemId)
+  if (deja) {
+    state.fenetres = [...state.fenetres.filter((f) => f !== deja), deja]
+    broadcast()
+    return state
+  }
+  const it = getItem(itemId)
+  const url = mediaUrl(it?.relPath ?? null)
+  if (!it || it.kind !== 'image' || !url) return state
+  const ratio = it.width && it.height ? it.width / it.height : 4 / 3
+  const avant = state.fenetres[state.fenetres.length - 1]
+  const decale = (v: number): number => (v + 0.05 > 0.85 ? 0.3 : v + 0.05)
+  state.fenetres = [
+    ...state.fenetres,
+    {
+      itemId,
+      url,
+      title: it.title,
+      x: avant ? decale(avant.x) : 0.5,
+      y: avant ? decale(avant.y) : 0.5,
+      largeur: avant?.largeur ?? 30,
+      ratio
+    }
+  ]
+  broadcast()
+  return state
+}
+
+/** Déplace, retaille ou ramène devant la fenêtre d'une image. */
+export function reglerFenetre(itemId: number, patch: ReglageFenetre): DisplayState {
+  const f = state.fenetres.find((x) => x.itemId === itemId)
+  if (!f) return state
+  const { devant, ...reste } = patch
+  const neuve = { ...f, ...reste }
+  const autres = state.fenetres.filter((x) => x !== f)
+  state.fenetres = devant
+    ? [...autres, neuve]
+    : state.fenetres.map((x) => (x === f ? neuve : x))
+  broadcast()
+  return state
+}
+
+/** Ferme la fenêtre d'une image ; sans image, les ferme toutes. */
+export function fermerFenetre(itemId?: number): DisplayState {
+  if (!state.fenetres.length) return state
+  state.fenetres = itemId === undefined ? [] : state.fenetres.filter((f) => f.itemId !== itemId)
+  broadcast()
+  return state
+}
+
 export function setEncart(patch: Partial<Encart>): DisplayState {
   state.encart = { ...state.encart, ...patch }
   refreshJoueurs()
@@ -472,6 +534,7 @@ export function refreshJoueurs(): DisplayState {
       name: c.name,
       color: c.color,
       url: mediaUrl(portrait?.relPath ?? null),
+      cadre: portrait ? c.portraitCadre : null,
       initials: initialsOf(c.name),
       pv: vue(jauges[0]),
       sm: vue(spec ? jaugeSanite(spec, jauges) : undefined)

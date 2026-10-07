@@ -609,3 +609,46 @@ export const polygone = (pts: Pt[]): string =>
 /** `d="…"` d'une polyligne SVG. */
 export const chemin = (pts: Pt[]): string =>
   pts.map((p, i) => `${i ? 'L' : 'M'}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(' ')
+
+/**
+ * Mettre un sommet d'équerre : le déplacer, le moins possible, pour que ses
+ * deux côtés se coupent à angle droit.
+ *
+ * Les voisins ne bougent pas. Tous les points qui voient [a, b] à angle droit
+ * sont sur le cercle de diamètre [a, b] (Thalès) : on ramène le sommet sur ce
+ * cercle, droit depuis son centre. En pixels, jamais en fractions — sur une
+ * carte qui n'est pas carrée, un angle droit en fractions ne l'est pas à l'œil.
+ */
+export function mettreDEquerre(v: Pt, a: Pt, b: Pt): Pt {
+  const m = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
+  const r = Math.hypot(b.x - a.x, b.y - a.y) / 2
+  let dx = v.x - m.x
+  let dy = v.y - m.y
+  let n = Math.hypot(dx, dy)
+  /* Sommet pile au milieu : on part à la perpendiculaire de [a, b]. */
+  if (n < 1e-9) {
+    dx = -(b.y - a.y)
+    dy = b.x - a.x
+    n = Math.hypot(dx, dy) || 1
+  }
+  return { x: m.x + (dx / n) * r, y: m.y + (dy / n) * r }
+}
+
+/**
+ * Le petit carré d'un angle droit, en chemin SVG — `null` si l'angle en `v`
+ * n'est pas droit (à un demi-degré près) ou si un côté est trop court pour
+ * le porter. En pixels : un angle droit en fractions ne l'est pas à l'œil.
+ */
+export function carreDAngle(v: Pt, a: Pt, b: Pt, cote = 8): string | null {
+  const ax = a.x - v.x
+  const ay = a.y - v.y
+  const bx = b.x - v.x
+  const by = b.y - v.y
+  const la = Math.hypot(ax, ay)
+  const lb = Math.hypot(bx, by)
+  if (la < cote * 1.5 || lb < cote * 1.5) return null
+  if (Math.abs((ax * bx + ay * by) / (la * lb)) > 0.01) return null
+  const u = { x: (ax / la) * cote, y: (ay / la) * cote }
+  const w = { x: (bx / lb) * cote, y: (by / lb) * cote }
+  return `M${v.x + u.x} ${v.y + u.y}L${v.x + u.x + w.x} ${v.y + u.y + w.y}L${v.x + w.x} ${v.y + w.y}`
+}

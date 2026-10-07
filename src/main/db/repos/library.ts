@@ -1,13 +1,12 @@
 import { activeCampaignId, getDb } from '../index'
-import { moveEntry, renameEntry, writeDoc } from '../../library'
-import type { Chapter, Folder, FolderNode, Item, ItemFilter, ItemKind } from '@shared/types'
+import { moveEntry, renameEntry, renommerJumeauTxt, writeDoc, writeTexteBrut } from '../../library'
+import type { Folder, FolderNode, Item, ItemFilter, ItemKind } from '@shared/types'
 
 /* ---------------- lignes brutes ---------------- */
 
 interface ItemRow {
   id: number
   folder_id: number | null
-  chapter_id: number | null
   place_id: number | null
   kind: ItemKind
   title: string
@@ -24,7 +23,7 @@ interface ItemRow {
 }
 
 const ITEM_SELECT = `
-  SELECT i.id, i.folder_id, i.chapter_id, i.place_id, i.kind, i.title, i.body,
+  SELECT i.id, i.folder_id, i.place_id, i.kind, i.title, i.body,
          i.rel_path, i.mime, i.bytes, i.width, i.height, i.duration, i.thumb_at,
          i.thumb_page, i.updated_at
     FROM item i`
@@ -33,7 +32,6 @@ function toItem(r: ItemRow): Item {
   return {
     id: r.id,
     folderId: r.folder_id,
-    chapterId: r.chapter_id,
     placeId: r.place_id,
     kind: r.kind,
     title: r.title,
@@ -71,58 +69,6 @@ export function changerPageVignette(itemId: number, page: number): Item | null {
     )
     .run(n, itemId, activeCampaignId())
   return getItem(itemId)
-}
-
-/* ---------------- chapitres ---------------- */
-
-export function listChapters(): Chapter[] {
-  return getDb()
-    .prepare(
-      `SELECT c.id, c.ord, c.title, c.notes,
-              (SELECT COUNT(*) FROM item i WHERE i.chapter_id = c.id)         AS items,
-              (SELECT COUNT(*) FROM place_chapter pc WHERE pc.chapter_id = c.id) AS places,
-              (SELECT COUNT(*) FROM beat b WHERE b.chapter_id = c.id)          AS beats
-         FROM chapter c
-        WHERE c.campaign_id = ?
-        ORDER BY c.ord, c.id`
-    )
-    .all(activeCampaignId()) as Chapter[]
-}
-
-export function createChapter(title: string): Chapter {
-  const cid = activeCampaignId()
-  const ord =
-    ((getDb().prepare(`SELECT MAX(ord) AS m FROM chapter WHERE campaign_id = ?`).get(cid) as any)
-      ?.m ?? -1) + 1
-  const info = getDb()
-    .prepare(`INSERT INTO chapter (campaign_id, ord, title) VALUES (?, ?, ?)`)
-    .run(cid, ord, title)
-  return { id: Number(info.lastInsertRowid), ord, title, notes: null, items: 0, places: 0, beats: 0 }
-}
-
-/**
- * L'ordre des chapitres, donné en entier.
- *
- * On renumérote de zéro plutôt que d'échanger deux rangs : une base héritée
- * peut porter deux chapitres au même rang — c'est arrivé — et un échange les
- * y laisserait pour toujours.
- */
-export function reorderChapters(ids: number[]): void {
-  const db = getDb()
-  const cid = activeCampaignId()
-  const set = db.prepare(`UPDATE chapter SET ord = ? WHERE id = ? AND campaign_id = ?`)
-  db.transaction(() => ids.forEach((id, n) => set.run(n, id, cid)))()
-}
-
-export function updateChapter(id: number, patch: { title?: string; notes?: string }): void {
-  const cur = getDb().prepare(`SELECT title, notes FROM chapter WHERE id = ?`).get(id) as any
-  getDb()
-    .prepare(`UPDATE chapter SET title = ?, notes = ? WHERE id = ?`)
-    .run(patch.title ?? cur.title, patch.notes ?? cur.notes, id)
-}
-
-export function removeChapter(id: number): void {
-  getDb().prepare(`DELETE FROM chapter WHERE id = ?`).run(id)
 }
 
 /* ---------------- dossiers ---------------- */
@@ -195,10 +141,6 @@ export function listItems(filter: ItemFilter): Item[] {
       params.folderId = filter.folderId
     }
   }
-  if (filter.chapterId != null) {
-    where.push('i.chapter_id = @chapterId')
-    params.chapterId = filter.chapterId
-  }
   if (filter.placeId != null) {
     where.push('i.place_id = @placeId')
     params.placeId = filter.placeId
@@ -233,11 +175,11 @@ export function itemByPath(relPath: string): Item | null {
 /**
  * Modifier un élément, c'est modifier un fichier : renommer le titre renomme
  * le fichier, changer de dossier le déplace, enregistrer un document l'écrit.
- * Seuls le chapitre et le lieu ne concernent que la base.
+ * Seul le lieu ne concerne que la base.
  */
 export function updateItem(
   id: number,
-  patch: Partial<Pick<Item, 'title' | 'body' | 'folderId' | 'chapterId' | 'placeId'>>
+  patch: Partial<Pick<Item, 'title' | 'body' | 'folderId' | 'placeId'>>
 ): Item | null {
   const cur = getItem(id)
   if (!cur) return null
@@ -245,6 +187,12 @@ export function updateItem(
   if (patch.body !== undefined && cur.kind === 'doc' && cur.relPath) {
     writeDoc(cur.relPath, patch.body ?? '')
     getDb().prepare(`UPDATE item SET body = ? WHERE id = ?`).run(patch.body ?? '', id)
+    // Le texte d'un moment, et chaque note du Bloc-notes, ont aussi leur version .txt.
+    if (
+      cur.relPath.startsWith('Bloc-notes/') ||
+      getDb().prepare(`SELECT 1 FROM beat_item WHERE item_id = ?`).get(id)
+    )
+      writeTexteBrut(cur.relPath, patch.body ?? '')
   }
 
   if (patch.folderId !== undefined && patch.folderId !== cur.folderId && cur.relPath) {
@@ -259,17 +207,11 @@ export function updateItem(
   const after = getItem(id)
   if (patch.title !== undefined && patch.title !== cur.title && after?.relPath) {
     renameEntry(after.relPath, patch.title)
+    if (cur.kind === 'doc') renommerJumeauTxt(after.relPath, patch.title)
   }
 
-  if (patch.chapterId !== undefined || patch.placeId !== undefined) {
-    const now = getItem(id)!
-    getDb()
-      .prepare(`UPDATE item SET chapter_id = @chapterId, place_id = @placeId WHERE id = @id`)
-      .run({
-        id,
-        chapterId: patch.chapterId !== undefined ? patch.chapterId : now.chapterId,
-        placeId: patch.placeId !== undefined ? patch.placeId : now.placeId
-      })
+  if (patch.placeId !== undefined) {
+    getDb().prepare(`UPDATE item SET place_id = ? WHERE id = ?`).run(patch.placeId, id)
   }
 
   return getItem(id)

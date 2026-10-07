@@ -1,8 +1,9 @@
 import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { copierLigne } from '../copie'
-import { couleurLibre } from '@shared/types'
+import { couleurLibre, lisCadreCarre } from '@shared/types'
 import type {
   ButinLigne,
+  CadreCarre,
   Character,
   CharacterKind,
   Frame,
@@ -175,6 +176,8 @@ export function blankData(spec: TemplateSpec): CharacterData {
 
 /** Le cadrage part en base sous forme de texte, ou pas du tout. */
 const cadre = (f: Frame | null | undefined): string | null => (f ? JSON.stringify(f) : null)
+/** Le carré du portrait, de même. */
+const carre = (c: CadreCarre | null | undefined): string | null => (c ? JSON.stringify(c) : null)
 
 /**
  * Le butin relu depuis la colonne. Une base d'avant la colonne, un texte
@@ -211,6 +214,7 @@ function toCharacter(r: any): Character {
     age: r.age,
     color: r.color,
     portraitItemId: r.portrait_item_id,
+    portraitCadre: lisCadreCarre(r.portrait_cadre),
     sheetItemId: r.sheet_item_id,
     sheetFrame: r.sheet_frame ? (JSON.parse(r.sheet_frame) as Frame) : null,
     kind: r.kind === 'pnj' ? 'pnj' : 'pj',
@@ -231,7 +235,7 @@ function toCharacter(r: any): Character {
  */
 const SELECT_PERSO = `
   SELECT c.id, c.template_id, c.name, c.player, c.occupation, c.portrait_item_id,
-         c.sheet_item_id, c.sheet_frame, c.age, c.color, c.kind, c.sexe, c.notes, c.butin,
+         c.portrait_cadre, c.sheet_item_id, c.sheet_frame, c.age, c.color, c.kind, c.sexe, c.notes, c.butin,
          CASE WHEN c.kind = 'pj'
               THEN COALESCE((SELECT cs.data FROM character_seance cs
                               WHERE cs.character_id = c.id AND cs.session_id = @sid), c.data)
@@ -240,7 +244,7 @@ const SELECT_PERSO = `
                       WHERE a.character_id = c.id AND a.session_id = @sid) AS present,
          EXISTS (SELECT 1 FROM game_session sortie, game_session ici
                   WHERE sortie.id = c.sortie_session_id AND ici.id = @sid
-                    AND (ici.date > sortie.date OR (ici.date = sortie.date AND ici.id >= sortie.id))
+                    AND (ici.ord > sortie.ord OR (ici.ord = sortie.ord AND ici.id >= sortie.id))
                 ) AS hors_jeu
     FROM character c`
 
@@ -347,14 +351,14 @@ function ecrisDonnees(id: number, data: CharacterData): void {
  * caractéristiques, ses affaires. Ensuite, chaque séance vit sa vie : soigner
  * quelqu'un à la scierie ne le soigne pas à la maison pleureuse.
  *
- * « D'avant » se lit dans l'ordre des séances, par date puis par création ;
+ * « D'avant » se lit dans l'ordre des séances, celui de la liste (migration 46) ;
  * un joueur qui n'a rien avant repart de sa fiche de base.
  */
 export function preparerSeance(sessionId: number): void {
   const db = getDb()
   const cid = activeCampaignId()
-  const sienne = db.prepare(`SELECT date, id FROM game_session WHERE id = ?`).get(sessionId) as
-    | { date: string; id: number }
+  const sienne = db.prepare(`SELECT ord, id FROM game_session WHERE id = ?`).get(sessionId) as
+    | { ord: number; id: number }
     | undefined
   if (!sienne) return
 
@@ -373,10 +377,10 @@ export function preparerSeance(sessionId: number): void {
         .prepare(
           `SELECT cs.session_id AS sid, cs.data FROM character_seance cs
              JOIN game_session g ON g.id = cs.session_id
-            WHERE cs.character_id = ? AND (g.date < ? OR (g.date = ? AND g.id < ?))
-            ORDER BY g.date DESC, g.id DESC LIMIT 1`
+            WHERE cs.character_id = ? AND (g.ord < ? OR (g.ord = ? AND g.id < ?))
+            ORDER BY g.ord DESC, g.id DESC LIMIT 1`
         )
-        .get(j.id, sienne.date, sienne.date, sienne.id) as { sid: number; data: string } | undefined
+        .get(j.id, sienne.ord, sienne.ord, sienne.id) as { sid: number; data: string } | undefined
 
       db.prepare(
         `INSERT INTO character_seance (character_id, session_id, data) VALUES (?, ?, ?)`
@@ -400,19 +404,37 @@ export function preparerSeance(sessionId: number): void {
  * ne remonte à l'original. Rend l'identifiant de la copie.
  */
 export function duplicatePnj(id: number): number {
-  const db = getDb()
-  const sid = activeSessionId()
   let neuf = 0
-  db.transaction(() => {
-    const ord =
-      ((db.prepare(`SELECT MAX(ord) AS m FROM character WHERE campaign_id = ?`).get(activeCampaignId()) as any)
-        ?.m ?? -1) + 1
-    neuf = copierLigne('character', id, { session_id: sid, ord })
-    for (const o of db.prepare(`SELECT id FROM objet_placement WHERE character_id = ?`).all(id) as {
-      id: number
-    }[])
-      copierLigne('objet_placement', o.id, { character_id: neuf, session_id: sid })
+  getDb().transaction(() => {
+    neuf = copierPnj(id, activeSessionId())
   })()
+  return neuf
+}
+
+/**
+ * Le cœur de la reprise, sans transaction, vers la séance `sid`. `jumeaux`
+ * raccroche le portrait et la fiche PDF au double de leur fichier quand le
+ * dossier a été recopié avec la séance.
+ */
+export function copierPnj(id: number, sid: number, jumeaux: Map<number, number> = new Map()): number {
+  const db = getDb()
+  const ord =
+    ((db.prepare(`SELECT MAX(ord) AS m FROM character WHERE campaign_id = ?`).get(activeCampaignId()) as any)
+      ?.m ?? -1) + 1
+  const brut = db
+    .prepare(`SELECT portrait_item_id AS p, sheet_item_id AS f FROM character WHERE id = ?`)
+    .get(id) as { p: number | null; f: number | null }
+  const fichier = (v: number | null): number | null => (v == null ? null : (jumeaux.get(v) ?? v))
+  const neuf = copierLigne('character', id, {
+    session_id: sid,
+    ord,
+    portrait_item_id: fichier(brut.p),
+    sheet_item_id: fichier(brut.f)
+  })
+  for (const o of db.prepare(`SELECT id FROM objet_placement WHERE character_id = ?`).all(id) as {
+    id: number
+  }[])
+    copierLigne('objet_placement', o.id, { character_id: neuf, session_id: sid })
   return neuf
 }
 
@@ -429,6 +451,7 @@ export function upsertCharacter(input: {
   color?: string | null
   sexe?: Sexe | null
   portraitItemId?: number | null
+  portraitCadre?: CadreCarre | null
   sheetItemId?: number | null
   sheetFrame?: Frame | null
   data?: CharacterData
@@ -441,7 +464,7 @@ export function upsertCharacter(input: {
       `UPDATE character SET template_id = @templateId, name = @name, player = @player,
                             occupation = @occupation, age = @age, color = @color,
                             sexe = @sexe, portrait_item_id = @portraitItemId,
-                            sheet_item_id = @sheetItemId, sheet_frame = @sheetFrame,
+                            portrait_cadre = @portraitCadre, sheet_item_id = @sheetItemId, sheet_frame = @sheetFrame,
                             notes = @notes, butin = @butin,
                             updated_at = datetime('now')
         WHERE id = @id`
@@ -455,6 +478,14 @@ export function upsertCharacter(input: {
       color: input.color !== undefined ? input.color : cur.color,
       sexe: input.sexe !== undefined ? input.sexe : cur.sexe,
       portraitItemId: input.portraitItemId !== undefined ? input.portraitItemId : cur.portraitItemId,
+      /* Nouveau portrait, nouveau carré : celui d'avant visait un autre visage. */
+      portraitCadre: carre(
+        input.portraitCadre !== undefined
+          ? input.portraitCadre
+          : input.portraitItemId !== undefined && input.portraitItemId !== cur.portraitItemId
+            ? null
+            : cur.portraitCadre
+      ),
       sheetItemId: input.sheetItemId !== undefined ? input.sheetItemId : cur.sheetItemId,
       sheetFrame: cadre(input.sheetFrame !== undefined ? input.sheetFrame : cur.sheetFrame),
       /* La nature ne se modifie pas ici : on ne rétrograde pas une fiche en
@@ -475,11 +506,11 @@ export function upsertCharacter(input: {
   const info = db
     .prepare(
       `INSERT INTO character (campaign_id, session_id, template_id, kind, notes, butin, name, player,
-                              occupation, age, color, sexe, portrait_item_id, sheet_item_id,
-                              sheet_frame, data, ord)
+                              occupation, age, color, sexe, portrait_item_id, portrait_cadre,
+                              sheet_item_id, sheet_frame, data, ord)
        VALUES (@cid, @sid, @templateId, @kind, @notes, @butin, @name, @player,
-               @occupation, @age, @color, @sexe, @portraitItemId, @sheetItemId,
-               @sheetFrame, @data, @ord)`
+               @occupation, @age, @color, @sexe, @portraitItemId, @portraitCadre,
+               @sheetItemId, @sheetFrame, @data, @ord)`
     )
     .run({
       cid: activeCampaignId(),
@@ -494,10 +525,18 @@ export function upsertCharacter(input: {
       occupation: input.occupation ?? null,
       age: input.age ?? null,
       sexe: input.sexe ?? null,
-      /* Une couleur d'office a la creation : la premiere libre de la table.
-         C'est elle qui distingue le joueur dans la liste et cercle son pion. */
-      color: input.color ?? couleurLibre(listCharacters().map((c) => c.color)),
+      /* Une couleur d'office a la creation : la premiere libre parmi les
+         joueurs. C'est elle qui distingue le joueur dans la liste et cercle
+         son pion. Les PNJ ne comptent pas : ils ne retiennent aucune teinte. */
+      color:
+        input.color ??
+        couleurLibre(
+          listCharacters()
+            .filter((c) => c.kind !== 'pnj')
+            .map((c) => c.color)
+        ),
       portraitItemId: input.portraitItemId ?? null,
+      portraitCadre: carre(input.portraitCadre ?? null),
       sheetItemId: input.sheetItemId ?? null,
       sheetFrame: cadre(input.sheetFrame ?? null),
       data: JSON.stringify(data),

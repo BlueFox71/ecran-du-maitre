@@ -173,7 +173,28 @@ export const FOLDER_ICONS: Record<string, (p?: P) => JSX.Element> = {
       p
     ),
   etoile: (p = {}) =>
-    box(<path d="m12 3.5 2.6 5.6 6 .8-4.4 4.2 1.1 6.1-5.3-2.9-5.3 2.9 1.1-6.1L3.4 9.9l6-.8z" />, p)
+    box(<path d="m12 3.5 2.6 5.6 6 .8-4.4 4.2 1.1 6.1-5.3-2.9-5.3 2.9 1.1-6.1L3.4 9.9l6-.8z" />, p),
+  /* Le dossier des textes de la Chronologie : un sablier, le temps qui passe
+     d'un moment à l'autre. Posé d'office sur le dossier « Moments ». */
+  moments: (p = {}) =>
+    box(
+      <>
+        <path d="M6.5 3.5h11M6.5 20.5h11" />
+        <path d="M8 3.5c0 4.5 8 4.5 8 8.5s-8 4-8 8.5M16 3.5c0 4.5-8 4.5-8 8.5s8 4 8 8.5" />
+        <path d="M10 18.5h4" />
+      </>,
+      p
+    ),
+  /* Le dossier du Bloc-notes : une feuille à spirale et sa case cochée. */
+  notes: (p = {}) =>
+    box(
+      <>
+        <path d="M5.5 5h13v16h-13z" />
+        <path d="M8.5 3v4M12 3v4M15.5 3v4" />
+        <path d="M8.5 11.5l1.3 1.3 2.4-2.6M13.5 12h2.5M8.5 17h7.5" />
+      </>,
+      p
+    )
 }
 
 export const FOLDER_ICON_KEYS = Object.keys(FOLDER_ICONS)
@@ -207,7 +228,9 @@ const FOLDER_TEINTES: Record<string, string> = {
   lieu: 'blood',
   losange: 'amethyste',
   ecran: 'azur',
-  etoile: 'bruyere'
+  etoile: 'bruyere',
+  moments: 'orange',
+  notes: 'jade'
 }
 
 export function teinteDossier(icon: string | null): string {

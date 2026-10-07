@@ -1,13 +1,30 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { MenuPion, type CiblePion } from '../components/MenuPion'
+import { MenuImage, type CibleImage } from '../components/MenuImage'
 import { Slide } from '../../shared/Slide'
+import { Visage } from '../../shared/Visage'
 import { Pings, usePings } from '../../shared/Pings'
 import { duree } from '../../shared/mesures'
 import { slideLabel } from '../components/Monitor'
-import { LAYOUTS, LAYOUT_NAME, accepteSi, initials, profondeur } from './Regie'
+import { accepteSi, initials, profondeur } from './Regie'
 import { decorDossier, folderIcon } from '../components/FolderIcons'
 import { Annotations, CadreAnnote } from '../components/Annotations'
+import { TableauDeScene, type Surbrillance } from '../components/Tableau'
+import { IconPhone, Portables } from '../components/Portables'
+import {
+  BoutonPoserLumiere,
+  BoutonTextes,
+  SensEncart,
+  VoletAnnoter,
+  VoletCase,
+  VoletTextes,
+  caseDuCollage,
+  useAnnotationsScene,
+  useCalqueDuLieu,
+  usePoseLumiere,
+  useTextesEcran
+} from '../components/OutilsDeScene'
 import { COLLAGE_CELLS, FRAME_NEUTRE, LUM_MAX, LUM_MIN, TRANSITIONS } from '@shared/types'
 import type {
   Annotation,
@@ -23,7 +40,11 @@ import type { UiFolder, UiItem } from '../../../../preload/index'
 import {
   IconCheck,
   IconChevron,
+  IconClose,
   IconDoc,
+  IconExpand,
+  IconPorte,
+  IconEye,
   IconCercle,
   IconEyeOff,
   IconFade,
@@ -70,16 +91,42 @@ export function Pupitre(): JSX.Element {
   const [presence, setPresence] = useState<Record<number, PionsDuLieu>>({})
   /* Le nom qu'on donne à un pion qui n'est à personne. `null` : champ fermé. */
   const [pnj, setPnj] = useState<string | null>(null)
+  /* Le côté gauche lit soit le fil de la séance, soit les documents annexes —
+     règles maison, tables, fiches qu'on garde sous la main toute la partie. */
+  const [cote, setCote] = useState<'chrono' | 'annexes'>('chrono')
+  const [annexeVue, setAnnexeVue] = useState<number | null>(null)
+  /* Le choix qu'ouvre un clic sur une image : visuel libre, ou fenêtre sur le direct. */
+  const [cibleImage, setCibleImage] = useState<CibleImage | null>(null)
   /*
-   * Les annotations du lieu qu'on arrange. Volontairement de l'état **local** :
-   * elles ne transitent pas par `display`, donc la fenêtre joueurs ne peut pas
-   * les recevoir, quoi qu'on fasse ici. On les lit, on ne les écrit pas — poser
-   * un repère reste un geste de la Régie ou de la fiche de lieu.
+   * Les annotations du lieu qu'on arrange, comme en Régie : on les voit, on les
+   * pose et on les écrit d'ici. De l'état local — la fenêtre joueurs ne peut
+   * pas les recevoir. Voir `useAnnotationsScene`.
    */
   const [voirAnnots, setVoirAnnots] = useState(false)
-  const [annots, setAnnots] = useState<Annotation[]>([])
-  /* La source, sous l'ambiance : les lieux de la campagne ou son dossier. */
-  const [tab, setTab] = useState<'lieux' | 'arbre'>('lieux')
+  /* L'ombre exacte de l'écran des joueurs, posée sur la scène à la demande. */
+  const [leurOeil, setLeurOeil] = useState(false)
+  /* Ce que le MJ survole dans son tableau de scène : un halo chez lui seul. */
+  const [survol, setSurvol] = useState<Surbrillance>(null)
+  /* La source, sous l'ambiance : les lieux, le dossier, ou les portables. */
+  const [tab, setTab] = useState<'lieux' | 'arbre' | 'portables'>('lieux')
+  /* Le tableau de scène, à gauche de l'image : le MJ le montre ou le cache.
+     Un confort de poste, retenu d'une ouverture à l'autre. */
+  const [voirScene, setVoirScene] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('paravent.scene') !== 'non'
+    } catch {
+      return true
+    }
+  })
+  const basculerScene = (): void =>
+    setVoirScene((v) => {
+      try {
+        localStorage.setItem('paravent.scene', v ? 'non' : 'oui')
+      } catch {
+        /* sans stockage, le choix ne dure que la séance */
+      }
+      return !v
+    })
   const [ouverts, setOuverts] = useState<Set<string>>(new Set())
 
   /* Le pointeur, comme en Régie : P le maintient, Ctrl le prête le temps d'un
@@ -97,6 +144,17 @@ export function Pupitre(): JSX.Element {
   const liveSlot = (display?.liveSlot ?? 0) as 0 | 1
   const idleSlot: 0 | 1 = liveSlot === 0 ? 1 : 0
   const onLive = visuel === liveSlot
+
+  /* En arrivant sur la page, on regarde ce que voient les joueurs : le direct,
+     toujours. Une fois seulement, dès que l'état de l'écran est connu — ensuite
+     on passe d'un visuel à l'autre comme on veut. */
+  const arrive = useRef(false)
+  useEffect(() => {
+    if (arrive.current || !display) return
+    arrive.current = true
+    setVisuel(display.liveSlot)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [display])
   const slide = display?.slots?.[visuel] ?? { type: 'black' as const }
   const prepSlide = display?.slots?.[idleSlot] ?? { type: 'black' as const }
   const layout: CollageLayout = prepSlide.type === 'collage' ? prepSlide.layout : '1'
@@ -138,13 +196,23 @@ export function Pupitre(): JSX.Element {
 
   /* Les annotations suivent le lieu qu'on arrange, et ne se lisent que si on
      les demande — inutile d'interroger la base pour un calque qu'on cache. */
-  useEffect(() => {
-    if (!voirAnnots) {
-      setAnnots([])
-      return
-    }
-    void window.jdr.annotations.of(editPlaceId).then(setAnnots)
-  }, [voirAnnots, editPlaceId])
+  const annot = useAnnotationsScene(editPlaceId, voirAnnots)
+  /* Le calque du lieu : il retient les pions, nourrit le tableau de scène et
+     l'œil des joueurs. Il se relit dès qu'un pion ou une porte bouge. */
+  const calque = useCalqueDuLieu(editPlaceId, edit.pions, display?.pions, display?.calqueRev)
+  /* Les textes posés sur le visuel qu'on regarde, et la case visée d'un collage. */
+  const textes = useTextesEcran(slide, onLive)
+  /* Une bougie qu'on allume, une lanterne qu'on pose : un clic dans la pièce. */
+  const lampe = usePoseLumiere(editPlaceId, calque)
+  const iCase = caseDuCollage(slide, activeCell)
+
+  /* La source ne montre que les espaces et leurs niveaux : les pièces rangées
+     sous un niveau se jouent par la carte du niveau, pas une à une. Un lieu
+     rangé nulle part reste, lui, à portée de main. */
+  const lieuxMontres = s.places.filter((p) => {
+    if (p.tier !== 'lieu' || p.parentId == null) return true
+    return s.places.find((x) => x.id === p.parentId)?.tier !== 'niveau'
+  })
 
   /** Le lieu mis en scène, et sa carte — c'est elle qui porte les repères. */
   const placeArrangee = s.places.find((p) => p.id === editPlaceId) ?? null
@@ -269,11 +337,6 @@ export function Pupitre(): JSX.Element {
     })
   }
 
-  const setLayout = async (l: CollageLayout): Promise<void> => {
-    await window.jdr.display.prepareLayout(l)
-    setActiveCell(0)
-    setVisuel(idleSlot)
-  }
 
   /** La manière vient du magasin : la Régie et le Pupitre basculent pareil. */
   const swap = async (ms: number): Promise<void> => {
@@ -281,7 +344,9 @@ export function Pupitre(): JSX.Element {
       s.toast('Image figée — dégèle d’abord pour changer l’écran joueurs', true)
       return
     }
-    await window.jdr.display.swap(ms, s.transition)
+    const d = await window.jdr.display.swap(ms, s.transition)
+    /* On vient d'envoyer : c'est le nouveau direct qu'on veut sous les yeux. */
+    setVisuel(d.liveSlot)
   }
 
   /* ---------------- pions sur la scène ---------------- */
@@ -546,9 +611,17 @@ export function Pupitre(): JSX.Element {
   const visuels = useMemo(() => matiere.filter((i) => A_L_ECRAN.has(i.kind)), [matiere])
   const sons = useMemo(() => matiere.filter((i) => i.kind === 'audio'), [matiere])
   const docs = useMemo(() => matiere.filter((i) => i.kind === 'doc'), [matiere])
+  /* Les PNJ que la Chronologie a mis en scène : leur portrait se prépare d'un
+     clic, leur pion se glisse sur la scène. */
+  const pnjsEnScene = useMemo(
+    () => s.characters.filter((c) => c.kind === 'pnj' && (beat?.pnjIds ?? []).includes(c.id)),
+    [s.characters, beat]
+  )
 
   const audio = display?.audio
   const played = s.beats.filter((b) => b.done).length
+  /* L'annexe qu'on lit : celle qu'on a choisie, sinon la première. */
+  const annexe = s.annexes.find((a) => a.id === annexeVue) ?? s.annexes[0] ?? null
 
   const setDone = async (done: boolean): Promise<void> => {
     if (!beat) return
@@ -557,7 +630,6 @@ export function Pupitre(): JSX.Element {
       title: beat.title,
       atTime: beat.atTime,
       note: beat.note,
-      chapterId: beat.chapterId,
       placeId: beat.placeId,
       done
     })
@@ -573,13 +645,47 @@ export function Pupitre(): JSX.Element {
         <div className="pu-chrono">
           <aside className="pane">
             <div className="pane-head">
-              <span className="eyebrow">Le fil</span>
-              <div className="spacer" />
-              <span className="eyebrow">
-                {played} / {s.beats.length}
-              </span>
+              <div className="seg pu-cote" role="tablist" aria-label="Ce qu’on lit">
+                <button
+                  role="tab"
+                  aria-selected={cote === 'chrono'}
+                  className={cote === 'chrono' ? 'on' : ''}
+                  onClick={() => setCote('chrono')}
+                  title={`Le fil de la séance — ${played} / ${s.beats.length} joués`}
+                >
+                  Chronologie
+                </button>
+                <button
+                  role="tab"
+                  aria-selected={cote === 'annexes'}
+                  className={cote === 'annexes' ? 'on' : ''}
+                  onClick={() => setCote('annexes')}
+                  title="Les documents qu’on garde sous la main toute la séance"
+                >
+                  Annexes
+                </button>
+              </div>
             </div>
             <div className="pane-body">
+              {cote === 'annexes' ? (
+                <div className="fil">
+                  {s.annexes.map((a) => (
+                    <button
+                      key={a.id}
+                      className={`moment${(annexe?.id ?? null) === a.id ? ' on' : ''}`}
+                      onClick={() => setAnnexeVue(a.id)}
+                      title={a.relPath ?? a.title}
+                    >
+                      <span className="t">
+                        <span className="ttl">{a.title}</span>
+                      </span>
+                    </button>
+                  ))}
+                  {s.annexes.length === 0 ? (
+                    <p className="vide">Aucun document annexe.</p>
+                  ) : null}
+                </div>
+              ) : (
               <ol className="fil">
                 {s.beats.map((b) => (
                   <li key={b.id}>
@@ -603,11 +709,40 @@ export function Pupitre(): JSX.Element {
                   <li className="vide">Aucun moment dans cette séance.</li>
                 ) : null}
               </ol>
+              )}
             </div>
           </aside>
 
           <section className="pane lecture">
-            {beat ? (
+            {cote === 'annexes' ? (
+              /* Au Paravent on lit ; on écrit dans Préparation › Annexes. */
+              annexe ? (
+                <>
+                  <header className="lect-head">
+                    <div>
+                      <span className="eyebrow">document annexe</span>
+                      <h3 className="display">{annexe.title}</h3>
+                    </div>
+                  </header>
+                  <div className="lect-body">
+                    <article className="read">
+                      <div
+                        className="read-body"
+                        dangerouslySetInnerHTML={{
+                          __html: annexe.body || '<p class="rien">Ce texte est vide.</p>'
+                        }}
+                      />
+                    </article>
+                  </div>
+                </>
+              ) : (
+                <div className="vide-grand">
+                  Aucun document annexe.
+                  <br />
+                  Ajoute-les dans Préparation de la séance › Annexes.
+                </div>
+              )
+            ) : beat ? (
               <>
                 <header className="lect-head">
                   <div>
@@ -628,22 +763,150 @@ export function Pupitre(): JSX.Element {
                   </button>
                 </header>
 
+                {/* Ce que le moment a à montrer, juste sous son titre : son lieu,
+                    ses images, ses PNJ en scène et ses sons — préparés dans la
+                    Chronologie, envoyés d'ici. */}
+                <div className="pu-montrer">
+                  <div className="pu-sect">
+                    <span className="eyebrow">À montrer</span>
+                    <span className="pu-line" />
+                    {display?.fenetres.length ? (
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        onClick={() => void window.jdr.display.fermerFenetre()}
+                        title={`Retirer de l’écran des joueurs : ${display.fenetres
+                          .map((f) => `« ${f.title} »`)
+                          .join(', ')}`}
+                      >
+                        <IconClose />
+                        {display.fenetres.length > 1
+                          ? `Fermer les ${display.fenetres.length} fenêtres`
+                          : 'Fermer la fenêtre'}
+                      </button>
+                    ) : null}
+                    <button className="btn btn-ghost btn-sm" onClick={() => setChoix(true)}>
+                      <IconSearch />
+                      Bibliothèque…
+                    </button>
+                  </div>
+                  <div className="pu-etagere">
+                    {lieu ? (
+                      <button
+                        className="pu-vig pu-lieu"
+                        onClick={() => void preparePlace(lieu.id)}
+                        title={`Préparer ${lieu.name} — ses pions reviennent avec lui`}
+                      >
+                        {carte?.url ? <img src={carte.url} alt="" /> : <span className="pu-rien" />}
+                        <span className="pu-kind">lieu</span>
+                        <span className="pu-nom">{lieu.name}</span>
+                      </button>
+                    ) : null}
+
+                    {visuels.map((it) => (
+                      <button
+                        key={it.id}
+                        className="pu-vig"
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData('text/media-item', String(it.id))
+                          e.dataTransfer.setData('text/pion-item', String(it.id))
+                          e.dataTransfer.effectAllowed = 'copy'
+                        }}
+                        onClick={(e) =>
+                          it.kind === 'image'
+                            ? setCibleImage({ item: it, titre: it.title, x: e.clientX, y: e.clientY })
+                            : void poser(it)
+                        }
+                        title={
+                          it.kind === 'image'
+                            ? `${it.title} — clic : visuel libre ou fenêtre sur le direct ; glisser sur la scène : un pion`
+                            : `Préparer ${it.title} — ou le glisser sur la scène pour en faire un pion`
+                        }
+                      >
+                        {it.poster || (it.kind === 'image' && it.url) ? (
+                          <img src={it.poster ?? it.url!} alt="" />
+                        ) : null}
+                        {it.kind === 'video' ? <span className="pu-play" /> : null}
+                        {/* Le triangle dit déjà que c'est une vidéo ; la place sert
+                            mieux à dire combien de temps elle dure. */}
+                        <span className="pu-kind">
+                          {it.kind === 'video' ? (duree(it.duration) ?? 'vidéo') : 'image'}
+                        </span>
+                        <span className="pu-nom">{it.title}</span>
+                      </button>
+                    ))}
+
+                    {pnjsEnScene.map((c) => {
+                      const photo = s.allItems.find((i) => i.id === c.portraitItemId)
+                      return (
+                        <button
+                          key={c.id}
+                          className="pu-vig pu-pnj"
+                          draggable
+                          onDragStart={(e) => {
+                            e.dataTransfer.setData('text/pion-char', String(c.id))
+                            e.dataTransfer.effectAllowed = 'copy'
+                          }}
+                          onClick={(e) =>
+                            photo
+                              ? setCibleImage({
+                                  item: photo,
+                                  titre: c.name,
+                                  x: e.clientX,
+                                  y: e.clientY,
+                                  pnj: true
+                                })
+                              : undefined
+                          }
+                          title={
+                            photo
+                              ? `${c.name} — clic : son portrait sur le visuel libre ou en fenêtre sur le direct ; glisser sur la scène : son pion`
+                              : `${c.name} n’a pas de portrait — glisse-le sur la scène pour poser son pion`
+                          }
+                        >
+                          {photo?.url ? (
+                            <img src={photo.url} alt="" draggable={false} />
+                          ) : (
+                            <span className="pu-initiales">{initials(c.name)}</span>
+                          )}
+                          <span className="pu-kind">pnj</span>
+                          <span className="pu-nom">{c.name}</span>
+                        </button>
+                      )
+                    })}
+
+                    {sons.length ? (
+                      <div className="pu-sons">
+                        {sons.map((it) => (
+                          <button
+                            key={it.id}
+                            className={`pu-son${audio?.itemId === it.id && audio.playing ? ' on' : ''}`}
+                            onClick={() => void poser(it)}
+                            title="Lancer cette ambiance"
+                          >
+                            {kindIcon('audio')}
+                            <span className="t">{it.title}</span>
+                          </button>
+                        ))}
+                      </div>
+                    ) : null}
+
+                    {!lieu && visuels.length === 0 && pnjsEnScene.length === 0 && sons.length === 0 ? (
+                      <p className="pu-vide">
+                        Rien à montrer pour ce moment — prépare-le dans la Chronologie, ou prends dans la bibliothèque.
+                      </p>
+                    ) : null}
+                  </div>
+                </div>
+
                 <div className="lect-body">
                   {beat.note ? <p className="mine">{beat.note}</p> : null}
                   {docs.map((d) => (
                     <article key={d.id} className="read">
+                      {/* On lit au Paravent ; on écrit dans la Chronologie. */}
                       <h4>
                         <IconDoc />
                         {d.title}
-                        <span className="spacer" />
-                        <button
-                          className="btn btn-ghost btn-sm"
-                          onClick={() => s.openInEditor(d.id)}
-                          title="Modifier ce texte"
-                        >
-                          <IconPen />
-                          Écrire
-                        </button>
                       </h4>
                       <div
                         className="read-body"
@@ -657,7 +920,7 @@ export function Pupitre(): JSX.Element {
                     <p className="vide-grand">
                       Rien à lire pour ce moment.
                       <br />
-                      Ce qu’il a à montrer, lui, est à droite.
+                      Ce qu’il a à montrer est juste au-dessus.
                     </p>
                   ) : null}
                 </div>
@@ -670,78 +933,6 @@ export function Pupitre(): JSX.Element {
 
         {/* ================= l'écran des joueurs ================= */}
         <section className="pane pu-regie">
-          {/* ---- ce que ce moment a sous la main ---- */}
-          <div className="pu-sect">
-            <span className="eyebrow">Ce moment</span>
-            <span className="pu-line" />
-            <button className="btn btn-ghost btn-sm" onClick={() => setChoix(true)}>
-              <IconSearch />
-              Bibliothèque…
-            </button>
-          </div>
-
-          <div className="pu-etagere">
-            {lieu ? (
-              <button
-                className="pu-vig pu-lieu"
-                onClick={() => void preparePlace(lieu.id)}
-                title={`Préparer ${lieu.name} — ses pions reviennent avec lui`}
-              >
-                {carte?.url ? <img src={carte.url} alt="" /> : <span className="pu-rien" />}
-                <span className="pu-kind">lieu</span>
-                <span className="pu-nom">{lieu.name}</span>
-              </button>
-            ) : null}
-
-            {visuels.map((it) => (
-              <button
-                key={it.id}
-                className="pu-vig"
-                draggable
-                onDragStart={(e) => {
-                  e.dataTransfer.setData('text/media-item', String(it.id))
-                  e.dataTransfer.setData('text/pion-item', String(it.id))
-                  e.dataTransfer.effectAllowed = 'copy'
-                }}
-                onClick={() => void poser(it)}
-                title={`Préparer ${it.title} — ou le glisser sur la scène pour en faire un pion`}
-              >
-                {it.poster || (it.kind === 'image' && it.url) ? (
-                  <img src={it.poster ?? it.url!} alt="" />
-                ) : null}
-                {it.kind === 'video' ? <span className="pu-play" /> : null}
-                {/* Le triangle dit déjà que c'est une vidéo ; la place sert
-                    mieux à dire combien de temps elle dure. */}
-                <span className="pu-kind">
-                  {it.kind === 'video' ? (duree(it.duration) ?? 'vidéo') : 'image'}
-                </span>
-                <span className="pu-nom">{it.title}</span>
-              </button>
-            ))}
-
-            {sons.length ? (
-              <div className="pu-sons">
-                {sons.map((it) => (
-                  <button
-                    key={it.id}
-                    className={`pu-son${audio?.itemId === it.id && audio.playing ? ' on' : ''}`}
-                    onClick={() => void poser(it)}
-                    title="Lancer cette ambiance"
-                  >
-                    {kindIcon('audio')}
-                    <span className="t">{it.title}</span>
-                  </button>
-                ))}
-              </div>
-            ) : null}
-
-            {!lieu && visuels.length === 0 && sons.length === 0 ? (
-              <p className="pu-vide">
-                Rien à diffuser sur ce moment — prends dans la bibliothèque.
-              </p>
-            ) : null}
-          </div>
-
           {/* ---- la barre de la régie ---- */}
           <div className="pu-bar stage-bar">
             <div className="seg">
@@ -762,25 +953,23 @@ export function Pupitre(): JSX.Element {
               ))}
             </div>
 
-            <span className="eyebrow">Disposition</span>
-            <div className="layouts">
-              {LAYOUTS.map((l) => (
-                <button
-                  key={l}
-                  className={`lay${layout === l ? ' on' : ''}`}
-                  onClick={() => void setLayout(l)}
-                  title={LAYOUT_NAME[l]}
-                  aria-label={LAYOUT_NAME[l]}
-                >
-                  <span className={`lay-glyph g-${l}`}>
-                    {Array.from({ length: COLLAGE_CELLS[l] }, (_, n) => (
-                      <i key={n} />
-                    ))}
-                  </span>
-                </button>
-              ))}
-            </div>
-
+            {/* Pas de dispositions au Paravent : on y joue un plan, pas un
+                collage. Elles restent à la Régie. */}
+            <button
+              className={`btn btn-sm${voirScene ? ' btn-on' : ''}`}
+              onClick={basculerScene}
+              aria-pressed={voirScene}
+              title={
+                !calque?.murs.length
+                  ? 'Le tableau de scène — portes, fenêtres, lumières. Ce lieu n’a pas de murs.'
+                  : voirScene
+                    ? 'Cacher le tableau de scène : l’image reprend toute la largeur'
+                    : 'Montrer le tableau de scène à gauche de l’image : portes, fenêtres, lumières'
+              }
+            >
+              <IconPorte />
+              Scène
+            </button>
             <span className="sep" />
             {/* Sans libellé, comme les dispositions voisines : la barre passait
                 à la ligne dès qu'on lui ajoutait un mot. */}
@@ -831,9 +1020,36 @@ export function Pupitre(): JSX.Element {
                 <IconRetour />
               </button>
             </label>
+
+            {/* Comme en Régie : ouvrir l'écran des joueurs sans quitter la scène. */}
+            <div className="spacer" />
+            {/* Sans libellé : la barre passait à la ligne dès qu'on lui
+                ajoutait un mot. L'info-bulle dit ce qu'il fait et où. */}
+            <button
+              className={`btn btn-sm btn-ico${display?.playerOpen ? ' btn-on' : ''}`}
+              aria-label={display?.playerOpen ? 'Fermer l’écran joueurs' : 'Ouvrir l’écran joueurs'}
+              onClick={() => void window.jdr.display.togglePlayer()}
+              title={`${display?.playerOpen ? 'Fermer' : 'Ouvrir'} l’écran joueurs — ${
+                sortie ? `${sortie.label} · ${sortie.width}×${sortie.height}` : 'sortie automatique'
+              } · F5`}
+            >
+              <IconExpand />
+            </button>
           </div>
 
           {/* ---- la grande scène : celle qu'on arrange ---- */}
+          {/* Le tableau de scène, à gauche de l'image et à sa hauteur : son
+              en-tête reste, la liste des pièces défile. Le bouton « Scène » de
+              la barre le cache, et l'image reprend toute la largeur. */}
+          <div className="big-avec-tableau pu-avec-tableau">
+            {voirScene && calque?.murs.length ? (
+              <TableauDeScene
+                calque={calque}
+                lieux={s.places.filter((p) => p.parentId === editPlaceId)}
+                survol={survol}
+                onSurvol={setSurvol}
+              />
+            ) : null}
           <div
             className={`big-frame${onLive ? ' live' : ''}`}
             style={{ ['--ecran' as string]: ecran }}
@@ -849,11 +1065,17 @@ export function Pupitre(): JSX.Element {
                 {onLive ? <Pings pings={ondes.pings} /> : null}
                 <Slide
                   slide={slide}
+                  /* Le calque est toujours donné : les murs retiennent les pions.
+                     L'ombre seule s'allume au bouton « Voir ce qu'ils voient ». */
+                  brouillard={calque}
+                  ombre={leurOeil}
+                  surbrillance={survol}
                   pions={edit.pions}
                   pionSize={edit.size}
                   /* Comme en Régie : la caméra ne suit que la scène à
                      l'antenne, jamais celle qu'on prépare. */
                   focusPionId={onLive ? (display?.focusPionId ?? null) : null}
+                  onDefocus={() => void window.jdr.pions.focus(null)}
                   pionLabels={display?.pionLabels ?? true}
                   pionPv={display?.pionPv ?? false}
                   joueurs={display?.joueurs}
@@ -863,6 +1085,9 @@ export function Pupitre(): JSX.Element {
                     void window.jdr.display.encart({ largeur, hauteur })
                   }
                   onAjuster={(id, key, d) => void ajusterJauge(id, key, d)}
+                  fenetres={onLive ? display?.fenetres : null}
+                  onFenetre={(id, patch) => void window.jdr.display.reglerFenetre(id, patch)}
+                  onFermerFenetre={(id) => void window.jdr.display.fermerFenetre(id)}
                   pointer={pointer}
                   onDropAt={(e, x, y, cell) => void dropOnStage(e, x, y, cell)}
                   onRemovePion={(id) => void removePion(id)}
@@ -870,6 +1095,16 @@ export function Pupitre(): JSX.Element {
                   onPionMenu={(pion, x, y) => setCiblePion({ pion, x, y })}
                   activeCell={onLive ? undefined : activeCell}
                   onPickCell={onLive ? undefined : setActiveCell}
+                  /* La molette agrandit, le glisser recadre ; les textes se
+                     déplacent et se choisissent sur l'image — comme en Régie. */
+                  onFrame={(cell, f) =>
+                    void window.jdr.display.frame(onLive ? 'live' : 'prep', cell, f)
+                  }
+                  onMoveText={textes.bouge}
+                  activeText={textes.over?.id ?? null}
+                  onPickText={textes.choisit}
+                  onPoserSurCarte={lampe.poser}
+                  lumieresMJ
                 />
                 {/* Par-dessus la scène, jamais dedans : le calque du MJ ne fait
                     pas partie de la diapositive, donc il ne part nulle part.
@@ -878,10 +1113,19 @@ export function Pupitre(): JSX.Element {
                 {voirAnnots && carteScene?.url ? (
                   <CadreAnnote
                     url={carteScene.url}
-                    className="sur-scene"
+                    className={`sur-scene${annot.outil ? ' arme' : ''}`}
                     frame={'frame' in slide ? (slide.frame ?? FRAME_NEUTRE) : FRAME_NEUTRE}
                   >
-                    <Annotations annotations={annots} mode="lecture" />
+                    <Annotations
+                      annotations={annot.annots}
+                      mode="edition"
+                      outil={annot.outil}
+                      choisi={annot.choisie}
+                      onChoisir={annot.setChoisie}
+                      onPoser={(k, x, y) => void annot.poser(k, x, y)}
+                      onDeplacer={(id, x, y) => void annot.deplacer(id, x, y)}
+                      onEffacer={(id) => void annot.effacer(id)}
+                    />
                   </CadreAnnote>
                 ) : null}
               </div>
@@ -891,6 +1135,12 @@ export function Pupitre(): JSX.Element {
               Visuel {visuel + 1} — {onLive ? pillText : 'libre, invisible des joueurs'}
             </span>
           </div>
+          </div>
+
+          {/* ---- les volets, sous la scène, quand on les demande ---- */}
+          <VoletCase slide={slide} iCase={iCase} onLive={onLive} />
+          {textes.ouvert ? <VoletTextes t={textes} onLive={onLive} /> : null}
+          {voirAnnots ? <VoletAnnoter a={annot} /> : null}
 
           {/* ---- les deux visuels, et la bascule ---- */}
           <div className="pu-slots">
@@ -914,6 +1164,7 @@ export function Pupitre(): JSX.Element {
                     pionPv={display?.pionPv ?? false}
                     joueurs={display?.joueurs}
                     encart={display?.encart}
+                    fenetres={live ? display?.fenetres : null}
                   />
                   <span className="pu-slot-head">
                     <span className="nm">Visuel {n + 1}</span>
@@ -952,6 +1203,7 @@ export function Pupitre(): JSX.Element {
                   />
                   <span>Santé mentale</span>
                 </label>
+                <SensEncart />
               </div>
 
               {/*
@@ -966,7 +1218,7 @@ export function Pupitre(): JSX.Element {
                     <span
                       className={`pu-j-face teinte c-${j.color ?? 'neutral'}${j.url ? ' photo' : ''}`}
                     >
-                      {j.url ? <img src={j.url} alt="" draggable={false} /> : j.initials}
+                      {j.url ? <Visage url={j.url} cadre={j.cadre} /> : j.initials}
                     </span>
                     {j.pv ? (
                       <JaugeRapide
@@ -992,61 +1244,107 @@ export function Pupitre(): JSX.Element {
               </div>
             </div>
 
-            <div className="pu-acts">
-              {/* La manière de basculer, juste au-dessus du bouton qui
-                  l'applique : on voit ce qui va se passer avant de le faire. */}
-              <div className="bascule-modes" role="group" aria-label="Manière de basculer">
-                {TRANSITIONS.map((t) => (
-                  <button
-                    key={t.key}
-                    className={`bascule-mode${s.transition === t.key ? ' on' : ''}`}
-                    onClick={() => s.setTransition(t.key)}
-                    title={t.aide}
-                  >
-                    {t.name}
-                  </button>
-                ))}
-              </div>
-              <button className="btn btn-brass" onClick={() => void swap(s.reglages.basculeMs)} disabled={frozen}>
-                <IconFade />
-                Basculer
-              </button>
-              <div className="pu-acts-row">
+          </div>
+
+          {/* ---- les gestes, en barre sous les visuels et l'encart ----
+              Une rangée à plat plutôt qu'une colonne étroite à dérouler :
+              tout se voit d'un coup d'œil, comme la barre de la Régie. */}
+          <div className="pu-acts">
+            {/* La manière de basculer, juste au-dessus du bouton qui
+                l'applique : on voit ce qui va se passer avant de le faire. */}
+            <div className="bascule-modes" role="group" aria-label="Manière de basculer">
+              {TRANSITIONS.map((t) => (
                 <button
-                  className="btn btn-sm"
-                  onClick={() => void window.jdr.display.blackout()}
-                  disabled={frozen}
-                  title="Ctrl+B"
+                  key={t.key}
+                  className={`bascule-mode${s.transition === t.key ? ' on' : ''}`}
+                  onClick={() => s.setTransition(t.key)}
+                  title={t.aide}
                 >
-                  <IconEyeOff />
-                  Voile
+                  {t.name}
                 </button>
-                <button
-                  className={`btn btn-sm${frozen ? ' btn-on' : ''}`}
-                  onClick={() => void window.jdr.display.freeze(!frozen)}
-                  title="Rien ne part vers les joueurs tant que c'est figé"
-                >
-                  <IconFreeze />
-                  Figer
-                </button>
-              </div>
-              {/* Sur sa propre ligne : le libellé ne tient pas en tiers de
-                  colonne, et l'abréger aurait rendu obscur un calque qu'on
-                  allume rarement. */}
+              ))}
+            </div>
+            <button className="btn btn-brass" onClick={() => void swap(s.reglages.basculeMs)} disabled={frozen}>
+              <IconFade />
+              Basculer
+            </button>
+            <button
+              className="btn btn-sm"
+              onClick={() => void swap(0)}
+              disabled={frozen}
+              title="Sans enchaînement — l’image change d’un coup"
+            >
+              Couper
+            </button>
+            <div className="pu-acts-row">
               <button
-                className={`btn btn-sm${voirAnnots ? ' btn-on' : ''}`}
-                onClick={() => setVoirAnnots((v) => !v)}
-                disabled={editPlaceId == null}
+                className="btn btn-sm"
+                onClick={() => void window.jdr.display.blackout()}
+                disabled={frozen}
                 title={
-                  editPlaceId == null
-                    ? 'Prépare d’abord le lieu où se tient la scène'
-                    : 'Affiche tes repères et tes textes sur la carte — chez toi seulement, jamais chez les joueurs'
+                  dark
+                    ? 'Remet aux joueurs l’image qu’ils voyaient avant le voile. Ctrl+B'
+                    : 'Coupe l’image des joueurs d’un coup — leur écran devient noir. Le même bouton la rétablit. Ctrl+B'
                 }
               >
-                <IconPen />
-                Voir annotations
+                <IconEyeOff />
+                {dark ? 'Rétablir' : 'Voile'}
+              </button>
+              <button
+                className={`btn btn-sm${frozen ? ' btn-on' : ''}`}
+                onClick={() => void window.jdr.display.freeze(!frozen)}
+                title="Rien ne part vers les joueurs tant que c'est figé"
+              >
+                <IconFreeze />
+                Figer
               </button>
             </div>
+            {/* Le pointeur avait son raccourci, pas son bouton : comme en
+                Régie, on doit pouvoir l'allumer sans connaître la touche. */}
+            <button
+              className={`btn btn-sm${pointing ? ' btn-on' : ''}`}
+              onClick={() => setPointing((v) => !v)}
+              title="Montre du doigt aux joueurs ce que la souris survole sur la scène — P, ou maintiens Ctrl le temps d’un geste"
+            >
+              <IconSearch />
+              Pointeur
+              <span className="kbd">P</span>
+            </button>
+            {/* Le brouillard s'applique tout seul dès qu'un lieu a des murs :
+                ce bouton te met un instant à la place des joueurs. */}
+            <button
+              className={`btn btn-sm${leurOeil ? ' btn-on' : ''}`}
+              onClick={() => setLeurOeil((v) => !v)}
+              disabled={!calque?.murs.length}
+              title={
+                !calque?.murs.length
+                  ? 'Ce lieu n’a pas de murs : les joueurs voient la carte entière'
+                  : leurOeil
+                    ? 'Revenir au plan entier — c’est de là que tu mènes'
+                    : 'Poser sur ta prévisualisation l’ombre exacte de leur écran'
+              }
+            >
+              <IconEye />
+              Voir ce qu’ils voient
+            </button>
+            <BoutonTextes t={textes} petit />
+            <BoutonPoserLumiere p={lampe} petit />
+            {/* Sur sa propre ligne : le libellé ne tient pas en tiers de
+                colonne, et l'abréger aurait rendu obscur un calque qu'on
+                allume rarement. */}
+            <button
+              className={`btn btn-sm${voirAnnots ? ' btn-on' : ''}`}
+              onClick={() => setVoirAnnots((v) => !v)}
+              disabled={editPlaceId == null}
+              title={
+                editPlaceId == null
+                  ? 'Prépare d’abord le lieu où se tient la scène'
+                  : 'Affiche tes repères et tes textes sur la carte — chez toi seulement, jamais chez les joueurs'
+              }
+            >
+              <IconPen />
+              Annotations
+            </button>
           </div>
 
           {/* ---- la réserve de pions ---- */}
@@ -1235,17 +1533,31 @@ export function Pupitre(): JSX.Element {
                   <button className={tab === 'arbre' ? 'on' : ''} onClick={() => setTab('arbre')}>
                     Dossier
                   </button>
+                  {/* Les portables se règlent sans quitter la scène, comme en Régie. */}
+                  <button
+                    className={tab === 'portables' ? 'on' : ''}
+                    onClick={() => setTab('portables')}
+                    title="Fiches, jets et pions depuis le téléphone des joueurs"
+                  >
+                    <IconPhone />
+                  </button>
                 </div>
                 <div className="spacer" />
                 <span className="eyebrow">
-                  {tab === 'lieux' ? `${s.places.length} lieux` : `${fichiers.length} fichiers`}
+                  {tab === 'lieux'
+                    ? `${lieuxMontres.length} lieux`
+                    : tab === 'arbre'
+                      ? `${fichiers.length} fichiers`
+                      : `${s.mobile?.devices.length ?? 0} appareils`}
                 </span>
               </div>
 
               <div className="pane-body">
-                {tab === 'lieux' ? (
+                {tab === 'portables' ? (
+                  <Portables />
+                ) : tab === 'lieux' ? (
                   <div className="lieux-list">
-                    {s.places.map((p) => {
+                    {lieuxMontres.map((p) => {
                       const ici = presence[p.id]?.joueurs ?? []
                       const map = s.allItems.find((i) => i.id === p.mapItemId)
                       return (
@@ -1281,7 +1593,7 @@ export function Pupitre(): JSX.Element {
                                 className={`jeton c-${j.color}${j.url ? ' photo' : ''}`}
                                 title={j.name}
                               >
-                                {j.url ? <img src={j.url} alt="" draggable={false} /> : j.initials}
+                                {j.url ? <Visage url={j.url} cadre={j.cadre} /> : j.initials}
                               </span>
                             ))}
                           </span>
@@ -1310,6 +1622,29 @@ export function Pupitre(): JSX.Element {
           }}
         />
       ) : null}
+      <MenuImage
+        cible={cibleImage}
+        onFerme={() => setCibleImage(null)}
+        onPreparer={poser}
+        libre={idleSlot + 1}
+        direct={liveSlot + 1}
+        /* Sur le direct, tout de suite, à la place de ce qu'il montre — et on
+           l'a sous les yeux. */
+        onDirect={async (it) => {
+          if (frozen) {
+            s.toast('Image figée — dégèle d’abord pour changer l’écran joueurs', true)
+            return
+          }
+          await window.jdr.display.showItem(it.id)
+          setVisuel(liveSlot)
+        }}
+        /* La fenêtre s'ouvre sur le direct : c'est lui qu'on veut avoir sous
+           les yeux pour la placer, pas le visuel libre. */
+        onFenetre={async (it) => {
+          await window.jdr.display.fenetre(it.id)
+          setVisuel(liveSlot)
+        }}
+      />
       <MenuPion
         cible={ciblePion}
         focusId={display?.focusPionId ?? null}
