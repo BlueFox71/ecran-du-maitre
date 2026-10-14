@@ -4,12 +4,14 @@ import { useRetourMoment } from './retourMoment'
 import { avancer, reculer, suivreHistorique } from './historique'
 import { Ariane } from './components/Ariane'
 import { Monitor } from './components/Monitor'
+import { HorlogeSeance } from './components/HorlogeSeance'
 import { Menubar, type Rubrique } from './components/Menubar'
 import { Parametres } from './components/Parametres'
 import { FicheCampagne, FicheSeance, Carnet, DupliquerSeance } from './components/Fiches'
 import { FicheCampagne as FicheDeCampagne } from './modules/FicheCampagne'
 import { Ambience } from './components/Ambience'
 import { Ident } from './components/Ident'
+import { CacheMJ } from './components/CacheMJ'
 import { Home } from './components/Home'
 import { Toasts } from './components/Toasts'
 import { Annonces, EcouteDesPortables } from './components/Portables'
@@ -23,6 +25,7 @@ import { Places } from './modules/Places'
 import { Objets } from './modules/Objets'
 import { Timeline } from './modules/Timeline'
 import { Annexes } from './modules/Annexes'
+import { Trame } from './modules/Trame'
 import { PAGES_PREPARATION } from './components/SousMenuPreparation'
 import { BlocNotes } from './modules/BlocNotes'
 import { Sheets } from './modules/Sheets'
@@ -42,7 +45,8 @@ import {
   IconRouage,
   IconScreen,
   IconSearch,
-  IconTimeline
+  IconTimeline,
+  IconTrame
 } from './components/Icons'
 
 export function App(): JSX.Element {
@@ -57,6 +61,14 @@ export function App(): JSX.Element {
      et elles ne doivent pas mourir quand on change de module. */
   const [fiche, setFiche] = useState<'campagne' | 'seance' | 'carnet' | 'fiche' | 'dupliquer' | null>(null)
   const [params, setParams] = useState<{ depart?: Rubrique } | null>(null)
+
+  /* Une fenêtre qui renvoie vers une rubrique des paramètres (« modifier mon
+     profil ») le demande par un évènement : elle ne tient pas l'état d'ici. */
+  useEffect(() => {
+    const ouvrir = (e: Event): void => setParams({ depart: (e as CustomEvent<Rubrique>).detail })
+    window.addEventListener('jdr:parametres', ouvrir)
+    return () => window.removeEventListener('jdr:parametres', ouvrir)
+  }, [])
 
   /* L'historique des pages : il écoute le magasin dès le départ. */
   useEffect(() => suivreHistorique(), [])
@@ -219,6 +231,8 @@ export function App(): JSX.Element {
         {/* La campagne et la séance ferment le rail, juste au-dessus du numéro
             de version : on les ouvre au début de la soirée et plus après, alors
             que les modules au-dessus servent toute la partie. */}
+        {/* L'horloge de la séance : commencer, pause, reprendre, finir. */}
+        <HorlogeSeance />
         <Ident />
 
         <div className="rail-foot">
@@ -236,6 +250,8 @@ export function App(): JSX.Element {
         <header className="topbar">
           {/* ← → et le fil d'Ariane : sur toutes les pages, sans exception. */}
           <Ariane sousTitre={sub} />
+          {/* L'œil : voiler l'écran quand un joueur passe derrière le MJ. */}
+          <CacheMJ />
           <label className="search">
             <IconSearch />
             <input
@@ -282,6 +298,7 @@ export function App(): JSX.Element {
               {s.view === 'places' && <Places />}
               {s.view === 'objets' && <Objets />}
               {s.view === 'timeline' && <Timeline />}
+              {s.view === 'trame' && <Trame />}
               {s.view === 'annexes' && <Annexes />}
               {s.view === 'notes' && <BlocNotes />}
               {s.view === 'sheets' && <Sheets />}
@@ -422,6 +439,7 @@ function Preparation(): JSX.Element {
             count={s.beats.length}
             icon={<IconTimeline />}
           />
+          <NavItem id="trame" label="Arborescence" icon={<IconTrame />} />
           <NavItem id="annexes" label="Annexes" count={s.annexes.length} icon={<IconDoc />} />
         </div>
       ) : null}
@@ -455,10 +473,12 @@ function subtitle(s: ReturnType<typeof useStore.getState>): string {
       return `${s.places.length} lieux`
     case 'objets': {
       const poses = s.objets.reduce((n, o) => n + o.placements.length, 0)
-      return `${s.objets.length} objets · ${s.objetFamilles.length} familles · ${poses} posés`
+      return `${s.objets.length} objets · ${s.objetFamilles.length} catégories · ${poses} posés`
     }
     case 'timeline':
       return `${s.session?.label ?? ''} · ${s.beats.length} moment${s.beats.length > 1 ? 's' : ''}`
+    case 'trame':
+      return `${s.session?.label ?? ''} · le scénario, pour le MJ seul`
     case 'annexes':
       return `${s.session?.label ?? ''} · ${s.annexes.length} document${s.annexes.length > 1 ? 's' : ''}`
     case 'pupitre': {

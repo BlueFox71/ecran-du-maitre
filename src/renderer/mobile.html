@@ -13,6 +13,14 @@
     <meta name="theme-color" content="#0f1518" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <!-- Posée sur l'écran d'accueil, la page s'ouvre comme une application :
+         son icône, son nom, sans la barre du navigateur. Le manifeste ne dit
+         pas d'adresse de départ : c'est celle du QR, invitation comprise. -->
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Écran" />
+    <link rel="manifest" href="/portable/manifest.webmanifest" />
+    <link rel="apple-touch-icon" href="/portable/icone-180.png" />
+    <link rel="icon" type="image/png" sizes="192x192" href="/portable/icone-192.png" />
     <title>Écran du Maître</title>
   </head>
   <body>

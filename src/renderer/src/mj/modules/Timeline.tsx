@@ -1,9 +1,8 @@
-import { useMemo, useRef, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { useRetourMoment } from '../retourMoment'
 import {
   IconClose,
-  IconDoc,
   IconImage,
   IconPlus,
   IconSearch,
@@ -12,8 +11,9 @@ import {
 import { SelecteurHeure } from '../components/SelecteurHeure'
 import { TexteEnPlace } from '../components/TexteEnPlace'
 import { SousMenuPreparation } from '../components/SousMenuPreparation'
-import type { UiFolder, UiItem } from '../../../../preload/index'
+import type { UiItem } from '../../../../preload/index'
 import type { Beat, Place } from '@shared/types'
+import { DOSSIER_MOMENTS, dossierDeLApp } from '@shared/dossierDeLApp'
 
 /* ============================================================
    Chronologie : suivre sa séance, pas piloter l'écran.
@@ -21,7 +21,6 @@ import type { Beat, Place } from '@shared/types'
    ============================================================ */
 
 /** Le dossier où se rangent les textes des moments, dans celui de la séance. */
-const DOSSIER_MOMENTS = 'Moments'
 
 type Pick = { kind: 'beat'; id: number } | { kind: 'place'; id: number } | null
 
@@ -48,6 +47,25 @@ export function Timeline(): JSX.Element {
     setPick({ kind: 'beat', id: b.id })
   }
 
+  /* La surveillance du dossier suit d'ordinaire seule ; ce bouton la double
+     quand un texte a été écrit ailleurs et qu'on veut le voir tout de suite. */
+  const [relecture, setRelecture] = useState(false)
+  const relireDisque = async (): Promise<void> => {
+    setRelecture(true)
+    try {
+      await window.jdr.library.rescan()
+      const nouveaux = await window.jdr.timeline.adopterTextes()
+      await Promise.all([s.refreshLibrary(), s.refreshTimeline(), s.refreshAnnexes()])
+      s.toast(
+        nouveaux
+          ? `${nouveaux} moment${nouveaux > 1 ? 's' : ''} ajouté${nouveaux > 1 ? 's' : ''} depuis le dossier.`
+          : 'Textes relus.'
+      )
+    } finally {
+      setRelecture(false)
+    }
+  }
+
   return (
     <section className="view chrono">
       <div className="vhead">
@@ -66,6 +84,14 @@ export function Timeline(): JSX.Element {
         <span className="eyebrow">
           {s.beats.length} moment{s.beats.length > 1 ? 's' : ''}
         </span>
+        <button
+          className="btn btn-ghost btn-sm"
+          disabled={relecture}
+          title="Reprendre les textes tels qu'ils sont dans l'explorateur de fichiers — un texte du dossier « Moments » sans moment en reçoit un"
+          onClick={() => void relireDisque()}
+        >
+          {relecture ? 'Relecture…' : 'Relire le dossier'}
+        </button>
       </div>
 
       <div className="chrono-grid">
@@ -122,7 +148,6 @@ export function Timeline(): JSX.Element {
               <div className="fil">
                 {s.places.map((p) => {
                   const on = current?.kind === 'place' && current.id === p.id
-                  const n = s.allItems.filter((i) => i.placeId === p.id && i.kind === 'doc').length
                   return (
                     <button
                       key={p.id}
@@ -135,7 +160,6 @@ export function Timeline(): JSX.Element {
                         <span className="ttl">{p.name}</span>
                         {p.summary ? <span className="sub">{p.summary}</span> : null}
                       </span>
-                      {n ? <span className="h num">{n} ✎</span> : null}
                     </button>
                   )
                 })}
@@ -149,7 +173,7 @@ export function Timeline(): JSX.Element {
           {beat ? (
             <BeatReading key={beat.id} beat={beat} />
           ) : place ? (
-            <PlaceReading place={place} />
+            <PlaceReading key={place.id} place={place} />
           ) : (
             <div className="vide-grand">
               Choisis un moment à gauche.
@@ -186,19 +210,11 @@ function BeatReading({ beat }: { beat: Beat }): JSX.Element {
     await window.jdr.timeline.attach(beat.id, itemId)
     await s.refreshTimeline()
   }
-  /* Les textes des moments se rangent ensemble, dans « Moments », au cœur du
-     dossier de la séance. Le premier texte crée le dossier et lui donne son
-     sablier ; on ne le recrée pas s'il est déjà là. */
-  const dossierDesMoments = async (): Promise<string> => {
-    const base = s.session?.folderRel ?? ''
-    const rel = base ? `${base}/${DOSSIER_MOMENTS}` : DOSSIER_MOMENTS
-    const existe = (ns: UiFolder[]): boolean =>
-      ns.some((f) => f.relPath === rel || existe(f.children))
-    if (existe(useStore.getState().tree)) return rel
-    const cree = await window.jdr.folders.create(base, DOSSIER_MOMENTS)
-    await window.jdr.folders.decor(cree, 'moments', null)
-    return cree
-  }
+  /* Les textes des moments se rangent ensemble, dans « Moments », dans le
+     dossier de l'app de la séance. Le premier texte crée le dossier ; on ne
+     le recrée pas s'il est déjà là. */
+  const dossierDesMoments = (): Promise<string> =>
+    window.jdr.folders.assurer(dossierDeLApp(s.session?.folderRel, DOSSIER_MOMENTS), 'moments')
 
   const creation = useRef(false)
   const creerTexte = async (): Promise<void> => {
@@ -281,9 +297,17 @@ function BeatReading({ beat }: { beat: Beat }): JSX.Element {
         <button
           className="btn btn-ghost btn-sm"
           onClick={async () => {
-            if (!confirm(`Supprimer « ${beat.title} » ?`)) return
+            const avecTexte = docs.some((d) => d.relPath?.split('/').slice(-2, -1)[0] === DOSSIER_MOMENTS)
+            if (
+              !confirm(
+                avecTexte
+                  ? `Supprimer « ${beat.title} » ? Son texte part à la corbeille de Windows.`
+                  : `Supprimer « ${beat.title} » ?`
+              )
+            )
+              return
             await window.jdr.timeline.removeBeat(beat.id)
-            await s.refreshTimeline()
+            await Promise.all([s.refreshTimeline(), s.refreshLibrary()])
           }}
         >
           <IconTrash />
@@ -448,7 +472,51 @@ function BeatReading({ beat }: { beat: Beat }): JSX.Element {
 
 function PlaceReading({ place }: { place: Place }): JSX.Element {
   const s = useStore()
-  const docs = s.allItems.filter((i) => i.placeId === place.id && i.kind === 'doc')
+  /* La description du lieu, écrite ici comme dans « Lieux » : ce qu'on tape
+     attend une seconde, puis part. Le reste du lieu (plan, murs, ambiance)
+     ne se touche qu'à sa page. */
+  const [champs, setChamps] = useState({ summary: place.summary ?? '', notes: place.notes ?? '' })
+  const [etat, setEtat] = useState<'saved' | 'dirty' | 'saving'>('saved')
+  const minuteur = useRef<number | null>(null)
+  const enAttente = useRef<Partial<Place> | null>(null)
+
+  const ecrire = async (): Promise<void> => {
+    if (minuteur.current) window.clearTimeout(minuteur.current)
+    minuteur.current = null
+    const d = enAttente.current
+    if (!d) return
+    enAttente.current = null
+    setEtat('saving')
+    await window.jdr.places.upsert({ id: place.id, name: place.name, ...d })
+    await useStore.getState().refreshPlaces()
+    setEtat((e) => (e === 'saving' ? 'saved' : e))
+  }
+
+  const changer = (d: { summary?: string; notes?: string }): void => {
+    setChamps((c) => ({ ...c, ...d }))
+    enAttente.current = {
+      ...enAttente.current,
+      ...(d.summary !== undefined ? { summary: d.summary || null } : {}),
+      ...(d.notes !== undefined ? { notes: d.notes || null } : {})
+    }
+    setEtat('dirty')
+    if (minuteur.current) window.clearTimeout(minuteur.current)
+    minuteur.current = window.setTimeout(() => void ecrire(), 900)
+  }
+
+  /* Le fichier du lieu réécrit ailleurs : on le reprend, tant que rien
+     n'attend d'être enregistré ici. */
+  useEffect(() => {
+    if (etat !== 'saved') return
+    setChamps({ summary: place.summary ?? '', notes: place.notes ?? '' })
+  }, [place.summary, place.notes, etat])
+
+  // En changeant de lieu : ce qui n'est pas encore écrit l'est.
+  useEffect(
+    () => () => void ecrire(),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
 
   return (
     <>
@@ -460,33 +528,32 @@ function PlaceReading({ place }: { place: Place }): JSX.Element {
           </span>
           <h3 className="display">{place.name}</h3>
         </div>
+        <div className="spacer" />
+        <span className="eyebrow">
+          {etat === 'saved' ? 'Enregistré' : etat === 'saving' ? 'Enregistrement…' : 'Modifié'}
+        </span>
       </header>
 
-      <div className="lect-body">
-        {place.summary ? <p className="mine">{place.summary}</p> : null}
-        {place.notes ? (
-          <article className="read">
-            <div className="read-body">
-              {place.notes.split(/\n{2,}/).map((par, n) => (
-                <p key={n}>{par}</p>
-              ))}
-            </div>
-          </article>
-        ) : null}
-
-        {docs.map((d) => (
-          <article key={d.id} className="read">
-            <h4>
-              <IconDoc />
-              {d.title}
-            </h4>
-            <div className="read-body" dangerouslySetInnerHTML={{ __html: d.body ?? '' }} />
-          </article>
-        ))}
-
-        {!place.summary && !place.notes && docs.length === 0 ? (
-          <p className="vide-grand">Ce lieu n’a pas encore de texte.</p>
-        ) : null}
+      <div className="lect-body lieu-desc">
+        <div className="field">
+          <label htmlFor="cl-sum">Description — ce que voient les joueurs en arrivant</label>
+          <textarea
+            id="cl-sum"
+            rows={6}
+            value={champs.summary}
+            placeholder="Ce qu’ils découvrent en entrant…"
+            onChange={(e) => changer({ summary: e.target.value })}
+          />
+        </div>
+        <div className="field">
+          <label htmlFor="cl-notes">Notes du MJ — ce qu'ils ne doivent pas savoir</label>
+          <textarea
+            id="cl-notes"
+            rows={8}
+            value={champs.notes}
+            onChange={(e) => changer({ notes: e.target.value })}
+          />
+        </div>
       </div>
     </>
   )
@@ -496,12 +563,14 @@ function PlaceReading({ place }: { place: Place }): JSX.Element {
    Choisir une image de la Bibliothèque
    ============================================================ */
 
-function ChoixImage({
+export function ChoixImage({
   exclure,
+  titre = 'Ajouter une image au moment',
   onPick,
   onClose
 }: {
   exclure: number[]
+  titre?: string
   onPick: (it: UiItem) => void
   onClose: () => void
 }): JSX.Element {
@@ -519,7 +588,7 @@ function ChoixImage({
       <div className="modal choix-images" onClick={(e) => e.stopPropagation()}>
         <header>
           <IconImage />
-          <h3>Ajouter une image au moment</h3>
+          <h3>{titre}</h3>
         </header>
 
         <div className="body">

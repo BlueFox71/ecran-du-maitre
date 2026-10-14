@@ -2,6 +2,13 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { Brut } from '@shared/reglages'
 import type {
   Annotation,
+  FicheDuLieu,
+  LieuScenario,
+  SorteCarte,
+  Trame,
+  TrameCarte,
+  TrameLien,
+  TrameType,
   Encart,
   Beat,
   ButinLigne,
@@ -18,9 +25,13 @@ import type {
   CharacterKind,
   CharacterLogEntry,
   DisplayState,
+  EchellePlan,
+  EntrantTour,
+  ToursMj,
   EffetObjet,
   FolderNode,
   GlypheObjet,
+  Inventaire,
   Objet,
   ObjetFamille,
   ObjetPlacement,
@@ -37,6 +48,8 @@ import type {
   NatureOuverture,
   Ouverture,
   Place,
+  Astre,
+  CielDuLieu,
   PochetteDoc,
   PochetteOnglet,
   Pointer,
@@ -68,6 +81,16 @@ import type {
 export type UiItem = Item & { url: string | null; poster: string | null }
 /** La pochette entière : ses rangements, et ce qui y est rangé. */
 export type UiPochette = { onglets: PochetteOnglet[]; docs: PochetteDoc[] }
+/** Ce qu'on écrit d'une découverte ou d'un déclencheur. */
+export type ContenuCarte = {
+  sorte?: SorteCarte
+  titre?: string
+  si?: string
+  alors?: string
+  beatId?: number | null
+  objetIds?: number[]
+  pnjIds?: number[]
+}
 export type UiFolder = Omit<FolderNode, 'items' | 'children'> & {
   items: UiItem[]
   children: UiFolder[]
@@ -78,6 +101,10 @@ const call = <R>(channel: string, ...args: unknown[]): Promise<R> =>
 
 const api = {
   app: {
+    /** Ouvre le panneau d'émojis du système ; il écrit dans le champ qui a la main. */
+    emojis: () => call<void>('app:emojis'),
+    /** Le portrait du MJ pris dans l'explorateur, copié dans la campagne ; null si on renonce. */
+    portraitMj: () => call<string | null>('profil:portraitMj'),
     info: () =>
       call<{
         version: string
@@ -171,6 +198,8 @@ const api = {
   folders: {
     tree: () => call<{ tree: UiFolder[]; orphans: UiItem[] }>('folders:tree'),
     create: (parentRel: string, name: string) => call<string>('folders:create', parentRel, name),
+    /** Un dossier de l'app (`.ecran-du-maitre/…`), créé s'il manque ; rend son chemin. */
+    assurer: (rel: string, icone: string | null = null) => call<string>('folders:assurer', rel, icone),
     rename: (rel: string, name: string) => call<string>('folders:rename', rel, name),
     move: (rel: string, destRel: string) => call<string>('folders:move', rel, destRel),
     trash: (rel: string) => call<void>('folders:trash', rel),
@@ -244,6 +273,34 @@ const api = {
     thumbPage: (id: number, page: number) => call<UiItem | null>('items:thumbPage', id, page)
   },
 
+  /**
+   * Les tours : à qui de jouer. Tout vit en mémoire dans le processus
+   * principal ; chaque geste rend l'état entier, que `onState` annonce aussi.
+   */
+  tours: {
+    etat: () => call<ToursMj | null>('tours:etat'),
+    candidats: () => call<EntrantTour[]>('tours:candidats'),
+    ouvrir: () => call<ToursMj | null>('tours:ouvrir'),
+    carac: (key: string | null) => call<ToursMj | null>('tours:carac', key),
+    saisir: (cle: string, patch: Partial<Pick<EntrantTour, 'de' | 'carac' | 'montre'>>) =>
+      call<ToursMj | null>('tours:saisir', cle, patch),
+    ajouter: (cle: string) => call<ToursMj | null>('tours:ajouter', cle),
+    retirer: (cle: string) => call<ToursMj | null>('tours:retirer', cle),
+    commencer: () => call<ToursMj | null>('tours:commencer'),
+    annuler: () => call<ToursMj | null>('tours:annuler'),
+    suivant: () => call<ToursMj | null>('tours:suivant'),
+    precedent: () => call<ToursMj | null>('tours:precedent'),
+    retarder: () => call<ToursMj | null>('tours:retarder'),
+    main: (cle: string) => call<ToursMj | null>('tours:main', cle),
+    deplacer: (cle: string, vers: number) => call<ToursMj | null>('tours:deplacer', cle, vers),
+    fin: () => call<ToursMj | null>('tours:fin'),
+    onState: (cb: (t: ToursMj | null) => void) => {
+      const h = (_e: unknown, t: ToursMj | null): void => cb(t)
+      ipcRenderer.on('tours:state', h)
+      return (): void => void ipcRenderer.removeListener('tours:state', h)
+    }
+  },
+
   /** Les pions posés sur l'écran joueurs, lieu par lieu. */
   pions: {
     presence: () => call<Record<number, PionsDuLieu>>('pions:presence'),
@@ -266,13 +323,17 @@ const api = {
     layer: (id: number, ou: 'devant' | 'derriere') => call<DisplayState>('pions:layer', id, ou),
     /** Le soustraire aux joueurs, ou le leur rendre. */
     hide: (id: number, cache: boolean) => call<DisplayState>('pions:hide', id, cache),
+    /** Le montrer sans son nom : les joueurs voient le jeton, pas qui c'est. */
+    anonyme: (id: number, anonyme: boolean) => call<DisplayState>('pions:anonyme', id, anonyme),
     /** Lui faire une fiche : il devient un PNJ, sans bouger de la carte. */
     promote: (id: number) => call<DisplayState>('pions:promote', id),
     remove: (id: number) => call<DisplayState>('pions:remove', id),
     clear: (placeId: number) => call<number>('pions:clear', placeId),
     /** Suivre ce pion à l'écran, ou lâcher celui qu'on suivait avec `null`. */
     focus: (id: number | null) => call<DisplayState>('pions:focus', id),
-    size: (placeId: number, size: number) => call<DisplayState>('pions:size', placeId, size)
+    size: (placeId: number, size: number) => call<DisplayState>('pions:size', placeId, size),
+    /** Les pions de ce lieu suivent-ils l'échelle, ou la taille réglée à la main ? */
+    main: (placeId: number, main: boolean) => call<EchellePlan>('pions:main', placeId, main)
   },
 
   places: {
@@ -283,6 +344,12 @@ const api = {
     duplicate: (id: number) => call<number>('places:duplicate', id),
     get: (id: number) => call<Place | null>('places:get', id),
     upsert: (input: Partial<Place> & { name: string }) => call<Place>('places:upsert', input),
+    /**
+     * Changer l'image d'un plan sans déformer murs, portes, lumières, pions et
+     * repères : ils gardent leur forme, centrés sur la nouvelle image.
+     */
+    remplacerCarte: (id: number, nouvelle: number) =>
+      call<{ place: Place | null; pieces: number }>('places:remplacerCarte', id, nouvelle),
     remove: (id: number) => call<void>('places:remove', id),
     /**
      * Ranger un lieu ailleurs, ou le remuer parmi ses freres. `beforeId` dit
@@ -298,6 +365,17 @@ const api = {
     zone: (id: number, zone: [number, number][] | null, ancre?: [number, number] | null) =>
       call<Place | null>('places:zone', id, zone, ancre),
     /**
+     * Les pièces d'un étage viennent de suivre ses murs (recalage côté
+     * serveur) : on relit les lieux, et `suites` dit les lieux nés d'une coupe.
+     */
+    onRecales: (cb: (e: { placeId: number; suites: string[] }) => void) => {
+      const h = (_e: unknown, e: { placeId: number; suites: string[] }): void => cb(e)
+      ipcRenderer.on('places:recales', h)
+      return (): void => {
+        ipcRenderer.removeListener('places:recales', h)
+      }
+    },
+    /**
      * Rogner le plan du lieu : une copie rognée de l'image, à côté de
      * l'originale, et tout ce qui était posé dessus recalé.
      */
@@ -305,6 +383,21 @@ const api = {
     etage: (id: number, tier: 'niveau' | 'lieu') => call<void>('places:etage', id, tier),
     rogner: (id: number, cadre: { x: number; y: number; w: number; h: number }) =>
       call<Place | null>('places:rogner', id, cadre),
+    /** Caler : l'image reste, tout ce qui est posé dessus se recale au cadre. */
+    /** L'échelle du plan de ce lieu, et la taille que ses pions en tirent. */
+    echelle: (id: number) => call<EchellePlan>('places:echelle', id),
+    /** Fixer l'échelle au trait (mètres de la largeur du plan) — `null`, revenir aux portes. */
+    etalonner: (id: number, metres: number | null) =>
+      call<EchellePlan>('places:etalonner', id, metres),
+    caler: (id: number, cadre: { x: number; y: number; w: number; h: number }) =>
+      call<Place | null>('places:caler', id, cadre),
+    /** Caler en tournant : `octets`, l'image redressée, que le lieu prend en copie. */
+    calerTourne: (
+      id: number,
+      octets: Uint8Array,
+      jpeg: boolean,
+      cadre: { x: number; y: number; w: number; h: number }
+    ) => call<Place | null>('places:calerTourne', id, octets, jpeg, cadre),
     /** Le groupe y est entre, ou on s'etait trompe. */
     seen: (id: number, seen: boolean) => call<Place | null>('places:seen', id, seen),
     /**
@@ -316,6 +409,15 @@ const api = {
     /** Une zone eclairee une fois reste-t-elle decouverte, sur cette carte ? */
     lumGarde: (id: number, garde: boolean) =>
       call<Place | null>('places:lumGarde', id, garde),
+    /** Ce lieu n'est qu'une pièce : ses murs le referment, il ne se découpe pas. */
+    pieceUnique: (id: number, unique: boolean) =>
+      call<Place | null>('places:pieceUnique', id, unique),
+    /** Le soleil ou la lune, et d'où vient sa lumière ; `null`, aucun. */
+    astre: (id: number, astre: Astre | null) => call<Place | null>('places:astre', id, astre),
+    cielEspace: (id: number, astre: Astre | null) =>
+      call<Place | null>('places:cielEspace', id, astre),
+    ciel: (id: number) => call<CielDuLieu>('places:ciel', id),
+    nord: (id: number, nord: number) => call<CielDuLieu>('places:nord', id, nord),
     /** Jusqu'ou le regard porte ici, en part de la largeur ; `null`, sans limite. */
     regardPortee: (id: number, portee: number | null) =>
       call<Place | null>('places:regardPortee', id, portee)
@@ -353,7 +455,9 @@ const api = {
   objets: {
     /** Tout d'un coup : la réserve, ses rayons, et l'unité de valeur. */
     list: () =>
-      call<{ objets: Objet[]; familles: ObjetFamille[]; unite: string }>('objets:list'),
+      call<{ objets: Objet[]; familles: ObjetFamille[]; unite: string; inventaires: Inventaire[] }>(
+        'objets:list'
+      ),
     /** Un nom suffit : la fiche se remplit après, l'objet existe tout de suite. */
     add: (input: { nom: string; familleId?: number | null }) => call<Objet>('objets:add', input),
     update: (
@@ -416,6 +520,20 @@ const api = {
     /** Retire un exemplaire de là où il était. L'objet, lui, reste en réserve. */
     reprendre: (id: number) => call<Objet | null>('objets:reprendre', id),
 
+    /** Un inventaire partagé — le camion, la malle. Il naît fermé. */
+    inventaireAdd: (nom: string) => call<Inventaire>('objets:inventaireAdd', nom),
+    /** Le renommer, ou l'ouvrir et le fermer aux téléphones. */
+    inventaireUpdate: (id: number, patch: { nom?: string; ouvert?: boolean }) =>
+      call<Inventaire | null>('objets:inventaireUpdate', id, patch),
+    /** Le supprimer : son contenu retourne à la réserve. */
+    inventaireRemove: (id: number) => call<void>('objets:inventaireRemove', id),
+    /** Ranger des objets de la réserve dans un inventaire ; rend combien y sont entrés. */
+    remplir: (inventaireId: number, objetIds: number[]) =>
+      call<number>('objets:remplir', inventaireId, objetIds),
+    /** Remettre un exemplaire — celui d'un joueur, d'un lieu — dans un inventaire. */
+    remettre: (placementId: number, inventaireId: number) =>
+      call<string | null>('objets:remettre', placementId, inventaireId),
+
     /** Le nom de l'unité de valeur de la campagne — francs, crédits, pièces d'or. */
     unite: (unite: string) => call<string>('objets:unite', unite),
     familleAdd: (input: { nom: string; teinte?: string; glyphe?: GlypheObjet }) =>
@@ -424,13 +542,17 @@ const api = {
       call<ObjetFamille | null>('objets:familleUpdate', id, patch),
     /** Retirer un rayon laisse ses objets en réserve, sans famille. */
     familleRemove: (id: number) => call<void>('objets:familleRemove', id),
+    /** Masquer à partir de la séance ouverte, ou réafficher partout. */
+    familleMasquer: (id: number, masquee: boolean) =>
+      call<ObjetFamille | null>('objets:familleMasquer', id, masquee),
 
     /**
-     * Un joueur vient de ranger une de ses affaires depuis son téléphone.
+     * Un joueur vient de ranger une de ses affaires depuis son téléphone, ou
+     * de piocher dans un inventaire — `geste` le dit alors en toutes lettres.
      * Renvoie la fonction de désabonnement.
      */
-    onChanged: (cb: () => void) => {
-      const h = (): void => cb()
+    onChanged: (cb: (geste: string | null) => void) => {
+      const h = (_e: unknown, geste: string | null): void => cb(geste ?? null)
       ipcRenderer.on('objets:changes', h)
       return () => void ipcRenderer.removeListener('objets:changes', h)
     }
@@ -470,6 +592,8 @@ const api = {
       id: number,
       patch: {
         nature?: NatureOuverture
+        /** Passer sur un autre mur du même lieu. */
+        murId?: number
         d?: number
         largeur?: number
         ouverte?: boolean
@@ -492,6 +616,8 @@ const api = {
       clair?: number
       penombre?: number
       teinte?: string
+      ouverture?: number
+      cap?: number
     }) => call<Lumiere | null>('lumieres:add', input),
     update: (
       id: number,
@@ -504,6 +630,10 @@ const api = {
         teinte?: string
         /** L'icône se montre-t-elle aux joueurs. */
         icone?: boolean
+        /** 360 : tout autour ; moins, un faisceau directif. */
+        ouverture?: number
+        /** Où pointe le faisceau, 0 vers le haut. */
+        cap?: number
       }
     ) => call<Lumiere | null>('lumieres:update', id, patch),
     remove: (id: number) => call<void>('lumieres:remove', id)
@@ -549,9 +679,59 @@ const api = {
     removeBeat: (id: number) => call<void>('timeline:removeBeat', id),
     reorderBeats: (ids: number[]) => call<void>('timeline:reorderBeats', ids),
     attach: (beatId: number, itemId: number) => call<void>('timeline:attach', beatId, itemId),
+    /** Un moment pour chaque texte du dossier « Moments » qui n'en a pas ; rend leur nombre. */
+    adopterTextes: () => call<number>('timeline:adopterTextes'),
     detach: (beatId: number, itemId: number) => call<void>('timeline:detach', beatId, itemId),
     /** Les PNJ que ce moment met en scène, donnés en entier. */
     setPnjs: (beatId: number, ids: number[]) => call<void>('timeline:setPnjs', beatId, ids)
+  },
+
+  /** La trame de la séance en cours : préparée, puis cochée au Paravent. */
+  trame: {
+    lire: () => call<Trame>('trame:lire'),
+    creer: (input: { type: TrameType; x: number; y: number; titre?: string }) =>
+      call<TrameCarte>('trame:creer', input),
+    /** Un champ absent ne bouge pas ; les PNJ se donnent en entier. */
+    maj: (id: number, patch: Partial<Omit<TrameCarte, 'id' | 'sessionId' | 'fait'>>) =>
+      call<void>('trame:maj', id, patch),
+    cocher: (id: number, fait: boolean) => call<void>('trame:cocher', id, fait),
+    toutDecocher: () => call<void>('trame:toutDecocher'),
+    supprimer: (id: number) => call<void>('trame:supprimer', id),
+    relier: (de: number, a: number) => call<TrameLien | null>('trame:relier', de, a),
+    majLien: (id: number, mot: string) => call<void>('trame:majLien', id, mot),
+    supprimerLien: (id: number) => call<void>('trame:supprimerLien', id)
+  },
+
+  /** La fiche d'un lieu : scénarios, découvertes et déclencheurs, PNJ. Le MJ seul la voit. */
+  fiche: {
+    lire: (placeId: number) => call<FicheDuLieu>('fiche:lire', placeId),
+    ajouterScenario: (placeId: number, titre?: string) =>
+      call<LieuScenario>('fiche:ajouterScenario', placeId, titre),
+    majScenario: (id: number, patch: { titre?: string; info?: string }) =>
+      call<void>('fiche:majScenario', id, patch),
+    supprimerScenario: (id: number) => call<void>('fiche:supprimerScenario', id),
+    /** Les numéros suivent l'ordre donné. */
+    ordonnerScenarios: (placeId: number, ids: number[]) =>
+      call<void>('fiche:ordonnerScenarios', placeId, ids),
+    /** Une carte neuve arrive en haut de la liste ; rend son identifiant. */
+    ajouterCarte: (placeId: number, c: ContenuCarte) => call<number>('fiche:ajouterCarte', placeId, c),
+    /** Un champ absent ne bouge pas ; les liens se donnent en entier. */
+    majCarte: (id: number, c: ContenuCarte) => call<void>('fiche:majCarte', id, c),
+    /** Cochée, elle descend en bas ; décochée, elle remonte en haut. */
+    cocherCarte: (id: number, fait: boolean) => call<void>('fiche:cocherCarte', id, fait),
+    supprimerCarte: (id: number) => call<void>('fiche:supprimerCarte', id),
+    ajouterPnj: (placeId: number, characterId: number) =>
+      call<void>('fiche:ajouterPnj', placeId, characterId),
+    retirerPnj: (placeId: number, characterId: number) =>
+      call<void>('fiche:retirerPnj', placeId, characterId),
+    /** Des fiches reprises de leur fichier texte. Renvoie la fonction de désabonnement. */
+    onRelue: (cb: () => void) => {
+      const h = (): void => cb()
+      ipcRenderer.on('fiche:relue', h)
+      return (): void => {
+        ipcRenderer.removeListener('fiche:relue', h)
+      }
+    }
   },
 
   templates: {
@@ -651,6 +831,11 @@ const api = {
       player?: string | null
       occupation?: string | null
       age?: string | null
+      biographie?: string | null
+      lieuNaissance?: string | null
+      ville?: string | null
+      /** Cinq émojis au plus, tous différents — le surplus est écarté. */
+      emojis?: string[]
       color?: string | null
       /** La silhouette de sa poupée d'équipement — homme ou femme. */
       sexe?: Sexe | null
@@ -683,7 +868,15 @@ const api = {
       call<Character>('characters:setStat', id, key, value),
     setState: (id: number, key: string, on: boolean) =>
       call<Character>('characters:setState', id, key, on),
-    log: (id: number) => call<CharacterLogEntry[]>('characters:log', id)
+    log: (id: number) => call<CharacterLogEntry[]>('characters:log', id),
+    /** Des PNJ repris de leur fichier texte. Renvoie la fonction de désabonnement. */
+    onRelus: (cb: () => void) => {
+      const h = (): void => cb()
+      ipcRenderer.on('characters:relus', h)
+      return (): void => {
+        ipcRenderer.removeListener('characters:relus', h)
+      }
+    }
   },
 
   rolls: {
@@ -756,6 +949,8 @@ const api = {
     texts: (slot: 'prep' | 'live', texts: TextOverlay[]) =>
       call<DisplayState>('display:texts', slot, texts),
     blackout: () => call<DisplayState>('display:blackout'),
+    /** Retire la présentation d'un joueur et rend l'écran d'avant. */
+    arreterPresentation: () => call<DisplayState>('display:arreterPresentation'),
     freeze: (on: boolean) => call<DisplayState>('display:freeze', on),
     pionLabels: (on: boolean) => call<DisplayState>('display:pionLabels', on),
     pionPv: (on: boolean) => call<DisplayState>('display:pionPv', on),

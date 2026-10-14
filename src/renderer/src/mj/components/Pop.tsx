@@ -16,12 +16,19 @@ export function Pop({
   x,
   y,
   className,
+  haut = false,
   onClose,
   children
 }: {
   x: number
   y: number
   className?: string
+  /**
+   * Ouvert au-dessus du point : `y` est alors son bord du bas. Le panneau
+   * grandit vers le haut quand son contenu s'allonge, et reste collé au
+   * bouton qui l'a ouvert.
+   */
+  haut?: boolean
   onClose: () => void
   children: React.ReactNode
 }): JSX.Element {
@@ -31,14 +38,24 @@ export function Pop({
   useLayoutEffect(() => {
     const el = boite.current
     if (!el) return
-    const b = el.getBoundingClientRect()
-    const marge = 10
-    setPose({
-      left: Math.max(marge, Math.min(x, window.innerWidth - b.width - marge)),
-      top: Math.max(marge, Math.min(y, window.innerHeight - b.height - marge)),
-      visibility: 'visible'
-    })
-  }, [x, y])
+    const cale = (): void => {
+      const b = el.getBoundingClientRect()
+      const marge = 10
+      const top = haut ? y - b.height : y
+      setPose({
+        left: Math.max(marge, Math.min(x, window.innerWidth - b.width - marge)),
+        top: Math.max(marge, Math.min(top, window.innerHeight - b.height - marge)),
+        visibility: 'visible'
+      })
+    }
+    cale()
+    /* Ouvert vers le haut, il doit se recaler quand il grandit — sinon il
+       pousserait vers le bas, sous le bouton. */
+    if (!haut) return
+    const obs = new ResizeObserver(cale)
+    obs.observe(el)
+    return () => obs.disconnect()
+  }, [x, y, haut])
 
   useEffect(() => {
     const touche = (e: KeyboardEvent): void => {

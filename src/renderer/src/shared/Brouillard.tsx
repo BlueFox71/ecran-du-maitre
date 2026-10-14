@@ -17,8 +17,24 @@
  * yeux et la taille de l'image, il rend du noir.
  */
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import type { CalqueBrouillard } from '@shared/types'
+import { FORCE_ASTRE, type CalqueBrouillard } from '@shared/types'
+import { formesDesMurs } from '@shared/pieces'
 import { bordsOuverture } from '@shared/ouvertures'
+import {
+  CLAIR_DE_TORCHE,
+  DegradesLueurs,
+  LumiereDuDehors,
+  MELANGE_LUMIERE,
+  FlouRegard,
+  CouchesRegard,
+  DegradesDuRegard,
+  couchesDuRegard,
+  empreinteDehors,
+  empreinteLueurs,
+  halosDesLampes,
+  type Dehors,
+  type Lueur
+} from './Lueur'
 import {
   barrieres,
   bords,
@@ -27,6 +43,7 @@ import {
   champDeVision,
   cheminDesInconnues,
   grille,
+  lueurDuDehors,
   polygone,
   type Pt
 } from '@shared/murs'
@@ -79,24 +96,67 @@ export function Brouillard({
     [murs, ouvertures, w, h]
   )
 
-  /** Le regard de chaque joueur, arrêté par les murs. */
-  const regards = useMemo(
+  /**
+   * Le regard de chaque joueur, arrêté par les murs.
+   *
+   * Sa portée est celle de la carte — sauf s'il porte une lampe : il voit
+   * alors aussi loin qu'elle éclaire, et la lampe passe avant le réglage.
+   * `loin`, le même regard sans limite, pour ce qu'une lampe éclaire au-delà.
+   */
+  const regardsY = useMemo(
     () =>
       w > 0 && h > 0
         ? yeux
-            .map((o) =>
-              champDeVision(
-                barrieresVue,
-                { x: o.x * w, y: o.y * h },
-                o.cap,
-                calque.regardOuverture,
-                regardPortee ? regardPortee * w : Infinity
-              )
-            )
-            .filter((p) => p.length > 2)
+            .map((o) => {
+              const c = { x: o.x * w, y: o.y * h }
+              const portee = porteurs.find((p) => p.characterId === o.characterId)?.rayon ?? regardPortee
+              const pts = champDeVision(barrieresVue, c, o.cap, calque.regardOuverture, portee ? portee * w : Infinity)
+              return {
+                c,
+                cap: o.cap,
+                portee,
+                pts,
+                loin: portee ? champDeVision(barrieresVue, c, o.cap, calque.regardOuverture) : pts
+              }
+            })
+            .filter((r) => r.pts.length > 2)
         : [],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [yeux, barrieresVue, regardPortee, calque.regardOuverture, w, h]
+    [yeux, porteurs, barrieresVue, regardPortee, calque.regardOuverture, w, h]
+  )
+  const regards = useMemo(() => regardsY.map((r) => r.pts), [regardsY])
+  const loins = useMemo(() => regardsY.map((r) => r.loin), [regardsY])
+  /** Ce qu'on voit sans lumière : les regards, jusqu'à leur portée. */
+  const proches = regardsY.filter((r) => r.portee).map((r) => r.pts)
+  /** Les mêmes murs, où les vitres ne laissent rien passer — s'il y en a. */
+  const sansVitres = useMemo(
+    () =>
+      w > 0 && h > 0 && ouvertures.some((o) => o.nature === 'vitre')
+        ? barrieres(
+            murs,
+            'vue',
+            enPx,
+            ouvertures.filter((o) => o.nature !== 'vitre')
+          ).concat(bords(w, h))
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [murs, ouvertures, w, h]
+  )
+  /**
+   * Chaque regard en couches : ses côtés, flous, et sa part nette — chacun vu
+   * directement ou à travers une vitre, qui le voile encore. Sans limite pour
+   * ce qu'une lampe éclaire ; jusqu'à la portée pour ce qu'on distingue dans
+   * le noir. Dans l'ordre des regards, pour aller avec leur fondu.
+   */
+  const couchesY = useMemo(
+    () =>
+      regardsY.map((r) => ({
+        loin: couchesDuRegard(barrieresVue, sansVitres, r.c, r.cap, calque.regardOuverture, null),
+        proche: r.portee
+          ? couchesDuRegard(barrieresVue, sansVitres, r.c, r.cap, calque.regardOuverture, r.portee * w)
+          : []
+      })),
+    [regardsY, barrieresVue, sansVitres, calque.regardOuverture, w]
   )
 
   /**
@@ -107,17 +167,35 @@ export function Brouillard({
    * Une pièce éclairée l'est pour toute la table, quelle que soit la main qui
    * tient la lampe.
    */
-  const lueurs = useMemo(() => {
+  const lueurs = useMemo((): Lueur[] => {
     if (w <= 0 || h <= 0) return []
-    const ronds = lumieres
+    const ronds: Lueur[] = lumieres
       .filter((l) => l.allumee)
-      .map((l) => champDeVision(barrieresVue, { x: l.x * w, y: l.y * h }, 0, 360, l.penombre * w))
+      /* Une lampe directive n'éclaire que son faisceau — le même secteur que
+         le regard d'un pion. */
+      .map((l) => {
+        const c = { x: l.x * w, y: l.y * h }
+        return {
+          pts: champDeVision(barrieresVue, c, l.cap, l.ouverture, l.penombre * w),
+          c,
+          r: l.penombre * w,
+          f: l.clair / l.penombre
+        }
+      })
     for (const o of yeux) {
       const porte = porteurs.find((p) => p.characterId === o.characterId)
       if (!porte) continue
-      ronds.push(champDeVision(barrieresVue, { x: o.x * w, y: o.y * h }, 0, 360, porte.rayon * w))
+      const c = { x: o.x * w, y: o.y * h }
+      ronds.push({
+        /* Une lampe de poche éclaire où le pion regarde. */
+        pts: champDeVision(barrieresVue, c, o.cap, porte.ouverture ?? 360, porte.rayon * w),
+        c,
+        r: porte.rayon * w,
+        f: CLAIR_DE_TORCHE
+      })
     }
-    return ronds.filter((p) => p.length > 2)
+    ronds.push(...halosDesLampes(lumieres, barrieresVue, w, h))
+    return ronds.filter((l) => l.pts.length > 2)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [lumieres, porteurs, yeux, barrieresVue, w, h])
 
@@ -128,7 +206,18 @@ export function Brouillard({
    * ce qui tombe à la fois dans un regard et dans une lueur. Une carte sans la
    * moindre lampe se visite comme avant, à la seule vue.
    */
-  const sousLaLampe = lumieres.length > 0 || porteurs.length > 0
+  /* Le soleil ou la lune : dehors éclairé, et ce qui entre par les fenêtres. */
+  const dehors = useMemo((): Dehors | null => {
+    if (!calque.astre || w <= 0 || h <= 0) return null
+    return {
+      dedans: lueurDuDehors(murs, ouvertures, calque.astre.cap, w, h),
+      pieces: formesDesMurs(murs).map((f) => f.pts.map(enPx)),
+      force: FORCE_ASTRE[calque.astre.nature]
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [calque.astre?.nature, calque.astre?.cap, murs, ouvertures, w, h])
+
+  const sousLaLampe = lumieres.length > 0 || porteurs.length > 0 || !!dehors
 
 
   /* La mémoire de la table : ce qui a été vu et qu'on ne regarde plus. Elle ne
@@ -165,14 +254,10 @@ export function Brouillard({
    * déjà en main, donc elle ne coûte qu'une boucle d'entiers, et elle ne
    * bouge que si l'image doit bouger.
    */
-  const empreinte = useMemo(() => {
-    let h = lueurs.length
-    for (const l of lueurs) {
-      h = (h * 33 + l.length) | 0
-      for (const p of l) h = (h * 33 + (p.x | 0) * 7 + (p.y | 0) * 13) | 0
-    }
-    return (h >>> 0).toString(36)
-  }, [lueurs])
+  const empreinte = useMemo(
+    () => `${empreinteLueurs(lueurs)}${empreinteDehors(dehors)}`,
+    [lueurs, dehors]
+  )
 
   const id = `${propre}-${empreinte}`
 
@@ -192,11 +277,20 @@ export function Brouillard({
   useEffect(() => {
     if (!lumGarde || !carreaux || !regards.length) return
     const neuf = new Set<number>()
-    for (const r of regards) for (const c of casesVues(r, carreaux)) neuf.add(c)
+    for (const r of loins) for (const c of casesVues(r, carreaux)) neuf.add(c)
     if (sousLaLampe) {
       const eclairees = new Set<number>()
-      for (const l of lueurs) for (const c of casesVues(l, carreaux)) eclairees.add(c)
+      for (const l of lueurs) for (const c of casesVues(l.pts, carreaux)) eclairees.add(c)
+      if (dehors) {
+        /* Dehors, tout est éclairé ; dedans, ce que l'astre fait entrer. */
+        const dansLesPieces = new Set<number>()
+        for (const p of dehors.pieces) for (const c of casesVues(p, carreaux)) dansLesPieces.add(c)
+        for (let c = 0; c < carreaux.cols * carreaux.rows; c++)
+          if (!dansLesPieces.has(c)) eclairees.add(c)
+        for (const c of casesVues(dehors.dedans, carreaux)) eclairees.add(c)
+      }
       for (const c of [...neuf]) if (!eclairees.has(c)) neuf.delete(c)
+      for (const r of proches) for (const c of casesVues(r, carreaux)) neuf.add(c)
     }
     for (const o of yeux)
       for (const c of casesAutour({ x: o.x * w, y: o.y * h }, Math.max(carreaux.taille, w * A_PORTEE), carreaux))
@@ -208,7 +302,7 @@ export function Brouillard({
       return s
     })
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [regards, lueurs, carreaux, lumGarde, sousLaLampe])
+  }, [regards, loins, lueurs, dehors, carreaux, lumGarde, sousLaLampe])
 
   const inconnu = useMemo(
     () => (lumGarde && carreaux && connu.size ? cheminDesInconnues(connu, carreaux) : ''),
@@ -228,6 +322,43 @@ export function Brouillard({
    * le plan de la maison. Fermée, un trait plein en travers ; ouverte, un
    * trait creux : le passage est libre, et ça se lit d'un coup d'œil.
    */
+  /* Le fondu de chaque regard proche : net près de l'œil, effacé au bout de
+     la portée — comme une lampe. Un par œil ; l'identifiant suit l'œil. */
+  const fondus = regardsY.map((r, i) =>
+    r.portee
+      ? {
+          id: `${id}-rg-${i}-${Math.round(r.c.x)}-${Math.round(r.c.y)}-${Math.round(r.portee * 1000)}`,
+          c: r.c,
+          r: r.portee * w
+        }
+      : null
+  )
+  /**
+   * Les regards dans un masque : `voir`, le blanc est ce qu'on voit ; sinon le
+   * blanc est l'ombre. Les côtés d'abord, à moitié, puis la part nette ; sous
+   * la lampe, ce qui est éclairé au loin, puis ce qu'on distingue jusqu'à la
+   * portée, en fondu.
+   */
+  const regardsDans = (voir: boolean): JSX.Element => (
+    /* Les bords des cônes, adoucis : tout le regard passe par un léger flou. */
+    <g filter={`url(#${id}-flou)`}>
+      {sousLaLampe ? (
+        <g mask={`url(#${id}-lum)`}>
+          {couchesY.map((c, i) => (
+            <CouchesRegard key={i} couches={c.loin} voir={voir} />
+          ))}
+        </g>
+      ) : (
+        couchesY.map((c, i) =>
+          regardsY[i]?.portee ? null : <CouchesRegard key={i} couches={c.loin} voir={voir} />
+        )
+      )}
+      {/* Jusqu'à la portée, on distingue sans lumière — de moins en moins. */}
+      {couchesY.map((c, i) => (
+        <CouchesRegard key={`p${i}`} couches={c.proche} voir={voir} fondu={fondus[i]?.id ?? null} />
+      ))}
+    </g>
+  )
   const portes = ouvertures
     .filter((o) => o.nature === 'porte')
     .map((o) => {
@@ -251,23 +382,34 @@ export function Brouillard({
     >
       <defs>
         {/* Blanc là où une lampe porte : tout ce qu'on croise avec elle. */}
+        {/* Plein jour jusqu'au clair, puis la pénombre qui baisse : ce qu'on
+            y voit se voit moins bien. */}
+        {fondus.map((f, i) =>
+          f ? (
+            <DegradesDuRegard key={f.id} id={f.id} c={f.c} r={f.r} couches={couchesY[i]?.proche ?? []} voir />
+          ) : null
+        )}
+        <FlouRegard id={`${id}-flou`} w={w} h={h} />
         <mask id={`${id}-lum`}>
-          {lueurs.map((l, i) => (
-            <polygon key={i} points={polygone(l)} fill="#fff" />
-          ))}
+          <DegradesLueurs lueurs={lueurs} id={`${id}-g`} />
+          {/* Le même flou que le regard : une lueur arrêtée par un mur, ou le
+              bord d'un faisceau, ne fait pas un trait net. */}
+          <g filter={`url(#${id}-flou)`}>
+            {lueurs.map((l, i) => (
+              <polygon
+                key={i}
+                points={polygone(l.pts)}
+                fill={`url(#${id}-g-${i})`}
+                style={MELANGE_LUMIERE}
+              />
+            ))}
+            {dehors ? <LumiereDuDehors dehors={dehors} w={w} h={h} /> : null}
+          </g>
         </mask>
         {/* Blanc = on voit. C'est l'inverse du masque d'ombre, et il sert à
             n'écrire sur la carte que dans le champ des joueurs. */}
         <mask id={`${id}-champ`}>
-          {sousLaLampe ? (
-            <g mask={`url(#${id}-lum)`}>
-              {regards.map((r, i) => (
-                <polygon key={i} points={polygone(r)} fill="#fff" />
-              ))}
-            </g>
-          ) : (
-            regards.map((r, i) => <polygon key={i} points={polygone(r)} fill="#fff" />)
-          )}
+          {regardsDans(true)}
           {yeux.map((o, i) => (
             <circle key={i} cx={o.x * w} cy={o.y * h} r={w * A_PORTEE} fill="#fff" />
           ))}
@@ -275,15 +417,7 @@ export function Brouillard({
         {/* Blanc = on ne voit pas. Chaque regard y creuse son trou. */}
         <mask id={`${id}-vu`}>
           <rect x="0" y="0" width={w} height={h} fill="#fff" />
-          {sousLaLampe ? (
-            <g mask={`url(#${id}-lum)`}>
-              {regards.map((r, i) => (
-                <polygon key={i} points={polygone(r)} fill="#000" />
-              ))}
-            </g>
-          ) : (
-            regards.map((r, i) => <polygon key={i} points={polygone(r)} fill="#000" />)
-          )}
+          {regardsDans(false)}
           {/* Ce qu'on a au bout des bras, lampe ou pas : on ne joue pas un
               aveugle qui ne sait pas où il pose les pieds. */}
           {yeux.map((o, i) => (
@@ -293,15 +427,7 @@ export function Brouillard({
         {inconnu ? (
           <mask id={`${id}-noir`}>
             <path d={inconnu} fill="#fff" />
-            {sousLaLampe ? (
-              <g mask={`url(#${id}-lum)`}>
-                {regards.map((r, i) => (
-                  <polygon key={i} points={polygone(r)} fill="#000" />
-                ))}
-              </g>
-            ) : (
-              regards.map((r, i) => <polygon key={i} points={polygone(r)} fill="#000" />)
-            )}
+            {regardsDans(false)}
             {yeux.map((o, i) => (
               <circle key={i} cx={o.x * w} cy={o.y * h} r={w * A_PORTEE} fill="#000" />
             ))}

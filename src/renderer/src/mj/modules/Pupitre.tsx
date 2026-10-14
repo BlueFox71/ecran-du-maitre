@@ -1,17 +1,26 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
+import { usePoignee } from '../components/Poignee'
+import { ChoixPnj, RetirerDeLaReserve, usePnjEnReserve } from '../components/ReservePnj'
 import { MenuPion, type CiblePion } from '../components/MenuPion'
 import { MenuImage, type CibleImage } from '../components/MenuImage'
+import { FicheCompacte } from '../components/FicheDuLieu'
 import { Slide } from '../../shared/Slide'
+import { BoutonTours, Tours, pionEnJeu } from '../components/Tours'
+import { TrameEnJeu } from '../components/PlanTrame'
+import { Valeur } from '../components/Valeur'
 import { Visage } from '../../shared/Visage'
 import { Pings, usePings } from '../../shared/Pings'
 import { duree } from '../../shared/mesures'
 import { slideLabel } from '../components/Monitor'
-import { accepteSi, initials, profondeur } from './Regie'
+import { accepteSi, initials, profondeur, useSansPieces } from './Regie'
+import { estPiece } from './Places'
 import { decorDossier, folderIcon } from '../components/FolderIcons'
 import { Annotations, CadreAnnote } from '../components/Annotations'
 import { TableauDeScene, type Surbrillance } from '../components/Tableau'
+import { BoutonObjets, ObjetsDeScene, usePanneauScene } from '../components/ObjetsDeScene'
 import { IconPhone, Portables } from '../components/Portables'
+import { TexteCourt } from '../components/TexteCourt'
 import {
   BoutonPoserLumiere,
   BoutonTextes,
@@ -34,6 +43,7 @@ import type {
   JaugeVue,
   Pion,
   PionsDuLieu,
+  Place,
   Pointer
 } from '@shared/types'
 import type { UiFolder, UiItem } from '../../../../preload/index'
@@ -53,6 +63,7 @@ import {
   IconRetour,
   IconRotate,
   IconSearch,
+  IconTrame,
   IconStop,
   IconTrash,
   kindIcon
@@ -91,10 +102,13 @@ export function Pupitre(): JSX.Element {
   const [presence, setPresence] = useState<Record<number, PionsDuLieu>>({})
   /* Le nom qu'on donne à un pion qui n'est à personne. `null` : champ fermé. */
   const [pnj, setPnj] = useState<string | null>(null)
-  /* Le côté gauche lit soit le fil de la séance, soit les documents annexes —
-     règles maison, tables, fiches qu'on garde sous la main toute la partie. */
-  const [cote, setCote] = useState<'chrono' | 'annexes'>('chrono')
+  /* Le côté gauche lit soit le fil de la séance, soit les lieux — ce que voient
+     les joueurs en arrivant, et ce qu'ils ne doivent pas savoir —, soit les
+     documents annexes : règles maison, tables, fiches qu'on garde sous la main
+     toute la partie. */
+  const [cote, setCote] = useState<'chrono' | 'lieux' | 'annexes'>('chrono')
   const [annexeVue, setAnnexeVue] = useState<number | null>(null)
+  const [lieuVu, setLieuVu] = useState<number | null>(null)
   /* Le choix qu'ouvre un clic sur une image : visuel libre, ou fenêtre sur le direct. */
   const [cibleImage, setCibleImage] = useState<CibleImage | null>(null)
   /*
@@ -109,24 +123,19 @@ export function Pupitre(): JSX.Element {
   const [survol, setSurvol] = useState<Surbrillance>(null)
   /* La source, sous l'ambiance : les lieux, le dossier, ou les portables. */
   const [tab, setTab] = useState<'lieux' | 'arbre' | 'portables'>('lieux')
-  /* Le tableau de scène, à gauche de l'image : le MJ le montre ou le cache.
-     Un confort de poste, retenu d'une ouverture à l'autre. */
-  const [voirScene, setVoirScene] = useState<boolean>(() => {
+  /* À gauche de l'image : le tableau de scène ou les objets du lieu, l'un ou
+     l'autre. Le choix d'avant (« Scène » seule) sert de point de départ. */
+  const [panneau, basculerPanneau] = usePanneauScene('paravent.panneau', () => {
     try {
-      return localStorage.getItem('paravent.scene') !== 'non'
+      return localStorage.getItem('paravent.scene') === 'non' ? null : 'scene'
     } catch {
-      return true
+      return 'scene'
     }
   })
-  const basculerScene = (): void =>
-    setVoirScene((v) => {
-      try {
-        localStorage.setItem('paravent.scene', v ? 'non' : 'oui')
-      } catch {
-        /* sans stockage, le choix ne dure que la séance */
-      }
-      return !v
-    })
+  const voirScene = panneau === 'scene'
+  /* L'arborescence de la séance, par-dessus tout : on y coche ce qui est fait. */
+  const [trameOuverte, setTrameOuverte] = useState(false)
+  const basculerScene = (): void => basculerPanneau('scene')
   const [ouverts, setOuverts] = useState<Set<string>>(new Set())
 
   /* Le pointeur, comme en Régie : P le maintient, Ctrl le prête le temps d'un
@@ -511,10 +520,16 @@ export function Pupitre(): JSX.Element {
     [s.beats, s.activeBeatId]
   )
   const rang = (c: Character): number => (c.kind !== 'pnj' ? 0 : enScene.has(c.id) ? 1 : 2)
+  /* Les joueurs, et les seuls PNJ que le MJ a mis sur la ligne (le +). */
+  const reserve = usePnjEnReserve()
+  const [choixPnj, setChoixPnj] = useState(false)
   const reservePions = useMemo(
-    () => s.characters.filter((c) => c.present).sort((a, b) => rang(a) - rang(b)),
+    () =>
+      s.characters
+        .filter((c) => c.present && (c.kind !== 'pnj' || reserve.ids.has(c.id)))
+        .sort((a, b) => rang(a) - rang(b)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [s.characters, enScene]
+    [s.characters, enScene, reserve.ids]
   )
 
   const placedChars = new Set(edit.pions.map((p) => p.characterId).filter(Boolean))
@@ -623,6 +638,48 @@ export function Pupitre(): JSX.Element {
   /* L'annexe qu'on lit : celle qu'on a choisie, sinon la première. */
   const annexe = s.annexes.find((a) => a.id === annexeVue) ?? s.annexes[0] ?? null
 
+  /* Les lieux en arbre, comme leurs fichiers : l'espace, puis ses niveaux,
+     puis leurs pièces. Un lieu dont le parent a disparu remonte à la racine. */
+  const lieuxEnArbre = useMemo(() => {
+    const ids = new Set(s.places.map((p) => p.id))
+    const enfants = new Map<number | null, Place[]>()
+    for (const p of s.places) {
+      const cle = p.parentId != null && ids.has(p.parentId) ? p.parentId : null
+      enfants.set(cle, [...(enfants.get(cle) ?? []), p])
+    }
+    const out: { p: Place; prof: number }[] = []
+    const vus = new Set<number>()
+    const descendre = (cle: number | null, prof: number): void => {
+      const freres = [...(enfants.get(cle) ?? [])].sort((a, b) => a.ord - b.ord || a.id - b.id)
+      for (const p of freres) {
+        if (vus.has(p.id)) continue
+        vus.add(p.id)
+        out.push({ p, prof })
+        descendre(p.id, prof + 1)
+      }
+    }
+    descendre(null, 0)
+    return out
+  }, [s.places])
+  /* Le lieu qu'on lit : celui qu'on a choisi, sinon celui du moment. */
+  const lieuLu =
+    s.places.find((p) => p.id === lieuVu) ?? lieu ?? lieuxEnArbre[0]?.p ?? null
+  /* Taire les pièces ; celle qu'on lit reste, sa ligne allumée dit où l'on est. */
+  const [sansPieces, basculerPieces] = useSansPieces('paravent.sansPieces')
+  const lieuxLus = sansPieces
+    ? lieuxEnArbre.filter(({ p }) => !estPiece(p) || p.id === lieuLu?.id)
+    : lieuxEnArbre
+  const filiationLu = useMemo(() => {
+    const noms: string[] = []
+    for (
+      let p = lieuLu ? s.places.find((x) => x.id === lieuLu.parentId) : undefined;
+      p && noms.length < 12;
+      p = s.places.find((x) => x.id === p!.parentId)
+    )
+      noms.unshift(p.name)
+    return noms.join(' › ')
+  }, [lieuLu, s.places])
+
   const setDone = async (done: boolean): Promise<void> => {
     if (!beat) return
     await window.jdr.timeline.upsertBeat({
@@ -636,11 +693,19 @@ export function Pupitre(): JSX.Element {
     await s.refreshTimeline()
   }
 
+  /* La frontière entre la lecture et la régie se tire à la souris. */
+  const colonnes = usePoignee({ variable: '--pu-g', cle: 'paravent.largeurGauche', gauche: ':scope > .pu-chrono', min: 420, resteMin: 480, demiEcart: 7 })
+
   return (
     /* `chrono` n'est pas décoratif : les panneaux, leurs en-têtes et le
        sélecteur à deux boutons ne sont stylés que sous cette classe. */
     <section className="view chrono pupitre">
-      <div className="pu-grid">
+      <div
+        ref={colonnes.ref}
+        className="pu-grid"
+        style={colonnes.largeur != null ? ({ '--pu-g': `${colonnes.largeur}px` } as React.CSSProperties) : undefined}
+      >
+        {colonnes.poignee}
         {/* ================= la séance ================= */}
         <div className="pu-chrono">
           <aside className="pane">
@@ -657,6 +722,15 @@ export function Pupitre(): JSX.Element {
                 </button>
                 <button
                   role="tab"
+                  aria-selected={cote === 'lieux'}
+                  className={cote === 'lieux' ? 'on' : ''}
+                  onClick={() => setCote('lieux')}
+                  title="Ce que voient les joueurs en arrivant, et les notes du MJ"
+                >
+                  Lieux
+                </button>
+                <button
+                  role="tab"
                   aria-selected={cote === 'annexes'}
                   className={cote === 'annexes' ? 'on' : ''}
                   onClick={() => setCote('annexes')}
@@ -667,7 +741,31 @@ export function Pupitre(): JSX.Element {
               </div>
             </div>
             <div className="pane-body">
-              {cote === 'annexes' ? (
+              {cote === 'lieux' ? (
+                <div className="fil">
+                  <label className="lieux-filtre pu-filtre">
+                    <input
+                      type="checkbox"
+                      checked={sansPieces}
+                      onChange={(e) => basculerPieces(e.target.checked)}
+                    />
+                    Ne pas montrer les pièces
+                  </label>
+                  {lieuxLus.map(({ p, prof }) => (
+                    <button
+                      key={p.id}
+                      className={`moment pu-lieu${(lieuLu?.id ?? null) === p.id ? ' on' : ''}`}
+                      style={{ '--prof': prof } as React.CSSProperties}
+                      onClick={() => setLieuVu(p.id)}
+                    >
+                      <span className="t">
+                        <span className="ttl">{p.name}</span>
+                      </span>
+                    </button>
+                  ))}
+                  {lieuxEnArbre.length === 0 ? <p className="vide">Aucun lieu.</p> : null}
+                </div>
+              ) : cote === 'annexes' ? (
                 <div className="fil">
                   {s.annexes.map((a) => (
                     <button
@@ -714,7 +812,47 @@ export function Pupitre(): JSX.Element {
           </aside>
 
           <section className="pane lecture">
-            {cote === 'annexes' ? (
+            {cote === 'lieux' ? (
+              /* Au Paravent on lit ; on écrit dans Lieux, ou dans le fichier. */
+              lieuLu ? (
+                <>
+                  <header className="lect-head">
+                    <div>
+                      <span className="eyebrow">{filiationLu || 'lieu'}</span>
+                      <h3 className="display">{lieuLu.name}</h3>
+                    </div>
+                  </header>
+                  <div className="lect-body lect-lieu">
+                    {/* La fiche du lieu, simplifiée : on y coche et on y montre ;
+                        on l'écrit dans Lieux. */}
+                    <FicheCompacte
+                      key={lieuLu.id}
+                      p={lieuLu}
+                      onChanger={setLieuVu}
+                      onMontrer={(item, titre, x, y) => setCibleImage({ item, titre, x, y })}
+                      avant={
+                        <article className="read pu-lieu-lecture">
+                          <h4>Ce que voient les joueurs</h4>
+                          <TexteDeLieu texte={lieuLu.summary} />
+                        </article>
+                      }
+                      apres={
+                        <article className="read pu-lieu-lecture">
+                          <h4>Notes du MJ</h4>
+                          <TexteDeLieu texte={lieuLu.notes} />
+                        </article>
+                      }
+                    />
+                  </div>
+                </>
+              ) : (
+                <div className="vide-grand">
+                  Aucun lieu.
+                  <br />
+                  Crée-les dans Lieux.
+                </div>
+              )
+            ) : cote === 'annexes' ? (
               /* Au Paravent on lit ; on écrit dans Préparation › Annexes. */
               annexe ? (
                 <>
@@ -970,6 +1108,21 @@ export function Pupitre(): JSX.Element {
               <IconPorte />
               Scène
             </button>
+            <BoutonObjets
+              on={panneau === 'objets'}
+              placeId={editPlaceId}
+              onClick={() => basculerPanneau('objets')}
+            />
+            <BoutonTours />
+            <button
+              className={`btn btn-sm${trameOuverte ? ' btn-on' : ''}`}
+              aria-pressed={trameOuverte}
+              onClick={() => setTrameOuverte(true)}
+              title="L’arborescence de la séance : cocher ce qui est fait, voir ce qui est à portée — pour toi seul"
+            >
+              <IconTrame />
+              Arborescence
+            </button>
             <span className="sep" />
             {/* Sans libellé, comme les dispositions voisines : la barre passait
                 à la ligne dès qu'on lui ajoutait un mot. */}
@@ -1008,7 +1161,17 @@ export function Pupitre(): JSX.Element {
                 disabled={!pivotable}
                 onChange={(e) => poseLum(Number(e.target.value))}
               />
-              <span className={`val num${lum !== 100 ? ' corrige' : ''}`}>{lum} %</span>
+              <Valeur
+                className={`val num${lum !== 100 ? ' corrige' : ''}`}
+                value={lum}
+                min={LUM_MIN * 100}
+                max={LUM_MAX * 100}
+                step={5}
+                unite=" %"
+                disabled={!pivotable}
+                label="Lumière de l’image"
+                onChange={poseLum}
+              />
               <button
                 type="button"
                 className="btn btn-sm lum-neutre"
@@ -1027,15 +1190,19 @@ export function Pupitre(): JSX.Element {
                 ajoutait un mot. L'info-bulle dit ce qu'il fait et où. */}
             <button
               className={`btn btn-sm btn-ico${display?.playerOpen ? ' btn-on' : ''}`}
-              aria-label={display?.playerOpen ? 'Fermer l’écran joueurs' : 'Ouvrir l’écran joueurs'}
+              aria-label={display?.playerOpen ? 'Fermer l’écran joueurs' : 'Projeter l’écran joueurs'}
               onClick={() => void window.jdr.display.togglePlayer()}
-              title={`${display?.playerOpen ? 'Fermer' : 'Ouvrir'} l’écran joueurs — ${
+              title={`${display?.playerOpen ? 'Fermer' : 'Projeter'} l’écran joueurs — ${
                 sortie ? `${sortie.label} · ${sortie.width}×${sortie.height}` : 'sortie automatique'
               } · F5`}
             >
               <IconExpand />
             </button>
           </div>
+
+          {/* ---- les tours : à qui de jouer ---- */}
+          <Tours />
+          {trameOuverte ? <TrameEnJeu onClose={() => setTrameOuverte(false)} /> : null}
 
           {/* ---- la grande scène : celle qu'on arrange ---- */}
           {/* Le tableau de scène, à gauche de l'image et à sa hauteur : son
@@ -1045,9 +1212,17 @@ export function Pupitre(): JSX.Element {
             {voirScene && calque?.murs.length ? (
               <TableauDeScene
                 calque={calque}
+                placeId={editPlaceId}
                 lieux={s.places.filter((p) => p.parentId === editPlaceId)}
                 survol={survol}
                 onSurvol={setSurvol}
+              />
+            ) : null}
+            {panneau === 'objets' ? (
+              <ObjetsDeScene
+                placeId={editPlaceId}
+                onSurvol={setSurvol}
+                onMontrer={(item, titre, x, y) => setCibleImage({ item, titre, x, y })}
               />
             ) : null}
           <div
@@ -1075,6 +1250,8 @@ export function Pupitre(): JSX.Element {
                   /* Comme en Régie : la caméra ne suit que la scène à
                      l'antenne, jamais celle qu'on prépare. */
                   focusPionId={onLive ? (display?.focusPionId ?? null) : null}
+                  /* Le halo de celui qui joue, comme chez les joueurs. */
+                  pionEnJeuId={onLive ? pionEnJeu(s.tours, edit.pions) : null}
                   onDefocus={() => void window.jdr.pions.focus(null)}
                   pionLabels={display?.pionLabels ?? true}
                   pionPv={display?.pionPv ?? false}
@@ -1160,6 +1337,7 @@ export function Pupitre(): JSX.Element {
                     pions={live ? display?.pions : undefined}
                     pionSize={display?.pionSize}
                     focusPionId={live ? display?.focusPionId : null}
+                    pionEnJeuId={live ? (display?.tour?.pionEnJeuId ?? null) : null}
                     pionLabels={display?.pionLabels ?? true}
                     pionPv={display?.pionPv ?? false}
                     joueurs={display?.joueurs}
@@ -1348,6 +1526,20 @@ export function Pupitre(): JSX.Element {
           </div>
 
           {/* ---- la réserve de pions ---- */}
+          {choixPnj ? (
+            <ChoixPnj
+              enScene={enScene}
+              onSansFiche={
+                editPlaceId == null
+                  ? undefined
+                  : () => {
+                      setChoixPnj(false)
+                      setPnj('')
+                    }
+              }
+              onClose={() => setChoixPnj(false)}
+            />
+          ) : null}
           <div className="tray pu-tray">
             <span className="eyebrow">Pions</span>
             <div className="tray-pions">
@@ -1358,33 +1550,35 @@ export function Pupitre(): JSX.Element {
                 const parti = placed || editPlaceId == null ? null : ailleurs(c.id, editPlaceId)
                 const photo = s.allItems.find((i) => i.id === c.portraitItemId)
                 return (
-                  <div
-                    key={c.id}
-                    className={`tok teinte c-${c.color ?? 'neutral'}${placed ? ' placed' : ''}${
-                      enScene.size && rang(c) === 2 ? ' en-retrait' : ''
-                    }${
-                      photo ? ' photo' : ''
-                    }`}
-                    draggable={!placed}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData('text/pion-char', String(c.id))
-                      e.dataTransfer.effectAllowed = 'copy'
-                    }}
-                    onDragEnter={(e) => void accepteSi(e, 'text/pion-item')}
-                    onDragOver={(e) => void accepteSi(e, 'text/pion-item')}
-                    onDrop={(e) => void setPhoto(e, c.id)}
-                    title={
-                      placed
-                        ? `${c.name} — déjà sur la table`
-                        : parti
-                          ? `${c.name} — actuellement à ${parti.lieu} ; le poser ici l’y fera quitter`
-                          : photo
-                            ? c.name
-                            : `${c.name} — glisse une image ici pour lui donner sa photo`
-                    }
-                  >
-                    {photo?.url ? <img src={photo.url} alt="" draggable={false} /> : initials(c.name)}
-                  </div>
+                  <span key={c.id} className="tray-tok">
+                    <div
+                      className={`tok teinte c-${c.color ?? 'neutral'}${placed ? ' placed' : ''}${
+                        enScene.size && rang(c) === 2 ? ' en-retrait' : ''
+                      }${
+                        photo ? ' photo' : ''
+                      }`}
+                      draggable={!placed}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/pion-char', String(c.id))
+                        e.dataTransfer.effectAllowed = 'copy'
+                      }}
+                      onDragEnter={(e) => void accepteSi(e, 'text/pion-item')}
+                      onDragOver={(e) => void accepteSi(e, 'text/pion-item')}
+                      onDrop={(e) => void setPhoto(e, c.id)}
+                      title={
+                        placed
+                          ? `${c.name} — déjà sur la table`
+                          : parti
+                            ? `${c.name} — actuellement à ${parti.lieu} ; le poser ici l’y fera quitter`
+                            : photo
+                              ? c.name
+                              : `${c.name} — glisse une image ici pour lui donner sa photo`
+                      }
+                    >
+                      {photo?.url ? <img src={photo.url} alt="" draggable={false} /> : initials(c.name)}
+                    </div>
+                    {c.kind === 'pnj' ? <RetirerDeLaReserve c={c} onRetirer={() => reserve.retirer(c.id)} /> : null}
+                  </span>
                 )
               })}
 
@@ -1392,13 +1586,8 @@ export function Pupitre(): JSX.Element {
                 <button
                   type="button"
                   className="tok neuf"
-                  disabled={editPlaceId == null}
-                  title={
-                    editPlaceId == null
-                      ? 'Choisis d’abord le lieu où se tient la scène'
-                      : 'Poser un pion de PNJ — caché des joueurs jusqu’à ce que tu le montres'
-                  }
-                  onClick={() => setPnj('')}
+                  title="Ajouter des PNJ à la ligne des pions"
+                  onClick={() => setChoixPnj(true)}
                 >
                   +
                 </button>
@@ -1440,7 +1629,22 @@ export function Pupitre(): JSX.Element {
                   await refreshEdit()
                 }}
               />
-              <span className="val num">{edit.size.toFixed(1)} %</span>
+              <Valeur
+                className="val num"
+                value={edit.size}
+                min={2}
+                max={20}
+                step={0.5}
+                decimales={1}
+                unite=" %"
+                disabled={editPlaceId == null}
+                label="Taille des pions"
+                onChange={async (v) => {
+                  if (editPlaceId == null) return
+                  await window.jdr.pions.size(editPlaceId, v)
+                  await refreshEdit()
+                }}
+              />
             </label>
 
             <span className="sep" />
@@ -1514,6 +1718,15 @@ export function Pupitre(): JSX.Element {
               value={audio?.volume ?? 0.35}
               aria-label="Volume de l’ambiance"
               onChange={(e) => void window.jdr.display.audio({ volume: Number(e.target.value) })}
+            />
+            <Valeur
+              className="val num"
+              value={Math.round((audio?.volume ?? 0.35) * 100)}
+              min={0}
+              max={100}
+              unite=" %"
+              label="Volume de l’ambiance"
+              onChange={(v) => void window.jdr.display.audio({ volume: v / 100 })}
             />
           </div>
 
@@ -1765,5 +1978,25 @@ function ChoixMedia({
         </footer>
       </div>
     </div>
+  )
+}
+
+/**
+ * Le texte d'un lieu, tel qu'on l'a tapé ou écrit dans son fichier : une ligne
+ * vide sépare deux paragraphes, un retour simple reste un retour.
+ */
+function TexteDeLieu({ texte }: { texte: string | null }): JSX.Element {
+  const paras = (texte ?? '')
+    .replace(/\r\n?/g, '\n')
+    .split(/\n\s*\n/)
+    .map((p) => p.trim())
+    .filter(Boolean)
+  if (paras.length === 0) return <p className="rien">Rien d’écrit.</p>
+  return (
+    <TexteCourt lignes={4} className="read-body">
+      {paras.map((p, i) => (
+        <p key={i}>{p}</p>
+      ))}
+    </TexteCourt>
   )
 }

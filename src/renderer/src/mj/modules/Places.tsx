@@ -11,37 +11,55 @@
  * - **le découpage d'un plan**, où les pièces d'un étage se tracent au rectangle
  *   sur la carte du niveau, au lieu de chercher une image chacune.
  */
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { Valeur } from '../components/Valeur'
 import { createPortal } from 'react-dom'
 import { useStore } from '../store'
 import {
   IconAudio,
   IconCadrage,
+  IconRegle,
   IconCercle,
   IconCheck,
   IconChevron,
-  IconClose,
   IconDoc,
+  IconAimant,
+  IconGomme,
   IconImage,
+  IconLoupe,
   IconMurs,
   IconPen,
   IconPlace,
   IconPlus,
   IconSoleil,
+  IconSouris,
   IconTrash,
   IconType,
-  kindIcon
 } from '../components/Icons'
 import { ChoixDansArbre } from '../components/ChoixDansArbre'
+import { Pop } from '../components/Pop'
 import { ReprendreDUneSeance } from '../components/ReprendreDUneSeance'
 import { ObjetsDuLieu } from '../components/ObjetsDuLieu'
 import { Annotations, CadreAnnote, type OutilAnnotation } from '../components/Annotations'
-import { AideMurs, BarreMurs, CalqueMurs, VoletMurs, useMurs } from '../components/Murs'
+import {
+  AideMurs,
+  BarreLumiere,
+  BarreOuverture,
+  BoutonTestLumiere,
+  FormerPiece,
+  BarreTrait,
+  CalqueMurs,
+  VoletMurs,
+  useMurs
+} from '../components/Murs'
 import {
   PARENT_TIERS,
   PION_COULEURS,
   TIER_LABEL,
+  ventDe,
   type Annotation,
+  type Astre,
+  type EchellePlan,
   type Item,
   type Place,
   type PlaceTier,
@@ -51,6 +69,9 @@ import {
 import { boiteDe, centreDe, dansForme, pointInterieur, type Forme } from '@shared/pieces'
 import { carreDAngle, mettreDEquerre, type Pt } from '@shared/murs'
 import { BoutonEquerre } from '../components/BoutonEquerre'
+import { FicheDuLieu } from '../components/FicheDuLieu'
+import { ApercuDuCiel } from '../components/ApercuDuCiel'
+import { SuiteAriane } from '../components/SuiteAriane'
 
 /** Ce qu'on est en train de créer à la chaîne, et sous quel contenant. */
 type Rafale = { parentId: number | null; tier: PlaceTier }
@@ -58,14 +79,13 @@ type Rafale = { parentId: number | null; tier: PlaceTier }
 /**
  * L'habitude de chaque étage à l'ouverture du module.
  *
- * Un espace montre ses niveaux : il y en a deux ou trois, ce sont les titres
- * de la maison. Un niveau, lui, tient parfois quinze pièces — il attend qu'on
- * le demande. C'est l'arbre qu'on veut voir en arrivant : les bâtiments, leurs
- * étages, et rien de plus.
+ * Tout est déplié en arrivant : espaces, bâtiments, niveaux et leurs pièces.
+ * Ce qu'on replie à la main le reste d'une visite à l'autre — voir
+ * `bascules`.
  */
 const OUVERT_DABORD: Record<PlaceTier, boolean> = {
   espace: true,
-  niveau: false,
+  niveau: true,
   lieu: false
 }
 
@@ -107,15 +127,34 @@ const NOM_LIBRE = '__autre'
 export function Places(): JSX.Element {
   const s = useStore()
   const [choisi, setChoisi] = useState<number | null>(null)
-  /** Le lieu ouvert en grand ; la liste disparaît tant qu'il l'est. */
+  /** Le lieu dont l'éditeur de plan est ouvert ; la liste disparaît tant qu'il l'est. */
   const [ouvert, setOuvert] = useState<number | null>(null)
+  /** Le lieu dont la fiche est ouverte : l'éditeur de plan y ramène. */
+  const [fiche, setFiche] = useState<number | null>(null)
   /** Le lieu dont la fiche s'ouvre directement sur le calque des murs. */
   const [murs, setMurs] = useState<number | null>(null)
   /**
    * Les contenants qui ne font pas comme leur étage — ceux qu'on a basculés à
    * la main. Le reste suit `OUVERT_DABORD`.
    */
-  const [bascules, setBascules] = useState<Set<number>>(new Set())
+  /* Retenues d'une visite à l'autre, par campagne : un contenant qu'on a
+     replié le reste quand on revient sur la page. */
+  const cleBascules = `lieux.bascules.${s.project?.dir ?? ''}`
+  const [bascules, setBascules] = useState<Set<number>>(() => {
+    try {
+      const v = JSON.parse(localStorage.getItem(cleBascules) ?? '[]')
+      return new Set(Array.isArray(v) ? v.filter((x) => typeof x === 'number') : [])
+    } catch {
+      return new Set()
+    }
+  })
+  useEffect(() => {
+    try {
+      localStorage.setItem(cleBascules, JSON.stringify([...bascules]))
+    } catch {
+      /* sans stockage, le repli ne dure que la visite */
+    }
+  }, [bascules, cleBascules])
   const [rafale, setRafale] = useState<Rafale | null>(null)
   const [reprise, setReprise] = useState(false)
 
@@ -282,17 +321,71 @@ export function Places(): JSX.Element {
     setMurs(n.id)
   }
 
+  const ouvrirFiche = (id: number | null): void => {
+    if (id == null) return
+    setChoisi(id)
+    setFiche(id)
+  }
+
   const lieuOuvert = place(ouvert)
+  const ficheOuverte = place(fiche)
   if (lieuOuvert)
     return (
+      <>
+      <SuiteAriane
+        onRetour={() => {
+          setOuvert(null)
+          setMurs(null)
+          setFiche(null)
+        }}
+      >
+        <CheminDuLieu
+          p={lieuOuvert}
+          onOuvrir={(id) => {
+            setOuvert(null)
+            setMurs(null)
+            ouvrirFiche(id)
+          }}
+          fin={
+            <>
+              <button
+                className="ariane-lien"
+                title="Revenir à la fiche du lieu"
+                onClick={() => {
+                  setOuvert(null)
+                  setMurs(null)
+                  ouvrirFiche(lieuOuvert.id)
+                }}
+              >
+                {lieuOuvert.name}
+              </button>
+              <span className="ariane-sep">›</span>
+              <h1 aria-current="page">Plan</h1>
+            </>
+          }
+        />
+      </SuiteAriane>
       <FicheLieu
+        /* Une autre fiche, un autre état : on ne garde pas un mode murs ou un
+           rognage à moitié fait en changeant de lieu. */
+        key={lieuOuvert.id}
         p={lieuOuvert}
         niveau={place(lieuOuvert.parentId)}
         pieces={enfants(lieuOuvert.id, 'lieu')}
         surLesMurs={murs === lieuOuvert.id}
+        /* Venu d'une fiche, « Terminé » y ramène ; le fil d'Ariane, à la liste. */
+        onTermine={
+          ficheOuverte
+            ? () => {
+                setOuvert(null)
+                setMurs(null)
+              }
+            : undefined
+        }
         onFermer={() => {
           setOuvert(null)
           setMurs(null)
+          setFiche(null)
         }}
         onMurs={() => {
           /* Une pièce renvoie au plan de son étage ; tout autre lieu trace
@@ -301,10 +394,46 @@ export function Places(): JSX.Element {
           if (cible) void ouvrirLesMurs(cible)
         }}
         onRelire={relire}
+        onChanger={(id) => {
+          setOuvert(id)
+          setChoisi(id)
+          setMurs(null)
+          if (fiche != null) setFiche(id)
+        }}
       />
+      </>
     )
 
-  const rien = espaces.length === 0 && orphelins.length === 0
+  if (ficheOuverte)
+    return (
+      <>
+      <SuiteAriane onRetour={() => setFiche(null)}>
+        <CheminDuLieu
+          p={ficheOuverte}
+          onOuvrir={(id) => ouvrirFiche(id)}
+          fin={<SautDeLieu courant={ficheOuverte.id} onChanger={(id) => ouvrirFiche(id)} fleches={false} />}
+        />
+      </SuiteAriane>
+      <FicheDuLieu
+        key={ficheOuverte.id}
+        p={ficheOuverte}
+        niveau={place(ficheOuverte.parentId)}
+        voisins={voisinsDe(s.places, ficheOuverte.id)}
+        onChanger={(id) => ouvrirFiche(id)}
+        onEditerPlan={() => {
+          /* Un niveau se découpe ; un espace, un lieu, une pièce ouvrent leur
+             plan, où l'on trace les murs, les portes et les lumières. Pas de
+             `decouperEspace` ici : il crée un niveau à chaque ouverture, et
+             un « Rez-de-chaussée » effacé revenait au prochain passage. */
+          const q = ficheOuverte
+          if (q.tier === 'niveau') void ouvrirLesMurs(q)
+          else setOuvert(q.id)
+        }}
+      />
+      </>
+    )
+
+  const rien =espaces.length === 0 && orphelins.length === 0
 
   /*
    * Le même rendu sert deux fois : sous son espace, et tout seul en bas quand
@@ -333,7 +462,7 @@ export function Places(): JSX.Element {
               choisi={choisi === l.id}
               onChoisir={() => setChoisi(l.id)}
               onVu={() => void marquerVu(l)}
-              onOuvrir={() => setOuvert(l.id)}
+              onOuvrir={() => ouvrirFiche(l.id)}
               onDeposer={deplacer}
               onEffacer={jetable ? () => void effacerLieu(l) : undefined}
             />
@@ -393,7 +522,7 @@ export function Places(): JSX.Element {
           onBasculer={() => basculer(b.id)}
           onChoisir={() => setChoisi(b.id)}
           onVu={() => void marquerVu(b)}
-          onOuvrir={() => b.mapItemId && setOuvert(b.id)}
+          onOuvrir={() => ouvrirFiche(b.id)}
           onDeposer={deplacer}
           actions={bouton(b, 'niveau', 'Niveau')}
         />
@@ -430,7 +559,7 @@ export function Places(): JSX.Element {
           onBasculer={() => basculer(n.id)}
           onChoisir={() => setChoisi(n.id)}
           onVu={() => void marquerVu(n)}
-          onOuvrir={() => n.mapItemId && void ouvrirLesMurs(n)}
+          onOuvrir={() => ouvrirFiche(n.id)}
           onDeposer={deplacer}
         />
         {deplie ? rendreTuiles(lieux, n) : null}
@@ -452,7 +581,7 @@ export function Places(): JSX.Element {
           onBasculer={() => basculer(e.id)}
           onChoisir={() => setChoisi(e.id)}
           onVu={() => void marquerVu(e)}
-          onOuvrir={() => e.mapItemId && setOuvert(e.id)}
+          onOuvrir={() => ouvrirFiche(e.id)}
           onDeposer={deplacer}
           actions={
             <>
@@ -568,7 +697,7 @@ export function Places(): JSX.Element {
           niveau={place(place(choisi)?.parentId ?? null)}
           onRelire={relire}
           onEfface={() => setChoisi(null)}
-          onOuvrir={() => setOuvert(choisi)}
+          onOuvrir={() => ouvrirFiche(choisi)}
           onMurs={(p) => void ouvrirLesMurs(p)}
           onAjouterNiveau={(p) => {
             setRafale({ parentId: p.id, tier: 'niveau' })
@@ -603,7 +732,7 @@ function peutRanger(src: Place, dst: Place, tous: Place[]): { dedans: boolean; a
 }
 
 /** Une pièce découpée dans le plan de son étage — pas un niveau de bâtiment cadré. */
-function estPiece(p: Place): boolean {
+export function estPiece(p: Place): boolean {
   return p.tier === 'lieu' && !!p.zone
 }
 
@@ -800,7 +929,6 @@ function Ligne({
   const s = useStore()
   const map = s.allItems.find((i) => i.id === p.mapItemId)
   const { cible, props } = useDepot(p, false, onDeposer)
-  const ap = useApercu()
 
   return (
     <div
@@ -838,13 +966,13 @@ function Ligne({
       >
         <IconChevron className="caret" />
       </button>
-      <span className="mini" {...ap.gestes}>
-        {map?.url ? <PlanCadre url={map.url} zone={p.zone} /> : <IconPlace />}
+      <span className="mini">
+        {map?.url ? <PlanCadre url={map.poster ?? map.url} zone={p.zone} /> : <IconPlace />}
       </span>
-      {ap.vise ? <Apercu p={p} url={map?.url ?? null} vise={ap.vise} /> : null}
       <span className="tx">
+        {/* Le résumé n'a pas sa place ici : il rognait le nom. L'aperçu au
+            survol du plan le montre, et le volet de droite l'écrit. */}
         <b>{p.name}</b>
-        {p.summary ? <span className="sum">{p.summary}</span> : null}
       </span>
       {pieces ? (
         <span className="tag c-brass" title="Pièces tracées sur ce plan">
@@ -890,8 +1018,14 @@ function Jalon({ p, onVu }: { p: Place; onVu: () => void }): JSX.Element {
  * calcul que `CadreAnnote`, en beaucoup plus court — ici rien ne se pose
  * dessus.
  */
+/* `url` : la vignette gravée par l'examen des médias quand elle existe. Un
+   plan d'étage fait souvent des dizaines de milliers de pixels de côté : le
+   décoder entier pour une tuile de soixante pixels, à chaque lieu de la
+   liste, figeait la page. Les vues où l'on travaille, elles, gardent l'image
+   pleine. */
 function PlanCadre({ url, zone }: { url: string; zone: PointMur[] | null }): JSX.Element {
-  if (!zone || zone.length < 3) return <img src={url} alt="" draggable={false} />
+  if (!zone || zone.length < 3)
+    return <img src={url} alt="" loading="lazy" decoding="async" draggable={false} />
   /* Le contour n'est pas un rectangle ; la vignette, si. On cadre donc sur la
      boîte qui l'enferme — assez pour reconnaître la pièce d'un coup d'œil. */
   const b = boiteDe(zone)
@@ -899,6 +1033,8 @@ function PlanCadre({ url, zone }: { url: string; zone: PointMur[] | null }): JSX
     <img
       src={url}
       alt=""
+      loading="lazy"
+      decoding="async"
       draggable={false}
       className="cadree"
       style={{
@@ -908,104 +1044,6 @@ function PlanCadre({ url, zone }: { url: string; zone: PointMur[] | null }): JSX
         top: `${(-b.y * 100) / b.h}%`
       }}
     />
-  )
-}
-
-/* ------------------------------------------------------------
-   L'aperçu au survol
-   ------------------------------------------------------------ */
-
-/** La taille du panneau flottant, en pixels de mise en page. */
-const APERCU_L = 360
-const APERCU_H = 240
-
-/** Où le panneau va se poser, et de quel côté de la vignette. */
-type Vise = { x: number; y: number; cote: 'droite' | 'gauche' }
-
-/**
- * Poser le panneau à côté de la vignette, sans sortir de la fenêtre.
- *
- * À droite si la place y est, à gauche sinon ; centré sur la vignette en
- * hauteur, puis ramené dans l'écran. On ne le met jamais **sur** la vignette :
- * le curseur y est, et le panneau s'en irait aussitôt.
- */
-function placerApercu(r: DOMRect): Vise {
-  const marge = 10
-  const h = APERCU_H + 52
-  const aDroite = r.right + marge + APERCU_L <= window.innerWidth
-  const x = aDroite ? r.right + marge : Math.max(marge, r.left - marge - APERCU_L)
-  const y = Math.min(
-    Math.max(marge, r.top + r.height / 2 - h / 2),
-    Math.max(marge, window.innerHeight - h - marge)
-  )
-  return { x, y, cote: aDroite ? 'droite' : 'gauche' }
-}
-
-/**
- * Le survol qui agrandit.
- *
- * Les vignettes sont petites — c'est voulu, un étage en tient beaucoup —, mais
- * un plan minuscule ne se lit pas. Le curseur touche la vignette, le plan
- * s'ouvre en grand à côté : **pas de délai**, on survole pour voir, on ne
- * devrait pas avoir à attendre pour être compris. Tout le reste le referme :
- * on part, on clique, on fait défiler, on commence à glisser.
- */
-function useApercu(): {
-  vise: Vise | null
-  gestes: {
-    onMouseEnter: (e: React.MouseEvent<HTMLElement>) => void
-    onMouseLeave: () => void
-    onMouseDown: () => void
-  }
-} {
-  const [vise, setVise] = useState<Vise | null>(null)
-
-  const fermer = useCallback((): void => setVise(null), [])
-
-  /* Si la liste bouge sous le panneau, il ne montre plus la bonne vignette. */
-  useEffect(() => {
-    if (!vise) return
-    window.addEventListener('scroll', fermer, true)
-    window.addEventListener('wheel', fermer, { capture: true, passive: true })
-    return () => {
-      window.removeEventListener('scroll', fermer, true)
-      window.removeEventListener('wheel', fermer, true)
-    }
-  }, [vise, fermer])
-
-  return {
-    vise,
-    gestes: {
-      onMouseEnter: (e) => setVise(placerApercu(e.currentTarget.getBoundingClientRect())),
-      onMouseLeave: fermer,
-      onMouseDown: fermer
-    }
-  }
-}
-
-/**
- * Le panneau lui-même : le même plan, en grand, et de quoi le nommer.
- *
- * Il se pose sur le corps de la page et non dans la tuile : une tuile est dans
- * une liste qui défile et qui coupe ce qui dépasse, le panneau n'y tiendrait
- * pas.
- */
-function Apercu({ p, url, vise }: { p: Place; url: string | null; vise: Vise }): JSX.Element {
-  return createPortal(
-    <div
-      className={`apercu apercu-${vise.cote}`}
-      style={{ left: vise.x, top: vise.y, width: APERCU_L }}
-      role="presentation"
-    >
-      <div className="apercu-vue" style={{ height: APERCU_H }}>
-        {url ? <PlanCadre url={url} zone={p.zone} /> : <IconPlace />}
-      </div>
-      <div className="apercu-tx">
-        <b>{p.name}</b>
-        {p.summary ? <span>{p.summary}</span> : null}
-      </div>
-    </div>,
-    document.body
   )
 }
 
@@ -1036,7 +1074,6 @@ function Tuile({
   const s = useStore()
   const map = s.allItems.find((i) => i.id === p.mapItemId)
   const { cible, props } = useDepot(p, true, onDeposer)
-  const ap = useApercu()
 
   return (
     <div
@@ -1058,12 +1095,11 @@ function Tuile({
           l'aperçu, qui les montre avec le plan plutôt qu'à côté. */}
       {/* Les deux pastilles vivent dans la vue, et non dans la tuile : c'est au
           plan qu'elles doivent se tenir, quelle que soit la marge autour. */}
-      <span className="vue" {...ap.gestes}>
-        {map?.url ? <PlanCadre url={map.url} zone={p.zone} /> : <IconPlace />}
+      <span className="vue">
+        {map?.url ? <PlanCadre url={map.poster ?? map.url} zone={p.zone} /> : <IconPlace />}
         <Jalon p={p} onVu={onVu} />
         {onEffacer ? <OterTuile nom={p.name} onEffacer={onEffacer} /> : null}
       </span>
-      {ap.vise ? <Apercu p={p} url={map?.url ?? null} vise={ap.vise} /> : null}
       <span className="nom">{p.name}</span>
       <span className="sig">
         {p.docCount ? (
@@ -1268,13 +1304,16 @@ function Volet({
             tier: p.tier,
             parentId: p.parentId,
             zone: p.zone,
-            seen: p.seen
+            seen: p.seen,
+            /* Le texte, lui, ne revient du dehors (son fichier dans « Lieux »)
+               que si rien n'attend d'être enregistré. */
+            ...(minuteur.current ? {} : { summary: p.summary, notes: p.notes })
           }
         : p
     )
     setConfirme(false)
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [p?.id, p?.tier, p?.parentId, p?.seen, p?.zone?.length])
+  }, [p?.id, p?.tier, p?.parentId, p?.seen, p?.zone?.length, p?.summary, p?.notes])
 
   if (!f || !p)
     return (
@@ -1308,7 +1347,12 @@ function Volet({
     const v = { ...f, ...d }
     setF(v)
     if (minuteur.current) window.clearTimeout(minuteur.current)
-    if (differe) minuteur.current = window.setTimeout(() => void enregistrer(v), 700)
+    minuteur.current = null
+    if (differe)
+      minuteur.current = window.setTimeout(() => {
+        minuteur.current = null
+        void enregistrer(v)
+      }, 700)
     else void enregistrer(v)
   }
 
@@ -1401,7 +1445,7 @@ function Volet({
           {f.tier === 'niveau' && f.zone && niveau ? (
             <button className="choix-carte" onClick={() => setChoixCarte(true)}>
               <span className="vue">
-                {carte?.url ? <PlanCadre url={carte.url} zone={f.zone} /> : <IconPlace />}
+                {carte?.url ? <PlanCadre url={carte.poster ?? carte.url} zone={f.zone} /> : <IconPlace />}
               </span>
               <span className="tx">
                 <b>Le plan de {niveau.name}, vu de près</b>
@@ -1412,7 +1456,7 @@ function Volet({
           ) : f.zone && niveau ? (
             <button className="choix-carte" onClick={() => onMurs(niveau)}>
               <span className="vue">
-                {carte?.url ? <PlanCadre url={carte.url} zone={f.zone} /> : <IconPlace />}
+                {carte?.url ? <PlanCadre url={carte.poster ?? carte.url} zone={f.zone} /> : <IconPlace />}
               </span>
               <span className="tx">
                 <b>Une pièce du plan de {niveau.name}</b>
@@ -1423,7 +1467,11 @@ function Volet({
           ) : (
             <button className="choix-carte" onClick={() => setChoixCarte(true)}>
               <span className="vue">
-                {carte?.url ? <img src={carte.url} alt="" draggable={false} /> : <IconPlace />}
+                {carte?.url ? (
+                  <img src={carte.poster ?? carte.url} alt="" loading="lazy" decoding="async" draggable={false} />
+                ) : (
+                  <IconPlace />
+                )}
               </span>
               <span className="tx">
                 <b>{carte ? carte.title : 'Aucune carte'}</b>
@@ -1532,6 +1580,14 @@ function Volet({
           </select>
         </div>
 
+        {p.tier === 'espace' ? (
+          <CielDeLEspace
+            espace={p}
+            lieux={descendantsDe(p.id, s.places)}
+            onRelire={onRelire}
+          />
+        ) : null}
+
         {f.tier === 'lieu' ? (
           <div className="decouverte">
             <span className="tx">
@@ -1565,35 +1621,16 @@ function Volet({
       </div>
 
       <footer>
-        {f.tier === 'niveau' || f.tier === 'espace' ? (
-          <button
-            className="btn btn-brass"
-            disabled={!f.mapItemId}
-            title={
-              f.mapItemId
-                ? 'Tracer les murs sur le plan, puis former les lieux et les bâtiments qu’ils referment'
-                : 'Donne-lui d’abord une carte'
-            }
-            onClick={() => onMurs(f)}
-          >
-            <IconMurs />
-            Découper en lieux
-          </button>
-        ) : (
-          <>
-            <button
-              className="btn btn-brass"
-              disabled={!f.mapItemId}
-              title={
-                f.mapItemId ? 'La carte en grand : repères et murs' : 'Donne-lui d’abord une carte'
-              }
-              onClick={onOuvrir}
-            >
-              <IconPen />
-              Ouvrir la carte
-            </button>
-          </>
-        )}
+        {/* Une seule porte pour tous : la fiche, d'où « Éditer le plan » mène
+            aux murs, aux lumières et au découpage. */}
+        <button
+          className="btn btn-brass"
+          title="Ses découvertes et déclencheurs, ses scénarios, ses PNJ et ses objets — et son plan"
+          onClick={onOuvrir}
+        >
+          <IconPen />
+          Ouvrir la fiche
+        </button>
         <span className="spacer" />
         {ecrit ? <span className="etat">enregistré</span> : null}
         {/* La confirmation tient dans le bouton : une seconde ligne ferait
@@ -1639,6 +1676,128 @@ function Volet({
         />
       )}
     </aside>
+  )
+}
+
+/**
+ * Le soleil ou la lune de tout un espace.
+ *
+ * Posé, il tombe sur chacun de ses lieux, tourné selon le nord de chaque plan,
+ * et les lieux ne le règlent plus eux-mêmes. « Chaque lieu le sien » rend à
+ * chacun ce qu'il avait réglé avant.
+ */
+function CielDeLEspace({
+  espace,
+  lieux,
+  onRelire
+}: {
+  espace: Place
+  lieux: Place[]
+  onRelire: () => Promise<void>
+}): JSX.Element {
+  const a = espace.ciel
+  const [apercu, setApercu] = useState(false)
+  const [cap, setCap] = useState(a?.cap ?? 135)
+  /* Les plans à montrer : ceux qui ont une image à eux. Une pièce découpée
+     se voit déjà sur le plan de son étage. */
+  const plans = [espace, ...lieux].filter((q) => q.mapItemId != null && !q.zone)
+  useEffect(() => setCap(a?.cap ?? 135), [a?.cap])
+  const poser = async (v: Astre | null): Promise<void> => {
+    await window.jdr.places.cielEspace(espace.id, v)
+    await onRelire()
+  }
+  const tourner = (v: number): void => {
+    if (a) void poser({ ...a, cap: ((v % 360) + 360) % 360 })
+  }
+  const reglage = (
+    <>
+      <div className="murs-rangee">
+        <button
+          className="btn btn-sm"
+          aria-pressed={!a}
+          title="Chaque lieu règle son soleil ou sa lune dans son plan"
+          onClick={() => void poser(null)}
+        >
+          Chaque lieu le sien
+        </button>
+        <button
+          className="btn btn-sm"
+          aria-pressed={a?.nature === 'soleil'}
+          title="Le jour sur tout l’espace"
+          onClick={() => void poser({ nature: 'soleil', cap })}
+        >
+          ☀ Soleil
+        </button>
+        <button
+          className="btn btn-sm"
+          aria-pressed={a?.nature === 'lune'}
+          title="La nuit sur tout l’espace : la même chose, à moitié"
+          onClick={() => void poser({ nature: 'lune', cap })}
+        >
+          ☾ Lune
+        </button>
+      </div>
+      {a ? (
+        <>
+          <span className="murs-reglage" title="D’où vient la lumière : 0° le nord, 90° l’est">
+            <span>Vient de</span>
+            <input
+              type="range"
+              min={0}
+              max={359}
+              step={1}
+              value={Math.round(cap)}
+              onChange={(e) => setCap(Number(e.target.value))}
+              onPointerUp={() => tourner(cap)}
+              onKeyUp={() => tourner(cap)}
+            />
+            <Valeur
+              className="num"
+              value={Math.round(cap)}
+              min={0}
+              max={359}
+              unite="°"
+              label="D’où vient la lumière"
+              onChange={(v) => {
+                setCap(v)
+                tourner(v)
+              }}
+            />
+          </span>
+          <span className="murs-cap">
+            La lumière vient {ventDe(cap)}, sur {lieux.length ? `ses ${lieux.length} lieux` : 'tous ses lieux'} —
+            chacun la tourne selon le nord de son plan, et ne la règle plus lui-même.
+          </span>
+        </>
+      ) : null}
+    </>
+  )
+  return (
+    <div className="field ciel-espace">
+      <label>Le ciel de l’espace — la lumière du dehors de tous ses lieux</label>
+      {reglage}
+      <button
+        className="btn btn-sm"
+        disabled={!plans.length}
+        title={
+          plans.length
+            ? 'Tous les plans de cet espace côte à côte, sous le soleil ou la lune'
+            : 'Aucun lieu de cet espace n’a encore de plan'
+        }
+        onClick={() => setApercu(true)}
+      >
+        <IconSoleil />
+        Voir l’ensemble des lieux
+      </button>
+      {apercu ? (
+        <ApercuDuCiel
+          espace={espace}
+          ciel={a ? { ...a, cap } : null}
+          reglage={reglage}
+          onClose={() => setApercu(false)}
+        />
+      ) : null}
+    </div>
   )
 }
 
@@ -1689,14 +1848,155 @@ function proportionsDifferent(a: Item | undefined, b: Item | undefined): boolean
  * Une pièce découpée montre sa zone, mais pose ses repères et ses murs en
  * coordonnées du plan entier : c'est le même calque que celui de l'étage.
  */
+/**
+ * Sauter d'une fiche à l'autre. Les lieux viennent dans l'ordre de l'arbre,
+ * décalés selon leur profondeur — un espace, ses niveaux, leurs pièces —,
+ * pour qu'on s'y retrouve comme dans la liste.
+ */
+/** Tous les lieux dans l'ordre de l'arbre, avec leur profondeur. */
+function rangsDesLieux(places: Place[]): { p: Place; prof: number }[] {
+  const ids = new Set(places.map((p) => p.id))
+  const sous = (pid: number | null): Place[] =>
+    places.filter((p) => (pid === null ? p.parentId === null || !ids.has(p.parentId) : p.parentId === pid))
+  const out: { p: Place; prof: number }[] = []
+  const vus = new Set<number>()
+  const descendre = (pid: number | null, prof: number): void => {
+    for (const p of sous(pid)) {
+      if (vus.has(p.id)) continue
+      vus.add(p.id)
+      out.push({ p, prof })
+      descendre(p.id, prof + 1)
+    }
+  }
+  descendre(null, 0)
+  return out
+}
+
+/* Précédent et suivant, dans l'ordre de l'arbre : on parcourt les lieux
+   comme on lirait la liste, sans rouvrir le sélecteur. */
+function voisinsDe(places: Place[], courant: number): { avant: Place | null; apres: Place | null } {
+  const rangs = rangsDesLieux(places)
+  const ici = rangs.findIndex((r) => r.p.id === courant)
+  return {
+    avant: ici > 0 ? rangs[ici - 1].p : null,
+    apres: ici >= 0 && ici < rangs.length - 1 ? rangs[ici + 1].p : null
+  }
+}
+
+/** Les contenants d'un lieu, du plus large au plus proche : l'espace, le bâtiment, le niveau. */
+function ascendants(places: Place[], p: Place): Place[] {
+  const out: Place[] = []
+  let q = places.find((x) => x.id === p.parentId)
+  while (q && !out.includes(q)) {
+    out.unshift(q)
+    q = places.find((x) => x.id === q!.parentId)
+  }
+  return out
+}
+
+/**
+ * Le chemin d'un lieu dans la barre du haut : ses contenants, cliquables, puis
+ * le lieu lui-même — le sélecteur pour sauter ailleurs, ou un lien vers sa
+ * fiche quand on est sur son plan.
+ */
+function CheminDuLieu({
+  p,
+  onOuvrir,
+  fin
+}: {
+  p: Place
+  onOuvrir: (id: number) => void
+  fin: React.ReactNode
+}): JSX.Element {
+  const s = useStore()
+  return (
+    <>
+      {ascendants(s.places, p).map((q) => (
+        <Fragment key={q.id}>
+          <span className="ariane-sep">›</span>
+          <button className="ariane-lien" onClick={() => onOuvrir(q.id)} title={`La fiche de ${q.name}`}>
+            {q.name}
+          </button>
+        </Fragment>
+      ))}
+      <span className="ariane-sep">›</span>
+      {fin}
+    </>
+  )
+}
+
+function SautDeLieu({
+  courant,
+  onChanger,
+  fleches = true
+}: {
+  courant: number
+  onChanger: (id: number) => void
+  /** Les flèches précédent / suivant autour du sélecteur. */
+  fleches?: boolean
+}): JSX.Element {
+  const s = useStore()
+  const rangs = useMemo(() => rangsDesLieux(s.places), [s.places])
+  const ici = rangs.findIndex((r) => r.p.id === courant)
+  const { avant, apres } = voisinsDe(s.places, courant)
+  /* La sorte de chaque lieu, pour la teinte de sa ligne : un espace, un
+     bâtiment, un niveau, un lieu ne se confondent pas dans la liste. */
+  const sorte = (p: Place): string =>
+    p.tier === 'lieu' && estBatiment(p, s.places) ? 'batiment' : p.tier
+  const choisi = ici >= 0 ? rangs[ici].p : null
+
+  return (
+    <span className="saut-lieu-hote">
+      {fleches ? (
+      <button
+        className="btn btn-sm btn-ghost saut-fleche"
+        disabled={!avant}
+        title={avant ? `Lieu précédent : ${avant.name}` : 'Premier lieu de la liste'}
+        aria-label="Lieu précédent"
+        onClick={() => avant && onChanger(avant.id)}
+      >
+        ←
+      </button>
+      ) : null}
+      <select
+        className={`saut-lieu sorte-${choisi ? sorte(choisi) : 'lieu'}`}
+        value={courant}
+        aria-label="Ouvrir la fiche d’un autre lieu"
+        title="Ouvrir la fiche d’un autre lieu"
+        onChange={(e) => onChanger(Number(e.target.value))}
+      >
+        {rangs.map(({ p, prof }) => (
+          <option key={p.id} value={p.id} className={`sorte-${sorte(p)}`}>
+            {'   '.repeat(prof)}
+            {p.name}
+          </option>
+        ))}
+      </select>
+      {fleches ? (
+      <button
+        className="btn btn-sm btn-ghost saut-fleche"
+        disabled={!apres}
+        title={apres ? `Lieu suivant : ${apres.name}` : 'Dernier lieu de la liste'}
+        aria-label="Lieu suivant"
+        onClick={() => apres && onChanger(apres.id)}
+      >
+        →
+      </button>
+      ) : null}
+    </span>
+  )
+}
+
 function FicheLieu({
   p,
   niveau,
   pieces,
   surLesMurs,
+  onTermine,
   onFermer,
   onMurs,
-  onRelire
+  onRelire,
+  onChanger
 }: {
   p: Place
   niveau: Place | null
@@ -1704,16 +2004,28 @@ function FicheLieu({
   pieces: Place[]
   /** La fiche s'ouvre directement sur le calque des murs. */
   surLesMurs?: boolean
+  /** Ouvert depuis la fiche du lieu : « Terminé » y ramène. */
+  onTermine?: () => void
   onFermer: () => void
   onMurs: () => void
   onRelire: () => Promise<void>
+  /** Passer à la fiche d'un autre lieu, sans repasser par la liste. */
+  onChanger: (id: number) => void
 }): JSX.Element {
   const s = useStore()
   const [annote, setAnnote] = useState(false)
   /* Le calque des murs : un troisième mode, exclusif de l'annotation. Les deux
      se posent sur la même carte, et on ne trace pas une cloison en visant un
      repère. */
-  const [murs, setMurs] = useState(!!surLesMurs)
+  /* On arrive sur « Choisir », le calque des murs prêt : murs, portes, lampes
+     et repères se prennent du même clic. */
+  const [murs, setMurs] = useState(true)
+  /** Le menu « Image ▾ » : remplacer, caler, rogner, étalonner. */
+  const [menuImage, setMenuImage] = useState<{ x: number; y: number } | null>(null)
+  /** Ce qu'on montre sur le plan, sans changer d'outil. Pour l'œil seulement. */
+  const [calques, setCalques] = useState({ murs: true, lumieres: true, mj: true, grille: false })
+  /** Le plan comme la lumière le laisse aux joueurs, sans murs ni repères. */
+  const [vueJoueurs, setVueJoueurs] = useState(false)
   const mu = useMurs(p.id)
   /** Le pion d'essai est posé, ou l'on attend son point de départ. */
   const enTest = mu.essai !== null || mu.attenteDepart
@@ -1734,7 +2046,14 @@ function FicheLieu({
    * Un geste au rectangle sur la carte : garder ce cadre de l'image, ou
    * faire un lieu de ce qu'on vient d'entourer.
    */
-  const [trace, setTrace] = useState<'rogner' | 'lieu' | null>(null)
+  const [trace, setTrace] = useState<'rogner' | 'lieu' | 'etalonner' | null>(null)
+  /**
+   * L'échelle du plan, et le trait qu'on tire pour la fixer : ses deux bouts
+   * en fractions de l'image, et la longueur qu'on tape, en mètres.
+   */
+  const [ech, setEch] = useState<EchellePlan | null>(null)
+  const [trait, setTrait] = useState<{ a: PointMur; b: PointMur } | null>(null)
+  const [metresTrait, setMetresTrait] = useState('')
   /**
    * Pendant le test : voit-on les murs, ou la carte comme les joueurs —
    * l'ombre seule ? C'est la bascule « Voir ce qu'ils voient » de la régie.
@@ -1748,6 +2067,68 @@ function FicheLieu({
     setTrace(null)
     setRect(null)
     setNomLieu('')
+    setTrait(null)
+    setMetresTrait('')
+  }
+  /**
+   * Caler l'image sous les murs : elle glisse et s'agrandit **seule**, les
+   * murs restent où ils sont. `z` agrandit autour du centre, `ox`/`oy`
+   * décalent, en fractions du cadre ; `r` la tourne, en degrés, sens horaire,
+   * autour de son centre. `null` hors de ce geste.
+   */
+  const [calage, setCalage] = useState<Calage | null>(null)
+  /* Une grille droite par-dessus, pour juger qu'un mur est bien d'aplomb. Elle
+     reste cochée d'un calage à l'autre, tant que la fiche est ouverte. */
+  const [grille, setGrille] = useState(false)
+  /* Les proportions de l'image, pour qu'elle tienne entière dans le cadre une
+     fois tournée. */
+  const [natCarte, setNatCarte] = useState<{ w: number; h: number } | null>(null)
+  /** Le zoom réellement appliqué : celui qu'on règle, réduit d'autant que la rotation déborde. */
+  const zoomCalage = (c: Calage): number => c.z * tienDans(natCarte, c.r)
+  /* Pendant un rognage ou un calage, la barre n'offre que lui : le reste
+     attend qu'on valide ou qu'on ferme. */
+  const rognage = trace === 'rogner' || calage !== null
+
+  /**
+   * Valider le calage. Un point du cadre `f` montre le point de l'image
+   * `(f − ½ − o) / z + ½` : c'est là que chaque mur doit aller pour rester
+   * sur ce qu'il recouvre. C'est le recalage d'un rognage au cadre
+   * `x = ½ + ox − z/2`, `w = z`.
+   *
+   * Tournée, l'image reste tournée : on la dessine telle qu'on la voit, dans
+   * une copie aussi grande que sa boîte englobante. Les murs n'ont alors plus
+   * qu'à s'agrandir avec le cadre — la rotation est dans l'image, ils restent
+   * où ils sont à l'écran.
+   */
+  const caler = async (): Promise<void> => {
+    if (!calage || occupe || !carte?.url) return
+    const { ox, oy, r } = calage
+    const z = zoomCalage(calage)
+    if (z === 1 && ox === 0 && oy === 0 && r === 0) return void setCalage(null)
+    setOccupe(true)
+    try {
+      if (r) {
+        const t = await dessinerTournee(carte.url, r)
+        const cw = (z * t.w2) / t.w
+        const ch = (z * t.h2) / t.h
+        await window.jdr.places.calerTourne(p.id, t.octets, t.jpeg, {
+          x: 0.5 + ox - cw / 2,
+          y: 0.5 + oy - ch / 2,
+          w: cw,
+          h: ch
+        })
+      } else
+        await window.jdr.places.caler(p.id, { x: 0.5 + ox - z / 2, y: 0.5 + oy - z / 2, w: z, h: z })
+      setCalage(null)
+      await onRelire()
+      await mu.relire()
+      await relire()
+      s.toast('Image calée — les murs et ce qui est posé ont suivi')
+    } catch (e) {
+      s.toast(e instanceof Error ? e.message : 'Calage impossible', true)
+    } finally {
+      setOccupe(false)
+    }
   }
 
   /** Rogner : une copie de l'image, réduite au cadre ; murs et pions recalés. */
@@ -1758,6 +2139,9 @@ function FicheLieu({
       await window.jdr.places.rogner(p.id, rect)
       finirTrace()
       await onRelire()
+      /* On reste peut-être en mode murs : ils ont bougé avec l'image. */
+      await mu.relire()
+      await relire()
       s.toast('Image rognée — une copie, l’originale reste dans son dossier')
     } catch (e) {
       s.toast(e instanceof Error ? e.message : 'Rognage impossible', true)
@@ -1765,6 +2149,29 @@ function FicheLieu({
       setOccupe(false)
     }
   }
+
+  /* Au clavier : Entrée rogne au cadre tracé, Échap renonce. Hors d'un champ
+     de saisie, pour ne pas voler la touche à qui écrit. */
+  useEffect(() => {
+    if (!rognage) return
+    const touche = (e: KeyboardEvent): void => {
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA' || el.isContentEditable)) return
+      if (e.key === 'Enter' && calage) {
+        e.preventDefault()
+        void caler()
+      } else if (e.key === 'Enter' && rect) {
+        e.preventDefault()
+        void rogner()
+      } else if (e.key === 'Escape') {
+        finirTrace()
+        setCalage(null)
+      }
+    }
+    window.addEventListener('keydown', touche)
+    return () => window.removeEventListener('keydown', touche)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [rognage, rect, occupe, calage])
 
   /**
    * Un lieu au rectangle : il naît dans cet étage, avec ce cadre pour contour.
@@ -1794,43 +2201,93 @@ function FicheLieu({
   }
 
   const carte = s.allItems.find((i) => i.id === p.mapItemId)
+
+  /* L'échelle se relit quand les portes changent : c'est d'elles qu'on
+     l'estime tant qu'on ne l'a pas fixée au trait. */
+  useEffect(() => {
+    let vivant = true
+    void window.jdr.places.echelle(p.id).then((e) => vivant && setEch(e))
+    return () => {
+      vivant = false
+    }
+  }, [p.id, mu.ouvertures])
+
+  /** La longueur du trait, en part de la largeur de l'image. */
+  const longueurDuTrait = (t: { a: PointMur; b: PointMur }): number | null => {
+    if (!carte?.width || !carte.height) return null
+    const l = Math.hypot(t.b[0] - t.a[0], ((t.b[1] - t.a[1]) * carte.height) / carte.width)
+    return l > 1e-4 ? l : null
+  }
+  const metresSaisis = Number(metresTrait.replace(',', '.'))
+  const traitValable = !!trait && metresSaisis > 0 && longueurDuTrait(trait) !== null
+
+  /** Fixer l'échelle au trait : la longueur tapée, rapportée à la largeur du plan. */
+  const fixerEchelle = async (): Promise<void> => {
+    if (!trait || !traitValable) return
+    const l = longueurDuTrait(trait)!
+    const e = await window.jdr.places.etalonner(p.id, metresSaisis / l)
+    setEch(e)
+    finirTrace()
+    s.toast(`Échelle fixée : le plan fait ${enMetres(e.metres)} de large`)
+  }
+
+  /* Échap renonce à l'étalonnage, hors d'un champ de saisie. */
+  useEffect(() => {
+    if (trace !== 'etalonner') return
+    const touche = (e: KeyboardEvent): void => {
+      const el = e.target as HTMLElement | null
+      if (el && (el.tagName === 'INPUT' || el.tagName === 'TEXTAREA')) return
+      if (e.key === 'Escape') finirTrace()
+    }
+    window.addEventListener('keydown', touche)
+    return () => window.removeEventListener('keydown', touche)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [trace])
   /* Une pièce découpée n'a pas d'image à elle : c'est celle de son étage
      qu'on remplace, et toutes ses sœurs suivent. */
   const plan = estPiece(p) && niveau ? niveau : p
+  /* Un lieu peut n'être qu'une pièce : ses murs le referment, lui — même posé
+     à même l'espace, comme la chapelle. Un étage, un bâtiment qui a déjà ses
+     niveaux ou une pièce découpée n'ont pas ce choix. */
+  const peutEtreUnique =
+    p.tier === 'lieu' &&
+    !estPiece(p) &&
+    !s.places.some((q) => q.parentId === p.id && q.tier === 'niveau')
+  const unique = peutEtreUnique && p.pieceUnique
+
+  const reglerUnique = async (oui: boolean): Promise<void> => {
+    await window.jdr.places.pieceUnique(p.id, oui)
+    await onRelire()
+  }
 
   /**
    * Remplacer l'image sans rien défaire : murs, portes, fenêtres et repères
    * appartiennent au lieu, pas au fichier — ils restent où ils sont. C'est
    * le geste pour la version éclairée d'un plan, celle sans les meubles, ou
    * une meilleure définition du même dessin.
+   *
+   * Une image d'autres proportions ne les déforme pas : ils gardent leur
+   * forme, centrés sur la nouvelle, et l'on rogne ensuite pour la recaler
+   * dessous.
    */
   const remplacerImage = async (id: number | null): Promise<void> => {
     setRemplacer(false)
     if (id === null || id === plan.mapItemId) return
     const avant = s.allItems.find((i) => i.id === plan.mapItemId)
     const apres = s.allItems.find((i) => i.id === id)
-    if (
-      proportionsDifferent(avant, apres) &&
-      !confirm(
-        `« ${apres?.title} » n’a pas les proportions de l’image actuelle (${avant?.width}×${avant?.height} contre ${apres?.width}×${apres?.height}).
-
-Les murs, les ouvertures et les repères suivront l’image en s’étirant avec elle. Remplacer quand même ?`
+    const autreForme = proportionsDifferent(avant, apres)
+    try {
+      const { pieces: n } = await window.jdr.places.remplacerCarte(plan.id, id)
+      await onRelire()
+      s.toast(
+        `Image remplacée — murs et repères conservés${
+          autreForme ? ' sans déformation, rogne pour recaler l’image' : ''
+        }${n ? `, ${n} pièce${n > 1 ? 's' : ''} suivent` : ''}`
       )
-    )
-      return
-    /* Le niveau d'un bâtiment qui reçoit son image cesse d'être un morceau du
-       plan d'en bas. */
-    await window.jdr.places.upsert({
-      id: plan.id,
-      name: plan.name,
-      mapItemId: id,
-      ...(plan.tier === 'niveau' && plan.zone ? { zone: null } : {})
-    })
-    const n = await suivreLaCarte(plan, plan.mapItemId, id, s.places)
-    await onRelire()
-    s.toast(
-      `Image remplacée — murs et repères conservés${n ? `, ${n} pièce${n > 1 ? 's' : ''} suivent` : ''}`
-    )
+    } catch (e) {
+      s.toast('L’image n’a pas été remplacée.', true)
+      console.error('[remplacer]', e)
+    }
   }
   const amb = s.allItems.find((i) => i.id === p.ambienceItemId)
   const docs = s.allItems.filter((i) => i.placeId === p.id)
@@ -1856,10 +2313,42 @@ Les murs, les ouvertures et les repères suivront l’image en s’étirant avec
     pieces.find((q) => q.ancre && dansForme(q.ancre, f.pts)) ?? null
 
   /**
+   * Ce que les murs ne savent pas trancher.
+   *
+   * Deux fiches accrochées dans la même pièce : le recalage n'en choisit
+   * aucune, et leurs contours restent figés. Une fiche accrochée hors de toute
+   * pièce fermée : son contour ne suit plus rien. On le dit, au lieu de
+   * laisser la fiche du lieu et le plan du niveau se contredire en silence.
+   */
+  const aDemeler = useMemo(() => {
+    const dans = mu.formes.map((f) => pieces.filter((q) => q.ancre && dansForme(q.ancre, f.pts)))
+    return {
+      conflits: dans.flatMap((l, i) => (l.length > 1 ? [{ i, lieux: l }] : [])),
+      orphelins: pieces.filter((q) => q.zone && q.ancre && !dans.some((l) => l.includes(q))),
+      libres: dans.flatMap((l, i) => (l.length === 0 ? [i] : []))
+    }
+  }, [mu.formes, pieces])
+
+  /** Mettre une fiche dans une pièce sans nom : son contour, et son point dedans. */
+  const placerDans = async (lieu: Place, i: number): Promise<void> => {
+    const f = mu.formes[i]
+    if (!f) return
+    await window.jdr.places.zone(lieu.id, f.pts, f.centre)
+    mu.setFormeVisee(null)
+    await onRelire()
+  }
+
+  /**
    * Baptiser une forme : elle devient un lieu de cet étage, avec son contour
    * et le point qui la désigne.
    */
   const nommerForme = async (f: Forme, nom: string): Promise<void> => {
+    /* Pièce unique : la forme, c'est le lieu — la renommer, c'est le renommer. */
+    if (unique) {
+      await window.jdr.places.upsert({ id: p.id, tier: p.tier, parentId: p.parentId, name: nom })
+      await onRelire()
+      return
+    }
     if (!(await enEtage())) return
     const deja = lieuDeLaForme(f)
     if (deja) {
@@ -1923,11 +2412,15 @@ Les murs, les ouvertures et les repères suivront l’image en s’étirant avec
    */
   const enEtage = async (): Promise<boolean> => {
     if (p.tier === 'niveau') return true
+    if (unique) {
+      s.toast('Ce lieu est une pièce unique : choisis « Plusieurs pièces » pour le découper', true)
+      return false
+    }
     /* Un espace ne tient pas de pièces : « Découper en lieux », dans son
        volet, passe par l'un de ses niveaux. */
     if (p.tier === 'espace') {
       s.toast(
-        'Un espace ne tient pas de lieux : découpe-le depuis son volet, il passera par un niveau',
+        'Un espace ne tient pas de pièces : trace-les sur l’un de ses niveaux (ajoute-en un dans la liste des lieux)',
         true
       )
       return false
@@ -1948,377 +2441,536 @@ Les murs, les ouvertures et les repères suivront l’image en s’étirant avec
     return true
   }
 
-  /*
-   * Les contours suivent les murs : quand un trait bouge, la pièce qu'il
-   * ferme change de forme, et le lieu doit s'en apercevoir. On ne réécrit que
-   * ce qui a vraiment changé, sinon on écrirait à chaque rendu.
-   */
-  useEffect(() => {
-    if (!murs) return
-    let vivant = true
-    void (async () => {
-      let touche = false
-      /* Un lieu nommé avant que l'ancre tombe toujours dedans — un couloir en
-         L, ancré à son centre de gravité, hors de lui — ne retrouvait plus sa
-         pièce. On le raccroche à un point de son propre contour. */
-      for (const q of pieces)
-        if (q.zone && q.ancre && !dansForme(q.ancre, q.zone)) {
-          await window.jdr.places.zone(q.id, q.zone, pointInterieur(q.zone))
-          touche = true
-        }
-      /* Les lieux dont la forme vient de changer, avec leur contour d'avant. */
-      const changes: { lieu: Place; avant: PointMur[] }[] = []
-      for (const f of mu.formes) {
-        const lieu = lieuDeLaForme(f)
-        if (!lieu) continue
-        const avant = JSON.stringify(lieu.zone ?? [])
-        const apres = JSON.stringify(f.pts)
-        if (avant === apres) continue
-        if (lieu.zone) changes.push({ lieu, avant: lieu.zone })
-        await window.jdr.places.zone(lieu.id, f.pts, lieu.ancre ?? f.centre)
-        touche = true
-      }
-
-      /*
-       * Un mur qui traverse un lieu le **coupe en deux** : le lieu garde la
-       * moitié où l'on l'avait nommé, et l'autre moitié devient un lieu à
-       * part — au lieu de rester une forme sans nom, qu'on prenait pour un
-       * lieu qui rétrécit. On la nomme d'après le lieu coupé ; un clic sur
-       * sa pastille, ou le volet, la rebaptise.
-       */
-      if (p.tier === 'niveau')
-        for (const f of mu.formes) {
-          if (lieuDeLaForme(f)) continue
-          const parent = changes.find((c) => dansForme(f.centre, c.avant))
-          if (!parent) continue
-          const neuf = await window.jdr.places.upsert({
-            tier: 'lieu',
-            parentId: p.id,
-            name: `${parent.lieu.name} (suite)`
-          })
-          await window.jdr.places.zone(neuf.id, f.pts, f.centre)
-          s.toast(`Le mur coupe « ${parent.lieu.name} » : l’autre moitié est « ${neuf.name} »`)
-          touche = true
-        }
-      if (touche && vivant) await onRelire()
-    })()
-    return () => {
-      vivant = false
-    }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [murs, mu.formes])
-
   const poser = async (kind: 'repere' | 'texte', x: number, y: number): Promise<void> => {
     const a = await window.jdr.annotations.add({ placeId: p.id, kind, x, y })
     await relire()
-    setChoisi(a.id)
     /* L'outil se désarme après usage : sinon on sème un repère à chaque clic,
-       y compris quand on voulait seulement en choisir un. */
+       y compris quand on voulait seulement en choisir un. On revient à
+       « Choisir », le repère posé choisi : son texte s'écrit à droite. */
+    choisirOutil('choisir')
+    setChoisi(a.id)
+  }
+
+  /* ---------- Les outils : un seul jeu, plus de modes ----------
+     Mur, rideau, porte, fenêtre, lumière et gomme sont les outils du calque
+     des murs ; repère et texte, ceux des annotations ; pièce, le tracé d'un
+     lieu au rectangle (ou la désignation de ses murs). « Choisir » prend un
+     mur, une porte, une lampe ou un repère, selon ce qu'on vise. */
+  const outilRail: OutilRail =
+    trace === 'lieu' || mu.pourPiece !== null
+      ? 'piece'
+      : annote && outil
+        ? outil
+        : !murs || mu.outil === 'selection'
+          ? 'choisir'
+          : mu.outil === 'vitre'
+            ? 'fenetre'
+            : mu.outil
+  const sansOutils = !carte?.url || enTest || rognage || trace === 'etalonner'
+  const pieceInterdite = estPiece(p) || unique || p.tier === 'espace'
+
+  const choisirOutil = (o: OutilRail): void => {
+    finirTrace()
+    mu.setPourPiece(null)
+    mu.setChoisi(null)
+    mu.setOuvChoisie(null)
+    mu.setLumChoisie(null)
+    setChoisi(null)
+    if (o === 'repere' || o === 'texte') {
+      setMurs(false)
+      setAnnote(true)
+      setOutil(o)
+      return
+    }
+    setAnnote(false)
     setOutil(null)
+    if (o === 'piece') {
+      setMurs(false)
+      setTrace('lieu')
+      return
+    }
+    setMurs(true)
+    mu.setOutil(o === 'choisir' ? 'selection' : o === 'fenetre' ? 'vitre' : o)
+  }
+
+  /* Désigner des murs pour en faire une pièce se fait sur le calque des murs. */
+  useEffect(() => {
+    if (mu.pourPiece === null) return
+    if (trace === 'lieu') finirTrace()
+    setMurs(true)
+    mu.setOutil('selection')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mu.pourPiece !== null])
+
+  /* Un mur, une porte ou une lampe choisis : le repère choisi se lâche. */
+  useEffect(() => {
+    if (mu.choisi != null || mu.ouvChoisie != null || mu.lumChoisie != null) setChoisi(null)
+  }, [mu.choisi, mu.ouvChoisie, mu.lumChoisie])
+
+  /* Au clavier : une touche par outil, et Échap arrête l'essai. Hors d'un
+     champ de saisie, sans Ctrl ni Alt — Ctrl+Z reste à défaire. */
+  useEffect(() => {
+    const h = (e: KeyboardEvent): void => {
+      const el = e.target as HTMLElement | null
+      if (el && (/^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName) || el.isContentEditable)) return
+      if (e.ctrlKey || e.metaKey || e.altKey) return
+      if (e.key === 'Escape' && enTest) {
+        mu.arreterEssai()
+        return
+      }
+      /* Échap repose l'outil Pièce ou Repère, comme le calque des murs le fait
+         pour les siens : on revient à « Choisir ». */
+      if (e.key === 'Escape' && !sansOutils) {
+        if (mu.pourPiece !== null) return void mu.setPourPiece(null)
+        if (trace === 'lieu' && rect) return void setRect(null)
+        if (trace === 'lieu' || annote) return void choisirOutil('choisir')
+      }
+      if (sansOutils) return
+      const o = OUTILS_RAIL.find((x) => x.touche === e.key.toLowerCase())
+      if (!o || (o.cle === 'piece' && pieceInterdite)) return
+      e.preventDefault()
+      choisirOutil(o.cle)
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  })
+
+  const lancerGeste = (g: 'caler' | 'rogner' | 'etalonner' | 'remplacer'): void => {
+    setMenuImage(null)
+    if (g === 'remplacer') return void setRemplacer(true)
+    choisirOutil('choisir')
+    if (g === 'caler') setCalage({ z: 1, ox: 0, oy: 0, r: 0 })
+    else setTrace(g)
+  }
+  const annulerGeste = (): void => {
+    finirTrace()
+    setCalage(null)
+  }
+
+  /* Le volet : ce qui est choisi, sinon l'état du plan. */
+  const lampeChoisie = mu.lumChoisie != null && mu.lumieres.some((l) => l.id === mu.lumChoisie)
+  const ouvChoisie = mu.ouvChoisie != null && mu.ouvertures.some((o) => o.id === mu.ouvChoisie)
+  const traitChoisi = murs && mu.outil === 'selection' && mu.choisi != null && mu.liste.some((t) => t.id === mu.choisi)
+  const vueJoueursOn = enTest ? !mursVisibles : vueJoueurs
+  const portes = mu.ouvertures.filter((o) => o.nature === 'porte').length
+  const fenetres = mu.ouvertures.length - portes
+
+  /* L'outil en main, dit en clair, avec ses gestes et ses touches. */
+  const barreOutil = (): JSX.Element => {
+    if (enTest)
+      return (
+        <div className="annot-barre pe-barre pe-essai">
+          <span className="pe-nom">Essai</span>
+          <AideMurs m={mu} />
+          <div className="spacer" />
+          <span className="note">rien n’est enregistré</span>
+          <button className="btn btn-sm" onClick={() => mu.arreterEssai()}>
+            Arrêter l’essai <kbd>Échap</kbd>
+          </button>
+        </div>
+      )
+    if (calage || trace === 'rogner' || trace === 'etalonner') {
+      const nom = calage ? 'Déplacer, zoomer, tourner l’image' : trace === 'rogner' ? 'Rogner' : 'Étalonner l’échelle'
+      const valider = calage ? 'Caler ici' : trace === 'rogner' ? 'Rogner à ce cadre' : 'Fixer l’échelle'
+      const peut = calage ? !occupe : trace === 'rogner' ? !!rect && !occupe : traitValable
+      return (
+        <div className="annot-barre pe-barre pe-geste">
+          <span className="pe-nom">{nom}</span>
+          {calage ? (
+            <>
+              <label htmlFor="cal-zoom">Zoom</label>
+              <input
+                id="cal-zoom"
+                type="range"
+                min={20}
+                max={800}
+                step={0.5}
+                value={Math.round(calage.z * 1000) / 10}
+                onChange={(e) => {
+                  const z = Number(e.target.value) / 100
+                  setCalage((c) => (c ? { ...c, z, ox: (c.ox * z) / c.z, oy: (c.oy * z) / c.z } : c))
+                }}
+              />
+              <Valeur
+                className="v"
+                value={Math.round(calage.z * 1000) / 10}
+                min={20}
+                max={800}
+                step={0.1}
+                decimales={1}
+                unite=" %"
+                label="Zoom de l’image"
+                onChange={(n) => {
+                  const z = n / 100
+                  setCalage((c) => (c ? { ...c, z, ox: (c.ox * z) / c.z, oy: (c.oy * z) / c.z } : c))
+                }}
+              />
+              {/* Le décalage, en part du cadre : 0 au centre, ± 100 % d'un
+                  cadre entier. Le curseur ne couvre que ± 20 %, pour viser
+                  fin ; au-delà, on glisse l'image ou l'on tape la valeur. */}
+              {(['ox', 'oy'] as const).map((k) => {
+                const v = Math.round(calage[k] * 1000) / 10
+                const regler = (n: number): void => setCalage((c) => (c ? { ...c, [k]: n / 100 } : c))
+                return (
+                  <Fragment key={k}>
+                    <label htmlFor={`cal-${k}`}>{k === 'ox' ? 'Horizontal' : 'Vertical'}</label>
+                    <input
+                      id={`cal-${k}`}
+                      type="range"
+                      min={-20}
+                      max={20}
+                      step={0.1}
+                      value={v}
+                      onChange={(e) => regler(Number(e.target.value))}
+                    />
+                    <Valeur
+                      className="v"
+                      value={v}
+                      min={-200}
+                      max={200}
+                      step={0.1}
+                      decimales={1}
+                      unite=" %"
+                      label={k === 'ox' ? 'Décalage horizontal de l’image' : 'Décalage vertical de l’image'}
+                      onChange={regler}
+                    />
+                  </Fragment>
+                )
+              })}
+              <label htmlFor="cal-r" title="Double-clic sur le curseur : droite">
+                Rotation
+              </label>
+              <input
+                id="cal-r"
+                type="range"
+                min={-180}
+                max={180}
+                step={0.5}
+                value={calage.r}
+                title="Double-clic : droite"
+                onChange={(e) => {
+                  const r = Number(e.target.value)
+                  setCalage((c) => (c ? { ...c, r } : c))
+                }}
+                onDoubleClick={() => setCalage((c) => (c ? { ...c, r: 0 } : c))}
+              />
+              <Valeur
+                className="v"
+                value={calage.r}
+                min={-180}
+                max={180}
+                step={0.5}
+                decimales={1}
+                unite="°"
+                label="Rotation de l’image"
+                onChange={(r) => setCalage((c) => (c ? { ...c, r } : c))}
+              />
+              <label className="coche" title="Une grille droite sur la carte, pour juger l’aplomb">
+                <input type="checkbox" checked={grille} onChange={(e) => setGrille(e.target.checked)} />
+                <span>Grille</span>
+              </label>
+              <span className="note">Glisser : déplacer · molette : zoomer (Ctrl, plus fin) · double-clic : revenir au départ</span>
+            </>
+          ) : trace === 'rogner' ? (
+            <span className="note">
+              {rect
+                ? 'Tire les bords du cadre pour l’ajuster · une copie est faite, l’originale reste dans son dossier'
+                : 'Glisse sur la carte pour entourer ce que tu gardes · molette pour zoomer, clic molette glissé pour déplacer'}
+            </span>
+          ) : !trait ? (
+            <span className="note">Tire un trait sur une longueur que tu connais : un mur, une case de la grille, une table.</span>
+          ) : (
+            <>
+              <label className="etal-champ">
+                Ce trait mesure
+                <input
+                  type="text"
+                  inputMode="decimal"
+                  autoFocus
+                  value={metresTrait}
+                  onChange={(e) => setMetresTrait(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault()
+                      void fixerEchelle()
+                    } else if (e.key === 'Escape') finirTrace()
+                  }}
+                />
+                m
+              </label>
+              <button className="btn btn-sm btn-ghost" onClick={() => setTrait(null)}>
+                Retracer
+              </button>
+            </>
+          )}
+          <div className="spacer" />
+          <button className="btn btn-sm btn-ghost" onClick={annulerGeste}>
+            Annuler <kbd>Échap</kbd>
+          </button>
+          <button
+            className="btn btn-sm btn-brass"
+            disabled={!peut}
+            onClick={() => void (calage ? caler() : trace === 'rogner' ? rogner() : fixerEchelle())}
+          >
+            <IconCheck />
+            {valider} <kbd>Entrée</kbd>
+          </button>
+        </div>
+      )
+    }
+    const o = OUTILS_RAIL.find((x) => x.cle === outilRail)!
+    return (
+      <div className={`annot-barre pe-barre${o.mj ? ' pe-mj' : ''}`}>
+        <span className="pe-nom">{o.label}</span>
+        {outilRail === 'mur' || outilRail === 'rideau' ? (
+          <>
+            <button
+              className="btn btn-sm"
+              aria-pressed={mu.aimant}
+              title="Le trait s’accroche aux murs existants, à leurs angles et aux angles droits"
+              onClick={() => mu.setAimant(!mu.aimant)}
+            >
+              <IconAimant />
+              Colle aux murs
+            </button>
+            <button
+              className="btn btn-sm"
+              aria-pressed={mu.loupe}
+              title="Elle suit le curseur pendant le tracé pour viser au pixel"
+              onClick={() => mu.setLoupe(!mu.loupe)}
+            >
+              <IconLoupe />
+              Loupe
+            </button>
+          </>
+        ) : null}
+        {outilRail === 'lumiere' ? (
+          <>
+            <button
+              className={`btn btn-sm${mu.apercuLum ? ' btn-on' : ''}`}
+              aria-pressed={mu.apercuLum}
+              disabled={!mu.lumieres.length}
+              title={
+                mu.lumieres.length
+                  ? 'Voir la carte comme la lumière la laisse : ce qui reste noir restera noir pour les joueurs'
+                  : 'Pose d’abord une lumière : il n’y aurait rien à montrer'
+              }
+              onClick={() => mu.setApercuLum(!mu.apercuLum)}
+            >
+              <IconSoleil />
+              Ombre et lumière
+            </button>
+          </>
+        ) : null}
+        {outilRail === 'piece' ? (
+          trace === 'lieu' && rect ? (
+            <>
+              <input
+                className="trace-nom"
+                type="text"
+                autoFocus
+                value={nomLieu}
+                placeholder="Nom du lieu…"
+                onChange={(e) => setNomLieu(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') {
+                    e.preventDefault()
+                    void creerAuRectangle()
+                  } else if (e.key === 'Escape') setRect(null)
+                }}
+              />
+              <button className="btn btn-sm btn-brass" disabled={!nomLieu.trim() || occupe} onClick={() => void creerAuRectangle()}>
+                <IconCheck />
+                Créer <kbd>Entrée</kbd>
+              </button>
+            </>
+          ) : (
+            <FormerPiece m={mu} onNommer={(contour, nom) => void formerPiece(contour, nom)} />
+          )
+        ) : null}
+        {outilRail === 'piece' ? (
+          mu.pourPiece === null && !rect ? (
+            <span className="note">
+              Glisse un rectangle sur le vide pour faire un lieu · glisse un lieu pour le déplacer, tire ses coins ·
+              ou désigne les murs qui le bornent. Les murs fermés font déjà des pièces : nomme-les à droite.
+            </span>
+          ) : null
+        ) : o.mj ? (
+          <span className="note">Clique sur le plan pour poser · jamais chez les joueurs</span>
+        ) : outilRail === 'choisir' ? (
+          <span className="note">
+            Clique un mur, une porte, une lampe ou un repère pour le régler à droite · glisse pour déplacer ·{' '}
+            <b>double-clic</b> ajoute un sommet · <b>Alt + clic</b> coupe · <kbd>Suppr</kbd> retire
+          </span>
+        ) : (
+          <AideMurs m={mu} />
+        )}
+      </div>
+    )
   }
 
   return (
-    <section className="view">
-      <div className="vhead">
-        <div>
-          <h2 className="fil-ariane">
-            <button className="retour" onClick={onFermer}>
-              Lieux
-            </button>
-            <span className="chev">›</span>
-            {p.name}
-          </h2>
-          <p>
-            {[
-              TIER_LABEL[p.tier],
-              p.zone && niveau ? `une zone du plan de ${niveau.name}` : null,
-              p.summary
-            ]
-              .filter(Boolean)
-              .join(' · ') || 'Sans description courte.'}
-          </p>
-        </div>
-        <div className="spacer" />
+    <section className="view pe">
+      <div className="vhead pe-tete">
         {estPiece(p) && niveau ? (
           <button
             className="btn btn-ghost"
             onClick={onMurs}
+            disabled={rognage}
             title="Revoir cette pièce sur le plan de son étage, avec ses murs"
           >
             <IconMurs />
-            Voir les murs
+            Voir les murs de l’étage
           </button>
         ) : null}
+        <div className="spacer" />
         {plan.mapItemId ? (
-          <button
-            className="btn btn-ghost"
-            onClick={() => setRemplacer(true)}
-            title={
-              plan === p
-                ? 'Mettre une autre image sous les mêmes murs, fenêtres et repères'
-                : `Remplacer l’image du plan de ${plan.name} — ses murs, ses fenêtres et ses pièces restent en place`
-            }
-          >
-            <IconImage />
-            Remplacer l’image
-          </button>
+          <div className="pe-menu-hote">
+            <button
+              className="btn"
+              aria-expanded={!!menuImage}
+              disabled={rognage || enTest}
+              onClick={(e) => {
+                if (menuImage) return setMenuImage(null)
+                const b = e.currentTarget.getBoundingClientRect()
+                setMenuImage({ x: b.right - 290, y: b.bottom + 6 })
+              }}
+            >
+              <IconImage />
+              Image ▾
+            </button>
+            {menuImage ? (
+              <Pop x={menuImage.x} y={menuImage.y} className="menu-donner pe-menu" onClose={() => setMenuImage(null)}>
+                {carte?.url && !estPiece(p) ? (
+                  <button className="opt" onClick={() => lancerGeste('caler')}>
+                    <IconCadrage />
+                    <span>
+                      Déplacer, zoomer, tourner
+                      <span className="pe-det">Les murs restent ; l’image glisse dessous</span>
+                    </span>
+                  </button>
+                ) : null}
+                {carte?.url && !estPiece(p) ? (
+                  <button className="opt" onClick={() => lancerGeste('rogner')}>
+                    <IconCadrage />
+                    <span>
+                      Rogner
+                      <span className="pe-det">Une copie ; l’originale reste dans son dossier</span>
+                    </span>
+                  </button>
+                ) : null}
+                {carte?.url ? (
+                  <button className="opt" onClick={() => lancerGeste('etalonner')}>
+                    <IconRegle />
+                    <span>
+                      Étalonner l’échelle
+                      <span className="pe-det">Tirer un trait de longueur connue</span>
+                    </span>
+                  </button>
+                ) : null}
+                <button className="opt" onClick={() => lancerGeste('remplacer')}>
+                  <IconImage />
+                  <span>
+                    Remplacer l’image…
+                    <span className="pe-det">
+                      {plan === p ? 'Murs, fenêtres et repères restent en place' : `L’image de ${plan.name} — ses pièces suivent`}
+                    </span>
+                  </span>
+                </button>
+              </Pop>
+            ) : null}
+          </div>
         ) : null}
-        {carte?.url && !estPiece(p) ? (
-          <button
-            className={`btn${trace === 'rogner' ? ' btn-on' : ''}`}
-            disabled={enTest}
-            title="Garder un morceau de l’image — une copie rognée, l’originale ne bouge pas"
-            onClick={() => {
-              const v = trace === 'rogner' ? null : 'rogner'
-              finirTrace()
-              setTrace(v)
-              setAnnote(false)
-              setMurs(false)
-            }}
-          >
-            <IconCadrage />
-            Rogner
-          </button>
-        ) : null}
-        {carte?.url && !estPiece(p) && p.tier !== 'espace' ? (
-          <button
-            className={`btn${trace === 'lieu' ? ' btn-on' : ''}`}
-            disabled={enTest}
-            title="Entourer un rectangle sur la carte : il devient un lieu de cet étage"
-            onClick={() => {
-              const v = trace === 'lieu' ? null : 'lieu'
-              finirTrace()
-              setTrace(v)
-              setAnnote(false)
-              setMurs(false)
-            }}
-          >
-            <IconPlus />
-            Tracer un lieu
-          </button>
-        ) : null}
-        <button
-          className={`btn${annote ? ' btn-on' : ''}`}
-          disabled={!carte?.url || enTest}
-          title={
-            carte?.url
-              ? 'Poser des repères et des textes sur la carte — pour toi seul, jamais pour les joueurs'
-              : 'Ce lieu n’a pas de carte à annoter'
-          }
-          onClick={() => {
-            setAnnote((v) => !v)
-            setMurs(false)
-            finirTrace()
-            setOutil(null)
-            setChoisi(null)
-          }}
-        >
-          <IconPen />
-          Mode annotation
-        </button>
-        <button
-          className={`btn${(enTest ? mursVisibles : murs) ? ' btn-on' : ''}`}
-          disabled={!carte?.url}
-          title={
-            !carte?.url
-              ? 'Ce lieu n’a pas de carte où tracer des murs'
-              : enTest
-                ? mursVisibles
-                  ? 'Cacher les murs : tester la carte comme les joueurs la voient, l’ombre seule'
-                  : 'Montrer les murs pendant le test'
-                : 'Tracer les murs invisibles : ce qui arrête le pas et ce qui coupe la vue — jamais montré aux joueurs'
-          }
-          onClick={() => {
-            /* En test, le bouton ne quitte rien : il montre ou cache les murs,
-               comme « Voir ce qu'ils voient » en régie. */
-            if (enTest) {
-              setMursVisibles((v) => !v)
-              return
-            }
-            setMurs((v) => !v)
-            setAnnote(false)
-            finirTrace()
-            setOutil(null)
-            setChoisi(null)
-            mu.setChoisi(null)
-            mu.setEssai(null)
-          }}
-        >
-          <IconMurs />
-          Mode murs
-        </button>
-        {/* Entrer dans le test et en sortir sont deux gestes contraires : ils ne
-            se ressemblent pas. Vert on essaie, rouge on s'arrête. Le test se
-            fait sur le calque des murs : on y passe s'il n'est pas ouvert. */}
+        {/* Toujours là, quel que soit l'outil : un coup d'œil au noir, bouton tenu. */}
+        {carte?.url ? <BoutonTestLumiere m={mu} /> : null}
         {carte?.url ? (
+          /* Entrer dans l'essai et en sortir sont deux gestes contraires : ils ne
+             se ressemblent pas. Vert on essaie, rouge on s'arrête. */
           <button
-            className={`btn ${mu.essai !== null || mu.attenteDepart ? 'btn-sortie' : 'btn-essai'}`}
+            className={`btn ${enTest ? 'btn-sortie' : 'btn-essai'}`}
+            disabled={rognage}
             title={
-              mu.essai !== null || mu.attenteDepart
-                ? 'Ranger le pion et revenir au tracé des murs'
+              enTest
+                ? 'Ranger le pion d’essai — Échap'
                 : 'Poser un pion d’essai : il ne traverse pas, et il ne voit que ce que les murs lui laissent voir'
             }
             onClick={() => {
-              if (mu.essai !== null || mu.attenteDepart) {
-                mu.arreterEssai()
-                return
-              }
-              /* On reste où l'on est : en mode murs, on teste murs visibles ;
-                 ailleurs, comme les joueurs, l'ombre seule. Le bouton « Mode
-                 murs » bascule ensuite de l'un à l'autre. */
-              setAnnote(false)
-              setOutil(null)
-              setChoisi(null)
-              finirTrace()
-              setMursVisibles(murs)
-              /* Une pièce à moitié désignée n'a rien à faire dans un test. */
-              mu.setPourPiece(null)
+              if (enTest) return void mu.arreterEssai()
+              choisirOutil('choisir')
+              setMursVisibles(true)
+              setVueJoueurs(false)
               void mu.commencerEssai()
             }}
           >
-            {enTest ? 'Quitter le test' : 'Tester lieu avec un pion'}
+            {enTest ? 'Arrêter l’essai' : 'Essayer avec un pion'}
+          </button>
+        ) : null}
+        {onTermine ? (
+          /* En haut à droite, au bout de la barre (choix de Jules) : on a fini,
+             on rentre à la fiche. */
+          <button className="btn btn-brass fl-termine" onClick={onTermine} disabled={rognage}>
+            <IconCheck />
+            Terminé
           </button>
         ) : null}
       </div>
 
-      <div className={`fiche-lieu${annote || murs || trace ? ' annote' : ''}`}>
-        <div className="fl-carte">
-          {trace ? (
-            <div className="annot-barre">
-              <span className="eyebrow">{trace === 'rogner' ? 'Rogner' : 'Tracer un lieu'}</span>
-              {!rect ? (
-                <span className="note">
-                  {trace === 'rogner'
-                    ? 'Glisse sur la carte pour entourer ce que tu gardes.'
-                    : 'Glisse sur le vide pour entourer un lieu · glisse un lieu pour le déplacer · tire ses coins · double-clic sur un bord ajoute un coin.'}
-                </span>
-              ) : trace === 'rogner' ? (
-                <>
-                  <button
-                    className="btn btn-sm btn-brass"
-                    disabled={occupe}
-                    onClick={() => void rogner()}
-                  >
-                    <IconCheck />
-                    Rogner à ce cadre
-                  </button>
-                  <span className="note">
-                    Une copie « (rognée) » à côté de l’originale ; murs, lampes, pions et repères
-                    suivent.
-                  </span>
-                </>
-              ) : (
-                <>
-                  <input
-                    className="trace-nom"
-                    type="text"
-                    autoFocus
-                    value={nomLieu}
-                    placeholder="Nom du lieu…"
-                    onChange={(e) => setNomLieu(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        void creerAuRectangle()
-                      } else if (e.key === 'Escape') setRect(null)
-                    }}
-                  />
-                  <button
-                    className="btn btn-sm btn-brass"
-                    disabled={!nomLieu.trim() || occupe}
-                    onClick={() => void creerAuRectangle()}
-                  >
-                    <IconCheck />
-                    Créer
-                  </button>
-                </>
-              )}
-              <div className="spacer" />
-              <button className="btn btn-sm btn-ghost" onClick={finirTrace}>
-                <IconClose />
-                Fermer
-              </button>
-            </div>
-          ) : null}
-          {murs ? (
-            <div className="annot-barre murs-barre">
-              <BarreMurs m={mu} onFormer={(contour, nom) => void formerPiece(contour, nom)} />
-              <AideMurs m={mu} />
-            </div>
-          ) : null}
-          {annote ? (
-            <div className="annot-barre">
-              <span className="eyebrow">Annoter</span>
-              <button
-                className={`btn btn-sm${outil === 'repere' ? ' btn-on' : ''}`}
-                onClick={() => setOutil(outil === 'repere' ? null : 'repere')}
-                title="Puis clique sur la carte pour poser le repère"
-              >
-                <IconPlus />
-                Repère
-              </button>
-              <button
-                className={`btn btn-sm${outil === 'texte' ? ' btn-on' : ''}`}
-                onClick={() => setOutil(outil === 'texte' ? null : 'texte')}
-                title="Puis clique sur la carte pour poser le texte"
-              >
-                <IconType />
-                Texte
-              </button>
-              <div className="spacer" />
-              <span className="note">
-                {outil
-                  ? 'Clique sur la carte pour le poser.'
-                  : 'Glisse pour déplacer · clique pour écrire · jamais vu des joueurs.'}
-              </span>
-            </div>
-          ) : null}
-
-          {carte?.url ? (
-            <div className="fl-lum">
-              <IconSoleil />
-              <label htmlFor="fl-lum">Luminosité</label>
-              <input
-                id="fl-lum"
-                type="range"
-                min={40}
-                max={220}
-                step={5}
-                value={lum}
-                onChange={(e) => setLum(Number(e.target.value))}
-              />
-              <span className="v">{lum} %</span>
-              {lum === 100 ? null : (
-                <button className="btn btn-sm btn-ghost" onClick={() => setLum(100)}>
-                  Rétablir
+      <div className="fiche-lieu pe-corps annote">
+        {carte?.url ? (
+          <nav className="pe-outils" aria-label="Outils du plan">
+            {OUTILS_RAIL.map((o, i) => (
+              <Fragment key={o.cle}>
+                {o.groupe && (i === 0 || OUTILS_RAIL[i - 1].groupe !== o.groupe) ? (
+                  <span className="pe-groupe">{o.groupe}</span>
+                ) : null}
+                <button
+                  className={`pe-outil${o.mj ? ' mj' : ''}${outilRail === o.cle && !sansOutils ? ' on' : ''}`}
+                  aria-pressed={outilRail === o.cle && !sansOutils}
+                  aria-label={o.label}
+                  title={`${o.label} — ${o.touche.toUpperCase()}${o.cle === 'piece' && pieceInterdite ? ' · pas ici : ' + (unique ? 'le lieu est une pièce unique' : estPiece(p) ? 'trace-la sur le plan de l’étage' : 'un espace se découpe par un niveau') : ''}`}
+                  disabled={sansOutils || (o.cle === 'piece' && pieceInterdite)}
+                  onClick={() => choisirOutil(o.cle)}
+                >
+                  {o.icone}
+                  <span className="pe-touche">{o.touche.toUpperCase()}</span>
                 </button>
-              )}
-              <span className="note">Pour y voir — rien n’est enregistré.</span>
-            </div>
-          ) : null}
+              </Fragment>
+            ))}
+          </nav>
+        ) : null}
+
+        <div className="fl-carte">
+          {carte?.url ? barreOutil() : null}
 
           <div className="fl-image">
             {carte?.url ? (
               /* Le cadre prend les proportions de l'image : elle s'affiche
                  entière — ou cadrée sur la zone de la pièce — et les repères
                  tombent exactement dessus. */
-              <CadreAnnote
-                url={carte.url}
-                zoomable={!p.zone}
-                zone={p.zone ? boiteDe(p.zone) : null}
-              >
+              <CadreAnnote url={carte.url} zoomable={!p.zone && !calage} zone={p.zone ? boiteDe(p.zone) : null}>
                 {/* Le filtre ne touche que l'image : repères, murs et pions
-                    gardent leurs couleurs, sans quoi on ne les lirait plus. */}
+                    gardent leurs couleurs, sans quoi on ne les lirait plus.
+                    Au calage, elle seule bouge : le calque reste. */}
                 <img
                   src={carte.url}
                   alt={carte.title}
                   draggable={false}
-                  style={lum === 100 ? undefined : { filter: `brightness(${lum}%)` }}
+                  onLoad={(e) => setNatCarte({ w: e.currentTarget.naturalWidth, h: e.currentTarget.naturalHeight })}
+                  style={{
+                    ...(lum === 100 ? {} : { filter: `brightness(${lum}%)` }),
+                    ...(calage
+                      ? {
+                          transform: `translate(${calage.ox * 100}%, ${calage.oy * 100}%) scale(${zoomCalage(calage)}) rotate(${calage.r}deg)`
+                        }
+                      : {})
+                  }}
                 />
-                {annote || liste.length ? (
+                {(calage && grille) || (calques.grille && !calage) ? <div className="cal-grille" aria-hidden="true" /> : null}
+                {calage ? <CalqueCalage vue={calage} onVue={setCalage} /> : null}
+                {annote && calques.mj ? (
                   <Annotations
                     annotations={liste}
-                    mode={annote ? 'edition' : 'lecture'}
+                    mode="edition"
                     outil={outil}
                     choisi={choisi}
                     onChoisir={setChoisi}
@@ -2334,9 +2986,20 @@ Les murs, les ouvertures et les repères suivront l’image en s’étirant avec
                     }}
                   />
                 ) : null}
-                {trace === 'rogner' ? (
-                  <CalqueRectangle rect={rect} assombrir onRect={setRect} />
+                {trace === 'rogner' ? <CalqueRectangle rect={rect} assombrir onRect={setRect} /> : null}
+                {trace === 'etalonner' ? (
+                  <CalqueTrait
+                    trait={trait}
+                    onTrait={(t) => {
+                      setTrait(t)
+                      /* On propose la longueur que dit l'échelle actuelle : souvent,
+                         on n'a qu'à confirmer — ou à corriger. */
+                      const l = longueurDuTrait(t)
+                      setMetresTrait(ech?.metres && l ? String(Math.round(ech.metres * l * 10) / 10).replace('.', ',') : '')
+                    }}
+                  />
                 ) : null}
+                {ech?.metres ? <RegleEchelle metres={ech.metres} zone={p.zone ? boiteDe(p.zone) : null} /> : null}
                 {trace === 'lieu' ? (
                   <CalqueLieux
                     lieux={pieces}
@@ -2350,57 +3013,92 @@ Les murs, les ouvertures et les repères suivront l’image en s’étirant avec
                     }}
                   />
                 ) : null}
-                {/* Le test se joue sur ce calque, avec ou sans le mode murs. */}
-                {murs || enTest ? (
-                  <CalqueMurs
-                    murs={mu.liste}
-                    ouvertures={mu.ouvertures}
-                    pourPiece={mu.pourPiece}
-                    onPourPiece={mu.setPourPiece}
-                    contourPropose={mu.contourPropose}
-                    attenteDepart={mu.attenteDepart}
-                    onDepart={(x, y) => mu.partirDe(x, y)}
-                    formes={mu.formes}
-                    formeVisee={mu.formeVisee}
-                    nomDeForme={(f) => lieuDeLaForme(f)?.name ?? null}
-                    ouvChoisie={mu.ouvChoisie}
-                    onOuvChoisie={mu.setOuvChoisie}
-                    onPoserOuverture={(murId, n, d) => void mu.poserOuverture(murId, n, d)}
-                    onNommer={(f, nom) => void nommerForme(f, nom)}
-                    joindre={mu.joindre}
-                    onJoindreFini={() => mu.setJoindre(false)}
-                    traitsCaches={enTest && !mursVisibles}
-                    mode="edition"
-                    outil={mu.outil}
-                    nature={mu.nature}
-                    aimant={mu.aimant}
-                    loupe={mu.loupe}
-                    gomme={mu.gomme}
-                    carte={carte.url}
-                    choisi={mu.choisi}
-                    onChoisir={mu.setChoisi}
-                    onPoser={(n, traces, retraits) => void mu.poser(n, traces, retraits)}
-                    onCouper={(id, pieces) => void mu.couper(id, pieces)}
-                    onDeplacer={(id, pts) => void mu.deplacer(id, pts)}
-                    onEffacer={(id) => void mu.effacer(id)}
-                    onBasculerPorte={(id) => void mu.basculerPorte(id)}
-                    onVerrouiller={(id, v) => void mu.verrouiller(id, v)}
-                    onAccorder={(id) => void mu.accorder(id)}
-                    onGommer={(retraits) => void mu.gommer(retraits)}
-                    onGommeTaille={mu.setGomme}
-                    onBrouillard={mu.setNoir}
-                    essai={mu.essai}
-                    onEssai={mu.setEssai}
-                    largeurOuv={mu.largeurDefaut ?? s.reglages.mursLargeur}
-                    apercuLum={mu.apercuLum}
-                    lumieres={mu.lumieres}
-                    lumChoisie={mu.lumChoisie}
-                    lumGarde={mu.lumGarde}
-                    regardPortee={mu.regardPortee}
-                    onLumChoisie={mu.setLumChoisie}
-                    onPoserLumiere={(x, y) => void mu.poserLumiere(x, y)}
-                    onReglerLumiere={(id, patch) => void mu.reglerLumiere(id, patch)}
-                    onOterLumiere={(id) => void mu.oterLumiere(id)}
+                {/* Les murs se voient toujours ; on n'y touche qu'avec leurs outils. */}
+                <CalqueMurs
+                  murs={mu.liste}
+                  ouvertures={mu.ouvertures}
+                  pourPiece={mu.pourPiece}
+                  onPourPiece={mu.setPourPiece}
+                  contourPropose={mu.contourPropose}
+                  attenteDepart={mu.attenteDepart}
+                  onDepart={(x, y) => mu.partirDe(x, y)}
+                  formes={mu.formes}
+                  formeVisee={mu.formeVisee}
+                  nomDeForme={(f) => (unique ? p.name : (lieuDeLaForme(f)?.name ?? null))}
+                  ouvChoisie={mu.ouvChoisie}
+                  onOuvChoisie={mu.setOuvChoisie}
+                  onPoserOuverture={(murId, n, d) => void mu.poserOuverture(murId, n, d)}
+                  onNommer={(f, nom) => void nommerForme(f, nom)}
+                  joindre={mu.joindre}
+                  onJoindreFini={() => mu.setJoindre(false)}
+                  traitsCaches={(enTest && !mursVisibles) || (!enTest && (vueJoueurs || !calques.murs))}
+                  mode={rognage || trace !== null || !(murs || enTest) ? 'lecture' : 'edition'}
+                  outil={mu.outil}
+                  /* La nature du trait suit l'outil : le Rideau trace des
+                     rideaux. Elle restait à « mur » depuis la 1.0.0, quel
+                     que soit l'outil. */
+                  nature={mu.outil === 'rideau' ? 'rideau' : 'mur'}
+                  aimant={mu.aimant}
+                  loupe={mu.loupe}
+                  gomme={mu.gomme}
+                  carte={carte.url}
+                  choisi={mu.choisi}
+                  onChoisir={mu.setChoisi}
+                  onPoser={(n, traces, retraits) => void mu.poser(n, traces, retraits)}
+                  onCouper={(id, pieces) => void mu.couper(id, pieces)}
+                  onDeplacer={(id, pts) => void mu.deplacer(id, pts)}
+                  onEffacer={(id) => void mu.effacer(id)}
+                  onBasculerPorte={(id) => void mu.basculerPorte(id)}
+                  onDeplacerOuverture={(id, d, murId) => void mu.reglerOuverture(id, { d, murId })}
+                  onVerrouiller={(id, v) => void mu.verrouiller(id, v)}
+                  onAccorder={(id) => void mu.accorder(id)}
+                  onGommer={(retraits) => void mu.gommer(retraits)}
+                  onGommeTaille={mu.setGomme}
+                  onBrouillard={mu.setNoir}
+                  essai={mu.essai}
+                  pionPourcent={ech?.pionPourcent}
+                  onEssai={mu.setEssai}
+                  largeurOuv={mu.largeurDefaut ?? s.reglages.mursLargeur}
+                  apercuLum={mu.apercuLum}
+                  testLum={mu.testLum}
+                  lumieres={calques.lumieres || enTest ? mu.lumieres : []}
+                  lumChoisie={mu.lumChoisie}
+                  lumGarde={mu.lumGarde}
+                  astre={mu.astre}
+                  nord={mu.nord}
+                  voirAstre={mu.voirAstre}
+                  regardPortee={mu.regardPortee}
+                  onLumChoisie={mu.setLumChoisie}
+                  onOutil={mu.setOutil}
+                  onPoserLumiere={(x, y) => void mu.poserLumiere(x, y)}
+                  onReglerLumiere={(id, patch) => void mu.reglerLumiere(id, patch)}
+                  onOterLumiere={(id) => void mu.oterLumiere(id)}
+                />
+                {/* Avec « Choisir », les repères se prennent par-dessus les murs ;
+                    le vide, lui, laisse passer le clic vers eux. */}
+                {!annote && calques.mj && !vueJoueursOn && liste.length ? (
+                  <Annotations
+                    annotations={liste}
+                    mode={outilRail === 'choisir' && !sansOutils ? 'edition' : 'lecture'}
+                    traversant
+                    choisi={choisi}
+                    onChoisir={(id) => {
+                      if (id != null) {
+                        mu.setChoisi(null)
+                        mu.setOuvChoisie(null)
+                        mu.setLumChoisie(null)
+                      }
+                      setChoisi(id)
+                    }}
+                    onDeplacer={async (id, x, y) => {
+                      await window.jdr.annotations.move(id, x, y)
+                      await relire()
+                    }}
+                    onEffacer={async (id) => {
+                      await window.jdr.annotations.remove(id)
+                      setChoisi(null)
+                      await relire()
+                    }}
                   />
                 ) : null}
               </CadreAnnote>
@@ -2408,88 +3106,186 @@ Les murs, les ouvertures et les repères suivront l’image en s’étirant avec
               <div className="fl-sans">
                 <IconPlace />
                 <b>Aucune carte</b>
-                Ajoute-lui une carte pour pouvoir l’annoter.
+                Ajoute-lui une carte pour tracer ses murs et l’annoter.
               </div>
             )}
+
+            {carte?.url ? (
+              <>
+                {/* Ce qu'on montre ou cache, sans changer d'outil. */}
+                <div className="pe-calques" role="group" aria-label="Calques">
+                  {(
+                    [
+                      ['murs', 'Murs'],
+                      ['lumieres', 'Lumières'],
+                      ['mj', 'Repères MJ'],
+                      ['grille', 'Grille']
+                    ] as const
+                  ).map(([k, l]) => (
+                    <button
+                      key={k}
+                      aria-pressed={calques[k]}
+                      onClick={() => setCalques((c) => ({ ...c, [k]: !c[k] }))}
+                      title={calques[k] ? `Cacher : ${l.toLowerCase()}` : `Montrer : ${l.toLowerCase()}`}
+                    >
+                      <i />
+                      {l}
+                    </button>
+                  ))}
+                </div>
+                {/* Ce qui ne touche que l'affichage : rien ici ne s'enregistre. */}
+                <div className="pe-vue">
+                  <span title="Pour y voir — n’est pas enregistré, et revient à 100 % au changement de lieu">
+                    <IconSoleil />
+                  </span>
+                  <input
+                    type="range"
+                    min={40}
+                    max={220}
+                    step={5}
+                    value={lum}
+                    aria-label="Luminosité de l’affichage"
+                    onChange={(e) => setLum(Number(e.target.value))}
+                    onDoubleClick={() => setLum(100)}
+                  />
+                  <Valeur className="v" value={lum} min={40} max={220} step={5} unite=" %" label="Luminosité" onChange={setLum} />
+                  <span className="pe-sep" />
+                  <button
+                    aria-pressed={vueJoueursOn}
+                    disabled={!enTest && !mu.lumieres.length}
+                    title={
+                      enTest
+                        ? 'Le plan comme les joueurs le voient : l’ombre seule, sans les murs'
+                        : mu.lumieres.length
+                          ? 'Le plan comme la lumière le laisse aux joueurs, sans murs ni repères'
+                          : 'Pose d’abord une lumière, ou lance un essai avec un pion'
+                    }
+                    onClick={() => {
+                      if (enTest) return setMursVisibles((v) => !v)
+                      const v = !vueJoueurs
+                      setVueJoueurs(v)
+                      mu.setApercuLum(v)
+                    }}
+                  >
+                    Vue joueurs
+                  </button>
+                </div>
+              </>
+            ) : null}
           </div>
+
+          {carte?.url ? (
+            <div className="pe-etat">
+              <span>
+                Échelle <b>{ech?.metres ? `${enMetres(ech.metres)} de large` : 'inconnue'}</b>
+              </span>
+              <span>
+                <b>{mu.liste.length}</b> trait{mu.liste.length > 1 ? 's' : ''} · <b>{portes}</b> porte{portes > 1 ? 's' : ''} ·{' '}
+                <b>{fenetres}</b> fenêtre{fenetres > 1 ? 's' : ''} · <b>{mu.lumieres.length}</b> lampe{mu.lumieres.length > 1 ? 's' : ''}
+                {liste.length ? (
+                  <>
+                    {' '}
+                    · <b>{liste.length}</b> repère{liste.length > 1 ? 's' : ''}
+                  </>
+                ) : null}
+              </span>
+              <div className="spacer" />
+              <span>
+                <kbd>Ctrl</kbd>+<kbd>Z</kbd> défaire · <kbd>Ctrl</kbd>+<kbd>Y</kbd> refaire · molette : zoomer · clic molette glissé : déplacer
+              </span>
+              <span className="pe-enreg">Enregistré au fur et à mesure</span>
+            </div>
+          ) : null}
         </div>
 
-        <aside className="fl-cote">
-          {murs ? (
-            <VoletMurs
-              m={mu}
-              nomDeForme={(f) => lieuDeLaForme(f)?.name ?? null}
-              onNommer={(f, nom) => void nommerForme(f, nom)}
-              onEffacerPiece={(f) => void effacerPiece(f)}
-            />
-          ) : annote ? (
+        <aside className="fl-cote pe-volet">
+          {enTest ? (
+            <VoletMurs m={mu} />
+          ) : lampeChoisie ? (
+            <div className="pe-choix">
+              <BarreLumiere m={mu} />
+            </div>
+          ) : ouvChoisie ? (
+            <div className="pe-choix">
+              <BarreOuverture m={mu} />
+            </div>
+          ) : traitChoisi ? (
+            <div className="pe-choix">
+              <BarreTrait m={mu} />
+            </div>
+          ) : enCours ? (
             <NoteAnnotation
               a={enCours}
               total={liste.length}
               onEcrire={async (texte) => {
-                if (!enCours) return
                 await window.jdr.annotations.update(enCours.id, { texte })
                 await relire()
               }}
               onCouleur={async (color) => {
-                if (!enCours) return
                 await window.jdr.annotations.update(enCours.id, { color })
                 await relire()
               }}
             />
           ) : (
             <>
-              <div className="fl-bloc">
-                <span className="eyebrow">Notes du MJ</span>
-                <p className={p.notes ? 'texte' : 'vide'}>
-                  {p.notes || 'Rien de noté pour l’instant.'}
-                </p>
-              </div>
-
-              <div className="fl-bloc">
-                <span className="eyebrow">Découverte</span>
-                <p className={p.seen ? 'texte' : 'vide'}>
-                  {p.seen ? 'Le groupe y est passé.' : 'Le groupe n’y a jamais mis les pieds.'}
-                </p>
-              </div>
-
-              <div className="fl-bloc">
-                <span className="eyebrow">Ambiance</span>
-                <p className={amb ? 'texte' : 'vide'}>{amb ? amb.title : 'Aucune ambiance.'}</p>
-              </div>
-
-              <div className="fl-bloc">
-                <ObjetsDuLieu placeId={p.id} />
-              </div>
-
-              <div className="fl-bloc">
-                <span className="eyebrow">Documents {docs.length ? `· ${docs.length}` : ''}</span>
-                {docs.length ? (
-                  <div className="fl-docs">
-                    {docs.map((d: Item) => (
-                      <button
-                        key={d.id}
-                        className="doc-row"
-                        onClick={() => s.openInEditor(d.id)}
-                        title="Ouvrir dans l’éditeur"
-                      >
-                        {kindIcon(d.kind, 'ico')}
-                        <span className="t">
-                          <span className="ttl">{d.title}</span>
-                        </span>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <p className="vide">Aucun document rattaché.</p>
-                )}
-              </div>
-
-              {liste.length ? (
-                <div className="fl-bloc">
-                  <span className="eyebrow">Annotations · {liste.length}</span>
-                  <p className="vide">Visibles de toi seul, ici et en régie. Jamais des joueurs.</p>
+              <h3 className="pe-volet-titre">Le plan de {p.name}</h3>
+              {ech ? (
+                <VoletEchelle
+                  ech={ech}
+                  onEtalonner={() => lancerGeste('etalonner')}
+                  onRevenir={async () => setEch(await window.jdr.places.etalonner(p.id, null))}
+                  onPionMain={async (main) => setEch(await window.jdr.pions.main(p.id, main))}
+                />
+              ) : null}
+              {aDemeler.conflits.length || aDemeler.orphelins.length ? (
+                <div className="fl-bloc murs-conflit">
+                  <span className="eyebrow">À démêler</span>
+                  {aDemeler.conflits.map((c) => (
+                    <div key={`c${c.i}`} onMouseEnter={() => mu.setFormeVisee(c.i)} onMouseLeave={() => mu.setFormeVisee(null)}>
+                      <p>
+                        {c.lieux.map((q) => `« ${q.name} »`).join(' et ')} sont accrochés à la même pièce : aucun ne suit les
+                        murs.
+                      </p>
+                      {c.lieux.slice(1).map((q) => (
+                        <PlacerDans
+                          key={q.id}
+                          lieu={q}
+                          libres={aDemeler.libres}
+                          onVoir={mu.setFormeVisee}
+                          onPlacer={(i) => void placerDans(q, i)}
+                        />
+                      ))}
+                    </div>
+                  ))}
+                  {aDemeler.orphelins.map((q) => (
+                    <div key={`o${q.id}`}>
+                      <p>« {q.name} » n’est dans aucune pièce fermée : son contour ne suit plus les murs.</p>
+                      <PlacerDans
+                        lieu={q}
+                        libres={aDemeler.libres}
+                        onVoir={mu.setFormeVisee}
+                        onPlacer={(i) => void placerDans(q, i)}
+                      />
+                    </div>
+                  ))}
                 </div>
+              ) : null}
+              <VoletMurs
+                m={mu}
+                nomDeForme={(f) => (unique ? p.name : (lieuDeLaForme(f)?.name ?? null))}
+                onNommer={(f, nom) => void nommerForme(f, nom)}
+                onEffacerPiece={(f) => void effacerPiece(f)}
+                pieceUnique={unique}
+                onPieceUnique={peutEtreUnique ? (oui) => void reglerUnique(oui) : undefined}
+              />
+              {onTermine ? (
+                <p className="pe-vers-fiche">
+                  Le texte à lire, les secrets, les objets et les PNJ se préparent dans{' '}
+                  <button className="lien" onClick={onTermine}>
+                    la fiche de {p.name}
+                  </button>
+                  .
+                </p>
               ) : null}
             </>
           )}
@@ -2508,6 +3304,64 @@ Les murs, les ouvertures et les repères suivront l’image en s’étirant avec
         />
       )}
     </section>
+  )
+}
+
+/** Un outil de la barre de gauche : sa touche, son icône, son groupe. */
+type OutilRail = 'choisir' | 'mur' | 'rideau' | 'porte' | 'fenetre' | 'lumiere' | 'piece' | 'gomme' | 'repere' | 'texte'
+
+const OUTILS_RAIL: { cle: OutilRail; label: string; touche: string; groupe?: string; mj?: boolean; icone: JSX.Element }[] = [
+  { cle: 'choisir', label: 'Choisir', touche: 'v', icone: <IconSouris /> },
+  { cle: 'mur', label: 'Mur', touche: 'm', groupe: 'Tracer', icone: <IconOutilMur /> },
+  { cle: 'rideau', label: 'Rideau', touche: 'r', groupe: 'Tracer', icone: <IconOutilRideau /> },
+  { cle: 'porte', label: 'Porte', touche: 'p', groupe: 'Tracer', icone: <IconOutilPorte /> },
+  { cle: 'fenetre', label: 'Fenêtre', touche: 'f', groupe: 'Tracer', icone: <IconOutilFenetre /> },
+  { cle: 'lumiere', label: 'Lumière', touche: 'l', groupe: 'Tracer', icone: <IconSoleil /> },
+  { cle: 'piece', label: 'Pièce', touche: 'q', groupe: 'Tracer', icone: <IconOutilPiece /> },
+  { cle: 'gomme', label: 'Gomme', touche: 'e', groupe: 'Tracer', icone: <IconGomme /> },
+  { cle: 'repere', label: 'Repère', touche: 'a', groupe: 'MJ', mj: true, icone: <IconCercle /> },
+  { cle: 'texte', label: 'Texte', touche: 't', groupe: 'MJ', mj: true, icone: <IconType /> }
+]
+
+/* Les icônes des outils qui n'en avaient pas : un trait, un rideau, une porte,
+   une fenêtre, un contour de pièce. */
+function IconOutilMur(): JSX.Element {
+  return (
+    <svg className="ico" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.1" aria-hidden="true">
+      <path d="M2.5 13.5 13.5 2.5" />
+      <circle cx="2.5" cy="13.5" r="1.3" />
+      <circle cx="13.5" cy="2.5" r="1.3" />
+    </svg>
+  )
+}
+function IconOutilRideau(): JSX.Element {
+  return (
+    <svg className="ico" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.1" aria-hidden="true">
+      <path d="M2.5 2v12M13.5 2v12M2.5 3c2.2 2 2.2 8 0 10M13.5 3c-2.2 2-2.2 8 0 10" />
+    </svg>
+  )
+}
+function IconOutilPorte(): JSX.Element {
+  return (
+    <svg className="ico" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.1" aria-hidden="true">
+      <rect x="4" y="2" width="8" height="12" rx="0.5" />
+      <circle cx="10" cy="8.5" r="0.8" />
+    </svg>
+  )
+}
+function IconOutilFenetre(): JSX.Element {
+  return (
+    <svg className="ico" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.1" aria-hidden="true">
+      <rect x="3" y="3" width="10" height="10" />
+      <path d="M8 3v10M3 8h10" />
+    </svg>
+  )
+}
+function IconOutilPiece(): JSX.Element {
+  return (
+    <svg className="ico" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.1" aria-hidden="true">
+      <rect x="2.5" y="3.5" width="11" height="9" strokeDasharray="2 2" />
+    </svg>
   )
 }
 
@@ -2941,6 +3795,357 @@ function CalqueRectangle({
         </svg>
       ) : null}
     </div>
+  )
+}
+
+/** L'image au calage : agrandie, décalée, tournée sous les murs qui restent. */
+type Calage = { z: number; ox: number; oy: number; r: number }
+
+/**
+ * De combien réduire une image tournée de `r` degrés pour qu'elle tienne
+ * entière dans le cadre qu'elle remplissait droite. 1 à plat ; à un quart de
+ * tour, le rapport de ses côtés.
+ */
+function tienDans(nat: { w: number; h: number } | null, r: number): number {
+  if (!nat?.w || !nat.h || !r) return 1
+  const a = (r * Math.PI) / 180
+  const c = Math.abs(Math.cos(a))
+  const sn = Math.abs(Math.sin(a))
+  return Math.min(nat.w / (nat.w * c + nat.h * sn), nat.h / (nat.w * sn + nat.h * c))
+}
+
+/**
+ * L'image tournée de `r` degrés (sens horaire), dessinée dans sa boîte
+ * englobante. Les coins vides restent transparents en PNG, noirs en JPEG —
+ * une photo de plan ne gagne rien à quadrupler de poids. Le protocole `jdr:`
+ * autorise la lecture : la toile n'est pas souillée.
+ */
+async function dessinerTournee(
+  url: string,
+  r: number
+): Promise<{ octets: Uint8Array; jpeg: boolean; w: number; h: number; w2: number; h2: number }> {
+  const img = new Image()
+  img.crossOrigin = 'anonymous'
+  img.src = url
+  await img.decode()
+  const w = img.naturalWidth
+  const h = img.naturalHeight
+  const a = (r * Math.PI) / 180
+  const c = Math.abs(Math.cos(a))
+  const sn = Math.abs(Math.sin(a))
+  const w2 = Math.ceil(w * c + h * sn)
+  const h2 = Math.ceil(w * sn + h * c)
+  const jpeg = /\.jpe?g(?:$|[?#])/i.test(url)
+  const toile = document.createElement('canvas')
+  toile.width = w2
+  toile.height = h2
+  const ctx = toile.getContext('2d')
+  if (!ctx) throw new Error('Impossible de dessiner l’image tournée')
+  if (jpeg) {
+    ctx.fillStyle = '#000'
+    ctx.fillRect(0, 0, w2, h2)
+  }
+  ctx.imageSmoothingQuality = 'high'
+  ctx.translate(w2 / 2, h2 / 2)
+  ctx.rotate(a)
+  ctx.drawImage(img, -w / 2, -h / 2)
+  const blob = await new Promise<Blob | null>((ok) =>
+    toile.toBlob(ok, jpeg ? 'image/jpeg' : 'image/png', 0.92)
+  )
+  if (!blob) throw new Error('Impossible d’écrire l’image tournée')
+  return { octets: new Uint8Array(await blob.arrayBuffer()), jpeg, w, h, w2, h2 }
+}
+
+/**
+ * Le calque du calage : il prend la molette et le glisser pour l'image seule.
+ * Tout se compte en fractions du cadre, lues sur sa taille à l'écran — le
+ * zoom du cadre lui-même n'y change donc rien.
+ */
+function CalqueCalage({
+  vue,
+  onVue
+}: {
+  vue: Calage
+  onVue: (v: Calage) => void
+}): JSX.Element {
+  const hote = useRef<HTMLDivElement>(null)
+  const tire = useRef<{ x: number; y: number; ox: number; oy: number } | null>(null)
+  /* Le gestionnaire de molette est posé une fois : il lit la vue à jour ici. */
+  const courante = useRef(vue)
+  courante.current = vue
+
+  /* La molette agrandit autour du curseur : le point visé de l'image reste
+     sous la souris. Ctrl, plus finement. */
+  useEffect(() => {
+    const el = hote.current
+    if (!el) return
+    const h = (e: WheelEvent): void => {
+      e.preventDefault()
+      e.stopPropagation()
+      const b = el.getBoundingClientRect()
+      const u = (e.clientX - b.left) / b.width - 0.5
+      const v = (e.clientY - b.top) / b.height - 0.5
+      const p = courante.current
+      /* Des crans fins : on cale au pixel près, pas on explore. */
+      const pas = e.ctrlKey ? 1.004 : 1.01
+      const z = Math.min(8, Math.max(0.2, p.z * (e.deltaY < 0 ? pas : 1 / pas)))
+      const k = z / p.z
+      onVue({ ...p, z, ox: u - k * (u - p.ox), oy: v - k * (v - p.oy) })
+    }
+    el.addEventListener('wheel', h, { passive: false })
+    return () => el.removeEventListener('wheel', h)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  return (
+    <div
+      ref={hote}
+      className="calque-calage"
+      title="Glisser : déplacer l’image · molette : zoomer (Ctrl, plus fin) · double-clic : revenir au départ"
+      onPointerDown={(e) => {
+        if (e.button !== 0 && e.button !== 1) return
+        e.preventDefault()
+        e.stopPropagation()
+        e.currentTarget.setPointerCapture(e.pointerId)
+        tire.current = { x: e.clientX, y: e.clientY, ox: vue.ox, oy: vue.oy }
+      }}
+      onPointerMove={(e) => {
+        const t = tire.current
+        if (!t) return
+        const b = e.currentTarget.getBoundingClientRect()
+        onVue({
+          ...vue,
+          ox: t.ox + (e.clientX - t.x) / b.width,
+          oy: t.oy + (e.clientY - t.y) / b.height
+        })
+      }}
+      onPointerUp={() => {
+        tire.current = null
+      }}
+      onDoubleClick={(e) => {
+        e.stopPropagation()
+        onVue({ z: 1, ox: 0, oy: 0, r: 0 })
+      }}
+    />
+  )
+}
+
+/**
+ * Les pièces sans nom où l'on peut mettre une fiche : une pastille par pièce,
+ * qui l'éclaire sur le plan au survol.
+ */
+function PlacerDans({
+  lieu,
+  libres,
+  onVoir,
+  onPlacer
+}: {
+  lieu: Place
+  libres: number[]
+  onVoir: (i: number | null) => void
+  onPlacer: (i: number) => void
+}): JSX.Element {
+  if (!libres.length)
+    return <p className="note">Aucune pièce sans nom où mettre « {lieu.name} » : trace ses murs d’abord.</p>
+  return (
+    <div className="placer-dans">
+      <span className="note">Mettre « {lieu.name} » dans :</span>
+      {libres.map((i, k) => (
+        <button
+          key={i}
+          className="btn btn-sm"
+          onMouseEnter={() => onVoir(i)}
+          onMouseLeave={() => onVoir(null)}
+          onClick={() => onPlacer(i)}
+          title="La pièce s’éclaire sur le plan au survol"
+        >
+          pièce sans nom {k + 1}
+        </button>
+      ))}
+    </div>
+  )
+}
+
+/** Une longueur en mètres, à la française : « 34 m », « 2,5 m ». */
+function enMetres(m: number | null): string {
+  if (m === null) return '—'
+  const arrondi = m >= 20 ? Math.round(m) : Math.round(m * 10) / 10
+  return `${String(arrondi).replace('.', ',')} m`
+}
+
+/**
+ * Le trait d'étalonnage : on le tire d'un bout à l'autre d'une longueur
+ * connue. En fractions de l'image, comme tout ce qui se pose sur le plan.
+ */
+function CalqueTrait({
+  trait,
+  onTrait
+}: {
+  trait: { a: PointMur; b: PointMur } | null
+  onTrait: (t: { a: PointMur; b: PointMur }) => void
+}): JSX.Element {
+  const depart = useRef<PointMur | null>(null)
+  const [enCours, setEnCours] = useState<{ a: PointMur; b: PointMur } | null>(null)
+  const lire = (e: React.PointerEvent<HTMLDivElement>): PointMur => {
+    const b = e.currentTarget.getBoundingClientRect()
+    return [
+      Math.min(1, Math.max(0, (e.clientX - b.left) / b.width)),
+      Math.min(1, Math.max(0, (e.clientY - b.top) / b.height))
+    ]
+  }
+  const t = enCours ?? trait
+  return (
+    <div
+      className="calque-rect calque-trait"
+      onPointerDown={(e) => {
+        if (e.button !== 0) return
+        e.stopPropagation()
+        e.currentTarget.setPointerCapture(e.pointerId)
+        depart.current = lire(e)
+        setEnCours({ a: depart.current, b: depart.current })
+      }}
+      onPointerMove={(e) => {
+        if (depart.current) setEnCours({ a: depart.current, b: lire(e) })
+      }}
+      onPointerUp={(e) => {
+        if (!depart.current) return
+        const fini = { a: depart.current, b: lire(e) }
+        depart.current = null
+        setEnCours(null)
+        if (Math.hypot(fini.b[0] - fini.a[0], fini.b[1] - fini.a[1]) > 0.01) onTrait(fini)
+      }}
+    >
+      {t ? (
+        <svg viewBox="0 0 1 1" preserveAspectRatio="none" aria-hidden="true">
+          <line x1={t.a[0]} y1={t.a[1]} x2={t.b[0]} y2={t.b[1]} className="trait" />
+          <line x1={t.a[0]} y1={t.a[1]} x2={t.a[0]} y2={t.a[1]} className="bout" />
+          <line x1={t.b[0]} y1={t.b[1]} x2={t.b[0]} y2={t.b[1]} className="bout" />
+        </svg>
+      ) : null}
+    </div>
+  )
+}
+
+/** Les longueurs rondes qu'une règle peut montrer. */
+const REGLES = [0.5, 1, 2, 5, 10, 20, 50, 100, 200, 500]
+
+/**
+ * La règle d'échelle, en bas à gauche du plan — ou de la pièce qu'on regarde.
+ * Une longueur ronde qui tient dans un sixième de ce qu'on voit.
+ */
+function RegleEchelle({ metres, zone }: { metres: number; zone: Zone | null }): JSX.Element | null {
+  const vue = zone ?? { x: 0, y: 0, w: 1, h: 1 }
+  const visible = metres * vue.w
+  const longueur = [...REGLES].reverse().find((l) => l <= visible / 6) ?? REGLES[0]
+  const part = longueur / metres
+  return (
+    <div
+      className="regle-echelle"
+      style={{
+        left: `${(vue.x + vue.w * 0.02) * 100}%`,
+        top: `${(vue.y + vue.h * 0.96) * 100}%`,
+        width: `${part * 100}%`,
+        fontSize: `${Math.max(0.4, vue.w) * 12}px`
+      }}
+      aria-hidden="true"
+    >
+      <span>{enMetres(longueur)}</span>
+    </div>
+  )
+}
+
+/**
+ * Le volet de l'échelle : d'où on la sait, ce qu'elle donne, et la taille des
+ * pions qu'on en tire. Voir `src/main/db/repos/echelle.ts`.
+ */
+function VoletEchelle({
+  ech,
+  onEtalonner,
+  onRevenir,
+  onPionMain
+}: {
+  ech: EchellePlan
+  onEtalonner: () => void
+  onRevenir: () => void
+  onPionMain: (main: boolean) => void
+}): JSX.Element {
+  const inconnue = ech.metres === null
+  const pourCent = (v: number): string => `${String(Math.round(v * 10) / 10).replace('.', ',')} %`
+  return (
+    <>
+      <div className="fl-bloc echelle-bloc">
+        <span className="eyebrow">Échelle du plan</span>
+        <span className={`etat-echelle ${ech.source ?? 'inconnue'}`}>
+          {ech.source === 'trait'
+            ? 'Étalonnée au trait'
+            : ech.source === 'portes'
+              ? `Estimée d’après ${ech.portes} porte${ech.portes > 1 ? 's' : ''}`
+              : 'Échelle inconnue'}
+        </span>
+        <div className="ech-ligne">
+          <span>Largeur du plan</span>
+          <b>{inconnue ? '—' : `≈ ${enMetres(ech.metres)}`}</b>
+        </div>
+        <div className="ech-ligne">
+          <span>1 mètre</span>
+          <b>{inconnue ? '—' : `${pourCent(100 / ech.metres!)} du plan`}</b>
+        </div>
+        <p className="note">
+          {inconnue
+            ? 'Aucune porte posée et pas d’étalonnage : l’app ne sait pas encore la taille de ce plan. Tire un trait sur une longueur connue, ou pose une porte.'
+            : ech.source === 'trait'
+              ? 'Tu as fixé l’échelle au trait. Elle prime sur l’estimation par les portes.'
+              : 'Une porte fait environ 0,9 m : la largeur médiane des portes posées donne l’échelle. Tire un trait sur une longueur connue pour la corriger.'}
+        </p>
+        <div className="murs-rangee">
+          <button className="btn btn-sm btn-brass" onClick={onEtalonner}>
+            Étalonner au trait
+          </button>
+          {ech.source === 'trait' ? (
+            <button className="btn btn-sm btn-ghost" onClick={onRevenir}>
+              {ech.portes ? 'Revenir à l’estimation' : 'Oublier l’échelle'}
+            </button>
+          ) : null}
+        </div>
+        <p className="note">
+          Les pièces de cet étage partagent cette échelle. Un rognage la recale tout seul.
+        </p>
+      </div>
+      <div className="fl-bloc echelle-bloc">
+        <span className="eyebrow">Pions sur ce plan</span>
+        <div className="ech-ligne">
+          <span>Taille réelle</span>
+          <b>1,5 m</b>
+        </div>
+        <div className="ech-ligne">
+          <span>À l’écran</span>
+          <b>{pourCent(ech.pionPourcent)} du plan</b>
+        </div>
+        <div className="murs-rangee">
+          <button
+            className={`btn btn-sm${ech.pionMain ? ' btn-ghost' : ' btn-on'}`}
+            aria-pressed={!ech.pionMain}
+            onClick={() => onPionMain(false)}
+          >
+            À l’échelle
+          </button>
+          <button
+            className={`btn btn-sm${ech.pionMain ? ' btn-on' : ' btn-ghost'}`}
+            aria-pressed={ech.pionMain}
+            onClick={() => onPionMain(true)}
+          >
+            À la main
+          </button>
+        </div>
+        <p className="note">
+          {ech.pionMain
+            ? 'Réglée à la main sur ce lieu, depuis la Régie. Elle ne suit plus l’échelle.'
+            : inconnue
+              ? 'Échelle inconnue : le pion garde la taille réglée à la main en attendant.'
+              : 'Calculée d’après l’échelle : un pion fait une case de 1,5 m, sur chaque plan.'}
+        </p>
+      </div>
+    </>
   )
 }
 

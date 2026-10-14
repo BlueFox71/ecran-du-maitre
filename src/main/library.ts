@@ -28,7 +28,18 @@ import { BrowserWindow, nativeImage, shell } from 'electron'
 import { activeCampaignId, getDb } from './db'
 import { kindOf, mimeOf } from './kinds'
 import { htmlEnTexte } from '@shared/texteBrut'
+import {
+  DOSSIER_ANNEXES,
+  DOSSIER_LIEUX,
+  DOSSIER_MOMENTS,
+  DOSSIER_NOTES,
+  MARQUE,
+  dansLApp,
+  dossierDeLApp
+} from '@shared/dossierDeLApp'
 import type { ItemKind, LibraryRoot } from '@shared/types'
+
+export { DOSSIER_MOMENTS, DOSSIER_NOTES }
 
 /* ============================================================
    Racine
@@ -100,7 +111,13 @@ function walk(root: string): { dirs: string[]; files: DiskFile[] } {
       return // dossier illisible : on l'ignore plutôt que de faire tomber le scan
     }
     for (const e of entries as unknown as { name: string; isDirectory: () => boolean }[]) {
-      if (skip(e.name)) continue
+      /* Le dossier de l'app est caché, mais ses textes sont des documents
+         comme les autres : on y entre. On n'y lit ni la base ni les vignettes,
+         qui sont sa cuisine et non des fichiers de la campagne. */
+      const marque = depth === 0 && e.name === MARQUE
+      if (skip(e.name) && !(marque && e.isDirectory())) continue
+      if (depth === 1 && abs === join(root, MARQUE) && (!e.isDirectory() || e.name === 'vignettes'))
+        continue
       const child = join(abs, e.name)
       if (e.isDirectory()) {
         dirs.push(toRel(root, child))
@@ -143,6 +160,24 @@ const parentOf = (p: string): string => {
   return i < 0 ? '' : p.slice(0, i)
 }
 
+/**
+ * Un dossier a changé de chemin : ses lignes et celles de tout ce qu'il
+ * contient le suivent, sans changer d'identifiant. Le nom se recalcule à la
+ * prochaine relecture.
+ */
+function repath(from: string, to: string): void {
+  const db = getDb()
+  const cid = activeCampaignId()
+  db.prepare(
+    `UPDATE folder SET rel_path = ? || substr(rel_path, ?)
+      WHERE campaign_id = ? AND (rel_path = ? OR substr(rel_path, 1, length(?) + 1) = ? || '/')`
+  ).run(to, from.length + 1, cid, from, from, from)
+  db.prepare(
+    `UPDATE item SET rel_path = ? || substr(rel_path, ?)
+      WHERE campaign_id = ? AND substr(rel_path, 1, length(?) + 1) = ? || '/'`
+  ).run(to, from.length + 1, cid, from, from)
+}
+
 let lastScan: { at: string; folders: number; files: number } | null = null
 
 /**
@@ -153,10 +188,10 @@ let lastScan: { at: string; folders: number; files: number } | null = null
  * dossier, c'est tout. L'abonnement est donc posé de l'extérieur, par
  * `main/index.ts`.
  */
-let apresScan: (() => void) | null = null
+const apresScan: (() => void)[] = []
 
 export function auScan(fn: () => void): void {
-  apresScan = fn
+  apresScan.push(fn)
 }
 
 /**
@@ -207,17 +242,6 @@ export function scan(): { folders: number; files: number } {
 
   db.transaction(() => {
     /* ---------------- dossiers ---------------- */
-
-    const repath = (from: string, to: string): void => {
-      db.prepare(
-        `UPDATE folder SET rel_path = ? || substr(rel_path, ?), name = ?
-          WHERE campaign_id = ? AND (rel_path = ? OR rel_path LIKE ? || '/%')`
-      ).run(to, from.length + 1, basename(to), cid, from, from)
-      db.prepare(
-        `UPDATE item SET rel_path = ? || substr(rel_path, ?)
-          WHERE campaign_id = ? AND rel_path LIKE ? || '/%'`
-      ).run(to, from.length + 1, cid, from)
-    }
 
     // Un dossier renommé dans l'explorateur ne doit pas perdre son icône :
     // on apparie ce qui a disparu et ce qui est apparu au même endroit.
@@ -381,7 +405,7 @@ export function scan(): { folders: number; files: number } {
   })()
 
   lastScan = { at: new Date().toISOString(), folders: dirs.length, files: files.length }
-  apresScan?.()
+  for (const fn of apresScan) fn()
   return { folders: dirs.length, files: files.length }
 }
 
@@ -452,7 +476,10 @@ export function renameEntry(rel: string, name: string): string {
   if (dest === abs) return rel
   renameSync(abs, dest)
   const neuf = toRel(campaignRoot()!, dest)
-  if (!ext) suivreDossierDeSeance(rel, neuf)
+  if (!ext) {
+    suivreDossierDeSeance(rel, neuf)
+    suivreDansLApp(rel, neuf)
+  }
   scan()
   return neuf
 }
@@ -473,6 +500,21 @@ function suivreDossierDeSeance(ancien: string, neuf: string): void {
     .run(neuf, ancien, activeCampaignId(), ancien, ancien, ancien)
 }
 
+/**
+ * Un dossier renommé ou déplacé depuis l'application emmène son double du
+ * dossier de l'app : les textes de ses lieux et de ses moments restent à
+ * côté de lui.
+ */
+function suivreDansLApp(ancien: string, neuf: string): void {
+  if (dansLApp(ancien) || dansLApp(neuf)) return
+  const de = `${MARQUE}/${ancien}`
+  const vers = `${MARQUE}/${neuf}`
+  if (!existsSync(absOf(de)) || existsSync(absOf(vers))) return
+  mkdirSync(dirname(absOf(vers)), { recursive: true })
+  renameSync(absOf(de), absOf(vers))
+  repath(de, vers)
+}
+
 export function moveEntry(rel: string, destFolderRel: string): string {
   const abs = absOf(rel)
   const destDir = absOf(destFolderRel)
@@ -487,7 +529,10 @@ export function moveEntry(rel: string, destFolderRel: string): string {
   const dest = freePath(destDir, basename(abs, ext), ext)
   renameSync(abs, dest)
   const neuf = toRel(campaignRoot()!, dest)
-  if (!ext) suivreDossierDeSeance(rel, neuf)
+  if (!ext) {
+    suivreDossierDeSeance(rel, neuf)
+    suivreDansLApp(rel, neuf)
+  }
   scan()
   return neuf
 }
@@ -517,24 +562,32 @@ export async function copierDossier(
   const dest = freePath(dirname(src), safeName(nom))
   if (!insideRoot(dest)) throw new Error('Hors du dossier de campagne.')
 
-  const dossiers: string[] = []
+  const root = campaignRoot()!
+  const rel = toRel(root, dest)
+  /* Le dossier de la séance, et son double dans le dossier de l'app s'il en
+     a un : les textes des moments et des lieux partent avec la copie. */
+  const paires: [string, string][] = [[srcRel, rel]]
+  if (!dansLApp(srcRel) && existsSync(absOf(`${MARQUE}/${srcRel}`)))
+    paires.push([`${MARQUE}/${srcRel}`, `${MARQUE}/${rel}`])
+
+  const dossiers: { de: string; vers: string }[] = []
   const fichiers: { de: string; vers: string; octets: number }[] = []
   const lister = (de: string, vers: string): void => {
-    dossiers.push(vers)
+    dossiers.push({ de, vers })
     for (const e of readdirSync(de, { withFileTypes: true })) {
       if (skip(e.name)) continue
       if (e.isDirectory()) lister(join(de, e.name), join(vers, e.name))
       else fichiers.push({ de: join(de, e.name), vers: join(vers, e.name), octets: statSync(join(de, e.name)).size })
     }
   }
-  lister(src, dest)
+  for (const [de, vers] of paires) lister(absOf(de), absOf(vers))
 
   const total = fichiers.reduce((n, f) => n + f.octets, 0) || 1
   let fait = 0
   progres(0, total)
   stopWatch()
   try {
-    for (const d of dossiers) mkdirSync(d, { recursive: true })
+    for (const d of dossiers) mkdirSync(d.vers, { recursive: true })
     for (const f of fichiers) {
       await copyFile(f.de, f.vers)
       fait += f.octets
@@ -544,34 +597,31 @@ export async function copierDossier(
     startWatch()
   }
 
-  const root = campaignRoot()!
-  const rel = toRel(root, dest)
   scan()
 
   const db = getDb()
   const cid = activeCampaignId()
   const jumeaux = new Map<number, number>()
   db.transaction(() => {
-    const items = db
-      .prepare(
-        `SELECT id, rel_path AS rel FROM item
-          WHERE campaign_id = ? AND substr(rel_path, 1, length(?) + 1) = ? || '/'`
-      )
-      .all(cid, srcRel, srcRel) as { id: number; rel: string }[]
     const parChemin = db.prepare(`SELECT id FROM item WHERE campaign_id = ? AND rel_path = ?`)
-    for (const it of items) {
-      const double = parChemin.get(cid, rel + it.rel.slice(srcRel.length)) as { id: number } | undefined
-      if (double) jumeaux.set(it.id, double.id)
+    for (const [de, vers] of paires) {
+      const items = db
+        .prepare(
+          `SELECT id, rel_path AS rel FROM item
+            WHERE campaign_id = ? AND substr(rel_path, 1, length(?) + 1) = ? || '/'`
+        )
+        .all(cid, de, de) as { id: number; rel: string }[]
+      for (const it of items) {
+        const double = parChemin.get(cid, vers + it.rel.slice(de.length)) as { id: number } | undefined
+        if (double) jumeaux.set(it.id, double.id)
+      }
     }
     const decor = db.prepare(
       `UPDATE folder SET icon = (SELECT icon FROM folder WHERE campaign_id = @cid AND rel_path = @de),
                          color = (SELECT color FROM folder WHERE campaign_id = @cid AND rel_path = @de)
         WHERE campaign_id = @cid AND rel_path = @vers`
     )
-    for (const d of dossiers) {
-      const vers = toRel(root, d)
-      decor.run({ cid, de: srcRel + vers.slice(rel.length), vers })
-    }
+    for (const d of dossiers) decor.run({ cid, de: toRel(root, d.de), vers: toRel(root, d.vers) })
   })()
   announce()
   return { rel, jumeaux }
@@ -619,9 +669,6 @@ export function writeTexteBrut(rel: string, html: string): void {
   writeFileSync(txt, htmlEnTexte(html), 'utf8')
 }
 
-/** Le dossier où se rangent les textes des moments, dans celui de leur séance. */
-export const DOSSIER_MOMENTS = 'Moments'
-
 /**
  * Migration des fichiers, une fois par campagne : les textes des moments
  * écrits avant le dossier « Moments » vont l'y rejoindre — celui de leur
@@ -652,7 +699,7 @@ export function rangerTextesDesMoments(): void {
 
   const dossiers = new Set<string>()
   for (const t of textes) {
-    const dest = t.base ? `${t.base}/${DOSSIER_MOMENTS}` : DOSSIER_MOMENTS
+    const dest = dossierDeLApp(t.base, DOSSIER_MOMENTS)
     dossiers.add(dest)
     try {
       if (!existsSync(absOf(dest))) mkdirSync(absOf(dest), { recursive: true })
@@ -674,9 +721,6 @@ export function rangerTextesDesMoments(): void {
   db.prepare(`INSERT INTO setting (key, value) VALUES (?, '1')`).run(CLE)
 }
 
-/** Le dossier des notes du Bloc-notes, à la racine de la campagne : une note, un fichier. */
-export const DOSSIER_NOTES = 'Bloc-notes'
-
 /**
  * Le Bloc-notes a d'abord été un seul fichier, `Bloc-notes.html` à la racine.
  * Il est devenu un dossier de notes : l'ancien fichier y entre comme première
@@ -695,18 +739,103 @@ export function rangerAncienBlocNotes(): void {
       console.log('[bloc-notes] ancien Bloc-notes vide mis à la corbeille')
       return
     }
-    if (!existsSync(absOf(DOSSIER_NOTES))) mkdirSync(absOf(DOSSIER_NOTES))
-    moveEntry('Bloc-notes.html', DOSSIER_NOTES)
-    if (existsSync(txt)) moveEntry('Bloc-notes.txt', DOSSIER_NOTES)
+    const notes = dossierDeLApp(null, DOSSIER_NOTES)
+    if (!existsSync(absOf(notes))) mkdirSync(absOf(notes), { recursive: true })
+    moveEntry('Bloc-notes.html', notes)
+    if (existsSync(txt)) moveEntry('Bloc-notes.txt', notes)
     getDb()
       .prepare(
         `UPDATE folder SET icon = 'notes' WHERE campaign_id = ? AND rel_path = ? AND icon IS NULL`
       )
-      .run(activeCampaignId(), DOSSIER_NOTES)
+      .run(activeCampaignId(), notes)
     console.log('[bloc-notes] ancien Bloc-notes rangé comme première note')
   } catch (e) {
     console.error(`[bloc-notes] ancien Bloc-notes laissé en place : ${(e as Error).message}`)
   }
+}
+
+/**
+ * Le dossier de l'app voulu, créé s'il manque — avec ses parents. Rend son
+ * chemin. Il n'a jamais de « (2) » : c'est toujours le même qu'on rouvre.
+ */
+export function assurerDossier(rel: string, icone: string | null = null): string {
+  if (!dansLApp(rel)) throw new Error('Ce dossier n’est pas celui de l’application.')
+  const abs = absOf(rel)
+  if (!insideRoot(abs)) throw new Error('Hors du dossier de campagne.')
+  if (existsSync(abs)) return rel
+  mkdirSync(abs, { recursive: true })
+  scan()
+  if (icone) setFolderDecor(rel, icone, null)
+  return rel
+}
+
+/**
+ * Migration des fichiers, une fois par campagne : ce que l'application avait
+ * écrit dans le dossier du MJ — les textes des lieux et des moments, les
+ * annexes, le Bloc-notes — passe dans son dossier `.ecran-du-maitre`, aux mêmes
+ * chemins. Les dossiers sont déplacés d'un bloc, puis leurs lignes en base
+ * suivent : chaque texte garde son identifiant, donc son moment et sa place
+ * dans les annexes.
+ *
+ * On ne regarde que là où l'application écrivait : la racine de la campagne
+ * et le dossier de chaque séance. Un dossier déjà présent de l'autre côté
+ * reçoit le contenu, fichier par fichier, sans rien écraser.
+ */
+export function rangerDansLeDossierDeLApp(): void {
+  const db = getDb()
+  const CLE = 'migration.dossier-de-l-app'
+  const racine = campaignRoot()
+  if (!racine || !existsSync(racine)) return
+  if (db.prepare(`SELECT 1 FROM setting WHERE key = ?`).get(CLE)) return
+
+  const bases = new Set<string>([''])
+  for (const r of db
+    .prepare(`SELECT folder_rel AS base FROM game_session WHERE campaign_id = ? AND folder_rel IS NOT NULL`)
+    .all(activeCampaignId()) as { base: string }[])
+    if (!dansLApp(r.base)) bases.add(r.base)
+
+  const aRanger: string[] = [DOSSIER_NOTES]
+  for (const b of bases)
+    for (const nom of [DOSSIER_LIEUX, DOSSIER_MOMENTS, DOSSIER_ANNEXES])
+      aRanger.push(b ? `${b}/${nom}` : nom)
+
+  stopWatch()
+  try {
+    for (const de of aRanger) {
+      const src = absOf(de)
+      if (!existsSync(src) || !statSync(src).isDirectory()) continue
+      const vers = `${MARQUE}/${de}`
+      try {
+        if (!existsSync(absOf(vers))) {
+          mkdirSync(dirname(absOf(vers)), { recursive: true })
+          renameSync(src, absOf(vers))
+          repath(de, vers)
+        } else {
+          // Déjà là : on y verse le contenu, un élément après l'autre.
+          for (const e of readdirSync(src, { withFileTypes: true })) {
+            const ext = e.isDirectory() ? '' : extname(e.name)
+            const cible = freePath(absOf(vers), basename(e.name, ext), ext)
+            renameSync(join(src, e.name), cible)
+            if (e.isDirectory()) repath(`${de}/${e.name}`, toRel(campaignRoot()!, cible))
+            else
+              db.prepare(`UPDATE item SET rel_path = ? WHERE campaign_id = ? AND rel_path = ?`).run(
+                toRel(campaignRoot()!, cible),
+                activeCampaignId(),
+                `${de}/${e.name}`
+              )
+          }
+          void shell.trashItem(src).catch(() => {})
+        }
+        console.log(`[dossier de l'app] ${de} -> ${vers}`)
+      } catch (e) {
+        console.error(`[dossier de l'app] ${de} laissé en place : ${(e as Error).message}`)
+      }
+    }
+  } finally {
+    startWatch()
+  }
+  scan()
+  db.prepare(`INSERT INTO setting (key, value) VALUES (?, '1')`).run(CLE)
 }
 
 /**
@@ -716,6 +845,13 @@ export function rangerAncienBlocNotes(): void {
 export function renommerJumeauTxt(ancienRel: string, nom: string): void {
   const txt = ancienRel.replace(/\.html?$/i, '.txt')
   if (txt !== ancienRel && existsSync(absOf(txt))) renameEntry(txt, nom)
+}
+
+/** Un texte de moment à la corbeille, et sa version .txt avec lui. */
+export async function jeterTexte(rel: string): Promise<void> {
+  const txt = rel.replace(/\.html?$/i, '.txt')
+  if (existsSync(absOf(rel))) await trashEntry(rel)
+  if (txt !== rel && existsSync(absOf(txt))) await trashEntry(txt)
 }
 
 export function readDoc(rel: string): string {
@@ -748,6 +884,20 @@ export function rognerImage(
   const jpeg = ext === '.jpg' || ext === '.jpeg'
   const dest = freePath(dirname(abs), `${basename(abs, extname(abs))} (rognée)`, jpeg ? ext : '.png')
   writeFileSync(dest, jpeg ? rogne.toJPEG(92) : rogne.toPNG())
+  scan()
+  return toRel(campaignRoot()!, dest)
+}
+
+/**
+ * La copie tournée d'une image, dessinée par l'interface — Electron ne sait
+ * tourner une image que d'un quart de tour. Posée à côté de l'originale, qui
+ * ne bouge pas.
+ */
+export function copieTournee(rel: string, octets: Uint8Array, jpeg: boolean): string {
+  const abs = absOf(rel)
+  const ext = extname(abs).toLowerCase()
+  const dest = freePath(dirname(abs), `${basename(abs, extname(abs))} (tournée)`, jpeg ? ext : '.png')
+  writeFileSync(dest, Buffer.from(octets))
   scan()
   return toRel(campaignRoot()!, dest)
 }
@@ -795,7 +945,10 @@ export function startWatch(): void {
   const root = campaignRoot()
   if (!root || !existsSync(root)) return
   try {
-    watcher = watch(root, { recursive: true }, () => {
+    watcher = watch(root, { recursive: true }, (_e, nom) => {
+      // La base et les vignettes bougent sans cesse et ne se relisent pas.
+      const n = String(nom ?? '').replace(/\\/g, '/')
+      if (n.startsWith(`${MARQUE}/projet.db`) || n.startsWith(`${MARQUE}/vignettes`)) return
       // Une copie de fichiers déclenche des dizaines d'événements : on attend
       // que ça se calme avant de relire le dossier.
       if (pending) clearTimeout(pending)

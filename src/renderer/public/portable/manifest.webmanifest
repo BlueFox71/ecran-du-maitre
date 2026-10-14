@@ -1,0 +1,15 @@
+{
+  "name": "Écran du Maître",
+  "short_name": "Écran",
+  "description": "Ta fiche, tes jets, ton pion et ta pochette, à la table.",
+  "lang": "fr",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0f1518",
+  "theme_color": "#0f1518",
+  "icons": [
+    { "src": "icone-192.png", "sizes": "192x192", "type": "image/png" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png" },
+    { "src": "icone-512.png", "sizes": "512x512", "type": "image/png", "purpose": "maskable" }
+  ]
+}

@@ -15,7 +15,7 @@ import type { Lumiere } from '@shared/types'
 
 const SELECT = `
   SELECT l.id, l.place_id AS placeId, l.x, l.y, l.clair, l.penombre, l.allumee, l.teinte,
-         l.icone
+         l.icone, l.ouverture, l.cap
     FROM lumiere l`
 
 /** Une couleur qu'on accepte d'écrire : #rgb ou #rrggbb, et rien d'autre. */
@@ -30,6 +30,18 @@ const RAYON = { min: 0.01, max: 1.5 }
 const borne = (v: number, min: number, max: number): number =>
   Math.min(max, Math.max(min, Number.isFinite(v) ? v : min))
 
+/** Un faisceau : de 10° à 360°, ce dernier voulant dire « tout autour ». */
+const faisceau = (v: unknown): number => {
+  const n = Math.round(Number(v))
+  return Number.isFinite(n) ? Math.min(360, Math.max(10, n)) : 360
+}
+
+/** Un cap ramené dans [0, 360). */
+const capSur = (v: unknown): number => {
+  const n = Number(v)
+  return Number.isFinite(n) ? ((n % 360) + 360) % 360 : 0
+}
+
 function toLumiere(r: any): Lumiere {
   const clair = borne(r.clair, RAYON.min, RAYON.max)
   return {
@@ -42,7 +54,9 @@ function toLumiere(r: any): Lumiere {
     penombre: Math.max(clair, borne(r.penombre, RAYON.min, RAYON.max)),
     allumee: !!r.allumee,
     teinte: teinteSure(r.teinte),
-    icone: !!r.icone
+    icone: !!r.icone,
+    ouverture: faisceau(r.ouverture),
+    cap: capSur(r.cap)
   }
 }
 
@@ -65,14 +79,16 @@ export function addLumiere(input: {
   clair?: number
   penombre?: number
   teinte?: string
+  ouverture?: number
+  cap?: number
 }): Lumiere | null {
   const lieu = getDb().prepare(`SELECT id FROM place WHERE id = ?`).get(input.placeId)
   if (!lieu) return null
   const clair = borne(input.clair ?? 0.09, RAYON.min, RAYON.max)
   const info = getDb()
     .prepare(
-      `INSERT INTO lumiere (place_id, x, y, clair, penombre, allumee, teinte)
-       VALUES (@placeId, @x, @y, @clair, @penombre, 1, @teinte)`
+      `INSERT INTO lumiere (place_id, x, y, clair, penombre, allumee, teinte, ouverture, cap)
+       VALUES (@placeId, @x, @y, @clair, @penombre, 1, @teinte, @ouverture, @cap)`
     )
     .run({
       placeId: input.placeId,
@@ -80,7 +96,9 @@ export function addLumiere(input: {
       y: borne(input.y, 0, 1),
       clair,
       penombre: Math.max(clair, borne(input.penombre ?? clair * 1.8, RAYON.min, RAYON.max)),
-      teinte: teinteSure(input.teinte)
+      teinte: teinteSure(input.teinte),
+      ouverture: faisceau(input.ouverture ?? 360),
+      cap: capSur(input.cap ?? 0)
     })
   return getLumiere(Number(info.lastInsertRowid))
 }
@@ -95,6 +113,8 @@ export function updateLumiere(
     allumee?: boolean
     teinte?: string
     icone?: boolean
+    ouverture?: number
+    cap?: number
   }
 ): Lumiere | null {
   const av = getLumiere(id)
@@ -106,7 +126,8 @@ export function updateLumiere(
     .prepare(
       `UPDATE lumiere
           SET x = @x, y = @y, clair = @clair, penombre = @penombre,
-              allumee = @allumee, teinte = @teinte, icone = @icone
+              allumee = @allumee, teinte = @teinte, icone = @icone,
+              ouverture = @ouverture, cap = @cap
         WHERE id = @id`
     )
     .run({
@@ -117,27 +138,41 @@ export function updateLumiere(
       penombre: Math.max(clair, penombre),
       allumee: (patch.allumee === undefined ? av.allumee : patch.allumee) ? 1 : 0,
       teinte: patch.teinte === undefined ? av.teinte : teinteSure(patch.teinte, av.teinte),
-      icone: (patch.icone === undefined ? av.icone : patch.icone) ? 1 : 0
+      icone: (patch.icone === undefined ? av.icone : patch.icone) ? 1 : 0,
+      ouverture: patch.ouverture === undefined ? av.ouverture : faisceau(patch.ouverture),
+      cap: patch.cap === undefined ? av.cap : capSur(patch.cap)
     })
   return getLumiere(id)
 }
 
-/** Le rayon d'une torche portée, en part de la largeur de la carte. */
-const TORCHE = 0.14
+/** La portée d'une torche ordinaire, dans la réalité. */
+export const TORCHE_M = 9
+/**
+ * La largeur qu'on prête à un plan dont on ignore l'échelle — ni trait, ni
+ * porte. Une torche de 9 m y tient alors 15 % : ce que valait la torche
+ * d'avant, quand la portée se donnait en part de la largeur.
+ */
+const LARGEUR_SANS_ECHELLE_M = 60
 
 /**
  * Les personnages qui portent de la lumière.
  *
  * Rien n'est câblé à un système de jeu : l'effet d'un objet est une ligne
  * libre, et c'est **sa tête** qu'on lit. Si elle commence par « éclair » ou
- * par « lumi », l'objet éclaire. Le détail peut donner la portée en pour-cent
- * (« 20 % ») ; sans quoi c'est une torche ordinaire.
+ * par « lumi », l'objet éclaire. Le détail donne la portée en mètres
+ * (« 12 m »), que l'échelle du plan (`metres`, la largeur de l'image) change
+ * en part de la carte ; les effets d'avant la donnaient en pour-cent
+ * (« 20 % »), on les lit encore. Sans portée, c'est une torche ordinaire.
+ * Un angle (« cône 30° ») en fait une lampe directive, tournée comme le
+ * pion ; sans angle, elle éclaire tout autour.
  *
  * Seul ce qui est **porté** compte : une lanterne au fond d'un sac n'éclaire
  * personne, et un objet posé dans un lieu n'est pas encore une lampe — celles
  * du décor se posent sur le plan, dans la fiche du lieu.
  */
-export function porteursDeLumiere(): { characterId: number; rayon: number; objet: string }[] {
+export function porteursDeLumiere(
+  metres: number | null
+): { characterId: number; rayon: number; ouverture: number; objet: string }[] {
   const sansAccents = (v: string): string =>
     v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
 
@@ -151,7 +186,7 @@ export function porteursDeLumiere(): { characterId: number; rayon: number; objet
     )
     .all(activeSessionId()) as { characterId: number; nom: string; effets: string | null }[]
 
-  const out: { characterId: number; rayon: number; objet: string }[] = []
+  const out: { characterId: number; rayon: number; ouverture: number; objet: string }[] = []
   for (const l of lignes) {
     let effets: { tete?: string; detail?: string }[] = []
     try {
@@ -163,9 +198,20 @@ export function porteursDeLumiere(): { characterId: number; rayon: number; objet
     for (const e of effets) {
       const tete = sansAccents(String(e?.tete ?? ''))
       if (!tete.startsWith('eclair') && !tete.startsWith('lumi')) continue
-      const part = /(\d+(?:[.,]\d+)?)\s*%/.exec(String(e?.detail ?? ''))
-      const rayon = part ? Math.min(1.5, Math.max(0.01, Number(part[1].replace(',', '.')) / 100)) : TORCHE
-      out.push({ characterId: l.characterId, rayon, objet: l.nom })
+      const detail = String(e?.detail ?? '')
+      const nombre = (v: string): number => Number(v.replace(',', '.'))
+      const enM = /(\d+(?:[.,]\d+)?)\s*m\b/i.exec(detail)
+      const enPct = /(\d+(?:[.,]\d+)?)\s*%/.exec(detail)
+      const largeur = metres && metres > 0 ? metres : LARGEUR_SANS_ECHELLE_M
+      const part = enM
+        ? nombre(enM[1]) / largeur
+        : enPct
+          ? nombre(enPct[1]) / 100
+          : TORCHE_M / largeur
+      const rayon = Math.min(1.5, Math.max(0.01, part))
+      const enDeg = /(\d+)\s*°/.exec(detail)
+      const ouverture = enDeg ? faisceau(enDeg[1]) : 360
+      out.push({ characterId: l.characterId, rayon, ouverture, objet: l.nom })
       break
     }
   }

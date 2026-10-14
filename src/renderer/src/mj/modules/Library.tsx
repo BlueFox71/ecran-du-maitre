@@ -289,8 +289,11 @@ export function Library(): JSX.Element {
 
   const dropOn = (folderRel: string): void => {
     const d = dragged.current
+    /* `accepte` lit ce qu'on tient en main : on lui demande avant de lâcher
+       prise, sinon il ne voit plus rien et refuse tout, en silence. */
+    const ok = accepte(folderRel)
     dragged.current = null
-    if (!d || !accepte(folderRel)) return
+    if (!d || !ok) return
     const ou = `« ${folderRel.split('/').pop() ?? 'la racine'} »`
 
     if (d.kind === 'file') {
@@ -433,6 +436,9 @@ export function Library(): JSX.Element {
         className={`row file${on ? ' on' : ''}`}
         draggable
         onDragStart={() => (dragged.current = { kind: 'file', item: i })}
+        /* Lâcher sur un fichier, c'est lâcher dans son dossier : dans un
+           dossier déplié, les fichiers couvrent l'essentiel de la place. */
+        {...cible(parentOf(i.relPath ?? ''))}
         onClick={() => setSel({ kind: 'file', id: i.id })}
         onDoubleClick={() => ouvrir(i)}
       >
@@ -749,6 +755,15 @@ export function Library(): JSX.Element {
           <div className={`pane-body${view === 'table' ? ' flush' : ''}`}>
             {view === 'tree' ? (
               <>
+                {/* La racine, en tête : sans elle, rien ne pouvait remonter
+                    d'un dossier vers le haut de la campagne. */}
+                <div className="row folder racine" {...cible('')}>
+                  <span className="caret" />
+                  <span className="fico">
+                    <IconFolder className="ico" />
+                  </span>
+                  <span className="name">{s.campaign?.name ?? 'Campagne'}</span>
+                </div>
                 {s.tree.map((f) => folderRow(f, 0))}
                 {s.orphans.filter(matches).map(fileRow)}
               </>
@@ -847,14 +862,17 @@ export function Library(): JSX.Element {
               }}
               onNewSub={() => newFolder(selectedFolder.relPath)}
               onRename={() => setRenaming(selectedFolder.relPath)}
-              onDelete={(e) =>
+              onDelete={(e) => {
+                /* Sans cela, le même clic arrive à la fenêtre, qui ferme tout
+                   ce qui flotte — la confirmation à peine ouverte comprise. */
+                e.stopPropagation()
                 setDoomed({
                   x: e.clientX,
                   y: e.clientY,
                   rel: selectedFolder.relPath,
                   n: selectedFolder.items.length
                 })
-              }
+              }}
               onDecor={(icon) => setDecor(selectedFolder.relPath, icon)}
             />
           ) : selectedFile ? (

@@ -1,8 +1,13 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
+import { ChoixPnj, RetirerDeLaReserve, usePnjEnReserve } from '../components/ReservePnj'
 import { MenuPion, type CiblePion } from '../components/MenuPion'
 import { TableauDeScene, type Surbrillance } from '../components/Tableau'
+import { BoutonObjets, ObjetsDeScene, usePanneauScene } from '../components/ObjetsDeScene'
+import { MenuImage, type CibleImage } from '../components/MenuImage'
 import { Slide } from '../../shared/Slide'
+import { BoutonTours, Tours, pionEnJeu } from '../components/Tours'
+import { Valeur } from '../components/Valeur'
 import { Visage } from '../../shared/Visage'
 import { Pings, usePings } from '../../shared/Pings'
 import { decorDossier, folderIcon } from '../components/FolderIcons'
@@ -10,6 +15,8 @@ import { Annotations, CadreAnnote, type OutilAnnotation } from '../components/An
 import { slideLabel } from '../components/Monitor'
 import { IconPhone, Portables } from '../components/Portables'
 import { BoutonPoserLumiere, usePoseLumiere } from '../components/OutilsDeScene'
+import { BoutonAttente } from '../components/Attente'
+import { estPiece } from './Places'
 import {
   IconAudio,
   IconChevron,
@@ -21,6 +28,7 @@ import {
   IconFreeze,
   IconPen,
   IconPlus,
+  IconPorte,
   IconRetour,
   IconRotate,
   IconSearch,
@@ -101,11 +109,43 @@ export function profondeur(p: Place, tous: Place[]): number {
   return Math.min(d, 4)
 }
 
+/**
+ * « Ne pas montrer les pièces » : les pièces encombrent une liste de lieux
+ * quand on mène d'étage en étage. Une habitude du poste, retenue d'une
+ * ouverture à l'autre — chaque liste a sa clé, et donc son propre choix.
+ */
+export function useSansPieces(cle: string): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(() => {
+    try {
+      return localStorage.getItem(cle) === '1'
+    } catch {
+      return false
+    }
+  })
+  const basculer = (v: boolean): void => {
+    setOn(v)
+    try {
+      localStorage.setItem(cle, v ? '1' : '0')
+    } catch {
+      /* sans mémoire, le choix vaut pour la séance */
+    }
+  }
+  return [on, basculer]
+}
+
 export function Regie(): JSX.Element {
   const s = useStore()
   const display = s.display
 
   const [tab, setTab] = useState<Tab>('lieux')
+  const [sansPieces, basculerPieces] = useSansPieces('regie.sansPieces')
+  /* Une pièce à l'écran ou en préparation reste visible : sa ligne allumée
+     est le seul endroit où on la retrouve. */
+  const lieuxVus = sansPieces
+    ? s.places.filter(
+        (p) => !estPiece(p) || p.id === display?.placeId || p.id === display?.pendingPlaceId
+      )
+    : s.places
   /* Les ondes des joueurs : le MJ doit voir où on lui montre, sinon il n'a
      que le nom de celui qui parle. */
   const ondes = usePings()
@@ -296,6 +336,11 @@ export function Regie(): JSX.Element {
    * de leur écran.
    */
   const [leurOeil, setLeurOeil] = useState(false)
+  /* À gauche de l'image : le tableau de scène ou les objets du lieu, l'un ou
+     l'autre — comme au Paravent. La scène d'abord : c'était la seule. */
+  const [panneau, basculerPanneau] = usePanneauScene('regie.panneau', () => 'scene')
+  /* Montrer l'image d'un objet : le même menu qu'au Paravent. */
+  const [cibleImage, setCibleImage] = useState<CibleImage | null>(null)
   /* Ce que le MJ survole dans son tableau de scène : un halo sur sa carte, et
      rien du tout chez les joueurs. */
   const [survol, setSurvol] = useState<Surbrillance>(null)
@@ -732,10 +777,16 @@ export function Regie(): JSX.Element {
     [s.beats, s.activeBeatId]
   )
   const rang = (c: Character): number => (c.kind !== 'pnj' ? 0 : enScene.has(c.id) ? 1 : 2)
+  /* Les joueurs, et les seuls PNJ que le MJ a mis sur la ligne (le +). */
+  const reserve = usePnjEnReserve()
+  const [choixPnj, setChoixPnj] = useState(false)
   const reservePions = useMemo(
-    () => s.characters.filter((c) => c.present).sort((a, b) => rang(a) - rang(b)),
+    () =>
+      s.characters
+        .filter((c) => c.present && (c.kind !== 'pnj' || reserve.ids.has(c.id)))
+        .sort((a, b) => rang(a) - rang(b)),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [s.characters, enScene]
+    [s.characters, enScene, reserve.ids]
   )
 
   const placedChars = new Set(edit.pions.map((p) => p.characterId).filter(Boolean))
@@ -854,7 +905,7 @@ Clic : préparer`
           onClick={() => void window.jdr.display.togglePlayer()}
         >
           <IconExpand />
-          {display?.playerOpen ? 'Fermer l’écran joueurs' : 'Ouvrir l’écran joueurs'}
+          {display?.playerOpen ? 'Fermer l’écran joueurs' : 'Projeter l’écran joueurs'}
         </button>
       </div>
 
@@ -935,7 +986,17 @@ Clic : préparer`
                 disabled={!pivotable}
                 onChange={(e) => poseLum(Number(e.target.value))}
               />
-              <span className={`val num${lum !== 100 ? ' corrige' : ''}`}>{lum} %</span>
+              <Valeur
+                className={`val num${lum !== 100 ? ' corrige' : ''}`}
+                value={lum}
+                min={LUM_MIN * 100}
+                max={LUM_MAX * 100}
+                step={5}
+                unite=" %"
+                disabled={!pivotable}
+                label="Lumière de l’image"
+                onChange={poseLum}
+              />
               {/* Éteint tant qu'on est déjà à 100 % : il n'aurait rien à faire,
                   et un bouton qui ne fait rien se remarque. */}
               <button
@@ -951,22 +1012,54 @@ Clic : préparer`
             </label>
 
             <div className="spacer" />
+            <button
+              className={`btn btn-sm${panneau === 'scene' ? ' btn-on' : ''}`}
+              onClick={() => basculerPanneau('scene')}
+              aria-pressed={panneau === 'scene'}
+              title={
+                !calque?.murs.length
+                  ? 'Le tableau de scène — portes, fenêtres, lumières. Ce lieu n’a pas de murs.'
+                  : panneau === 'scene'
+                    ? 'Cacher le tableau de scène : l’image reprend toute la largeur'
+                    : 'Montrer le tableau de scène à gauche de l’image : portes, fenêtres, lumières'
+              }
+            >
+              <IconPorte />
+              Scène
+            </button>
+            <BoutonObjets
+              on={panneau === 'objets'}
+              placeId={editPlaceId}
+              onClick={() => basculerPanneau('objets')}
+            />
+            <BoutonTours />
             <span className="eyebrow">
               {out ? `${out.label} · ${out.width}×${out.height}` : 'sortie automatique'}
             </span>
           </div>
+
+          {/* Les tours : à qui de jouer — les mêmes qu'au Paravent. */}
+          <Tours />
 
           {/* L'emplacement mesure ; le cadre s'y taille aux proportions de
               l'écran des joueurs, sans marge noire autour de la scène. */}
           {/* Le tableau de scène tient à gauche de l'image : pendant la
               partie, on ne trace plus, on ouvre et on allume. */}
           <div className="big-avec-tableau">
-            {calque?.murs.length ? (
+            {panneau === 'scene' && calque?.murs.length ? (
               <TableauDeScene
                 calque={calque}
+                placeId={editPlaceId}
                 lieux={s.places.filter((p) => p.parentId === editPlaceId)}
                 survol={survol}
                 onSurvol={setSurvol}
+              />
+            ) : null}
+            {panneau === 'objets' ? (
+              <ObjetsDeScene
+                placeId={editPlaceId}
+                onSurvol={setSurvol}
+                onMontrer={(item, titre, x, y) => setCibleImage({ item, titre, x, y })}
               />
             ) : null}
           <div
@@ -997,6 +1090,8 @@ Clic : préparer`
                        la main, une caméra ne viendrait que déranger le
                        cadrage qu'on lui compose. */
                     focusPionId={onLive ? (display?.focusPionId ?? null) : null}
+                    /* Le halo de celui qui joue, comme chez les joueurs. */
+                    pionEnJeuId={onLive ? pionEnJeu(s.tours, edit.pions) : null}
                     onDefocus={() => void window.jdr.pions.focus(null)}
   pionLabels={display?.pionLabels ?? true}
                     pionPv={display?.pionPv ?? false}
@@ -1145,6 +1240,20 @@ Clic : préparer`
           ) : null}
 
           {/* ---- réserve de pions ---- */}
+          {choixPnj ? (
+            <ChoixPnj
+              enScene={enScene}
+              onSansFiche={
+                editPlaceId == null
+                  ? undefined
+                  : () => {
+                      setChoixPnj(false)
+                      setPnj('')
+                    }
+              }
+              onClose={() => setChoixPnj(false)}
+            />
+          ) : null}
           <div className="tray">
             <span className="eyebrow">Pions</span>
             <div className="tray-pions">
@@ -1155,41 +1264,43 @@ Clic : préparer`
                 const parti = placed || editPlaceId == null ? null : ailleurs(c.id, editPlaceId)
                 const photo = s.allItems.find((i) => i.id === c.portraitItemId)
                 return (
-                  <div
-                    key={c.id}
-                    /* La couleur du personnage, ici comme sur son pion à
-                       l'écran : la réserve et la table parlent la même langue. */
-                    className={`tok teinte c-${c.color ?? 'neutral'}${placed ? ' placed' : ''}${
-                      enScene.size && rang(c) === 2 ? ' en-retrait' : ''
-                    }${
-                      photo ? ' photo' : ''
-                    }`}
-                    draggable={!placed}
-                    onDragStart={(e) => {
-                      e.dataTransfer.setData('text/pion-char', String(c.id))
-                      e.dataTransfer.effectAllowed = 'copy'
-                    }}
-                    // Une image lâchée sur un pion devient sa photo : c'est la
-                    // façon la plus courte de donner un visage à un personnage.
-                    onDragEnter={(e) => void accepteSi(e, 'text/pion-item')}
-                    onDragOver={(e) => void accepteSi(e, 'text/pion-item')}
-                    onDrop={(e) => void setPhoto(e, c.id)}
-                    title={
-                      placed
-                        ? `${c.name} — déjà sur la table`
-                        : parti
-                          ? `${c.name} — actuellement à ${parti.lieu} ; le poser ici l’y fera quitter`
-                          : photo
-                            ? c.name
-                            : `${c.name} — glisse une image ici pour lui donner sa photo`
-                    }
-                  >
-                    {photo?.url ? (
-                      <img src={photo.url} alt="" draggable={false} />
-                    ) : (
-                      initials(c.name)
-                    )}
-                  </div>
+                  <span key={c.id} className="tray-tok">
+                    <div
+                      /* La couleur du personnage, ici comme sur son pion à
+                         l'écran : la réserve et la table parlent la même langue. */
+                      className={`tok teinte c-${c.color ?? 'neutral'}${placed ? ' placed' : ''}${
+                        enScene.size && rang(c) === 2 ? ' en-retrait' : ''
+                      }${
+                        photo ? ' photo' : ''
+                      }`}
+                      draggable={!placed}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/pion-char', String(c.id))
+                        e.dataTransfer.effectAllowed = 'copy'
+                      }}
+                      // Une image lâchée sur un pion devient sa photo : c'est la
+                      // façon la plus courte de donner un visage à un personnage.
+                      onDragEnter={(e) => void accepteSi(e, 'text/pion-item')}
+                      onDragOver={(e) => void accepteSi(e, 'text/pion-item')}
+                      onDrop={(e) => void setPhoto(e, c.id)}
+                      title={
+                        placed
+                          ? `${c.name} — déjà sur la table`
+                          : parti
+                            ? `${c.name} — actuellement à ${parti.lieu} ; le poser ici l’y fera quitter`
+                            : photo
+                              ? c.name
+                              : `${c.name} — glisse une image ici pour lui donner sa photo`
+                      }
+                    >
+                      {photo?.url ? (
+                        <img src={photo.url} alt="" draggable={false} />
+                      ) : (
+                        initials(c.name)
+                      )}
+                    </div>
+                    {c.kind === 'pnj' ? <RetirerDeLaReserve c={c} onRetirer={() => reserve.retirer(c.id)} /> : null}
+                  </span>
                 )
               })}
 
@@ -1200,13 +1311,8 @@ Clic : préparer`
                 <button
                   type="button"
                   className="tok neuf"
-                  disabled={editPlaceId == null}
-                  title={
-                    editPlaceId == null
-                      ? 'Choisis d’abord le lieu où se tient la scène'
-                      : 'Poser un pion de PNJ — caché des joueurs jusqu’à ce que tu le montres'
-                  }
-                  onClick={() => setPnj('')}
+                  title="Ajouter des PNJ à la ligne des pions"
+                  onClick={() => setChoixPnj(true)}
                 >
                   +
                 </button>
@@ -1247,7 +1353,22 @@ Clic : préparer`
                   await refreshEdit()
                 }}
               />
-              <span className="val num">{edit.size.toFixed(1)} %</span>
+              <Valeur
+                className="val num"
+                value={edit.size}
+                min={2}
+                max={20}
+                step={0.5}
+                decimales={1}
+                unite=" %"
+                disabled={!place}
+                label="Taille des pions"
+                onChange={async (v) => {
+                  if (!place) return
+                  await window.jdr.pions.size(place.id, v)
+                  await refreshEdit()
+                }}
+              />
             </label>
 
             <span className="sep" />
@@ -1451,7 +1572,17 @@ Clic : préparer`
                 value={over?.size ?? TEXTE_NEUF.size}
                 onChange={(e) => poseTexte({ size: Number(e.target.value) })}
               />
-              <span className="val num">{(over?.size ?? TEXTE_NEUF.size).toFixed(2)} %</span>
+              <Valeur
+                className="val num"
+                value={over?.size ?? TEXTE_NEUF.size}
+                min={1.5}
+                max={14}
+                step={0.25}
+                decimales={2}
+                unite=" %"
+                label="Corps du texte"
+                onChange={(v) => poseTexte({ size: v })}
+              />
             </label>
 
             <span className="sep" />
@@ -1513,6 +1644,10 @@ Clic : préparer`
                 Textes
                 {textes.length ? <span className="kbd num">{textes.length}</span> : null}
               </button>
+              <span className="sep" />
+
+              {/* Avant la partie : l'écran qu'on laisse pendant qu'ils s'installent. */}
+              <BoutonAttente />
               <span className="sep" />
 
               {/* Les trois touchent l'écran des joueurs de trois façons proches :
@@ -1617,6 +1752,15 @@ Clic : préparer`
                 value={audio?.volume ?? 0.35}
                 onChange={(e) => void window.jdr.display.audio({ volume: Number(e.target.value) })}
               />
+              <Valeur
+                className="val num"
+                value={Math.round((audio?.volume ?? 0.35) * 100)}
+                min={0}
+                max={100}
+                unite=" %"
+                label="Volume de l’ambiance"
+                onChange={(v) => void window.jdr.display.audio({ volume: v / 100 })}
+              />
             </div>
           </div>
         </div>
@@ -1644,7 +1788,7 @@ Clic : préparer`
             <div className="spacer" />
             <span className="eyebrow">
               {tab === 'lieux'
-                ? `${s.places.length} lieux`
+                ? `${lieuxVus.length} lieux`
                 : tab === 'arbre'
                   ? `${flat.length} fichiers`
                   : `${s.mobile?.devices.length ?? 0} appareils`}
@@ -1660,8 +1804,16 @@ Clic : préparer`
                     `places:list` sort déjà dans cet ordre — on ne fait qu'indenter,
                     selon la profondeur réelle : un lieu rangé nulle part reste à
                     gauche, il n'appartient pas au dernier niveau affiché. */}
+                <label className="lieux-filtre">
+                  <input
+                    type="checkbox"
+                    checked={sansPieces}
+                    onChange={(e) => basculerPieces(e.target.checked)}
+                  />
+                  Ne pas montrer les pièces
+                </label>
                 <div className="lieux-list">
-                  {s.places.map((p) => {
+                  {lieuxVus.map((p) => {
                     const ici = presence[p.id]?.joueurs ?? []
                     const map = s.allItems.find((i) => i.id === p.mapItemId)
                     return (
@@ -1794,6 +1946,7 @@ Clic : préparer · glisser sur « À l’écran » : envoyer tout de suite`}
                     pions={live ? display?.pions : undefined}
                     pionSize={display?.pionSize}
                     focusPionId={live ? display?.focusPionId : null}
+                    pionEnJeuId={live ? (display?.tour?.pionEnJeuId ?? null) : null}
                     pionLabels={display?.pionLabels ?? true}
                     pionPv={display?.pionPv ?? false}
                     joueurs={display?.joueurs}
@@ -1848,6 +2001,30 @@ Clic : préparer · glisser sur « À l’écran » : envoyer tout de suite`}
         onFait={async () => {
           await refreshPresence()
           await refreshEdit()
+        }}
+      />
+      <MenuImage
+        cible={cibleImage}
+        onFerme={() => setCibleImage(null)}
+        onPreparer={async (it) => {
+          await dropOnPrepared(it.id)
+          regarder(idleSlot)
+        }}
+        libre={idleSlot + 1}
+        direct={liveSlot + 1}
+        onDirect={async (it) => {
+          if (frozen) {
+            s.toast('Image figée — dégèle d’abord pour changer l’écran joueurs', true)
+            return
+          }
+          await window.jdr.display.showItem(it.id)
+          regarder(liveSlot)
+        }}
+        /* La fenêtre s'ouvre sur le direct : c'est lui qu'on veut avoir sous
+           les yeux pour la placer. */
+        onFenetre={async (it) => {
+          await window.jdr.display.fenetre(it.id)
+          regarder(liveSlot)
         }}
       />
     </section>

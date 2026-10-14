@@ -27,6 +27,7 @@ import type {
 const BLACK: SlidePayload = { type: 'black' }
 
 const state: DisplayState = {
+  tour: null,
   slide: BLACK,
   slots: [BLACK, BLACK],
   liveSlot: 0,
@@ -192,8 +193,28 @@ function garderTextes(neuf: SlidePayload, avant: SlidePayload): SlidePayload {
 /** Envoie tout de suite à l'écran, sans passer par la préparation. */
 export function show(slide: SlidePayload): DisplayState {
   if (state.frozen) return state
-  if (slide.type !== 'black') state.previous = state.slide
+  /* D'une présentation à l'autre, on garde en mémoire ce qui était là avant
+     la première : c'est là qu'« Arrêter » doit ramener. */
+  const enchaine = ECRANS_A_PART.has(slide.type) && ECRANS_A_PART.has(state.slide.type)
+  if (slide.type !== 'black' && !enchaine) state.previous = state.slide
   state.slots[state.liveSlot] = garderTextes(slide, state.slots[state.liveSlot])
+  sync()
+  broadcast()
+  return state
+}
+
+/**
+ * Les écrans qu'on pose par-dessus la partie et qu'on retire ensuite : la
+ * présentation d'un joueur, l'attente d'avant séance. Les arrêter rend ce
+ * qui était là avant le premier d'entre eux.
+ */
+const ECRANS_A_PART = new Set<SlidePayload['type']>(['presentation', 'attente'])
+
+/** Retire la présentation d'un joueur ou l'attente : l'écran revient à ce qu'il montrait avant. */
+export function arreterPresentation(): DisplayState {
+  if (state.frozen || !ECRANS_A_PART.has(state.slide.type)) return state
+  state.slots[state.liveSlot] = state.previous ?? BLACK
+  state.previous = null
   sync()
   broadcast()
   return state
@@ -638,7 +659,26 @@ export function calqueABouge(): void {
   broadcast()
 }
 
+/**
+ * Ce qui recalcule les tours vus des joueurs. Comme `apres`, c'est un
+ * abonnement : `tours` a besoin de `display`, l'inverse ferait un cercle.
+ *
+ * On le recalcule à chaque diffusion, et non seulement quand le MJ touche aux
+ * tours : le halo suit un pion, et le pion peut changer de lieu, se cacher ou
+ * disparaître sans que les tours en sachent rien.
+ */
+let calculTour: (() => DisplayState['tour']) | null = null
+export function onCalculTour(f: () => DisplayState['tour']): void {
+  calculTour = f
+}
+
+/** Un message pour la seule fenêtre du MJ — ce que les joueurs ne doivent pas recevoir. */
+export function versMj(canal: string, charge: unknown): void {
+  if (mjWindow && !mjWindow.isDestroyed()) mjWindow.webContents.send(canal, charge)
+}
+
 export function broadcast(): void {
+  state.tour = calculTour?.() ?? null
   const payload = JSON.parse(JSON.stringify(state)) as DisplayState
   /*
    * Le gel se tient ici, au seuil, et non dans chaque fonction : c'est le seul

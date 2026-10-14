@@ -1,6 +1,7 @@
 import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { copierLigne } from '../copie'
 import { couleurLibre, lisCadreCarre } from '@shared/types'
+import { emojisDe } from '@shared/emojis'
 import type {
   ButinLigne,
   CadreCarre,
@@ -200,6 +201,10 @@ function lisButin(txt: string | null | undefined): ButinLigne[] {
   }
 }
 
+/** Les émojis repassent au tamis avant d'entrer : cinq, différents, rien d'autre. */
+const ecrisEmojis = (liste: string[] | null | undefined): string | null =>
+  emojisDe((liste ?? []).join('')).join('') || null
+
 /** Une liste vide ne s'écrit pas : la colonne reste nulle, comme à la création. */
 const ecrisButin = (lignes: ButinLigne[] | null | undefined): string | null =>
   lignes && lignes.length ? JSON.stringify(lignes) : null
@@ -212,6 +217,10 @@ function toCharacter(r: any): Character {
     player: r.player,
     occupation: r.occupation,
     age: r.age,
+    biographie: r.biographie ?? null,
+    lieuNaissance: r.lieu_naissance ?? null,
+    ville: r.ville ?? null,
+    emojis: emojisDe(r.emojis),
     color: r.color,
     portraitItemId: r.portrait_item_id,
     portraitCadre: lisCadreCarre(r.portrait_cadre),
@@ -235,7 +244,7 @@ function toCharacter(r: any): Character {
  */
 const SELECT_PERSO = `
   SELECT c.id, c.template_id, c.name, c.player, c.occupation, c.portrait_item_id,
-         c.portrait_cadre, c.sheet_item_id, c.sheet_frame, c.age, c.color, c.kind, c.sexe, c.notes, c.butin,
+         c.portrait_cadre, c.sheet_item_id, c.sheet_frame, c.age, c.biographie, c.lieu_naissance, c.ville, c.emojis, c.color, c.kind, c.sexe, c.notes, c.butin,
          CASE WHEN c.kind = 'pj'
               THEN COALESCE((SELECT cs.data FROM character_seance cs
                               WHERE cs.character_id = c.id AND cs.session_id = @sid), c.data)
@@ -448,6 +457,10 @@ export function upsertCharacter(input: {
   player?: string | null
   occupation?: string | null
   age?: string | null
+  biographie?: string | null
+  lieuNaissance?: string | null
+  ville?: string | null
+  emojis?: string[]
   color?: string | null
   sexe?: Sexe | null
   portraitItemId?: number | null
@@ -463,6 +476,8 @@ export function upsertCharacter(input: {
     db.prepare(
       `UPDATE character SET template_id = @templateId, name = @name, player = @player,
                             occupation = @occupation, age = @age, color = @color,
+                            biographie = @biographie, lieu_naissance = @lieuNaissance, ville = @ville,
+                            emojis = @emojis,
                             sexe = @sexe, portrait_item_id = @portraitItemId,
                             portrait_cadre = @portraitCadre, sheet_item_id = @sheetItemId, sheet_frame = @sheetFrame,
                             notes = @notes, butin = @butin,
@@ -475,6 +490,10 @@ export function upsertCharacter(input: {
       player: input.player !== undefined ? input.player : cur.player,
       occupation: input.occupation !== undefined ? input.occupation : cur.occupation,
       age: input.age !== undefined ? input.age : cur.age,
+      biographie: input.biographie !== undefined ? input.biographie : cur.biographie,
+      lieuNaissance: input.lieuNaissance !== undefined ? input.lieuNaissance : cur.lieuNaissance,
+      ville: input.ville !== undefined ? input.ville : cur.ville,
+      emojis: ecrisEmojis(input.emojis !== undefined ? input.emojis : cur.emojis),
       color: input.color !== undefined ? input.color : cur.color,
       sexe: input.sexe !== undefined ? input.sexe : cur.sexe,
       portraitItemId: input.portraitItemId !== undefined ? input.portraitItemId : cur.portraitItemId,
@@ -506,10 +525,12 @@ export function upsertCharacter(input: {
   const info = db
     .prepare(
       `INSERT INTO character (campaign_id, session_id, template_id, kind, notes, butin, name, player,
-                              occupation, age, color, sexe, portrait_item_id, portrait_cadre,
+                              occupation, age, biographie, lieu_naissance, ville, emojis, color, sexe,
+                              portrait_item_id, portrait_cadre,
                               sheet_item_id, sheet_frame, data, ord)
        VALUES (@cid, @sid, @templateId, @kind, @notes, @butin, @name, @player,
-               @occupation, @age, @color, @sexe, @portraitItemId, @portraitCadre,
+               @occupation, @age, @biographie, @lieuNaissance, @ville, @emojis, @color, @sexe,
+               @portraitItemId, @portraitCadre,
                @sheetItemId, @sheetFrame, @data, @ord)`
     )
     .run({
@@ -524,6 +545,10 @@ export function upsertCharacter(input: {
       player: input.player ?? null,
       occupation: input.occupation ?? null,
       age: input.age ?? null,
+      biographie: input.biographie ?? null,
+      lieuNaissance: input.lieuNaissance ?? null,
+      ville: input.ville ?? null,
+      emojis: ecrisEmojis(input.emojis),
       sexe: input.sexe ?? null,
       /* Une couleur d'office a la creation : la premiere libre parmi les
          joueurs. C'est elle qui distingue le joueur dans la liste et cercle

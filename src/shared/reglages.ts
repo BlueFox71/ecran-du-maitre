@@ -43,6 +43,8 @@ export interface ReglagesCampagne {
   mursGarde: boolean
   /** La largeur d'usine d'une porte, en part de largeur de carte. */
   mursLargeur: number
+  /** Les PNJ ont-ils, eux aussi, une colonne « fiche de compétences » ? */
+  pnjFiche: boolean
 }
 
 export const CAMPAGNE_DEFAUT: ReglagesCampagne = {
@@ -54,7 +56,9 @@ export const CAMPAGNE_DEFAUT: ReglagesCampagne = {
   mursPortee: null,
   mursAngle: OUVERTURE_REGARD,
   mursGarde: false,
-  mursLargeur: LARGEUR_DEFAUT
+  mursLargeur: LARGEUR_DEFAUT,
+  /* Masquée : un PNJ n'a pas de feuille remplie à la main, d'ordinaire. */
+  pnjFiche: false
 }
 
 export function lireCampagne(b: Brut): ReglagesCampagne {
@@ -67,7 +71,8 @@ export function lireCampagne(b: Brut): ReglagesCampagne {
     mursPortee: b['murs.portee'] ? borne(Number(b['murs.portee']), 0.02, 1.5) : null,
     mursAngle: nombre(b, 'murs.angle', CAMPAGNE_DEFAUT.mursAngle, 15, 360),
     mursGarde: oui(b, 'murs.garde', CAMPAGNE_DEFAUT.mursGarde),
-    mursLargeur: nombre(b, 'murs.largeur', CAMPAGNE_DEFAUT.mursLargeur, 0.005, 0.5)
+    mursLargeur: nombre(b, 'murs.largeur', CAMPAGNE_DEFAUT.mursLargeur, 0.005, 0.5),
+    pnjFiche: oui(b, 'pnj.fiche', CAMPAGNE_DEFAUT.pnjFiche)
   }
 }
 
@@ -91,6 +96,15 @@ export interface ReglagesPoste {
   appareils: number
   /** La loupe du texte dans l'Éditeur : 1, la taille d'usine. */
   editeurZoom: number
+  /** Le profil du maître du jeu : c'est lui qui s'assoit à la table de l'écran d'attente. */
+  mjPrenom: string
+  mjNom: string
+  /**
+   * Son image : `avatar:<id>`, l'une de celles que l'application fournit, ou
+   * `jdr://profil/…`, un fichier pris sur le disque et gardé sur le poste.
+   * `null`, un dé.
+   */
+  mjImage: string | null
 }
 
 export const POSTE_DEFAUT: ReglagesPoste = {
@@ -100,7 +114,10 @@ export const POSTE_DEFAUT: ReglagesPoste = {
   port: 7777,
   adresse: null,
   appareils: 2,
-  editeurZoom: 1
+  editeurZoom: 1,
+  mjPrenom: '',
+  mjNom: '',
+  mjImage: null
 }
 
 /** Les bornes de la loupe du texte : en deçà on ne lit plus, au-delà une ligne ne tient plus. */
@@ -115,8 +132,16 @@ export function lirePoste(b: Brut): ReglagesPoste {
     port: Math.round(nombre(b, 'portable.port', POSTE_DEFAUT.port, 1024, 65535)),
     adresse: b['portable.adresse']?.trim() || null,
     appareils: Math.round(nombre(b, 'portable.appareils', POSTE_DEFAUT.appareils, 1, 8)),
-    editeurZoom: nombre(b, 'editeur.zoom', POSTE_DEFAUT.editeurZoom, ZOOM_MIN, ZOOM_MAX)
+    editeurZoom: nombre(b, 'editeur.zoom', POSTE_DEFAUT.editeurZoom, ZOOM_MIN, ZOOM_MAX),
+    mjPrenom: b['mj.prenom']?.trim() ?? '',
+    mjNom: b['mj.nom']?.trim() ?? '',
+    mjImage: /^(avatar:[a-z-]+|jdr:\/\/profil\/.+)$/.test(b['mj.image'] ?? '') ? b['mj.image'] : null
   }
+}
+
+/** Le nom que le MJ porte à l'écran : prénom et nom, ou « Le MJ » s'il n'a rien dit. */
+export function nomDuMj(p: Pick<ReglagesPoste, 'mjPrenom' | 'mjNom'>): string {
+  return [p.mjPrenom, p.mjNom].filter(Boolean).join(' ') || 'Le MJ'
 }
 
 /* ============================================================

@@ -1,3 +1,4 @@
+import { echelleDe } from './echelle'
 import { getDb } from '../index'
 import { mediaUrl } from '../../vault'
 import { upsertCharacter } from './characters'
@@ -12,7 +13,7 @@ import type { Pion, PionsDuLieu } from '@shared/types'
 
 /** Couleur déduite de l'identifiant : deux pions voisins ne se ressemblent pas. */
 const PALETTE = ['brass', 'moss', 'iris', 'blood', 'neutral']
-const colorFor = (n: number): string => PALETTE[Math.abs(n) % PALETTE.length]
+export const colorFor = (n: number): string => PALETTE[Math.abs(n) % PALETTE.length]
 
 export function initialsOf(name: string): string {
   return name
@@ -34,8 +35,10 @@ interface Row {
   ord: number
   rotation: number
   hidden: number
+  anonyme: number
   char_name: string | null
   char_color: string | null
+  char_kind: string | null
   portrait_path: string | null
   portrait_cadre: string | null
   item_title: string | null
@@ -44,9 +47,10 @@ interface Row {
 
 const SELECT = `
   SELECT p.id, p.place_id, p.character_id, p.item_id, p.label, p.x, p.y,
-         p.ord, p.rotation, p.hidden,
+         p.ord, p.rotation, p.hidden, p.anonyme,
          c.name        AS char_name,
          c.color       AS char_color,
+         c.kind        AS char_kind,
          pi.rel_path   AS portrait_path,
          c.portrait_cadre,
          i.title       AS item_title,
@@ -62,6 +66,7 @@ function toPion(r: Row): Pion {
     id: r.id,
     placeId: r.place_id,
     characterId: r.character_id,
+    pnj: r.char_kind === 'pnj',
     itemId: r.item_id,
     label,
     url: mediaUrl(r.item_path ?? r.portrait_path),
@@ -75,7 +80,8 @@ function toPion(r: Row): Pion {
     y: r.y,
     ord: r.ord,
     rotation: r.rotation,
-    cache: !!r.hidden
+    cache: !!r.hidden,
+    anonyme: !!r.anonyme
   }
 }
 
@@ -100,20 +106,26 @@ export function listPions(placeId: number | null): Pion[] {
  * penserait à lire. Tout nouveau chemin vers les joueurs passe par ici.
  */
 export function listPionsVus(placeId: number | null): Pion[] {
-  return listPions(placeId).filter((p) => !p.cache)
+  /* Sans nom, il part sans nom : ni libellé, ni initiales qui le trahiraient. */
+  return listPions(placeId)
+    .filter((p) => !p.cache)
+    .map((p) => (p.anonyme ? { ...p, label: '', initials: '?' } : p))
 }
 
+/**
+ * La taille des pions d'un lieu, en pour cent de la largeur de son plan : à
+ * l'échelle quand on la connaît (un pion fait 1,5 m), sinon celle réglée à la
+ * main.
+ */
 export function pionSize(placeId: number | null): number {
   if (placeId == null) return 6
-  const r = getDb().prepare(`SELECT pion_size FROM place WHERE id = ?`).get(placeId) as
-    | { pion_size: number }
-    | undefined
-  return r?.pion_size ?? 6
+  return echelleDe(placeId).pionPourcent
 }
 
+/** Régler la taille à la main : le lieu ne suit plus l'échelle. */
 export function setPionSize(placeId: number, size: number): void {
   const clamped = Math.min(24, Math.max(2, size))
-  getDb().prepare(`UPDATE place SET pion_size = ? WHERE id = ?`).run(clamped, placeId)
+  getDb().prepare(`UPDATE place SET pion_size = ?, pion_main = 1 WHERE id = ?`).run(clamped, placeId)
 }
 
 export function addPion(input: {
@@ -246,6 +258,12 @@ export function promouvoirPion(id: number, templateId: number): Pion | null {
 /** Le soustraire aux joueurs, ou le leur rendre. */
 export function cacherPion(id: number, cache: boolean): Pion | null {
   getDb().prepare(`UPDATE pion SET hidden = ? WHERE id = ?`).run(cache ? 1 : 0, id)
+  return getPion(id)
+}
+
+/** Taire son nom aux joueurs, ou le leur dire. */
+export function anonymiserPion(id: number, anonyme: boolean): Pion | null {
+  getDb().prepare(`UPDATE pion SET anonyme = ? WHERE id = ?`).run(anonyme ? 1 : 0, id)
   return getPion(id)
 }
 

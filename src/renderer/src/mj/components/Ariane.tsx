@@ -3,6 +3,7 @@ import { useStore, type ViewId } from '../store'
 import { useRetourMoment } from '../retourMoment'
 import { avancer, reculer, useHistorique } from '../historique'
 import { IconPrecedent, IconSuivant } from './Icons'
+import { useSuiteAriane } from './SuiteAriane'
 
 /* ============================================================
    La barre du haut, à gauche : ← → puis le fil d'Ariane de la page.
@@ -22,6 +23,11 @@ const PAGES: Record<Exclude<ViewId, 'editor'>, Maillon[]> = {
     { label: 'Matière' },
     { label: 'Préparation de la séance', view: 'timeline' },
     { label: 'Chronologie' }
+  ],
+  trame: [
+    { label: 'Matière' },
+    { label: 'Préparation de la séance', view: 'timeline' },
+    { label: 'Arborescence' }
   ],
   annexes: [
     { label: 'Matière' },
@@ -62,6 +68,9 @@ export function Ariane({ sousTitre }: { sousTitre: string }): JSX.Element {
   const { pile, pos } = useHistorique()
   const maillons = chemin(s, docDuMoment)
   const dernier = maillons.length - 1
+  /* Une page qui va plus loin (la fiche d'un lieu) : son entrée devient un
+     lien de retour, et la suite s'écrit après, dans `#ariane-suite`. */
+  const retour = useSuiteAriane((r) => r.retour)
 
   return (
     <div className="ariane">
@@ -90,7 +99,11 @@ export function Ariane({ sousTitre }: { sousTitre: string }): JSX.Element {
         {maillons.map((m, i) => (
           <Fragment key={i}>
             {i > 0 ? <span className="ariane-sep">›</span> : null}
-            {i === dernier ? (
+            {i === dernier && retour ? (
+              <button className="ariane-lien" onClick={retour}>
+                {m.label}
+              </button>
+            ) : i === dernier ? (
               <h1 aria-current="page">{m.label}</h1>
             ) : m.view ? (
               <button className="ariane-lien" onClick={() => s.setView(m.view!)}>
@@ -101,7 +114,8 @@ export function Ariane({ sousTitre }: { sousTitre: string }): JSX.Element {
             )}
           </Fragment>
         ))}
-        {sousTitre ? <span className="ariane-sous">{sousTitre}</span> : null}
+        <span id="ariane-suite" className="ariane-suite" />
+        {sousTitre && !retour ? <span className="ariane-sous">{sousTitre}</span> : null}
       </nav>
     </div>
   )

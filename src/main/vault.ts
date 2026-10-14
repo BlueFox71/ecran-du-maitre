@@ -13,6 +13,7 @@ import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { net, protocol } from 'electron'
 import { absOf, campaignRoot, insideRoot } from './library'
+import { dataRoot } from './db'
 
 /** URL servie aux interfaces pour un chemin relatif au dossier de campagne. */
 export function mediaUrl(relPath: string | null): string | null {
@@ -50,6 +51,11 @@ export function vignetteUrl(id: number, thumbAt: string | null): string | null {
   return `jdr://vignette/${id}.jpg?v=${encodeURIComponent(thumbAt)}`
 }
 
+/** Le portrait du MJ vit hors de toute campagne : il suit le poste. */
+export function profilDir(): string {
+  return join(dataRoot(), 'profil-mj')
+}
+
 /* ---------------- le protocole ---------------- */
 
 /**
@@ -77,6 +83,13 @@ export function registerMediaProtocol(): void {
       const dir = vignettesDir()
       if (!dir || !/^\d+\.jpg$/.test(nom)) return new Response('Introuvable', { status: 404 })
       const abs = join(dir, nom)
+      if (!existsSync(abs)) return new Response('Introuvable', { status: 404 })
+      return servir(abs)
+    }
+
+    if (url.hostname === 'profil') {
+      if (!/^portrait-\d+\.[a-z0-9]+$/.test(nom)) return new Response('Introuvable', { status: 404 })
+      const abs = join(profilDir(), nom)
       if (!existsSync(abs)) return new Response('Introuvable', { status: 404 })
       return servir(abs)
     }

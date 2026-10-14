@@ -59,6 +59,7 @@ const MODULES: Record<string, string> = {
   objets: 'Objets',
   characters: 'Fiches',
   annexes: 'Annexes',
+  trame: 'Arborescence',
   templates: 'Fiche de campagne',
   sheet: 'Fiche de campagne',
   models: 'Fiche de campagne',
@@ -74,6 +75,8 @@ const CANAUX_HORS = new Set([
   'timeline:deleteSession',
   'timeline:setActiveSession',
   'timeline:placerSeance',
+  'trame:cocher',
+  'trame:toutDecocher',
   'places:seen',
   'characters:adjust',
   'characters:setState',
@@ -88,6 +91,7 @@ const CANAUX_HORS = new Set([
  */
 const INVERSES_DU_JEU = [
   /^UPDATE "beat" SET "done"=/,
+  /^UPDATE "trame_carte" SET "fait"=/,
   /* Ouvrir une porte, tirer un rideau, allumer une lampe : ça se referme et
      ça s'éteint, ça ne s'annule pas. */
   /^UPDATE "ouverture" SET "ouverte"=/,
@@ -267,6 +271,9 @@ export function ouvrirGroupe(): void {
   groupe++
 }
 
+/** Un geste en plusieurs appels est-il en cours ? */
+export const enGroupe = (): boolean => groupe > 0
+
 export function fermerGroupe(): void {
   if (groupe === 0) return
   groupe--
@@ -288,6 +295,18 @@ function rejouer(pas: Pas): Pas {
          n'est pas forcément celui des clés étrangères. On vérifie à la fin. */
       db.pragma('defer_foreign_keys = ON')
       for (const q of [...pas.sqls].reverse()) db.exec(q)
+      /* Le texte d'un moment parti à la corbeille avec lui, puis le moment
+         défait : le disque fait foi, le rattachement tombe et le moment
+         revient. Seulement ces rattachements-là — un lieu dont le plan a
+         disparu, lui, ne s'efface pas pour autant. */
+      const orphelins = db.pragma('foreign_key_check(beat_item)') as {
+        rowid: number | null
+        parent: string
+      }[]
+      for (const o of orphelins) {
+        if (o.rowid !== null && o.parent === 'item')
+          db.prepare(`DELETE FROM beat_item WHERE rowid = ?`).run(o.rowid)
+      }
     })()
   } finally {
     activer(false)

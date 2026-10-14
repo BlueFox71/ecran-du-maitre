@@ -164,8 +164,15 @@ export function CadreAnnote({
       ref={hote}
       className={`cadre-hote${zoomable ? ' zoomable' : ''}${className ? ` ${className}` : ''}`}
       onPointerDown={(e) => {
-        if (!zoomable || e.button !== 0) return
+        /* Le bouton du milieu recadre aussi : c'est le seul geste libre quand
+           le gauche trace — un cadre à rogner, un mur. */
+        if (!zoomable || (e.button !== 0 && e.button !== 1)) return
+        if (e.button === 1) e.preventDefault()
         tire.current = { x: e.clientX, y: e.clientY, ox: vue.ox, oy: vue.oy, bouge: false }
+      }}
+      onMouseDown={(e) => {
+        /* Sans quoi le clic molette lance le défilement automatique. */
+        if (zoomable && e.button === 1) e.preventDefault()
       }}
       onPointerMove={(e) => {
         const t = tire.current
@@ -192,7 +199,7 @@ export function CadreAnnote({
       onDoubleClick={() => zoomable && setVue({ z: 1, ox: 0, oy: 0 })}
       title={
         zoomable
-          ? 'Molette : agrandir · glisser : recadrer · double-clic : revenir au plan entier'
+          ? 'Molette : agrandir · glisser ou clic molette glissé : recadrer · double-clic : revenir au plan entier'
           : undefined
       }
     >
@@ -226,10 +233,17 @@ export function Annotations({
   onChoisir,
   onPoser,
   onDeplacer,
-  onEffacer
+  onEffacer,
+  traversant = false
 }: {
   annotations: Annotation[]
   mode: 'lecture' | 'edition'
+  /**
+   * Le calque laisse passer les clics dans le vide — vers les murs dessous —
+   * et ne retient que ceux qui tombent sur une annotation : on choisit l'un
+   * ou l'autre avec le même outil.
+   */
+  traversant?: boolean
   /** L'outil armé : le prochain clic sur la carte pose ceci. */
   outil?: OutilAnnotation
   choisi?: number | null
@@ -253,7 +267,7 @@ export function Annotations({
   return (
     <div
       ref={hote}
-      className={`annot-layer${edition ? ' edit' : ''}${outil ? ' arme' : ''}`}
+      className={`annot-layer${edition ? ' edit' : ''}${outil ? ' arme' : ''}${traversant ? ' traversant' : ''}`}
       onClick={(e) => {
         if (!edition) return
         /* Un clic dans le vide : soit on pose ce que l'outil tient, soit on

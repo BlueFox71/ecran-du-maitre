@@ -10,8 +10,10 @@ import { getDb } from '../index'
 import * as places from './places'
 import * as ouvertures from './ouvertures'
 import * as lumieres from './lumieres'
+import { echelleDe } from './echelle'
 import * as reglages from './reglages'
 import { lireCampagne } from '@shared/reglages'
+import { dansForme, formesDesMurs, pointInterieur } from '@shared/pieces'
 import {
   MUR_NATURES,
   type CalqueBrouillard,
@@ -121,6 +123,71 @@ export function removeMur(id: number): void {
   getDb().prepare(`DELETE FROM mur WHERE id = ?`).run(id)
 }
 
+/**
+ * Les pièces d'un étage suivent ses murs.
+ *
+ * Un lieu tracé sur un plan garde son contour en base, et la fiche du lieu ne
+ * lit que lui. Ce contour se recalait dans l'interface, seulement quand le
+ * plan était ouvert en mode murs : une retouche faite ailleurs — une autre
+ * session, la base elle-même — laissait des fiches à l'ancienne, et le plan du
+ * niveau ne disait plus la même chose que les fiches. On recale donc ici,
+ * après chaque geste sur un mur, dans le même échange : le contour se défait
+ * avec le geste.
+ *
+ * Chaque forme fermée revient au lieu dont le point d'accroche tombe dedans.
+ * Deux lieux dans la même forme : on ne choisit pas, on ne touche à rien — le
+ * volet des murs le signale, c'est au MJ de dire lequel va où.
+ *
+ * Dit si un contour a bougé, et les lieux nés d'une coupe : un mur qui
+ * traverse un lieu en laisse une moitié sans nom, qui devient « <lieu>
+ * (suite) ».
+ */
+export function recalerPieces(placeId: number): { touche: boolean; suites: string[] } {
+  const niveau = places.getPlace(placeId)
+  if (!niveau) return { touche: false, suites: [] }
+  let touche = false
+  const pieces = (
+    getDb().prepare(`SELECT id FROM place WHERE parent_id = ? AND tier = 'lieu'`).all(placeId) as {
+      id: number
+    }[]
+  )
+    .map((r) => places.getPlace(r.id))
+    .filter((q): q is NonNullable<typeof q> => !!q)
+  /* Un lieu dont le point d'accroche est sorti de son propre contour — un
+     couloir en L ancré à son centre de gravité — ne retrouverait plus sa
+     pièce : on le raccroche à un point de son contour. */
+  for (const q of pieces)
+    if (q.zone && q.ancre && !dansForme(q.ancre, q.zone)) {
+      q.ancre = pointInterieur(q.zone)
+      places.setZone(q.id, q.zone, q.ancre)
+      touche = true
+    }
+  const formes = formesDesMurs(listMurs(placeId))
+  const changes: { nom: string; avant: PointMur[] }[] = []
+  const libres: typeof formes = []
+  for (const f of formes) {
+    const ici = pieces.filter((q) => q.ancre && dansForme(q.ancre, f.pts))
+    if (ici.length === 0) libres.push(f)
+    if (ici.length !== 1) continue
+    const lieu = ici[0]
+    if (JSON.stringify(lieu.zone ?? []) === JSON.stringify(f.pts)) continue
+    if (lieu.zone) changes.push({ nom: lieu.name, avant: lieu.zone })
+    places.setZone(lieu.id, f.pts, lieu.ancre ?? f.centre)
+    touche = true
+  }
+  const suites: string[] = []
+  if (niveau.tier === 'niveau')
+    for (const f of libres) {
+      const coupe = changes.find((c) => dansForme(f.centre, c.avant))
+      if (!coupe) continue
+      const neuf = places.upsertPlace({ tier: 'lieu', parentId: placeId, name: `${coupe.nom} (suite)` })
+      places.setZone(neuf.id, f.pts, f.centre)
+      suites.push(`Le mur coupe « ${coupe.nom} » : l’autre moitié est « ${neuf.name} »`)
+      touche = true
+    }
+  return { touche, suites }
+}
+
 /** Combien de traits par lieu, pour le dire en face de chaque lieu. */
 export function murCounts(): Record<number, number> {
   const out: Record<number, number> = {}
@@ -151,6 +218,7 @@ export function calqueDe(placeId: number | null): CalqueBrouillard {
     lumGarde: !!lieu?.lumGarde,
     regardPortee: lieu?.regardPortee ?? null,
     regardOuverture: lireCampagne(reglages.tous()).mursAngle,
-    porteurs: lumieres.porteursDeLumiere()
+    porteurs: lumieres.porteursDeLumiere(placeId == null ? null : echelleDe(placeId).metres),
+    astre: placeId == null ? null : places.cielDe(placeId).astre
   }
 }

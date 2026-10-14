@@ -3,6 +3,10 @@ import { getItem } from './library'
 import { copierLieu } from './places'
 import { copierPnj } from './characters'
 import { copierLigne } from '../copie'
+import { copierTrame } from './trame'
+import { raccrocherFiches } from './ficheLieu'
+import { dossierDeLApp } from '@shared/dossierDeLApp'
+import { DOSSIER_MOMENTS, renameEntry, renommerJumeauTxt, safeName } from '../../library'
 import type { Beat, GameSession, Item } from '@shared/types'
 
 export function listSessions(): GameSession[] {
@@ -119,7 +123,7 @@ export function deleteSession(id: number): { ok: boolean; raison?: string } {
  * Dupliquer une séance : une nouvelle, qui devient la séance en cours, avec
  * une copie de ce que l'autre préparait — ses lieux (non découverts, sans
  * pions, comme toute reprise), ses PNJ, ses moments (à rejouer : aucun n'est
- * coché), ses notes et la liste de ses absents.
+ * coché), sa trame (décochée de même), ses notes et la liste de ses absents.
  *
  * `folderRel` est le dossier déjà recopié qui devient celui de la séance ;
  * `jumeaux` dit, pour chaque fichier de l'ancien dossier, son double dans le
@@ -173,6 +177,7 @@ export function dupliquerSeance(
 
     const insItem = db.prepare(`INSERT OR IGNORE INTO beat_item (beat_id, item_id, ord) VALUES (?, ?, ?)`)
     const insPnj = db.prepare(`INSERT OR IGNORE INTO beat_pnj (beat_id, character_id) VALUES (?, ?)`)
+    const beats = new Map<number, number>()
     for (const b of db
       .prepare(`SELECT id, place_id AS placeId FROM beat WHERE session_id = ? ORDER BY ord, id`)
       .all(srcId) as { id: number; placeId: number | null }[]) {
@@ -181,6 +186,7 @@ export function dupliquerSeance(
         done: 0,
         place_id: b.placeId == null ? null : (lieux.get(b.placeId) ?? b.placeId)
       })
+      beats.set(b.id, neuf)
       for (const i of db
         .prepare(`SELECT item_id AS id, ord FROM beat_item WHERE beat_id = ?`)
         .all(b.id) as { id: number; ord: number }[])
@@ -190,6 +196,12 @@ export function dupliquerSeance(
       }[])
         insPnj.run(neuf, pnj.get(c.id) ?? c.id)
     }
+
+    /* La trame suit, à rejouer : rien n'y est coché. */
+    copierTrame(srcId, nid, { beats, lieux, pnj, fichiers: jumeaux })
+
+    /* Les fiches des lieux recopiés désignent les doubles des PNJ et des moments. */
+    raccrocherFiches(lieux.values(), pnj, beats)
 
     db.prepare(
       `INSERT OR IGNORE INTO seance_absent (session_id, character_id)
@@ -297,6 +309,60 @@ export function upsertBeat(input: {
   return listBeats(sid).find((b) => b.id === id)!
 }
 
+/**
+ * Les textes qui n'appartiennent qu'à ce moment : rangés dans un dossier
+ * « Moments » et attachés à aucun autre. Ce sont eux qui partent avec lui ;
+ * une image, un document rattaché depuis ailleurs, restent.
+ */
+export function textesPropres(beatId: number): string[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT i.rel_path AS rel FROM beat_item bi JOIN item i ON i.id = bi.item_id
+        WHERE bi.beat_id = ? AND i.kind = 'doc' AND i.rel_path IS NOT NULL
+          AND NOT EXISTS (SELECT 1 FROM beat_item o WHERE o.item_id = i.id AND o.beat_id <> ?)`
+    )
+    .all(beatId, beatId) as { rel: string }[]
+  return rows.map((r) => r.rel).filter((rel) => rel.split('/').slice(-2, -1)[0] === DOSSIER_MOMENTS)
+}
+
+/**
+ * Le fichier du texte porte le nom du moment : le titre fait foi, le fichier
+ * (et sa version .txt) le suit. Pour un moment, ou pour tous ceux de la
+ * campagne — à l'ouverture, ce qui rattrape les textes nés sous un autre nom.
+ * Un nom déjà pris par un autre texte reçoit « (2) » et n'est plus retouché.
+ * Rend le nombre de fichiers renommés.
+ */
+export function alignerNomsDesTextes(beatId?: number): number {
+  const beats = (
+    beatId
+      ? getDb().prepare(`SELECT id, title FROM beat WHERE id = ?`).all(beatId)
+      : getDb()
+          .prepare(
+            `SELECT b.id, b.title FROM beat b JOIN game_session g ON g.id = b.session_id
+              WHERE g.campaign_id = ? ORDER BY b.session_id, b.ord, b.id`
+          )
+          .all(activeCampaignId())
+  ) as { id: number; title: string }[]
+  let n = 0
+  for (const b of beats) {
+    let voulu: string
+    try {
+      voulu = safeName(b.title)
+    } catch {
+      continue // un titre sans caractère utilisable : le fichier garde son nom
+    }
+    for (const rel of textesPropres(b.id)) {
+      const nom = rel.split('/').pop()!.replace(/\.html?$/i, '')
+      if (nom.toLowerCase() === voulu.toLowerCase()) continue
+      if (nom.startsWith(`${voulu} (`) && /^ \(\d+\)$/.test(nom.slice(voulu.length))) continue
+      const neuf = renameEntry(rel, voulu)
+      renommerJumeauTxt(rel, neuf.split('/').pop()!.replace(/\.html?$/i, ''))
+      n++
+    }
+  }
+  return n
+}
+
 export function removeBeat(id: number): void {
   getDb().prepare(`DELETE FROM beat WHERE id = ?`).run(id)
 }
@@ -314,6 +380,42 @@ export function attachToBeat(beatId: number, itemId: number): void {
   getDb()
     .prepare(`INSERT OR IGNORE INTO beat_item (beat_id, item_id, ord) VALUES (?, ?, ?)`)
     .run(beatId, itemId, ord)
+}
+
+/**
+ * Les textes posés dans le dossier « Moments » de la séance sans passer par
+ * l'application (l'explorateur, une autre session) : chacun fait naître son
+ * moment, au nom du fichier, à la suite des autres. Un texte déjà attaché à un
+ * moment — de n'importe quelle séance — est laissé tel quel. Rend le nombre de
+ * moments créés.
+ */
+export function adopterTextesDeMoments(sessionId?: number): number {
+  const db = getDb()
+  const sid = sessionId ?? activeSessionId()
+  const seance = db.prepare(`SELECT folder_rel AS base FROM game_session WHERE id = ?`).get(sid) as
+    | { base: string | null }
+    | undefined
+  if (!seance) return 0
+  const dossier = `${dossierDeLApp(seance.base, DOSSIER_MOMENTS)}/`
+  const orphelins = (
+    db
+      .prepare(
+        `SELECT i.id, i.title, i.rel_path AS rel FROM item i
+          WHERE i.campaign_id = ? AND i.kind = 'doc'
+            AND substr(i.rel_path, 1, length(?)) = ?
+            AND NOT EXISTS (SELECT 1 FROM beat_item bi WHERE bi.item_id = i.id)
+          ORDER BY i.id`
+      )
+      .all(activeCampaignId(), dossier, dossier) as { id: number; title: string; rel: string }[]
+  ).filter((r) => /\.html?$/i.test(r.rel) && !r.rel.slice(dossier.length).includes('/'))
+
+  db.transaction(() => {
+    for (const r of orphelins) {
+      const b = upsertBeat({ sessionId: sid, title: r.title })
+      attachToBeat(b.id, r.id)
+    }
+  })()
+  return orphelins.length
 }
 
 export function detachFromBeat(beatId: number, itemId: number): void {

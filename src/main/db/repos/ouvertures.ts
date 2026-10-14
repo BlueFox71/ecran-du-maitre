@@ -81,6 +81,8 @@ export function updateOuverture(
   id: number,
   patch: {
     nature?: NatureOuverture
+    /** Passer sur un autre mur — du même lieu, et un vrai mur. */
+    murId?: number
     d?: number
     largeur?: number
     ouverte?: boolean
@@ -89,6 +91,17 @@ export function updateOuverture(
 ): Ouverture | null {
   const cur = getOuverture(id)
   if (!cur) return null
+  let murId = cur.murId
+  if (patch.murId !== undefined && patch.murId !== cur.murId) {
+    const db = getDb()
+    const vers = db.prepare(`SELECT place_id, nature FROM mur WHERE id = ?`).get(patch.murId) as
+      | { place_id: number; nature: string }
+      | undefined
+    const ici = db.prepare(`SELECT place_id FROM mur WHERE id = ?`).get(cur.murId) as
+      | { place_id: number }
+      | undefined
+    if (vers && ici && vers.place_id === ici.place_id && vers.nature === 'mur') murId = patch.murId
+  }
   const verrouillee = patch.verrouillee !== undefined ? patch.verrouillee : cur.verrouillee
   /* Verrouiller, c'est refermer : une porte qu'on ferme à clé ne reste pas
      ouverte, et l'état enregistré ne doit pas dire le contraire. */
@@ -99,12 +112,13 @@ export function updateOuverture(
       : cur.ouverte
   getDb()
     .prepare(
-      `UPDATE ouverture SET nature = @nature, d = @d, largeur = @largeur,
+      `UPDATE ouverture SET mur_id = @murId, nature = @nature, d = @d, largeur = @largeur,
                             ouverte = @ouverte, verrouillee = @verrouillee
         WHERE id = @id`
     )
     .run({
       id,
+      murId,
       nature: patch.nature && patch.nature in OUVERTURE_NATURES ? patch.nature : cur.nature,
       d: patch.d !== undefined ? clamp(patch.d) : cur.d,
       largeur:

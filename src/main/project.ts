@@ -17,9 +17,14 @@ import { activeCampaignId, closeDb, dataRoot, getDb, isDbOpen, openDbAt } from '
 import * as carnet from './carnet'
 import * as mobile from './mobile'
 import * as display from './display'
+import * as tours from './tours'
 import * as fsLib from './library'
 import * as examen from './examen'
 import { listPlayers } from './db/repos/players'
+import { alignerNomsDesTextes } from './db/repos/timeline'
+import { synchroniserLieux } from './lieuxTexte'
+import { synchroniserPnj } from './pnjTexte'
+import { synchroniserArborescences } from './arborescenceTexte'
 import * as reglages from './db/repos/reglages'
 import { lireCampagne } from '@shared/reglages'
 import type { ProjectInfo } from '@shared/types'
@@ -95,7 +100,14 @@ export function openProject(dir: string): ProjectInfo {
   display.setOutput(lireCampagne(reglages.tous()).sortieEcran)
 
   fsLib.scan()
+  /* Avant les lieux : sans quoi ils réécriraient leurs textes de l'autre côté
+     et la migration trouverait deux dossiers « Lieux » à fusionner. */
+  fsLib.rangerDansLeDossierDeLApp()
   fsLib.rangerTextesDesMoments()
+  alignerNomsDesTextes()
+  synchroniserLieux()
+  synchroniserPnj()
+  synchroniserArborescences()
   fsLib.rangerAncienBlocNotes()
   fsLib.startWatch()
   /* Si cette campagne avait ouvert l'accès aux portables, il se rallume : ses
@@ -112,6 +124,8 @@ export function openProject(dir: string): ProjectInfo {
  */
 export function switchTo(dir: string): ProjectInfo {
   const info = openProject(dir)
+  /* Le combat de l'autre campagne s'arrête là. */
+  tours.fin()
   display.refreshJoueurs()
   /* Les fenêtres d'image montraient des images de l'autre campagne. */
   display.fermerFenetre()
@@ -208,6 +222,7 @@ export function closeProject(): void {
      un doit couper les appareils, sinon ils parleraient à la campagne
      suivante avec les identifiants de la précédente. */
   mobile.stop()
+  tours.fin()
   closeDb()
   courant = null
   carnet.setLastProject(null)

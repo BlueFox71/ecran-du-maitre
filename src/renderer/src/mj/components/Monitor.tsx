@@ -58,6 +58,8 @@ export function Monitor(): JSX.Element {
             /* Pendant le gel, la caméra est celle du gel : elle a été mise de
                côté avec la scène, et le moniteur montre la scène d'alors. */
             focusPionId={vue ? vue.focusPionId : display?.focusPionId}
+            /* Gelé, les joueurs gardent le halo d'avant : on ne le sait pas, on n'en montre pas. */
+            pionEnJeuId={vue ? null : (display?.tour?.pionEnJeuId ?? null)}
             pionLabels={display?.pionLabels ?? true}
             pionPv={display?.pionPv ?? false}
             joueurs={display?.joueurs}
@@ -92,12 +94,12 @@ export function Monitor(): JSX.Element {
           className={`btn btn-sm btn-c${open ? ' btn-on' : ''}`}
           onClick={async () => {
             const st = await window.jdr.display.togglePlayer()
-            toast(st.playerOpen ? 'Écran joueurs ouvert' : 'Écran joueurs fermé')
+            toast(st.playerOpen ? 'Écran joueurs projeté' : 'Écran joueurs fermé')
           }}
           title="F5"
         >
           <IconExpand />
-          {open ? 'Fermer' : 'Ouvrir'}
+          {open ? 'Fermer' : 'Projeter'}
         </button>
       </div>
 
@@ -117,8 +119,12 @@ export function slideLabel(slide: {
   type: string
   title?: string
   cells?: (CollageCell | null)[]
+  name?: string
+  titre?: string
 }): string {
   if (slide.type === 'black') return 'Voile noir'
+  if (slide.type === 'presentation') return `Présentation · ${slide.name ?? ''}`
+  if (slide.type === 'attente') return slide.titre ?? 'Ça commence bientôt'
   if (slide.type === 'collage') {
     const pleines = (slide.cells ?? []).filter(Boolean) as CollageCell[]
     if (!pleines.length) return 'Collage vide'

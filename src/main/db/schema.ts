@@ -1343,5 +1343,246 @@ export const MIGRATIONS: { id: number; sql: string }[] = [
        suffit. 0 par defaut : rien ne change pour les lampes du decor. */
     ALTER TABLE lumiere ADD COLUMN icone INTEGER NOT NULL DEFAULT 0;
     `
+  },
+  {
+    id: 49,
+    sql: `
+    /* Un pion montre sans son nom.
+
+       Le groupe voit qu'une silhouette se tient au fond de la salle ; il ne
+       sait pas encore qui c'est. Le MJ garde le nom pour lui : il ne quitte
+       pas le poste, ni vers l'ecran des joueurs ni vers les telephones.
+       0 par defaut : les pions deja poses gardent leur nom. */
+    ALTER TABLE pion ADD COLUMN anonyme INTEGER NOT NULL DEFAULT 0;
+    `
+  },
+  {
+    id: 50,
+    sql: `
+    /* Une lumiere directive : la lampe torche, le phare, le soupirail.
+
+       ouverture dit de combien de degres s'ouvre son faisceau ; 360 veut
+       dire « tout autour », la lampe d'avant. cap dit ou il pointe, en degres,
+       0 vers le haut — comme la rotation d'un pion. Les lampes deja posees
+       restent rondes. */
+    ALTER TABLE lumiere ADD COLUMN ouverture INTEGER NOT NULL DEFAULT 360;
+    ALTER TABLE lumiere ADD COLUMN cap REAL NOT NULL DEFAULT 0;
+    `
+  },
+  {
+    id: 51,
+    sql: `
+    /* La lumiere du dehors : le soleil ou la lune.
+
+       Ils sont si loin que leurs rayons arrivent paralleles : on ne les pose
+       pas sur la carte, on dit d'ou vient la lumiere (astre_cap, en degres,
+       0 vers le haut de l'image). Dehors, tout est eclaire ; dans les pieces,
+       seul ce qui entre par les fenetres et les portes ouvertes. NULL : ni
+       soleil ni lune, la carte d'avant. */
+    ALTER TABLE place ADD COLUMN astre TEXT;
+    ALTER TABLE place ADD COLUMN astre_cap REAL NOT NULL DEFAULT 135;
+    `
+  },
+  {
+    id: 52,
+    sql: `
+    /* Une categorie qui a servi dans une autre seance ne se touche plus : on
+       la masque, c'est tout. masquee_depuis dit a partir de quelle seance —
+       elle reste visible dans celles d'avant, ou elle a servi. NULL : visible
+       partout. */
+    ALTER TABLE objet_famille ADD COLUMN masquee_depuis INTEGER REFERENCES game_session(id) ON DELETE SET NULL;
+    `
+  },
+  {
+    id: 53,
+    sql: `
+    /* Les inventaires partages : le camion, la malle, la reserve du campement.
+       Le MJ les cree, les nomme, les remplit ; ouvert, un inventaire se voit
+       sur les telephones et chacun y pioche. Il vaut pour toute la campagne ;
+       son contenu, comme tout exemplaire, vit dans une seance. */
+    CREATE TABLE inventaire (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL REFERENCES campaign(id) ON DELETE CASCADE,
+      nom         TEXT NOT NULL,
+      ouvert      INTEGER NOT NULL DEFAULT 0,
+      ord         INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX idx_inventaire ON inventaire(campaign_id, ord);
+
+    /* Un exemplaire range dans un inventaire : port = 'inventaire'. Supprimer
+       l'inventaire rend son contenu a la reserve. */
+    ALTER TABLE objet_placement ADD COLUMN inventaire_id INTEGER REFERENCES inventaire(id) ON DELETE CASCADE;
+    CREATE INDEX idx_placement_inventaire ON objet_placement(inventaire_id);
+    `
+  },
+  {
+    id: 54,
+    sql: `
+    /* La trame de la seance : le scenario du debut a la fin, en cartes
+       reliees par des fleches. Elle ne sert qu'au MJ et ne quitte jamais son
+       poste. Une fleche dit « ceci ouvre la voie a cela ».
+
+       type : ouverture, scene, objectif ou fin. regle : quand plusieurs
+       fleches arrivent sur une carte, 'et' veut toutes celles d'avant faites,
+       'ou' se contente d'une. fait : coche au Paravent, en cours de partie.
+       x, y : la place de la carte sur le plan. Une image, un moment, un lieu
+       qui disparaissent laissent la carte en place, sans eux. */
+    CREATE TABLE trame_carte (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL REFERENCES game_session(id) ON DELETE CASCADE,
+      type       TEXT NOT NULL DEFAULT 'scene',
+      titre      TEXT NOT NULL DEFAULT '',
+      resume     TEXT NOT NULL DEFAULT '',
+      x          REAL NOT NULL DEFAULT 0,
+      y          REAL NOT NULL DEFAULT 0,
+      regle      TEXT NOT NULL DEFAULT 'et',
+      fait       INTEGER NOT NULL DEFAULT 0,
+      item_id    INTEGER REFERENCES item(id)  ON DELETE SET NULL,
+      beat_id    INTEGER REFERENCES beat(id)  ON DELETE SET NULL,
+      place_id   INTEGER REFERENCES place(id) ON DELETE SET NULL
+    );
+    CREATE INDEX idx_trame_carte ON trame_carte(session_id);
+
+    CREATE TABLE trame_carte_pnj (
+      carte_id     INTEGER NOT NULL REFERENCES trame_carte(id) ON DELETE CASCADE,
+      character_id INTEGER NOT NULL REFERENCES character(id)   ON DELETE CASCADE,
+      PRIMARY KEY (carte_id, character_id)
+    );
+
+    CREATE TABLE trame_lien (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      session_id INTEGER NOT NULL REFERENCES game_session(id) ON DELETE CASCADE,
+      de         INTEGER NOT NULL REFERENCES trame_carte(id)  ON DELETE CASCADE,
+      a          INTEGER NOT NULL REFERENCES trame_carte(id)  ON DELETE CASCADE,
+      mot        TEXT NOT NULL DEFAULT '',
+      UNIQUE (de, a)
+    );
+    CREATE INDEX idx_trame_lien ON trame_lien(session_id);
+    `
+  },
+  {
+    id: 55,
+    sql: `
+    /* La fiche d'un lieu : ce qui peut s'y passer et ce qui s'y trouve. Rien
+       de tout cela ne part vers l'ecran ni les portables.
+
+       lieu_scenario : les scenarios possibles des joueurs, numerotes par leur
+       place (ord). lieu_carte : une decouverte ou un declencheur, « si... alors
+       ... », cochable ; un declencheur peut mener a un moment. Ses objets et
+       ses PNJ lies vivent a cote. lieu_pnj : les PNJ qu'on rencontre la. */
+    CREATE TABLE lieu_scenario (
+      id       INTEGER PRIMARY KEY AUTOINCREMENT,
+      place_id INTEGER NOT NULL REFERENCES place(id) ON DELETE CASCADE,
+      ord      INTEGER NOT NULL DEFAULT 0,
+      titre    TEXT NOT NULL DEFAULT '',
+      info     TEXT NOT NULL DEFAULT ''
+    );
+    CREATE INDEX idx_lieu_scenario ON lieu_scenario(place_id, ord);
+
+    CREATE TABLE lieu_carte (
+      id       INTEGER PRIMARY KEY AUTOINCREMENT,
+      place_id INTEGER NOT NULL REFERENCES place(id) ON DELETE CASCADE,
+      sorte    TEXT NOT NULL DEFAULT 'decouverte',
+      titre    TEXT NOT NULL DEFAULT '',
+      si       TEXT NOT NULL DEFAULT '',
+      alors    TEXT NOT NULL DEFAULT '',
+      fait     INTEGER NOT NULL DEFAULT 0,
+      ord      INTEGER NOT NULL DEFAULT 0,
+      beat_id  INTEGER REFERENCES beat(id) ON DELETE SET NULL
+    );
+    CREATE INDEX idx_lieu_carte ON lieu_carte(place_id, ord);
+
+    CREATE TABLE lieu_carte_objet (
+      carte_id INTEGER NOT NULL REFERENCES lieu_carte(id) ON DELETE CASCADE,
+      objet_id INTEGER NOT NULL REFERENCES objet(id) ON DELETE CASCADE,
+      PRIMARY KEY (carte_id, objet_id)
+    );
+
+    CREATE TABLE lieu_carte_pnj (
+      carte_id     INTEGER NOT NULL REFERENCES lieu_carte(id) ON DELETE CASCADE,
+      character_id INTEGER NOT NULL REFERENCES character(id) ON DELETE CASCADE,
+      PRIMARY KEY (carte_id, character_id)
+    );
+
+    CREATE TABLE lieu_pnj (
+      place_id     INTEGER NOT NULL REFERENCES place(id) ON DELETE CASCADE,
+      character_id INTEGER NOT NULL REFERENCES character(id) ON DELETE CASCADE,
+      ord          INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (place_id, character_id)
+    );
+    `
+  },
+  {
+    id: 56,
+    sql: `
+    /* Le morceau de l'image que montre une carte de l'arborescence : un
+       cadre aux proportions du bandeau, en fractions de l'image, en JSON —
+       comme le carre d'un portrait. NULL : l'image au centre. */
+    ALTER TABLE trame_carte ADD COLUMN image_cadre TEXT;
+    `
+  },
+  {
+    id: 57,
+    sql: `
+    /* Le lieu où l'on a trouvé un exemplaire avant de le donner : la fiche du
+       lieu le garde en mémoire (« pris par Marie »). Posé au premier départ
+       d'un lieu, il ne bouge plus ensuite. */
+    ALTER TABLE objet_placement ADD COLUMN origine_place_id INTEGER REFERENCES place(id) ON DELETE SET NULL;
+    `
+  },
+  {
+    id: 58,
+    sql: `
+    /* L'échelle d'un plan, fixée au trait : combien de mètres fait la largeur
+       de son image. NULL : pas étalonné — on l'estime d'après les portes. */
+    ALTER TABLE place ADD COLUMN echelle REAL;
+    /* La taille des pions, à l'échelle (0) ou réglée à la main (1). Tant
+       que l'échelle est inconnue, la taille réglée sert quand même. */
+    ALTER TABLE place ADD COLUMN pion_main INTEGER NOT NULL DEFAULT 0;
+    `
+  },
+  {
+    id: 59,
+    sql: `
+    /* Un lieu qui n'est qu'une pièce : les murs qu'on trace sur son plan
+       referment le lieu lui-même, ils n'en font pas un étage à découper. */
+    ALTER TABLE place ADD COLUMN piece_unique INTEGER NOT NULL DEFAULT 0;
+    `
+  },
+  {
+    id: 60,
+    sql: `
+    /* Le nord de chaque carte, et le ciel de tout un espace.
+
+       nord dit ou pointe le nord sur l'image, en degres, 0 vers le haut, 90
+       vers la droite. astre_cap se compte desormais depuis le nord : le soleil
+       vient du sud-est sur toutes les cartes, chacune le tourne selon son nord.
+       Les nords valent 0, les caps d'avant ne bougent pas.
+
+       ciel et ciel_cap ne servent qu'a un espace : le soleil ou la lune de
+       tous ses lieux. Pose, il prime sur ce que chaque lieu avait regle.
+       NULL : chaque lieu garde le sien. */
+    ALTER TABLE place ADD COLUMN nord REAL NOT NULL DEFAULT 0;
+    ALTER TABLE place ADD COLUMN ciel TEXT;
+    ALTER TABLE place ADD COLUMN ciel_cap REAL NOT NULL DEFAULT 135;
+    `
+  },
+  {
+    id: 61,
+    sql: `
+    /* D'où vient un personnage joueur et où il vit, et son histoire : trois
+       textes libres de sa fiche. NULL : rien d'écrit. */
+    ALTER TABLE character ADD COLUMN biographie TEXT;
+    ALTER TABLE character ADD COLUMN lieu_naissance TEXT;
+    ALTER TABLE character ADD COLUMN ville TEXT;
+    `
+  },
+  {
+    id: 62,
+    sql: `
+    /* Les émojis qui jaillissent quand on présente un joueur à l'écran :
+       cinq au plus, tous différents, collés en un seul texte. NULL : aucun. */
+    ALTER TABLE character ADD COLUMN emojis TEXT;
+    `
   }
 ]

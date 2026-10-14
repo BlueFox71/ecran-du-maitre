@@ -1,12 +1,16 @@
 import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron'
-import { writeFileSync } from 'node:fs'
-import { join } from 'node:path'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
+import { extname, join } from 'node:path'
 import { activeCampaignId, activeSessionId, dataRoot, getDb, isDbOpen } from '../db'
 import * as lib from '../db/repos/library'
 import * as places from '../db/repos/places'
+import * as echelle from '../db/repos/echelle'
 import * as ouvertures from '../db/repos/ouvertures'
 import * as lumieres from '../db/repos/lumieres'
 import * as timeline from '../db/repos/timeline'
+import * as trame from '../db/repos/trame'
+import { synchroniserArborescencesBientot } from '../arborescenceTexte'
+import * as fiche from '../db/repos/ficheLieu'
 import * as chars from '../db/repos/characters'
 import * as players from '../db/repos/players'
 import * as carnet from '../carnet'
@@ -21,13 +25,17 @@ import * as reglages from '../db/repos/reglages'
 import * as rolls from '../db/repos/rolls'
 import * as pions from '../db/repos/pions'
 import * as display from '../display'
+import * as tours from '../tours'
 import * as defaire from '../defaire'
 import * as fsLib from '../library'
 import * as examen from '../examen'
-import { mediaUrl, vignetteUrl } from '../vault'
+import * as lieuxTexte from '../lieuxTexte'
+import { synchroniserPnjBientot } from '../pnjTexte'
+import { mediaUrl, profilDir, vignetteUrl } from '../vault'
 import { IMPORTABLE, IMAGE_EXT, VIDEO_EXT, AUDIO_EXT } from '../kinds'
 import { lireCampagne, type Brut } from '@shared/reglages'
 import type {
+  Astre,
   CollageLayout,
   ExamenFait,
   Frame,
@@ -64,8 +72,21 @@ function withUrls(items: Item[]): (Item & { url: string | null; poster: string |
 export function registerIpc(): void {
   const on = <A extends unknown[], R>(channel: string, fn: (...args: A) => R): void => {
     /* Ce qu'un échange de préparation écrit en base devient un pas de Ctrl+Z. */
-    ipcMain.handle(channel, (_e, ...args) => defaire.envelopper(channel, () => fn(...(args as A))))
+    ipcMain.handle(channel, (_e, ...args) => {
+      const r = defaire.envelopper(channel, () => fn(...(args as A)))
+      /* Un lieu retouché (ou défait) : son fichier texte suit. */
+      /* Les murs aussi : une coupe fait naître un lieu (voir recalerPieces). */
+      if (/^(places|defaire|timeline|fiche|murs):/.test(channel)) lieuxTexte.synchroniserBientot()
+      /* Un PNJ retouché, ou la fiche de campagne : son fichier suit. */
+      if (/^(characters|templates|sheet|defaire|project):/.test(channel)) synchroniserPnjBientot()
+      /* L'arborescence aussi, qui nomme lieux, moments et PNJ dans son fichier. */
+      if (/^(trame|places|defaire|timeline|characters):/.test(channel)) synchroniserArborescencesBientot()
+      return r
+    })
   }
+
+  /** Les étages dont les pièces attendent la fin d'un geste pour se recaler. */
+  const piecesEnAttente = new Set<number>()
 
   /* ---------------- défaire, refaire ---------------- */
 
@@ -82,7 +103,14 @@ export function registerIpc(): void {
   on('defaire:refaire', () => apresPas(defaire.refaire()))
   on('defaire:etat', () => defaire.etat())
   on('defaire:ouvrirGroupe', () => defaire.ouvrirGroupe())
-  on('defaire:fermerGroupe', () => defaire.fermerGroupe())
+  on('defaire:fermerGroupe', () => {
+    /* Les pièces attendaient la fin du geste : on les recale avant de le
+       fermer, et sous un canal suivi, pour que le recalage en fasse partie. */
+    const enAttente = [...piecesEnAttente]
+    piecesEnAttente.clear()
+    for (const id of enAttente) defaire.envelopper('murs:recaler', () => piecesSuivent(id))
+    defaire.fermerGroupe()
+  })
 
   /* ---------------- application ---------------- */
 
@@ -93,6 +121,33 @@ export function registerIpc(): void {
       ? getDb().prepare(`SELECT id, name, system FROM campaign WHERE id = ?`).get(activeCampaignId())
       : null
   }))
+  /* Le panneau d'émojis du système (Windows + point) : il écrit dans le
+     champ qui a la main, comme si on l'avait ouvert au clavier. */
+  on('app:emojis', () => app.showEmojiPanel())
+
+  /*
+   * Le portrait du MJ, pris n'importe où sur le disque. Il suit le maître du
+   * jeu d'une campagne à l'autre, comme le reste de son profil : on en garde
+   * une copie sous les données de l'application, servie en `jdr://profil/`.
+   * Le nom porte l'heure, pour qu'aucun écran ne garde l'ancienne en cache.
+   */
+  on('profil:portraitMj', async () => {
+    const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+    const res = await dialog.showOpenDialog(win, {
+      title: 'Ton portrait de MJ',
+      properties: ['openFile'],
+      filters: [{ name: 'Images', extensions: IMAGE_EXT }]
+    })
+    const source = res.canceled ? null : res.filePaths[0]
+    if (!source) return null
+    const dossier = profilDir()
+    if (existsSync(dossier))
+      for (const f of readdirSync(dossier)) rmSync(join(dossier, f), { force: true })
+    else mkdirSync(dossier, { recursive: true })
+    const nom = `portrait-${Date.now()}${extname(source).toLowerCase()}`
+    copyFileSync(source, join(dossier, nom))
+    return `jdr://profil/${nom}`
+  })
   on('app:openDataFolder', () => shell.openPath(dataRoot()))
 
   /**
@@ -198,6 +253,7 @@ export function registerIpc(): void {
     return { tree: decorate(tree), orphans: withUrls(orphans) }
   })
   on('folders:create', (parentRel: string, name: string) => fsLib.createFolder(parentRel, name))
+  on('folders:assurer', (rel: string, icone: string | null) => fsLib.assurerDossier(rel, icone))
   on('folders:rename', (rel: string, name: string) => fsLib.renameEntry(rel, name))
   on('folders:move', (rel: string, destRel: string) => fsLib.moveEntry(rel, destRel))
   on('folders:trash', (rel: string) => fsLib.trashEntry(rel))
@@ -300,6 +356,55 @@ export function registerIpc(): void {
     places.recalerApresRognage(id, item.id, neuf.id, cadre)
     return places.getPlace(id)
   })
+  /* Caler l'image sous les murs : elle ne change pas, ce sont les murs, les
+     pions, les lampes et les repères qui se recalent — le même calcul qu'un
+     rognage, sans nouvelle image. */
+  on('places:caler', (id: number, cadre: { x: number; y: number; w: number; h: number }) => {
+    const p = places.getPlace(id)
+    if (!p?.mapItemId) throw new Error('Ce lieu n’a pas d’image à caler')
+    places.recalerApresRognage(id, p.mapItemId, p.mapItemId, cadre)
+    return places.getPlace(id)
+  })
+  /* Caler en tournant : l'interface a dessiné l'image telle qu'on l'a
+     redressée — une copie, l'originale ne bouge pas. Le lieu la prend, et ce
+     qui est posé se recale comme après un rognage : ça ne fait que
+     s'agrandir, la rotation est déjà dans l'image. */
+  on(
+    'places:calerTourne',
+    (id: number, octets: Uint8Array, jpeg: boolean, cadre: { x: number; y: number; w: number; h: number }) => {
+      const p = places.getPlace(id)
+      const item = p?.mapItemId ? lib.getItem(p.mapItemId) : null
+      if (!p || !item?.relPath) throw new Error('Ce lieu n’a pas d’image à caler')
+      const rel = fsLib.copieTournee(item.relPath, octets, jpeg)
+      const neuf = lib.itemByPath(rel)
+      if (!neuf) throw new Error('L’image tournée n’a pas été retrouvée')
+      places.recalerApresRognage(id, item.id, neuf.id, cadre)
+      return places.getPlace(id)
+    }
+  )
+  /* Remplacer l'image d'un plan sans déformer ce qui est posé dessus : les
+     pièces découpées et les niveaux qui la partagent suivent. */
+  on('places:remplacerCarte', (id: number, nouvelle: number) => {
+    const p = places.getPlace(id)
+    if (!p) throw new Error('Lieu introuvable')
+    const ancienne = p.mapItemId
+    if (ancienne === nouvelle) return { place: p, pieces: 0 }
+    /* Le niveau d'un bâtiment qui reçoit son image cesse d'être un morceau du
+       plan d'en bas. */
+    if (p.tier === 'niveau' && p.zone) places.setZone(id, null)
+    const suivent = places
+      .listPlaces()
+      .filter((q) => q.parentId === id && q.zone && ancienne != null && q.mapItemId === ancienne).length
+    if (ancienne == null) places.upsertPlace({ id, name: p.name, mapItemId: nouvelle })
+    else
+      places.recalerApresRognage(
+        id,
+        ancienne,
+        nouvelle,
+        places.cadrePourRemplacer(lib.getItem(ancienne), lib.getItem(nouvelle))
+      )
+    return { place: places.getPlace(id), pieces: suivent }
+  })
   on('places:zone', (id: number, zone: PointMur[] | null, ancre?: PointMur | null) =>
     places.setZone(id, zone, ancre)
   )
@@ -307,6 +412,25 @@ export function registerIpc(): void {
     places.setRegardPortee(id, portee)
   )
   on('places:lumGarde', (id: number, garde: boolean) => places.setLumGarde(id, garde))
+  on('places:pieceUnique', (id: number, unique: boolean) => places.setPieceUnique(id, unique))
+  /* Le soleil ou la lune change ce que les joueurs voient : on le leur dit. */
+  on('places:astre', (id: number, astre: Astre | null) => {
+    const p = places.setAstre(id, astre)
+    display.calqueABouge()
+    return p
+  })
+  /* Le ciel d'un espace tombe sur tous ses lieux, celui à l'écran compris. */
+  on('places:cielEspace', (id: number, astre: Astre | null) => {
+    const p = places.setCiel(id, astre)
+    display.calqueABouge()
+    return p
+  })
+  on('places:ciel', (id: number) => places.cielDe(id))
+  on('places:nord', (id: number, nord: number) => {
+    const c = places.setNord(id, nord)
+    display.calqueABouge()
+    return c
+  })
   on('places:ouvLargeur', (id: number, largeur: number | null) =>
     places.setOuvLargeur(id, largeur)
   )
@@ -340,7 +464,8 @@ export function registerIpc(): void {
   on('objets:list', () => ({
     objets: objets.listObjets(),
     familles: objets.listFamilles(),
-    unite: objets.uniteValeur()
+    unite: objets.uniteValeur(),
+    inventaires: objets.listInventaires()
   }))
   on('objets:add', (input: { nom: string; familleId?: number | null }) => remue(objets.addObjet(input)))
   on('objets:update', (id: number, patch: any) => remue(objets.updateObjet(id, patch)))
@@ -358,10 +483,24 @@ export function registerIpc(): void {
   on('objets:desequiper', (placementId: number) => remue(objets.desequiper(placementId)))
   /* Faire passer un exemplaire d'une main à l'autre, ou dans une pièce. */
   on('objets:donner', (placementId: number, cible: any) => remue(objets.donner(placementId, cible)))
+  /* Les inventaires partagés : ce qu'on y range, ouvre ou ferme, les
+     téléphones le voient tout de suite. */
+  on('objets:inventaireAdd', (nom: string) => objets.addInventaire(nom))
+  on('objets:inventaireUpdate', (id: number, patch: { nom?: string; ouvert?: boolean }) =>
+    remue(objets.updateInventaire(id, patch))
+  )
+  on('objets:inventaireRemove', (id: number) => remue(objets.removeInventaire(id)))
+  on('objets:remplir', (inventaireId: number, objetIds: number[]) =>
+    remue(objets.remplir(inventaireId, objetIds))
+  )
+  on('objets:remettre', (placementId: number, inventaireId: number) =>
+    remue(objets.remettre(placementId, inventaireId))
+  )
   on('objets:unite', (unite: string) => objets.setUniteValeur(unite))
   on('objets:familleAdd', (input: any) => objets.addFamille(input))
   on('objets:familleUpdate', (id: number, patch: any) => objets.updateFamille(id, patch))
   on('objets:familleRemove', (id: number) => objets.removeFamille(id))
+  on('objets:familleMasquer', (id: number, masquee: boolean) => objets.masquerFamille(id, masquee))
 
   /* ---------------- murs invisibles d'un lieu ---------------- */
   /* Même isolement que les annotations, et pour la même raison : aucun de ces
@@ -374,9 +513,30 @@ export function registerIpc(): void {
      chaque changement de scene, et quatre allers-retours pour une image, c'est
      trois de trop. */
   on('murs:calque', (placeId: number | null) => murs.calqueDe(placeId))
-  on('murs:add', (input: any) => murs.addMur(input))
+  /* Après chaque geste sur un mur, les pièces de l'étage suivent — dans le
+     même échange, donc dans le même pas de Ctrl+Z. L'interface relit les
+     lieux, et dit qui une coupe vient de faire naître. */
+  const piecesSuivent = (placeId: number | null | undefined): void => {
+    if (placeId == null) return
+    /* Au milieu d'un geste en plusieurs appels, les murs sont à moitié posés :
+       on attend qu'il se ferme. */
+    if (defaire.enGroupe()) {
+      piecesEnAttente.add(placeId)
+      return
+    }
+    const { touche, suites } = murs.recalerPieces(placeId)
+    if (!touche) return
+    for (const w of BrowserWindow.getAllWindows())
+      if (!w.isDestroyed()) w.webContents.send('places:recales', { placeId, suites })
+  }
+  on('murs:add', (input: any) => {
+    const m = murs.addMur(input)
+    piecesSuivent(m?.placeId)
+    return m
+  })
   on('murs:update', (id: number, patch: any) => {
     const m = murs.updateMur(id, patch)
+    if (patch && ('pts' in patch || 'nature' in patch)) piecesSuivent(m?.placeId)
     /* Tirer ou ouvrir un rideau change ce que les joueurs voient : on le leur
        dit. Déplacer un trait, non — le tracé ne regarde que le MJ, et un
        calque rediffusé à chaque point d'une polyligne ferait clignoter la
@@ -384,7 +544,11 @@ export function registerIpc(): void {
     if (patch && 'ouvert' in patch) display.calqueABouge()
     return m
   })
-  on('murs:remove', (id: number) => murs.removeMur(id))
+  on('murs:remove', (id: number) => {
+    const placeId = murs.getMur(id)?.placeId
+    murs.removeMur(id)
+    piecesSuivent(placeId)
+  })
 
   on('ouvertures:of', (placeId: number | null) => ouvertures.listOuvertures(placeId))
   on('ouvertures:add', (input: any) => ouvertures.addOuverture(input))
@@ -429,6 +593,9 @@ export function registerIpc(): void {
      fiche avec le MJ. */
   const entrerDansLaSeance = (id: number): void => {
     chars.preparerSeance(id)
+    objets.reporterInventaires(id)
+    /* Un combat ne passe pas d'une séance à l'autre. */
+    tours.fin()
     display.refreshJoueurs()
     mobile.broadcast()
   }
@@ -484,14 +651,64 @@ export function registerIpc(): void {
     timeline.listBeats(sessionId).map((b) => ({ ...b, items: withUrls(b.items) }))
   )
   on('timeline:upsertBeat', (input: any) => {
-    const b = timeline.upsertBeat(input)
+    let b = timeline.upsertBeat(input)
+    /* Le titre fait foi : le fichier du texte le suit. */
+    if (input.id && timeline.alignerNomsDesTextes(b.id))
+      b = timeline.listBeats(b.sessionId).find((x) => x.id === b.id) ?? b
     return { ...b, items: withUrls(b.items) }
   })
-  on('timeline:removeBeat', (id: number) => timeline.removeBeat(id))
+  /* Le moment emporte son texte : sans quoi « Relire le dossier » le ferait
+     renaître. Corbeille de Windows, comme partout. */
+  on('timeline:removeBeat', async (id: number) => {
+    const textes = timeline.textesPropres(id)
+    timeline.removeBeat(id)
+    for (const rel of textes) await fsLib.jeterTexte(rel)
+  })
   on('timeline:reorderBeats', (ids: number[]) => timeline.reorderBeats(ids))
   on('timeline:attach', (beatId: number, itemId: number) => timeline.attachToBeat(beatId, itemId))
   on('timeline:detach', (beatId: number, itemId: number) => timeline.detachFromBeat(beatId, itemId))
+  on('timeline:adopterTextes', () => {
+    const n = timeline.adopterTextesDeMoments()
+    timeline.alignerNomsDesTextes()
+    return n
+  })
   on('timeline:setPnjs', (beatId: number, ids: number[]) => timeline.setBeatPnjs(beatId, ids))
+
+  /* ---------------- la trame de la séance ---------------- */
+
+  /* Le MJ seul la voit : rien ici ne part vers l'écran ni les portables. */
+  on('trame:lire', () => trame.lireTrame())
+  on('trame:creer', (input: any) => trame.creerCarte(input))
+  on('trame:maj', (id: number, patch: any) => trame.majCarte(id, patch))
+  on('trame:cocher', (id: number, fait: boolean) => trame.cocher(id, fait))
+  on('trame:toutDecocher', () => trame.toutDecocher())
+  on('trame:supprimer', (id: number) => trame.supprimerCarte(id))
+  on('trame:relier', (de: number, a: number) => trame.relier(de, a))
+  on('trame:majLien', (id: number, mot: string) => trame.majLien(id, mot))
+  on('trame:supprimerLien', (id: number) => trame.supprimerLien(id))
+
+  /* ---------------- la fiche d'un lieu ---------------- */
+
+  /* Scénarios, découvertes, déclencheurs, PNJ du lieu : pour le MJ seul. */
+  on('fiche:lire', (placeId: number) => fiche.lireFiche(placeId))
+  on('fiche:ajouterScenario', (placeId: number, titre?: string) =>
+    fiche.ajouterScenario(placeId, titre)
+  )
+  on('fiche:majScenario', (id: number, patch: any) => fiche.majScenario(id, patch))
+  on('fiche:supprimerScenario', (id: number) => fiche.supprimerScenario(id))
+  on('fiche:ordonnerScenarios', (placeId: number, ids: number[]) =>
+    fiche.ordonnerScenarios(placeId, ids)
+  )
+  on('fiche:ajouterCarte', (placeId: number, c: any) => fiche.ajouterCarte(placeId, c))
+  on('fiche:majCarte', (id: number, c: any) => fiche.majCarte(id, c))
+  on('fiche:cocherCarte', (id: number, fait: boolean) => fiche.cocherCarte(id, fait))
+  on('fiche:supprimerCarte', (id: number) => fiche.supprimerCarte(id))
+  on('fiche:ajouterPnj', (placeId: number, characterId: number) =>
+    fiche.ajouterPnj(placeId, characterId)
+  )
+  on('fiche:retirerPnj', (placeId: number, characterId: number) =>
+    fiche.retirerPnj(placeId, characterId)
+  )
 
   /* ---------------- documents annexes ---------------- */
 
@@ -725,6 +942,26 @@ export function registerIpc(): void {
     return res.filePath
   })
 
+  /* ---------------- tours ---------------- */
+
+  /* Rien n'est écrit en base : les tours vivent en mémoire, le temps d'un
+     combat. D'où `ipcMain.handle` tout court, sans pas de Ctrl+Z. */
+  ipcMain.handle('tours:etat', () => tours.etat())
+  ipcMain.handle('tours:candidats', () => tours.candidats())
+  ipcMain.handle('tours:ouvrir', () => tours.ouvrir())
+  ipcMain.handle('tours:carac', (_e, key: string | null) => tours.choisirCarac(key))
+  ipcMain.handle('tours:saisir', (_e, cle: string, patch) => tours.saisir(cle, patch))
+  ipcMain.handle('tours:ajouter', (_e, cle: string) => tours.ajouter(cle))
+  ipcMain.handle('tours:retirer', (_e, cle: string) => tours.retirer(cle))
+  ipcMain.handle('tours:commencer', () => tours.commencer())
+  ipcMain.handle('tours:annuler', () => tours.annuler())
+  ipcMain.handle('tours:suivant', () => tours.suivant())
+  ipcMain.handle('tours:precedent', () => tours.precedent())
+  ipcMain.handle('tours:retarder', () => tours.retarder())
+  ipcMain.handle('tours:main', (_e, cle: string) => tours.donnerMain(cle))
+  ipcMain.handle('tours:deplacer', (_e, cle: string, vers: number) => tours.deplacer(cle, vers))
+  ipcMain.handle('tours:fin', () => tours.fin())
+
   /* ---------------- régie ---------------- */
 
   on('display:state', () => display.getState())
@@ -789,6 +1026,7 @@ export function registerIpc(): void {
     display.setTexts(slot, texts)
   )
   on('display:blackout', () => display.blackout())
+  on('display:arreterPresentation', () => display.arreterPresentation())
   on('display:freeze', (on2: boolean) => display.setFrozen(on2))
   on('display:pionLabels', (on2: boolean) => display.setPionLabels(on2))
   on('display:pionPv', (on2: boolean) => display.setPionPv(on2))
@@ -874,6 +1112,10 @@ export function registerIpc(): void {
     pions.cacherPion(id, cache)
     return display.refreshPions()
   })
+  on('pions:anonyme', (id: number, anonyme: boolean) => {
+    pions.anonymiserPion(id, anonyme)
+    return display.refreshPions()
+  })
   on('pions:remove', (id: number) => {
     pions.removePion(id)
     return display.refreshPions()
@@ -889,6 +1131,19 @@ export function registerIpc(): void {
   on('pions:size', (placeId: number, size: number) => {
     pions.setPionSize(placeId, size)
     return display.refreshPions()
+  })
+  /* L'échelle d'un plan : la lire, la fixer au trait, et dire si les pions la
+     suivent. Chaque changement rediffuse la taille des pions. */
+  on('places:echelle', (placeId: number) => echelle.echelleDe(placeId))
+  on('places:etalonner', (placeId: number, metres: number | null) => {
+    const e = echelle.etalonner(placeId, metres)
+    display.refreshPions()
+    return e
+  })
+  on('pions:main', (placeId: number, main: boolean) => {
+    const e = echelle.poserPionMain(placeId, main)
+    display.refreshPions()
+    return e
   })
 
   /** Le pointeur : flux léger, sans rediffuser tout l'état. */

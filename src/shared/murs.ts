@@ -73,6 +73,38 @@ export function barrieres(
   return out
 }
 
+/**
+ * Ce que le soleil ou la lune éclaire **dans les pièces** : un polygone vu
+ * d'une source si lointaine que ses rayons sont parallèles.
+ *
+ * On la pose à trois cartes de distance, dans la direction d'où vient la
+ * lumière, et l'on borne tout d'une grande boîte pour que chaque rayon finisse
+ * quelque part. Les murs l'arrêtent ; les fenêtres et les portes ouvertes la
+ * laissent passer — ce sont les mêmes barrières que la vue. Dehors, le
+ * bâtiment jette une ombre sans fin : c'est à l'appelant d'éclairer tout ce
+ * qui n'est pas une pièce.
+ */
+export function lueurDuDehors(
+  murs: Mur[],
+  ouvertures: Ouverture[],
+  cap: number,
+  w: number,
+  h: number
+): Pt[] {
+  const enPx = (p: PointMur): Pt => ({ x: p[0] * w, y: p[1] * h })
+  const R = 3 * Math.max(w, h)
+  const a = (cap * Math.PI) / 180
+  const source = { x: w / 2 + Math.sin(a) * R, y: h / 2 - Math.cos(a) * R }
+  const B = 5 * Math.max(w, h)
+  const boite: Barriere[] = [
+    { a: { x: -B, y: -B }, b: { x: w + B, y: -B } },
+    { a: { x: w + B, y: -B }, b: { x: w + B, y: h + B } },
+    { a: { x: w + B, y: h + B }, b: { x: -B, y: h + B } },
+    { a: { x: -B, y: h + B }, b: { x: -B, y: -B } }
+  ]
+  return champDeVision(barrieres(murs, 'vue', enPx, ouvertures).concat(boite), source, 0, 360)
+}
+
 /** Les quatre bords de l'image : on n'en sort pas, et la vue s'y arrête. */
 export function bords(w: number, h: number): Barriere[] {
   return [

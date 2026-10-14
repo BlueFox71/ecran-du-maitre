@@ -17,6 +17,19 @@ import type { CadreCarre, CalqueBrouillard, MobilePing, PointMur } from '@shared
 
 const CLE = 'ecran-du-maitre/jeton'
 const CLE_APPAREIL = 'ecran-du-maitre/appareil'
+const CLE_ACCUEIL = 'ecran-du-maitre/accueil'
+
+/*
+ * L'offre d'installation du navigateur, si elle vient. Chrome ne la fait
+ * qu'en HTTPS : sur le réseau de la table, en HTTP, elle ne viendra
+ * généralement pas, et le bandeau montre alors le geste à faire à la main.
+ * On l'écoute dès le chargement, car elle arrive avant l'affichage.
+ */
+let offreInstallation: (Event & { prompt: () => Promise<void> }) | null = null
+window.addEventListener('beforeinstallprompt', (e) => {
+  e.preventDefault()
+  offreInstallation = e as Event & { prompt: () => Promise<void> }
+})
 
 /**
  * Où joindre le poste du maître du jeu.
@@ -43,6 +56,8 @@ interface PionVu {
   rotation: number
   /** La fiche derrière le jeton, ou `null` : un pion sans personnage n'a pas d'yeux. */
   characterId: number | null
+  /** Le pion d'un PNJ : pas de regard non plus. */
+  pnj?: boolean
   url: string | null
   cadre: CadreCarre | null
   mien: boolean
@@ -77,6 +92,13 @@ interface ObjetTel {
   teinte: string | null
 }
 
+/** Un inventaire que le MJ a ouvert à la table : le camion, la malle. */
+interface InventaireTel {
+  id: number
+  nom: string
+  contenu: { placementId: number; objetId: number; nom: string; qte: number; teinte: string | null }[]
+}
+
 interface Etat {
   campagne: string | null
   joueur: { id: number; nom: string; couleur: string | null } | null
@@ -96,12 +118,36 @@ interface Etat {
   /** Ses affaires à lui, et les endroits du corps où les mettre. */
   objets: ObjetTel[]
   emplacements: { cle: string; nom: string }[]
+  /** Les inventaires ouverts, où chacun pioche. Absent d'un serveur plus ancien. */
+  inventaires?: InventaireTel[]
   gele: boolean
   /** Le lieu à l'écran, et la taille de son plan : le repère des murs. */
   lieu: { id: number; nom: string; plan: string | null; w: number | null; h: number | null } | null
   pions: PionVu[]
   /** Il avance dès qu'une porte ou une lampe bouge : c'est le signal de relire le calque. */
   calqueRev: number
+  /** À qui le tour — `null` hors combat. Les participants cachés n'y sont pas. */
+  tour: TourTel | null
+  /** Le pion de celui qui joue : il porte un halo sur le plan. */
+  pionEnJeuId: number | null
+}
+
+interface EntrantTel {
+  nom: string
+  color: string
+  initials: string
+  url: string | null
+  cadre: CadreCarre | null
+  fait: boolean
+  mien: boolean
+}
+
+interface TourTel {
+  round: number
+  ordre: EntrantTel[]
+  /** Celui qui joue — ou, s'il est caché, celui qui jouera juste après. */
+  curseur: number
+  actifCache: boolean
 }
 
 interface Convive {
@@ -321,6 +367,84 @@ export function Mobile(): JSX.Element {
    Qui êtes-vous
    ============================================================ */
 
+/**
+ * « Mets-moi sur ton écran d'accueil » : proposé à l'ouverture, tant que la
+ * page tourne dans le navigateur.
+ *
+ * Aucun navigateur ne laisse une page s'installer d'elle-même sur un réseau
+ * local en HTTP : on montre donc le geste — le bouton Partager sur un iPhone
+ * ou un iPad, le menu ⋮ ailleurs. Si le navigateur offre quand même
+ * l'installation, un bouton la déclenche.
+ *
+ * « Plus tard » vaut pour cette visite ; « Ne plus proposer » pour toujours.
+ * Ouverte depuis l'écran d'accueil, la page ne propose plus rien.
+ */
+function PoserSurAccueil(): JSX.Element | null {
+  const [vu, setVu] = useState(() => {
+    const installee =
+      window.matchMedia('(display-mode: standalone)').matches ||
+      (navigator as Navigator & { standalone?: boolean }).standalone === true
+    if (installee) return true
+    try {
+      return (
+        localStorage.getItem(CLE_ACCUEIL) === 'non' || sessionStorage.getItem(CLE_ACCUEIL) === 'plus-tard'
+      )
+    } catch {
+      return false
+    }
+  })
+  if (vu) return null
+
+  const ios =
+    /iPhone|iPad|iPod/.test(navigator.userAgent) ||
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  const fermer = (pourToujours: boolean): void => {
+    try {
+      if (pourToujours) localStorage.setItem(CLE_ACCUEIL, 'non')
+      else sessionStorage.setItem(CLE_ACCUEIL, 'plus-tard')
+    } catch {
+      /* navigation privée : il reviendra, tant pis */
+    }
+    setVu(true)
+  }
+
+  return (
+    <div className="m-poser">
+      <img src="/portable/icone-180.png" alt="" />
+      <div className="m-poser-dit">
+        <b>Garde l’Écran sur ton écran d’accueil</b>
+        {offreInstallation ? (
+          <span>Il s’ouvrira comme une application, sans la barre du navigateur.</span>
+        ) : ios ? (
+          <span>
+            Touche <b>Partager</b> <i aria-hidden="true">⬆︎</i>, puis <b>Sur l’écran d’accueil</b>.
+          </span>
+        ) : (
+          <span>
+            Touche le menu <b>⋮</b> du navigateur, puis <b>Ajouter à l’écran d’accueil</b>.
+          </span>
+        )}
+        <span className="m-poser-actes">
+          {offreInstallation ? (
+            <button
+              className="oui"
+              onClick={() => {
+                void offreInstallation?.prompt()
+                offreInstallation = null
+                fermer(false)
+              }}
+            >
+              Ajouter
+            </button>
+          ) : null}
+          <button onClick={() => fermer(false)}>Plus tard</button>
+          <button onClick={() => fermer(true)}>Ne plus proposer</button>
+        </span>
+      </div>
+    </div>
+  )
+}
+
 function QuiEtesVous({
   convives,
   erreur,
@@ -336,6 +460,8 @@ function QuiEtesVous({
         <IconeApp taille={84} />
         <span>Quel joueur êtes-vous ?</span>
       </div>
+
+      <PoserSurAccueil />
 
       {erreur ? <p className="m-erreur">{erreur}</p> : null}
 
@@ -401,6 +527,9 @@ function Table({
         </button>
       </header>
 
+      {etat.tour ? <BandeauTour tour={etat.tour} /> : null}
+      <PoserSurAccueil />
+
       <main className="m-corps">
         {onglet === 'fiche' && <Fiche etat={etat} jeton={jeton} />}
         {onglet === 'jet' && <Jet etat={etat} jeton={jeton} />}
@@ -421,9 +550,76 @@ function Table({
             {o === 'poche' && etat.pochette.docs.some((d) => !d.lu) ? (
               <span className="m-neuf" aria-label="du nouveau" />
             ) : null}
+            {/* Un inventaire ouvert : il y a de quoi piocher dans le Sac. */}
+            {o === 'sac' && (etat.inventaires ?? []).length > 0 ? (
+              <span className="m-neuf" aria-label="un inventaire est ouvert" />
+            ) : null}
           </button>
         ))}
       </nav>
+    </div>
+  )
+}
+
+/* ---------------- les tours ---------------- */
+
+/**
+ * À qui le tour, sous l'en-tête, quel que soit l'onglet ouvert.
+ *
+ * Quand c'est le sien, la bande se fait dorée et le téléphone vibre une fois :
+ * on a souvent le nez ailleurs quand son tour arrive. Sinon, une ligne
+ * discrète dit qui joue et combien passent avant lui ; un toucher déplie
+ * l'ordre entier.
+ */
+function BandeauTour({ tour }: { tour: TourTel }): JSX.Element {
+  const [ouvert, setOuvert] = useState(false)
+  const n = tour.ordre.length
+  const enJeu = tour.actifCache ? null : tour.ordre[tour.curseur]
+  const moi = tour.ordre.findIndex((e) => e.mien)
+  const aMoi = enJeu?.mien ?? false
+  /* Combien de tours avant le sien. Un caché qui joue n'est pas dans
+     l'ordre : le curseur montre déjà celui d'après, d'où le un de plus. */
+  const dans = moi < 0 || aMoi ? null : ((moi - tour.curseur + n) % n) + (tour.actifCache ? 1 : 0)
+
+  const cle = `${tour.round}-${tour.curseur}`
+  useEffect(() => {
+    if (aMoi) navigator.vibrate?.([120, 60, 120])
+  }, [aMoi, cle])
+
+  return (
+    <div className={`m-tour${aMoi ? ' m-tour-moi' : ''}`}>
+      <button className="m-tour-ligne" onClick={() => setOuvert((o) => !o)} aria-expanded={ouvert}>
+        <span className="m-tour-round">Round {tour.round}</span>
+        <span className="m-tour-qui">
+          {aMoi
+            ? 'C’est ton tour'
+            : `Au tour de ${enJeu ? enJeu.nom : 'quelqu’un d’autre'}`}
+        </span>
+        {dans != null ? (
+          <span className="m-tour-dans">{dans === 1 ? 'toi juste après' : `toi dans ${dans}`}</span>
+        ) : null}
+        <span className="m-tour-fleche" aria-hidden="true">
+          {ouvert ? '▴' : '▾'}
+        </span>
+      </button>
+      {ouvert ? (
+        <ol className="m-tour-ordre">
+          {tour.ordre.map((e, i) => (
+            <li
+              key={i}
+              className={`${!tour.actifCache && i === tour.curseur ? 'actif' : ''}${
+                e.fait ? ' fait' : ''
+              }`}
+            >
+              <span className="m-tour-rond" style={teinte(e.color)}>
+                {e.url ? <Visage url={API + e.url} cadre={e.cadre} /> : e.initials}
+              </span>
+              {e.nom}
+              {e.mien ? <em> (toi)</em> : null}
+            </li>
+          ))}
+        </ol>
+      ) : null}
     </div>
   )
 }
@@ -566,6 +762,35 @@ function Fiche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
 function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
   const [ouvert, setOuvert] = useState<number | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
+  const [cherche, setCherche] = useState('')
+  const [envoi, setEnvoi] = useState<number | null>(null)
+  const inventaires = etat.inventaires ?? []
+
+  /** Prendre dans un inventaire, ou y remettre. L'état revient par le flux. */
+  const geste = async (
+    route: 'prendre' | 'remettre',
+    corps: { placementId: number; inventaireId?: number }
+  ): Promise<void> => {
+    setOuvert(null)
+    setErreur(null)
+    setEnvoi(corps.placementId)
+    try {
+      const r = await fetch(`${API}/api/${route}?t=${encodeURIComponent(jeton)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify(corps)
+      })
+      if (!r.ok)
+        setErreur(
+          (await r.json().catch(() => ({}))).erreur ??
+            (route === 'prendre' ? 'Impossible de le prendre.' : 'Impossible de le remettre.')
+        )
+    } catch {
+      setErreur('Le maître du jeu ne répond pas.')
+    } finally {
+      setEnvoi(null)
+    }
+  }
 
   const objets = etat.objets
   const portes = objets.filter((o) => o.emplacement)
@@ -641,11 +866,55 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
         <div className="m-objets">{sac.map(ligne)}</div>
       )}
 
-      {objets.length === 0 ? (
+      {objets.length === 0 && inventaires.length === 0 ? (
         <p className="m-note">
           Le maître du jeu ne t’a rien donné. Ce qu’il te tendra apparaîtra ici tout seul.
         </p>
       ) : null}
+
+      {/* Les inventaires que le MJ a ouverts : on y pioche, l'objet tombe dans
+          le sac. Fermés, ils disparaissent d'ici. */}
+      {inventaires.map((inv) => {
+        const mot = cherche.trim().toLowerCase()
+        const liste = inv.contenu.filter((c) => !mot || c.nom.toLowerCase().includes(mot))
+        return (
+          <section key={inv.id} className="m-inv">
+            <h2 className="m-inv-titre">{inv.nom}</h2>
+            {inv.contenu.length > 6 ? (
+              <input
+                className="m-inv-cherche"
+                type="search"
+                value={cherche}
+                onChange={(e) => setCherche(e.target.value)}
+                placeholder={`Chercher dans ${inv.nom}…`}
+                aria-label={`Chercher dans ${inv.nom}`}
+              />
+            ) : null}
+            {liste.length === 0 ? (
+              <p className="m-note">{inv.contenu.length ? 'Rien ne correspond.' : 'Plus rien dedans.'}</p>
+            ) : (
+              <div className="m-objets">
+                {liste.map((c) => (
+                  <div key={c.placementId} className="m-objet m-inv-ligne" style={teinte(c.teinte)}>
+                    <span className="m-o-pastille" />
+                    <span className="m-o-nom">
+                      {c.nom}
+                      {c.qte > 1 ? <b> ×{c.qte}</b> : null}
+                    </span>
+                    <button
+                      className="m-inv-prendre"
+                      disabled={envoi === c.placementId}
+                      onClick={() => void geste('prendre', { placementId: c.placementId })}
+                    >
+                      Prendre
+                    </button>
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+        )
+      })}
 
       {/* La feuille qui monte du bas : le pouce y arrive, et la liste des
           endroits du corps tient en un écran. */}
@@ -678,6 +947,16 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
                 <i>ne rien occuper</i>
               </button>
             </div>
+            {/* Le rendre : il quitte le sac et retourne dans l'inventaire. */}
+            {inventaires.map((inv) => (
+              <button
+                key={inv.id}
+                className="m-f-remettre"
+                onClick={() => void geste('remettre', { placementId: enChoix.placementId, inventaireId: inv.id })}
+              >
+                Remettre dans {inv.nom}
+              </button>
+            ))}
           </div>
         </div>
       ) : null}
@@ -860,11 +1139,132 @@ function Lire({ doc, onClose }: { doc: DocPoche; onClose: () => void }): JSX.Ele
         {doc.genre === 'video' ? (
           <video src={API + (doc.url ?? '')} controls playsInline />
         ) : (
-          <img src={API + (doc.url ?? '')} alt={doc.titre} draggable={false} />
+          <ImagePincee src={API + (doc.url ?? '')} alt={doc.titre} />
         )}
       </div>
       <div className="m-lire-pied">
         {doc.sien ? 'Le maître du jeu ne l’a donné qu’à toi.' : 'Toute la table a ce document.'}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Une image qu'on pince pour l'agrandir, qu'on fait glisser une fois agrandie,
+ * et qu'un double toucher agrandit ou remet d'aplomb.
+ *
+ * Le navigateur ne zoome pas pour nous : la page interdit le zoom
+ * (`user-scalable=no`), sans quoi le pincement sur la carte du pion agrandirait
+ * toute l'application. L'image fait donc son zoom elle-même.
+ */
+function ImagePincee({ src, alt }: { src: string; alt: string }): JSX.Element {
+  const cadre = useRef<HTMLDivElement>(null)
+  const [vue, setVue] = useState({ s: 1, x: 0, y: 0 })
+  const doigts = useRef(new Map<number, { x: number; y: number }>())
+  const depart = useRef<{
+    vue: { s: number; x: number; y: number }
+    milieu: { x: number; y: number }
+    ecart: number
+  } | null>(null)
+  const dernierToucher = useRef<{ t: number; x: number; y: number } | null>(null)
+  const bouge = useRef(false)
+
+  /* Le contenu ne quitte jamais le cadre : agrandi, ses bords restent dehors. */
+  const borner = (s: number, x: number, y: number): { s: number; x: number; y: number } => {
+    const b = cadre.current?.getBoundingClientRect()
+    const S = Math.min(6, Math.max(1, s))
+    if (!b || S === 1) return { s: 1, x: 0, y: 0 }
+    return {
+      s: S,
+      x: Math.min(0, Math.max(b.width - b.width * S, x)),
+      y: Math.min(0, Math.max(b.height - b.height * S, y))
+    }
+  }
+
+  const local = (e: React.PointerEvent): { x: number; y: number } => {
+    const b = cadre.current!.getBoundingClientRect()
+    return { x: e.clientX - b.left, y: e.clientY - b.top }
+  }
+
+  /* On repart de l'état présent à chaque doigt posé ou levé : passer de deux
+     doigts à un ne fait pas sauter l'image. */
+  const reprendre = (v: { s: number; x: number; y: number }): void => {
+    const pts = [...doigts.current.values()]
+    if (pts.length === 0) {
+      depart.current = null
+      return
+    }
+    const milieu =
+      pts.length > 1
+        ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
+        : pts[0]
+    const ecart = pts.length > 1 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0
+    depart.current = { vue: v, milieu, ecart }
+  }
+
+  return (
+    <div
+      ref={cadre}
+      className="m-pince"
+      onPointerDown={(e) => {
+        e.currentTarget.setPointerCapture(e.pointerId)
+        doigts.current.set(e.pointerId, local(e))
+        bouge.current = doigts.current.size > 1
+        reprendre(vue)
+      }}
+      onPointerMove={(e) => {
+        if (!doigts.current.has(e.pointerId) || !depart.current) return
+        doigts.current.set(e.pointerId, local(e))
+        const pts = [...doigts.current.values()]
+        const d = depart.current
+        if (pts.length > 1) {
+          const milieu = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
+          const ecart = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y)
+          const s = (d.vue.s * ecart) / Math.max(1, d.ecart)
+          /* Le point de l'image qui était sous les doigts y reste. */
+          const cx = (d.milieu.x - d.vue.x) / d.vue.s
+          const cy = (d.milieu.y - d.vue.y) / d.vue.s
+          setVue(borner(s, milieu.x - cx * s, milieu.y - cy * s))
+          bouge.current = true
+        } else {
+          const dx = pts[0].x - d.milieu.x
+          const dy = pts[0].y - d.milieu.y
+          if (Math.hypot(dx, dy) > 8) bouge.current = true
+          if (d.vue.s > 1) setVue(borner(d.vue.s, d.vue.x + dx, d.vue.y + dy))
+        }
+      }}
+      onPointerUp={(e) => {
+        const p = local(e)
+        doigts.current.delete(e.pointerId)
+        if (doigts.current.size === 0 && !bouge.current) {
+          /* Deux touchers rapprochés : on agrandit là où l'on a touché, ou
+             l'on revient à l'image entière. */
+          const avant = dernierToucher.current
+          const t = performance.now()
+          if (avant && t - avant.t < 320 && Math.hypot(p.x - avant.x, p.y - avant.y) < 30) {
+            dernierToucher.current = null
+            const v =
+              vue.s > 1
+                ? borner(1, 0, 0)
+                : borner(2.5, p.x - ((p.x - vue.x) / vue.s) * 2.5, p.y - ((p.y - vue.y) / vue.s) * 2.5)
+            setVue(v)
+            reprendre(v)
+            return
+          }
+          dernierToucher.current = { t, x: p.x, y: p.y }
+        }
+        reprendre(vue)
+      }}
+      onPointerCancel={(e) => {
+        doigts.current.delete(e.pointerId)
+        reprendre(vue)
+      }}
+    >
+      <div
+        className="m-pince-contenu"
+        style={{ transform: `translate(${vue.x}px, ${vue.y}px) scale(${vue.s})` }}
+      >
+        <img src={src} alt={alt} draggable={false} />
       </div>
     </div>
   )
@@ -1359,7 +1759,7 @@ function Plan({
   const yeux = useMemo(
     () =>
       etat.pions
-        .filter((p) => p.characterId != null)
+        .filter((p) => p.characterId != null && !p.pnj)
         .map((p) =>
           p.mien
             ? { x: pose.x, y: pose.y, cap: pose.cap, characterId: p.characterId as number }
@@ -1425,7 +1825,7 @@ function Plan({
               key={p.id}
               className={`m-pion c-${p.color}${p.mien ? ' m-mien' : ''}${
                 p.etat ? ` ${p.etat}` : ''
-              }`}
+              }${p.id === etat.pionEnJeuId ? ' m-en-jeu' : ''}`}
               style={{
                 left: `${q.x * 100}%`,
                 top: `${q.y * 100}%`,

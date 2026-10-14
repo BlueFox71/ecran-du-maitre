@@ -12,8 +12,16 @@
  * à vérifier.
  */
 import { activeCampaignId, activeSessionId, getDb } from '../index'
+import { copierLigne } from '../copie'
 import { UNITE_VALEUR_PAR_DEFAUT } from '@shared/types'
-import type { EffetObjet, Objet, ObjetFamille, ObjetPlacement, PortObjet } from '@shared/types'
+import type {
+  EffetObjet,
+  Inventaire,
+  Objet,
+  ObjetFamille,
+  ObjetPlacement,
+  PortObjet
+} from '@shared/types'
 
 /* ---------------- l'unité de valeur, réglée une fois ---------------- */
 
@@ -48,18 +56,49 @@ function toFamille(r: any): ObjetFamille {
     teinte: r.teinte ?? 'neutral',
     glyphe: r.glyphe ?? 'outils',
     ord: r.ord,
-    builtin: !!r.builtin
+    builtin: !!r.builtin,
+    verrouillee: !!r.verrouillee,
+    masquee: !!r.masquee
   }
+}
+
+/* Ce que la séance ouverte sait d'une catégorie.
+
+   Verrouillée : un de ses objets a un exemplaire posé dans une autre séance.
+   Un exemplaire sans séance — d'avant le cloisonnement — vaut pour toutes ;
+   il ne verrouille que s'il existe une autre séance que la nôtre.
+
+   Masquée : depuis la séance ouverte, ou une qui la précède dans l'ordre des
+   séances. Celles d'avant la montrent encore. */
+const SELECT_FAMILLE = `
+  SELECT f.id, f.nom, f.teinte, f.glyphe, f.ord, f.builtin,
+         EXISTS (
+           SELECT 1 FROM objet_placement p JOIN objet o ON o.id = p.objet_id
+            WHERE o.famille_id = f.id
+              AND (p.session_id <> @seance
+                   OR (p.session_id IS NULL AND EXISTS (
+                         SELECT 1 FROM game_session g
+                          WHERE g.campaign_id = f.campaign_id AND g.id <> @seance)))
+         ) AS verrouillee,
+         EXISTS (
+           SELECT 1 FROM game_session m, game_session c
+            WHERE m.id = f.masquee_depuis AND c.id = @seance
+              AND (c.ord, c.id) >= (m.ord, m.id)
+         ) AS masquee
+    FROM objet_famille f`
+
+function uneFamille(id: number): ObjetFamille | null {
+  const r = getDb()
+    .prepare(`${SELECT_FAMILLE} WHERE f.id = @id`)
+    .get({ id, seance: activeSessionId() })
+  return r ? toFamille(r) : null
 }
 
 export function listFamilles(): ObjetFamille[] {
   return (
     getDb()
-      .prepare(
-        `SELECT id, nom, teinte, glyphe, ord, builtin
-           FROM objet_famille WHERE campaign_id = ? ORDER BY ord, id`
-      )
-      .all(activeCampaignId()) as any[]
+      .prepare(`${SELECT_FAMILLE} WHERE f.campaign_id = @cid ORDER BY f.ord, f.id`)
+      .all({ cid: activeCampaignId(), seance: activeSessionId() }) as any[]
   ).map(toFamille)
 }
 
@@ -81,11 +120,7 @@ export function addFamille(input: { nom: string; teinte?: string; glyphe?: strin
       input.glyphe ?? 'outils',
       ord
     )
-  return toFamille(
-    db
-      .prepare(`SELECT id, nom, teinte, glyphe, ord, builtin FROM objet_famille WHERE id = ?`)
-      .get(Number(info.lastInsertRowid))
-  )
+  return uneFamille(Number(info.lastInsertRowid))!
 }
 
 export function updateFamille(
@@ -93,10 +128,10 @@ export function updateFamille(
   patch: { nom?: string; teinte?: string; glyphe?: string }
 ): ObjetFamille | null {
   const db = getDb()
-  const cur = db
-    .prepare(`SELECT id, nom, teinte, glyphe, ord, builtin FROM objet_famille WHERE id = ?`)
-    .get(id) as any
+  const cur = uneFamille(id)
   if (!cur) return null
+  /* Elle a servi ailleurs : ce que les autres séances en ont vu ne change pas. */
+  if (cur.verrouillee) return cur
   db.prepare(
     `UPDATE objet_famille SET nom = @nom, teinte = @teinte, glyphe = @glyphe WHERE id = @id`
   ).run({
@@ -105,16 +140,21 @@ export function updateFamille(
     teinte: patch.teinte ?? cur.teinte,
     glyphe: patch.glyphe ?? cur.glyphe
   })
-  return toFamille(
-    db
-      .prepare(`SELECT id, nom, teinte, glyphe, ord, builtin FROM objet_famille WHERE id = ?`)
-      .get(id)
-  )
+  return uneFamille(id)
 }
 
 /** Retirer un rayon ne retire pas ce qu'il contenait : les objets restent, sans famille. */
 export function removeFamille(id: number): void {
+  if (uneFamille(id)?.verrouillee) return
   getDb().prepare(`DELETE FROM objet_famille WHERE id = ?`).run(id)
+}
+
+/** Masquer à partir de la séance ouverte, ou réafficher partout. */
+export function masquerFamille(id: number, masquee: boolean): ObjetFamille | null {
+  getDb()
+    .prepare(`UPDATE objet_famille SET masquee_depuis = ? WHERE id = ?`)
+    .run(masquee ? activeSessionId() : null, id)
+  return uneFamille(id)
 }
 
 /* ---------------- les objets ---------------- */
@@ -184,11 +224,13 @@ function placementsOf(objetIds: number[]): Map<number, ObjetPlacement[]> {
   const rows = getDb()
     .prepare(
       `SELECT p.id, p.objet_id AS objetId, p.port, p.place_id AS placeId,
-              p.character_id AS characterId, p.detail, p.qte, p.etat, p.emplacement,
-              COALESCE(l.name, c.name, '—') AS cible
+              p.character_id AS characterId, p.inventaire_id AS inventaireId,
+              p.detail, p.qte, p.etat, p.emplacement, p.origine_place_id AS origineLieuId,
+              COALESCE(l.name, c.name, i.nom, '—') AS cible
          FROM objet_placement p
-         LEFT JOIN place l     ON l.id = p.place_id
-         LEFT JOIN character c ON c.id = p.character_id
+         LEFT JOIN place l      ON l.id = p.place_id
+         LEFT JOIN character c  ON c.id = p.character_id
+         LEFT JOIN inventaire i ON i.id = p.inventaire_id
         WHERE p.objet_id IN (${objetIds.map(() => '?').join(',')})
           AND (p.session_id = ? OR p.session_id IS NULL)
         ORDER BY p.ord, p.id`
@@ -201,9 +243,11 @@ function placementsOf(objetIds: number[]): Map<number, ObjetPlacement[]> {
       port: r.port as PortObjet,
       placeId: r.placeId,
       characterId: r.characterId,
+      inventaireId: r.inventaireId ?? null,
       cible: r.cible,
       precision: r.detail,
       emplacement: r.emplacement ?? null,
+      origineLieuId: r.origineLieuId ?? null,
       qte: r.qte ?? 1,
       etat: r.etat === 'trouve' ? 'trouve' : r.etat === 'porte' ? 'porte' : 'cache'
     }
@@ -519,7 +563,10 @@ export function donner(
   db.prepare(
     `UPDATE objet_placement
         SET port = @port, place_id = @placeId, character_id = @characterId,
-            emplacement = NULL, etat = @etat
+            inventaire_id = NULL, emplacement = NULL, etat = @etat,
+            /* Il quitte un lieu : le lieu s'en souvient (les valeurs lues ici
+               sont celles d'avant la mise à jour). */
+            origine_place_id = COALESCE(origine_place_id, CASE WHEN port = 'lieu' THEN place_id END)
       WHERE id = @id`
   ).run({
     id: placementId,
@@ -569,4 +616,263 @@ export function reprendre(id: number): Objet | null {
   if (!cur) return null
   db.prepare(`DELETE FROM objet_placement WHERE id = ?`).run(id)
   return getObjet(cur.objetId)
+}
+
+/* ---------------- les inventaires partagés ---------------- */
+
+/**
+ * Le camion, la malle : un inventaire que le MJ remplit et ouvre à la table.
+ * Ouvert, il se voit sur les téléphones ; chacun y pioche — l'objet tombe dans
+ * son sac — ou y remet ce qu'il a. Le contenu est fait d'exemplaires comme les
+ * autres (`port = 'inventaire'`), qui vivent dans la séance.
+ *
+ * Le journal — qui a pris quoi — ne vit qu'en mémoire : il sert pendant la
+ * partie, pas d'une soirée à l'autre.
+ */
+const journaux = new Map<number, Inventaire['journal']>()
+
+export function noter(inventaireId: number, texte: string): void {
+  const d = new Date()
+  const heure = `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+  const j = journaux.get(inventaireId) ?? []
+  j.push({ heure, texte })
+  journaux.set(inventaireId, j.slice(-30))
+}
+
+function toInventaire(r: any): Inventaire {
+  return { id: r.id, nom: r.nom, ouvert: !!r.ouvert, journal: journaux.get(r.id) ?? [] }
+}
+
+export function listInventaires(): Inventaire[] {
+  return (
+    getDb()
+      .prepare(`SELECT id, nom, ouvert FROM inventaire WHERE campaign_id = ? ORDER BY ord, id`)
+      .all(activeCampaignId()) as any[]
+  ).map(toInventaire)
+}
+
+function unInventaire(id: number): Inventaire | null {
+  const r = getDb().prepare(`SELECT id, nom, ouvert FROM inventaire WHERE id = ?`).get(id)
+  return r ? toInventaire(r) : null
+}
+
+/** Un inventaire neuf naît fermé : on le remplit tranquillement avant de l'ouvrir. */
+export function addInventaire(nom: string): Inventaire {
+  const db = getDb()
+  const cid = activeCampaignId()
+  const ord =
+    ((db.prepare(`SELECT MAX(ord) AS m FROM inventaire WHERE campaign_id = ?`).get(cid) as any)
+      ?.m ?? -1) + 1
+  const info = db
+    .prepare(`INSERT INTO inventaire (campaign_id, nom, ouvert, ord) VALUES (?, ?, 0, ?)`)
+    .run(cid, nom.trim() || 'Nouvel inventaire', ord)
+  return unInventaire(Number(info.lastInsertRowid))!
+}
+
+export function updateInventaire(
+  id: number,
+  patch: { nom?: string; ouvert?: boolean }
+): Inventaire | null {
+  const cur = unInventaire(id)
+  if (!cur) return null
+  const nom = patch.nom !== undefined ? patch.nom.trim() || cur.nom : cur.nom
+  const ouvert = patch.ouvert ?? cur.ouvert
+  getDb()
+    .prepare(`UPDATE inventaire SET nom = ?, ouvert = ? WHERE id = ?`)
+    .run(nom, ouvert ? 1 : 0, id)
+  if (ouvert !== cur.ouvert) noter(id, ouvert ? 'Ouvert aux joueurs' : 'Fermé aux joueurs')
+  return unInventaire(id)
+}
+
+/** Supprimer un inventaire rend son contenu à la réserve : les exemplaires partent avec lui. */
+export function removeInventaire(id: number): void {
+  getDb().prepare(`DELETE FROM inventaire WHERE id = ?`).run(id)
+  journaux.delete(id)
+}
+
+/** L'exemplaire de cet objet déjà rangé dans cet inventaire, dans la séance ouverte. */
+function dansInventaire(
+  inventaireId: number,
+  objetId: number
+): { id: number; qte: number } | undefined {
+  return getDb()
+    .prepare(
+      `SELECT id, qte FROM objet_placement
+        WHERE inventaire_id = ? AND objet_id = ? AND (session_id = ? OR session_id IS NULL)
+        ORDER BY id LIMIT 1`
+    )
+    .get(inventaireId, objetId, activeSessionId()) as { id: number; qte: number } | undefined
+}
+
+/**
+ * Ranger des objets de la réserve dans un inventaire. Une pièce unique déjà
+ * posée ailleurs dans la séance n'est pas dédoublée ; un objet en plusieurs
+ * exemplaires qu'on y range encore voit son nombre grossir. Rend le nombre
+ * d'objets ajoutés.
+ */
+export function remplir(inventaireId: number, objetIds: number[]): number {
+  const db = getDb()
+  const sid = activeSessionId()
+  let n = 0
+  db.transaction(() => {
+    for (const objetId of objetIds) {
+      const o = getObjet(objetId)
+      if (!o) continue
+      if (o.unique && o.placements.length > 0) continue
+      const ajout = o.unique ? 1 : Math.max(1, o.qte)
+      const deja = dansInventaire(inventaireId, objetId)
+      if (deja) {
+        db.prepare(`UPDATE objet_placement SET qte = ? WHERE id = ?`).run(deja.qte + ajout, deja.id)
+      } else {
+        const ord =
+          ((
+            db
+              .prepare(`SELECT MAX(ord) AS m FROM objet_placement WHERE objet_id = ?`)
+              .get(objetId) as any
+          )?.m ?? -1) + 1
+        db.prepare(
+          `INSERT INTO objet_placement (objet_id, session_id, port, inventaire_id, qte, etat, ord)
+           VALUES (?, ?, 'inventaire', ?, ?, 'trouve', ?)`
+        ).run(objetId, sid, inventaireId, ajout, ord)
+      }
+      n++
+    }
+  })()
+  return n
+}
+
+/** Ce qu'un inventaire contient, dans la séance ouverte — pour les téléphones. */
+export function contenuInventaire(inventaireId: number): {
+  placementId: number
+  objetId: number
+  nom: string
+  qte: number
+  teinte: string | null
+}[] {
+  return (
+    getDb()
+      .prepare(
+        `SELECT p.id AS placementId, o.id AS objetId, o.nom, p.qte, f.teinte
+           FROM objet_placement p
+           JOIN objet o ON o.id = p.objet_id
+           LEFT JOIN objet_famille f ON f.id = o.famille_id
+          WHERE p.inventaire_id = ? AND (p.session_id = ? OR p.session_id IS NULL)
+          ORDER BY o.nom COLLATE NOCASE`
+      )
+      .all(inventaireId, activeSessionId()) as any[]
+  ).map((r) => ({ ...r, qte: r.qte ?? 1, teinte: r.teinte ?? null }))
+}
+
+/** L'inventaire où est rangé cet exemplaire, s'il l'est. */
+export function inventaireDe(placementId: number): number | null {
+  const r = getDb()
+    .prepare(`SELECT inventaire_id AS id FROM objet_placement WHERE id = ?`)
+    .get(placementId) as { id: number | null } | undefined
+  return r?.id ?? null
+}
+
+/**
+ * Piocher un exemplaire : il tombe dans le sac du personnage. S'il y en a
+ * plusieurs, on n'en prend qu'un — les autres restent dans l'inventaire. Rend
+ * le nom de l'objet pris.
+ */
+export function prendre(placementId: number, characterId: number): string | null {
+  const db = getDb()
+  const p = db
+    .prepare(
+      `SELECT p.objet_id AS objetId, p.qte, o.nom FROM objet_placement p
+         JOIN objet o ON o.id = p.objet_id
+        WHERE p.id = ? AND p.inventaire_id IS NOT NULL`
+    )
+    .get(placementId) as { objetId: number; qte: number; nom: string } | undefined
+  if (!p) return null
+  db.transaction(() => {
+    if (p.qte > 1) {
+      db.prepare(`UPDATE objet_placement SET qte = qte - 1 WHERE id = ?`).run(placementId)
+      const sac = db
+        .prepare(
+          `SELECT id FROM objet_placement
+            WHERE character_id = ? AND objet_id = ? AND emplacement IS NULL
+              AND (session_id = ? OR session_id IS NULL)
+            LIMIT 1`
+        )
+        .get(characterId, p.objetId, activeSessionId()) as { id: number } | undefined
+      if (sac) db.prepare(`UPDATE objet_placement SET qte = qte + 1 WHERE id = ?`).run(sac.id)
+      else
+        db.prepare(
+          `INSERT INTO objet_placement (objet_id, session_id, port, character_id, qte, etat, ord)
+           VALUES (?, ?, 'pj', ?, 1, 'porte', 0)`
+        ).run(p.objetId, activeSessionId(), characterId)
+    } else {
+      db.prepare(
+        `UPDATE objet_placement
+            SET port = 'pj', inventaire_id = NULL, character_id = ?, etat = 'porte', emplacement = NULL
+          WHERE id = ?`
+      ).run(characterId, placementId)
+    }
+  })()
+  return p.nom
+}
+
+/**
+ * Remettre un exemplaire dans un inventaire — tout ce qu'il compte. S'il y en
+ * a déjà de ce même objet, les deux se rejoignent. Rend le nom de l'objet.
+ */
+export function remettre(placementId: number, inventaireId: number): string | null {
+  const db = getDb()
+  const p = db
+    .prepare(
+      `SELECT p.objet_id AS objetId, p.qte, o.nom FROM objet_placement p
+         JOIN objet o ON o.id = p.objet_id WHERE p.id = ?`
+    )
+    .get(placementId) as { objetId: number; qte: number; nom: string } | undefined
+  if (!p) return null
+  db.transaction(() => {
+    const deja = dansInventaire(inventaireId, p.objetId)
+    if (deja && deja.id !== placementId) {
+      db.prepare(`UPDATE objet_placement SET qte = ? WHERE id = ?`).run(deja.qte + p.qte, deja.id)
+      db.prepare(`DELETE FROM objet_placement WHERE id = ?`).run(placementId)
+    } else {
+      db.prepare(
+        `UPDATE objet_placement
+            SET port = 'inventaire', inventaire_id = ?, character_id = NULL, place_id = NULL,
+                etat = 'trouve', emplacement = NULL
+          WHERE id = ?`
+      ).run(inventaireId, placementId)
+    }
+  })()
+  return p.nom
+}
+
+/**
+ * Entrer dans une séance : chaque inventaire encore vide y reprend ce qu'il
+ * contenait à la séance d'avant. Ce qui a été pioché la dernière fois ne
+ * revient donc pas dans le camion.
+ */
+export function reporterInventaires(sessionId: number): void {
+  const db = getDb()
+  const sienne = db.prepare(`SELECT id, ord FROM game_session WHERE id = ?`).get(sessionId) as
+    | { id: number; ord: number }
+    | undefined
+  if (!sienne) return
+  const avant = db
+    .prepare(
+      `SELECT id FROM game_session
+        WHERE campaign_id = ? AND (ord < ? OR (ord = ? AND id < ?))
+        ORDER BY ord DESC, id DESC LIMIT 1`
+    )
+    .get(activeCampaignId(), sienne.ord, sienne.ord, sienne.id) as { id: number } | undefined
+  if (!avant) return
+  db.transaction(() => {
+    for (const inv of listInventaires()) {
+      const ici = db
+        .prepare(`SELECT 1 FROM objet_placement WHERE inventaire_id = ? AND session_id = ?`)
+        .get(inv.id, sessionId)
+      if (ici) continue
+      for (const p of db
+        .prepare(`SELECT id FROM objet_placement WHERE inventaire_id = ? AND session_id = ?`)
+        .all(inv.id, avant.id) as { id: number }[])
+        copierLigne('objet_placement', p.id, { session_id: sessionId })
+    }
+  })()
 }

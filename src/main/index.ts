@@ -10,6 +10,9 @@ import * as carnet from './carnet'
 import * as projet from './project'
 import { registerMediaProtocol, registerProtocolScheme } from './vault'
 import * as examen from './examen'
+import { synchroniserBientot } from './lieuxTexte'
+import { synchroniserPnjBientot } from './pnjTexte'
+import { synchroniserArborescencesBientot } from './arborescenceTexte'
 import { announce, auScan, stopWatch } from './library'
 import { lirePoste } from '@shared/reglages'
 
@@ -196,6 +199,12 @@ if (!app.requestSingleInstanceLock()) {
        se connaître : le dossier relu réveille le graveur, le graveur qui a du
        neuf fait rafraîchir les interfaces. */
     auScan(examen.planifier)
+    /* Un fichier de lieu écrit ailleurs : le lieu le reprend. */
+    auScan(synchroniserBientot)
+    /* Et pour les PNJ, dont un fichier neuf fait naître un PNJ. */
+    auScan(synchroniserPnjBientot)
+    /* De même pour l'arborescence d'une séance. */
+    auScan(synchroniserArborescencesBientot)
     examen.auxNouvelles(announce)
 
     ouvrirDernierProjet()

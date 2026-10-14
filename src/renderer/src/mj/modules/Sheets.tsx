@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { currentCharacter, itemById, playerOf, templateOf, useStore } from '../store'
+import { usePoignee } from '../components/Poignee'
 import {
   IconClose,
   IconExpand,
@@ -8,6 +9,7 @@ import {
   IconPen,
   IconPeople,
   IconPlus,
+  IconScreen,
   IconSliders,
   IconTrash,
   kindIcon
@@ -23,6 +25,7 @@ import { Visage } from '../../shared/Visage'
 import { RognageCarre } from '../components/RognageCarre'
 import type { UiItem } from '../../../../preload/index'
 import { PION_COULEURS } from '@shared/types'
+import { ChampEmojis } from '../components/ChampEmojis'
 import type {
   ButinLigne,
   CadreCarre,
@@ -261,6 +264,12 @@ function SheetBody({
   const s = useStore()
   const portrait = itemById(s.allItems, ch.portraitItemId)
   const fiche = itemById(s.allItems, ch.sheetItemId)
+  /* Ce personnage est-il en train d'être présenté aux joueurs ? */
+  const direct = s.display?.slots[s.display.liveSlot]
+  const enPresentation = direct?.type === 'presentation' && direct.characterId === ch.id
+  /* Un PNJ n'a sa colonne de feuille que si la campagne le veut (Paramètres › Table). */
+  const avecFeuille = ch.kind !== 'pnj' || s.reglages.pnjFiche
+  const colonnes = usePoignee({ variable: '--fiche-g', cle: 'fiche.largeurGauche', gauche: ':scope > .fiche-qui' })
   /** Ce qui est ouvert par-dessus la fiche : le choix d'une image, d'un PDF, ou sa lecture. */
   const [fenetre, setFenetre] = useState<
     'portrait' | 'carre' | 'fiche' | 'lecture' | 'identite' | null
@@ -384,7 +393,12 @@ function SheetBody({
         />
       )}
 
-      <div className="sheet-cols">
+      <div
+        ref={colonnes.ref}
+        className={`sheet-cols${avecFeuille ? '' : ' sheet-sans-feuille'}`}
+        style={colonnes.largeur != null ? ({ '--fiche-g': `${colonnes.largeur}px` } as React.CSSProperties) : undefined}
+      >
+        {colonnes.poignee}
         {/*
           Trois colonnes, et chacune ne répond qu'à une question. À gauche
           **qui il est** : son visage en grand, son nom, ce qu'il fait, qui le
@@ -458,6 +472,9 @@ function SheetBody({
               {[ch.occupation, ageDit(ch.age)].filter(Boolean).join(' · ') ||
                 (ch.kind === 'pnj' ? 'sans rôle noté' : 'sans occupation renseignée')}
             </p>
+            {ch.kind !== 'pnj' && (ch.lieuNaissance || ch.ville) ? (
+              <p className="role origine">{origineDite(ch)}</p>
+            ) : null}
 
             {/* La couleur et la personne qui mène le personnage vont ensemble :
                 à la table, on reconnaît le sien à sa teinte. Un PNJ n'est mené
@@ -483,6 +500,41 @@ function SheetBody({
                 <NomDuJoueur ch={ch} />
               </div>
             )}
+
+            {/* Le personnage entre en scène : il part tout de suite sur l'écran
+                des joueurs, sans passer par la préparation. */}
+            {ch.kind !== 'pnj' && enPresentation ? (
+              <button
+                className="btn btn-sm presenter"
+                aria-pressed
+                onClick={() => void window.jdr.display.arreterPresentation()}
+                title="Retirer la présentation : l’écran des joueurs revient à ce qu’il montrait avant"
+              >
+                <IconClose />
+                Arrêter la présentation
+              </button>
+            ) : ch.kind !== 'pnj' ? (
+              <button
+                className="btn btn-sm presenter"
+                onClick={() =>
+                  void window.jdr.display.show({
+                    type: 'presentation',
+                    characterId: ch.id,
+                    name: ch.name,
+                    occupation: [ch.occupation, ageDit(ch.age)].filter(Boolean).join(' · ') || undefined,
+                    player: playerOf(s, ch.id)?.name ?? ch.player ?? undefined,
+                    url: portrait?.url ?? null,
+                    color: ch.color,
+                    emojis: ch.emojis
+                  })
+                }
+                title="Montrer son portrait, son nom et ses émojis sur l’écran des joueurs, en direct"
+              >
+                <IconScreen />
+                Présenter le joueur à l’écran
+                {ch.emojis.length ? <span className="presenter-emo">{ch.emojis.join('')}</span> : null}
+              </button>
+            ) : null}
           </div>
 
           <div className="bloc">
@@ -511,7 +563,7 @@ function SheetBody({
           {/* Ce que le MJ sait de lui, et ce qu'on lui prend quand il tombe.
               Les PNJ seulement : un joueur a sa propre feuille pour ça, et ces
               deux blocs ne sont jamais diffusés. */}
-          {ch.kind === 'pnj' ? <NotesPnj ch={ch} /> : null}
+          {ch.kind === 'pnj' ? <NotesPnj ch={ch} /> : <Biographie ch={ch} />}
           {ch.kind === 'pnj' ? <ButinPnj ch={ch} /> : null}
 
           <Sortie ch={ch} />
@@ -762,7 +814,7 @@ function SheetBody({
           changeaient de largeur d'un personnage à l'autre, et le geste
           « lier sa fiche » se cherchait ailleurs à chaque fois.
         */}
-        {onglet === 'fiche' ? (
+        {onglet === 'fiche' && avecFeuille ? (
           fiche?.url ? (
           <ApercuFiche
             item={fiche}
@@ -909,6 +961,47 @@ function NotesPnj({ ch }: { ch: Character }): JSX.Element {
         onChange={(e) => tape(e.target.value)}
         placeholder={'Ce qu’il cache, ce qui le fait céder, sa voix.\nCe sur quoi il ment.'}
         aria-label={`Notes sur ${ch.name}`}
+      />
+    </div>
+  )
+}
+
+/**
+ * L'histoire d'un personnage joueur, écrite sur place comme les notes d'un
+ * PNJ : la frappe part en base quand la main s'arrête.
+ */
+function Biographie({ ch }: { ch: Character }): JSX.Element {
+  const s = useStore()
+  const [texte, setTexte] = useState(ch.biographie ?? '')
+  const frappe = useRef<ReturnType<typeof setTimeout> | null>(null)
+  /* Recalé quand on change de personnage ou que le formulaire l'a réécrite ;
+     pas sur le retour de sa propre frappe, rognée en base. */
+  useEffect(
+    () => setTexte((t) => (t.trim() === (ch.biographie ?? '').trim() ? t : (ch.biographie ?? ''))),
+    [ch.id, ch.biographie]
+  )
+  useEffect(() => () => void (frappe.current && clearTimeout(frappe.current)), [])
+
+  const tape = (v: string): void => {
+    setTexte(v)
+    if (frappe.current) clearTimeout(frappe.current)
+    frappe.current = setTimeout(() => {
+      void window.jdr.characters
+        .upsert({ id: ch.id, templateId: ch.templateId, name: ch.name, biographie: v.trim() || null })
+        .then(() => s.refreshCharacters())
+    }, 400)
+  }
+
+  return (
+    <div className="bloc pnj-notes">
+      <div className="bloc-tete">
+        <span className="eyebrow">Biographie</span>
+      </div>
+      <textarea
+        value={texte}
+        onChange={(e) => tape(e.target.value)}
+        placeholder="Ce qui l’a mené jusqu’ici."
+        aria-label={`Biographie de ${ch.name}`}
       />
     </div>
   )
@@ -1116,6 +1209,10 @@ function FormFiche({
   const [portraitItemId, setPortraitItemId] = useState<number | null>(ch?.portraitItemId ?? null)
   const [choixPortrait, setChoixPortrait] = useState(false)
   const [age, setAge] = useState((ch?.age ?? '').replace(/[^0-9]/g, ''))
+  const [lieuNaissance, setLieuNaissance] = useState(ch?.lieuNaissance ?? '')
+  const [ville, setVille] = useState(ch?.ville ?? '')
+  const [biographie, setBiographie] = useState(ch?.biographie ?? '')
+  const [emojis, setEmojis] = useState<string[]>(ch?.emojis ?? [])
   const [color, setColor] = useState<string | null>(ch?.color ?? null)
   /* La silhouette de sa poupée d'équipement. Deux dessins, pas une case
      d'état civil : c'est le corps sur lequel on pose la tête et les mains. */
@@ -1185,6 +1282,10 @@ function FormFiche({
       name: name.trim(),
       occupation: occupation.trim() || null,
       age: age.trim() || null,
+      lieuNaissance: pnj ? undefined : lieuNaissance.trim() || null,
+      ville: pnj ? undefined : ville.trim() || null,
+      biographie: pnj ? undefined : biographie.trim() || null,
+      emojis: pnj ? undefined : emojis,
       color,
       sexe
     })
@@ -1494,6 +1595,48 @@ function FormFiche({
             </div>
           </div>
 
+          {/* D'où il vient, où il vit, son histoire : des questions de joueur,
+              comme l'âge. Un PNJ tient tout cela dans sa description. */}
+          {pnj ? null : (
+            <>
+              <div className="deux">
+                <div className="field">
+                  <label htmlFor="nc-naiss">Lieu de naissance</label>
+                  <input
+                    id="nc-naiss"
+                    type="text"
+                    value={lieuNaissance}
+                    onChange={(e) => setLieuNaissance(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && void enregistrer()}
+                    placeholder="Quimper"
+                  />
+                </div>
+                <div className="field">
+                  <label htmlFor="nc-ville">Ville actuelle</label>
+                  <input
+                    id="nc-ville"
+                    type="text"
+                    value={ville}
+                    onChange={(e) => setVille(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && void enregistrer()}
+                    placeholder="Rennes"
+                  />
+                </div>
+              </div>
+              <div className="field">
+                <label htmlFor="nc-bio">Biographie</label>
+                <textarea
+                  id="nc-bio"
+                  rows={4}
+                  value={biographie}
+                  onChange={(e) => setBiographie(e.target.value)}
+                  placeholder="Ce qui l’a mené jusqu’ici."
+                />
+              </div>
+              <ChampEmojis emojis={emojis} onChange={setEmojis} />
+            </>
+          )}
+
         </div>
         <footer>
           {ch ? (
@@ -1682,6 +1825,17 @@ export function initials(name: string): string {
     .join('')
 }
 
+/** « Né à Quimper · vit à Rennes » — accordé à la silhouette quand on la connaît. */
+function origineDite(ch: Character): string {
+  const ne = ch.sexe === 'femme' ? 'Née' : 'Né'
+  return [
+    ch.lieuNaissance?.trim() ? `${ne} à ${ch.lieuNaissance.trim()}` : '',
+    ch.ville?.trim() ? `${ch.lieuNaissance?.trim() ? 'vit' : 'Vit'} à ${ch.ville.trim()}` : ''
+  ]
+    .filter(Boolean)
+    .join(' · ')
+}
+
 /** « 34 » se lit « 34 ans ». Une fiche d'avant qui portait déjà le mot le garde. */
 function ageDit(age: string | null): string {
   const a = age?.trim()
@@ -1729,4 +1883,3 @@ function levelWord(l: string): string {
     }[l] ?? l
   )
 }
-

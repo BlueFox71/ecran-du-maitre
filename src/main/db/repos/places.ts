@@ -1,8 +1,17 @@
 import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { copierLigne } from '../copie'
+import { copierFiche } from './ficheLieu'
 import * as reglages from './reglages'
 import { lireCampagne } from '@shared/reglages'
-import { PARENT_TIERS, type Place, type PlaceTier, type PointMur } from '@shared/types'
+import { planDe } from './echelle'
+import {
+  PARENT_TIERS,
+  type Astre,
+  type CielDuLieu,
+  type Place,
+  type PlaceTier,
+  type PointMur
+} from '@shared/types'
 
 const SELECT = `
   SELECT p.id, p.tier, p.parent_id AS parentId, p.ord, p.name, p.summary, p.notes,
@@ -10,7 +19,9 @@ const SELECT = `
          p.ambience_item_id AS ambienceItemId,
          p.zone_pts AS zonePts, p.ancre_x AS ancreX, p.ancre_y AS ancreY,
          p.seen, p.ouv_largeur AS ouvLargeur, p.lum_garde AS lumGarde,
-         p.regard_portee AS regardPortee,
+         p.piece_unique AS pieceUnique,
+         p.regard_portee AS regardPortee, p.astre, p.astre_cap AS astreCap,
+         p.nord, p.ciel, p.ciel_cap AS cielCap,
          (SELECT COUNT(*) FROM item i WHERE i.place_id = p.id) AS docCount
     FROM place p`
 
@@ -35,6 +46,15 @@ function toContour(brut: unknown): PointMur[] | null {
   }
 }
 
+/** Un angle ramené entre 0 et 360 ; ce qui n'est pas un nombre vaut 0. */
+function degres(v: number): number {
+  return Number.isFinite(v) ? ((v % 360) + 360) % 360 : 0
+}
+
+function versAstre(nature: unknown, cap: unknown): Astre | null {
+  return nature === 'soleil' || nature === 'lune' ? { nature, cap: degres(Number(cap)) } : null
+}
+
 function toPlace(r: any): Place {
   return {
     id: r.id,
@@ -53,8 +73,12 @@ function toPlace(r: any): Place {
     ouvLargeur:
       r.ouvLargeur === null || r.ouvLargeur === undefined ? null : Number(r.ouvLargeur),
     lumGarde: !!r.lumGarde,
+    pieceUnique: !!r.pieceUnique,
     regardPortee:
       r.regardPortee === null || r.regardPortee === undefined ? null : Number(r.regardPortee),
+    astre: versAstre(r.astre, r.astreCap),
+    nord: degres(Number(r.nord)),
+    ciel: r.tier === 'espace' ? versAstre(r.ciel, r.cielCap) : null,
     docCount: r.docCount
   }
 }
@@ -271,6 +295,73 @@ export function setRegardPortee(id: number, portee: number | null): Place | null
 }
 
 /**
+ * Le soleil ou la lune de cette carte, et d'où vient sa lumière, compté depuis
+ * le nord ; `null`, aucun. Sans effet visible tant que l'espace règle le ciel
+ * pour tous : on le garde pour le jour où il le rend.
+ */
+export function setAstre(id: number, astre: Astre | null): Place | null {
+  ecrireAstre(id, 'astre', 'astre_cap', astre)
+  return getPlace(id)
+}
+
+/** Le ciel d'un espace : le soleil ou la lune de tous ses lieux ; `null`, chacun le sien. */
+export function setCiel(espaceId: number, astre: Astre | null): Place | null {
+  ecrireAstre(espaceId, 'ciel', 'ciel_cap', astre)
+  return getPlace(espaceId)
+}
+
+function ecrireAstre(id: number, col: string, colCap: string, astre: Astre | null): void {
+  if (!astre) {
+    getDb().prepare(`UPDATE place SET ${col} = NULL WHERE id = ?`).run(id)
+    return
+  }
+  const cap = Number.isFinite(astre.cap) ? degres(astre.cap) : 135
+  const nature = astre.nature === 'lune' ? 'lune' : 'soleil'
+  getDb().prepare(`UPDATE place SET ${col} = ?, ${colCap} = ? WHERE id = ?`).run(nature, cap, id)
+}
+
+/**
+ * Où pointe le nord sur le plan de ce lieu — celui de l'étage, pour une pièce
+ * découpée : elle en partage l'image, donc la boussole.
+ */
+export function setNord(id: number, nord: number): CielDuLieu {
+  getDb().prepare(`UPDATE place SET nord = ? WHERE id = ?`).run(degres(nord), planDe(id))
+  return cielDe(id)
+}
+
+/** L'espace qui tient ce lieu, en remontant ; `null`, il n'est rangé dans aucun. */
+function espaceDe(id: number): Place | null {
+  const vus = new Set<number>()
+  let cur = getPlace(id)
+  while (cur && !vus.has(cur.id)) {
+    if (cur.tier === 'espace') return cur
+    vus.add(cur.id)
+    cur = cur.parentId == null ? null : getPlace(cur.parentId)
+  }
+  return null
+}
+
+/**
+ * Le soleil ou la lune qui éclaire ce lieu, tourné dans le repère de son
+ * image : le ciel de l'espace s'il en a un, sinon celui du lieu. Les caps se
+ * comptent depuis le nord ; le nord du plan les remet à l'endroit.
+ */
+export function cielDe(id: number): CielDuLieu {
+  const lieu = getPlace(id)
+  const plan = lieu ? getPlace(planDe(id)) : null
+  const nord = plan?.nord ?? 0
+  const espace = lieu ? espaceDe(id) : null
+  const general = espace?.ciel ? { espaceId: espace.id, nom: espace.name, astre: espace.ciel } : null
+  /* Un espace ne règle plus d'astre à lui : son réglage, c'est le ciel. */
+  const source = general?.astre ?? (lieu?.tier === 'espace' ? null : (lieu?.astre ?? null))
+  return {
+    astre: source ? { nature: source.nature, cap: degres(source.cap + nord) } : null,
+    nord,
+    general
+  }
+}
+
+/**
  * Ce que la lumière laisse derrière elle, sur cette carte.
  *
  * Coché, une zone éclairée une fois reste découverte ; décoché, elle retombe
@@ -279,6 +370,12 @@ export function setRegardPortee(id: number, portee: number | null): Place | null
  */
 export function setLumGarde(id: number, garde: boolean): Place | null {
   getDb().prepare(`UPDATE place SET lum_garde = ? WHERE id = ?`).run(garde ? 1 : 0, id)
+  return getPlace(id)
+}
+
+/** Ce lieu n'est qu'une pièce : ses murs le referment, il ne se découpe pas. */
+export function setPieceUnique(id: number, unique: boolean): Place | null {
+  getDb().prepare(`UPDATE place SET piece_unique = ? WHERE id = ?`).run(unique ? 1 : 0, id)
   return getPlace(id)
 }
 
@@ -395,7 +492,36 @@ export function movePlace(id: number, parentId: number | null, beforeId: number 
 export function removePlace(id: number): void {
   const db = getDb()
   const sous = descendants(id)
+  const partent = [id, ...sous.map((p) => p.id)]
   db.transaction(() => {
+    /* L'échelle et le nord sont ceux d'une image, pas d'un lieu : quand on
+       efface un plan, un autre lieu qui montre la même image en entier les
+       garde. Le « Rez-de-chaussée » né du plan d'un espace emportait sinon
+       l'échelle qu'on y avait fixée, et l'espace revenait sans. */
+    const marques = `(${partent.map(() => '?').join(',')})`
+    const seance = (
+      db.prepare(`SELECT session_id AS s FROM place WHERE id = ?`).get(id) as { s: number | null } | undefined
+    )?.s ?? null
+    const plans = db
+      .prepare(
+        `SELECT map_item_id AS carte, echelle, nord FROM place
+          WHERE id IN ${marques} AND map_item_id IS NOT NULL AND zone_pts IS NULL`
+      )
+      .all(...partent) as { carte: number; echelle: number | null; nord: number }[]
+    for (const pl of plans) {
+      if (pl.echelle != null)
+        db.prepare(
+          `UPDATE place SET echelle = ?
+            WHERE map_item_id = ? AND zone_pts IS NULL AND echelle IS NULL AND session_id IS ?
+              AND id NOT IN ${marques}`
+        ).run(pl.echelle, pl.carte, seance, ...partent)
+      if (pl.nord)
+        db.prepare(
+          `UPDATE place SET nord = ?
+            WHERE map_item_id = ? AND zone_pts IS NULL AND nord = 0 AND session_id IS ?
+              AND id NOT IN ${marques}`
+        ).run(pl.nord, pl.carte, seance, ...partent)
+    }
     const del = db.prepare(`DELETE FROM place WHERE id = ?`)
     for (const p of [...sous].reverse()) del.run(p.id)
     del.run(id)
@@ -477,6 +603,9 @@ export function copierLieu(
     /* Un objet déjà trouvé là-bas est de nouveau à trouver ici. */
     for (const o of ids(`SELECT id FROM objet_placement WHERE place_id = ?`, p.id))
       copierLigne('objet_placement', o, { place_id: neuf, session_id: sid, etat: 'cache' })
+
+    /* Sa fiche : scénarios, découvertes et déclencheurs, PNJ qu'on y croise. */
+    copierFiche(p.id, neuf)
   }
 
   return nouveau
@@ -494,6 +623,7 @@ export function copierLieu(
  *
  * Les pièces découpées sur ce plan, et les niveaux de bâtiment qui le
  * cadrent, suivent : ils partageaient l'image, ils partagent la nouvelle.
+
  */
 export function recalerApresRognage(
   id: number,
@@ -510,6 +640,10 @@ export function recalerApresRognage(
   )
 
   db.transaction(() => {
+    /* Une image rognée est plus étroite : l'échelle fixée au trait la suit.
+       Un calage ne change pas l'image, son échelle non plus. */
+    if (ancienne !== nouvelle)
+      db.prepare(`UPDATE place SET echelle = echelle * ? WHERE id = ? AND echelle IS NOT NULL`).run(c.w, id)
     for (const p of touches) {
       db.prepare(
         `UPDATE place SET map_item_id = ?,
@@ -557,11 +691,44 @@ export function recalerApresRognage(
   })()
 }
 
+/**
+ * Le cadre qui garde la forme de ce qui est posé quand l'image change de
+ * proportions.
+ *
+ * Tout se tient en fractions de la carte : sans rien faire, un plan carré
+ * remplacé par une image deux fois plus large étirerait ses murs du double.
+ * On place donc l'ancienne image **dans** la nouvelle, à ses propres
+ * proportions, aussi grande que possible et centrée — et tout ce qui y était
+ * posé la suit sans se déformer. On rogne ensuite pour recaler l'image sous
+ * les murs.
+ *
+ * Le cadre se lit comme celui d'un rognage (`recalerApresRognage`), dont c'est
+ * l'inverse : l'ancienne image y tient la place `1 / w` de la nouvelle. Sans
+ * mesure de l'une ou l'autre, ou à proportions égales, rien ne bouge.
+ */
+export function cadrePourRemplacer(
+  avant: { width: number | null; height: number | null } | null,
+  apres: { width: number | null; height: number | null } | null
+): { x: number; y: number; w: number; h: number } {
+  const neutre = { x: 0, y: 0, w: 1, h: 1 }
+  if (!avant?.width || !avant.height || !apres?.width || !apres.height) return neutre
+  const a0 = avant.width / avant.height
+  const a1 = apres.width / apres.height
+  if (Math.abs(a0 / a1 - 1) <= 0.002) return neutre
+  /* La part de la nouvelle image qu'occupe l'ancienne, en largeur et en hauteur. */
+  const fw = a0 > a1 ? 1 : a0 / a1
+  const fh = a0 > a1 ? a1 / a0 : 1
+  const fx = (1 - fw) / 2
+  const fy = (1 - fh) / 2
+  return { x: -fx / fw, y: -fy / fh, w: 1 / fw, h: 1 / fh }
+}
+
 /** Ce qui se pose sur la carte d'un lieu et le suit quand il change de rôle. */
 const CALQUES = ['mur', 'lumiere', 'annotation', 'pion'] as const
 
 /** Les réglages de carte qu'un étage tient pour ses pièces. */
-const REGLAGES_CARTE = 'pion_size, lum_garde, regard_portee, ouv_largeur'
+const REGLAGES_CARTE =
+  'pion_size, pion_main, echelle, lum_garde, regard_portee, ouv_largeur, astre, astre_cap, nord'
 
 /** Le premier contenant, en remontant, dont l'étage est admis au-dessus de `tier`. */
 function contenantAdmis(depart: number | null, tier: PlaceTier): number | null {

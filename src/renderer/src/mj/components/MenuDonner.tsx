@@ -11,6 +11,7 @@
  */
 import { useStore } from '../store'
 import { Pop } from './Pop'
+import { IconClose } from './Icons'
 import type { ObjetPlacement } from '@shared/types'
 
 export function MenuDonner({
@@ -48,8 +49,31 @@ export function MenuDonner({
     await onFait()
   }
 
+  /* Le camion, la malle : un inventaire partagé est un endroit de plus où
+     ranger un exemplaire. */
+  const inventaires = s.inventaires.filter((i) => i.id !== p.inventaireId)
+  const ranger = async (inventaireId: number): Promise<void> => {
+    onClose()
+    try {
+      await window.jdr.objets.remettre(p.id, inventaireId)
+    } catch (e) {
+      s.toast('L’objet n’a pas été rangé.', true)
+      console.error('[ranger]', e)
+      return
+    }
+    await onFait()
+  }
+
   return (
     <Pop x={x} y={y} className="menu-donner" onClose={onClose}>
+      <button
+        className="md-fermer"
+        onClick={onClose}
+        title="Fermer sans rien donner — Échap"
+        aria-label="Fermer"
+      >
+        <IconClose />
+      </button>
       <span className="eyebrow">Dans les mains de</span>
       {pjs.length === 0 ? <p className="pop-rien">Aucun personnage joueur.</p> : null}
       {pjs.map((c) => (
@@ -89,6 +113,18 @@ export function MenuDonner({
           {lieux.map((l) => (
             <button key={l.id} className="opt" onClick={() => void donner({ port: 'lieu', placeId: l.id })}>
               {l.name}
+            </button>
+          ))}
+        </>
+      ) : null}
+
+      {inventaires.length ? (
+        <>
+          <hr />
+          <span className="eyebrow">Le ranger dans</span>
+          {inventaires.map((i) => (
+            <button key={i.id} className="opt" onClick={() => void ranger(i.id)}>
+              {i.nom}
             </button>
           ))}
         </>

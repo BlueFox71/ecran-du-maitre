@@ -8,6 +8,12 @@
  *
  * Les dossiers sans rien à proposer sont retirés — inutile de montrer trente
  * dossiers de bruitages quand on cherche un PDF.
+ *
+ * **Plus de galerie de vignettes** (13 octobre 2026) : charger toutes les
+ * images d'un dossier ouvert rendait la fenêtre lente. Les images sont des
+ * lignes comme le reste ; un clic en montre une seule, à droite, avec son
+ * aperçu et sa date de mise à jour, et « Choisir » la retient. Le double-clic
+ * choisit tout de suite.
  */
 import { useMemo, useState } from 'react'
 import { useStore } from '../store'
@@ -16,6 +22,7 @@ import { decorDossier, folderIcon } from './FolderIcons'
 import type { UiFolder, UiItem } from '../../../../preload/index'
 import type { ItemKind } from '@shared/types'
 
+/** `vignettes` : des lignes et un volet d'aperçu à droite ; `lignes` : des lignes seules. */
 type Rendu = 'vignettes' | 'lignes'
 
 export function ChoixDansArbre({
@@ -44,20 +51,24 @@ export function ChoixDansArbre({
 }): JSX.Element {
   const s = useStore()
   const [q, setQ] = useState('')
-  /* Le dossier du fichier déjà attaché est ouvert d'emblée : on voit son choix actuel. */
+  const apercu = rendu === 'vignettes'
+  /** La ligne qu'on regarde dans le volet d'aperçu, pas encore choisie. */
+  const [vu, setVu] = useState<number | null>(courant)
+  /* Deux dossiers ouverts d'emblée : celui du fichier déjà attaché — on voit
+     son choix actuel —, et celui de la séance, où l'on range ce qu'on prépare
+     pour elle. */
   const [ouverts, setOuverts] = useState<Set<string>>(() => {
     const it = s.allItems.find((i) => i.id === courant)
     const rel = it?.relPath ?? ''
     const i = rel.lastIndexOf('/')
-    const dossier = i < 0 ? '' : rel.slice(0, i)
     const chemins = new Set<string>()
-    /* Ouvrir aussi tous les dossiers qui le contiennent, sinon il reste caché. */
-    let bout = dossier
-    while (bout) {
-      chemins.add(bout)
-      const j = bout.lastIndexOf('/')
-      bout = j < 0 ? '' : bout.slice(0, j)
-    }
+    /* Ouvrir aussi tous les dossiers qui les contiennent, sinon ils restent cachés. */
+    for (let bout of [i < 0 ? '' : rel.slice(0, i), s.session?.folderRel ?? ''])
+      while (bout) {
+        chemins.add(bout)
+        const j = bout.lastIndexOf('/')
+        bout = j < 0 ? '' : bout.slice(0, j)
+      }
     return chemins
   })
 
@@ -85,43 +96,74 @@ export function ChoixDansArbre({
 
   /* ---------------- les fichiers ---------------- */
 
-  const vignette = (i: UiItem): JSX.Element => (
-    <button
-      key={i.id}
-      className={`vign${courant === i.id ? ' on' : ''}`}
-      onClick={() => onPick(i.id)}
-      title={i.relPath ?? i.title}
-    >
-      {i.kind === 'image' && i.url ? (
-        <img src={i.url} alt="" draggable={false} loading="lazy" />
-      ) : (
-        <span className="g">{kindIcon(i.kind, 'ico')}</span>
-      )}
-      <span className="nm">{i.title}</span>
-    </button>
-  )
-
   const ligne = (i: UiItem): JSX.Element => (
     <button
       key={i.id}
-      className={`doc-row${courant === i.id ? ' on' : ''}`}
-      onClick={() => onPick(i.id)}
+      className={`doc-row${(apercu ? vu : courant) === i.id ? ' on' : ''}`}
+      onClick={() => (apercu ? setVu(i.id) : onPick(i.id))}
+      onDoubleClick={apercu ? () => onPick(i.id) : undefined}
       title={i.relPath ?? i.title}
     >
       {kindIcon(i.kind, 'ico')}
       <span className="t">
-        <span className="ttl">{i.title}</span>
+        <span className="ttl">{apercu ? nomDeFichier(i) : i.title}</span>
         {mot ? <span className="sub">{dossierDe(i)}</span> : null}
       </span>
+      {apercu && courant === i.id ? <span className="cda-actuel">actuelle</span> : null}
     </button>
   )
 
-  const fichiers = (liste: UiItem[]): JSX.Element =>
-    rendu === 'vignettes' ? (
-      <div className="galerie">{liste.map(vignette)}</div>
-    ) : (
-      <div className="lignes">{liste.map(ligne)}</div>
-    )
+  const fichiers = (liste: UiItem[]): JSX.Element => (
+    <div className="lignes">{liste.map(ligne)}</div>
+  )
+
+  const regarde = apercu && vu !== null ? s.allItems.find((i) => i.id === vu) ?? null : null
+
+  const volet = (): JSX.Element => (
+    <aside className="cda-volet">
+      {regarde ? (
+        <>
+          <div className="cda-image">
+            {regarde.url || regarde.poster ? (
+              <img
+                key={regarde.id}
+                src={(regarde.kind === 'image' ? regarde.url : regarde.poster) ?? regarde.poster ?? ''}
+                alt=""
+                draggable={false}
+              />
+            ) : (
+              <span className="g">{kindIcon(regarde.kind, 'ico')}</span>
+            )}
+          </div>
+          <div className="cda-nom" title={regarde.relPath ?? regarde.title}>
+            {nomDeFichier(regarde)}
+          </div>
+          <dl className="cda-infos">
+            <dt>Dossier</dt>
+            <dd>{dossierDe(regarde)}</dd>
+            {regarde.width && regarde.height ? (
+              <>
+                <dt>Taille</dt>
+                <dd>
+                  {regarde.width} × {regarde.height}
+                </dd>
+              </>
+            ) : null}
+            {regarde.bytes != null ? (
+              <>
+                <dt>Poids</dt>
+                <dd>{poids(regarde.bytes)}</dd>
+              </>
+            ) : null}
+            <dt>Mise à jour</dt>
+            <dd>{quand(regarde.updatedAt)}</dd>
+          </dl>
+        </>
+      ) : (
+        <p className="cda-rien">Cliquer sur un fichier pour le voir ici.</p>
+      )}
+    </aside>
+  )
 
   /* ---------------- les dossiers ---------------- */
 
@@ -182,31 +224,34 @@ export function ChoixDansArbre({
             />
           </label>
 
-          <div className="arbre">
-            {sansLibelle && !aplati ? (
-              <div className="galerie sans-seul">
-                <button
-                  className={`vign sans${courant === null ? ' on' : ''}`}
-                  onClick={() => onPick(null)}
-                  title={sansLibelle}
-                >
-                  <span className="g">
+          <div className={apercu ? 'cda' : undefined}>
+            <div className="arbre">
+              {sansLibelle && !aplati ? (
+                <div className="lignes">
+                  <button
+                    className={`doc-row${courant === null ? ' on' : ''}`}
+                    onClick={() => onPick(null)}
+                    title={sansLibelle}
+                  >
                     <IconClose />
-                  </span>
-                  <span className="nm">{sansLibelle}</span>
-                </button>
-              </div>
-            ) : null}
-
-            {aplati ? fichiers(trouves) : null}
-            {!aplati ? s.tree.map(dossier) : null}
-            {!aplati && racine.length ? fichiers(racine) : null}
-
-            {(aplati ? trouves.length : total) === 0 ? (
-              <p className="rien">
-                {mot ? 'Rien ne correspond.' : 'Rien de ce genre dans le dossier de campagne.'}
-              </p>
-            ) : null}
+                    <span className="t">
+                      <span className="ttl">{sansLibelle}</span>
+                    </span>
+                  </button>
+                </div>
+              ) : null}
+  
+              {aplati ? fichiers(trouves) : null}
+              {!aplati ? s.tree.map(dossier) : null}
+              {!aplati && racine.length ? fichiers(racine) : null}
+  
+              {(aplati ? trouves.length : total) === 0 ? (
+                <p className="rien">
+                  {mot ? 'Rien ne correspond.' : 'Rien de ce genre dans le dossier de campagne.'}
+                </p>
+              ) : null}
+            </div>
+            {apercu ? volet() : null}
           </div>
         </div>
 
@@ -219,14 +264,42 @@ export function ChoixDansArbre({
           <button className="btn btn-ghost" onClick={onClose}>
             Annuler
           </button>
+          {apercu ? (
+            <button
+              className="btn btn-primary"
+              disabled={regarde === null}
+              onClick={() => regarde && onPick(regarde.id)}
+            >
+              Choisir
+            </button>
+          ) : null}
         </footer>
       </div>
     </div>
   )
 }
 
+/** Le nom du fichier sur le disque, extension comprise ; le titre à défaut. */
+function nomDeFichier(it: UiItem): string {
+  const rel = it.relPath ?? ''
+  return rel ? rel.slice(rel.lastIndexOf('/') + 1) : it.title
+}
+
 function dossierDe(it: UiItem): string {
   const p = it.relPath ?? ''
   const i = p.lastIndexOf('/')
   return i < 0 ? 'racine' : p.slice(0, i)
+}
+
+const poids = (b: number): string => {
+  if (b < 1024) return `${b} o`
+  if (b < 1024 * 1024) return `${Math.round(b / 1024)} Ko`
+  return `${(b / 1024 / 1024).toFixed(1)} Mo`
+}
+
+const quand = (iso: string): string => {
+  const d = new Date(iso)
+  if (Number.isNaN(d.getTime())) return '—'
+  return d.toLocaleDateString('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' })
+    + ' à ' + d.toLocaleTimeString('fr-FR', { hour: '2-digit', minute: '2-digit' })
 }

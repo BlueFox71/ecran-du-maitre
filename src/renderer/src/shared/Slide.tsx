@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { COLLAGE_CELLS, FRAME_NEUTRE, corpsDeCase, etatDeVie } from '@shared/types'
 import { Brouillard } from './Brouillard'
 import { Visage } from './Visage'
@@ -19,6 +19,7 @@ import type {
   SlidePayload,
   TextOverlay
 } from '@shared/types'
+import { urlPortraitMj } from './avatarsMj'
 
 /**
  * De l'écran à la carte, et retour.
@@ -92,6 +93,11 @@ export interface SlideExtras {
   focusPionId?: number | null
   /** Fourni côté MJ : la main reprend le cadrage, le pion est lâché. */
   onDefocus?: () => void
+  /**
+   * Le pion de celui qui joue, pendant les tours : il porte un halo doré qui
+   * bat, chez le MJ comme chez les joueurs.
+   */
+  pionEnJeuId?: number | null
   pointer?: Pointer | null
   /**
    * Fourni seulement côté MJ : les pions deviennent saisissables, et la scène
@@ -164,6 +170,7 @@ export function Slide({
   pionSize = 6,
   focusPionId,
   onDefocus,
+  pionEnJeuId,
   pionLabels = true,
   pionPv = false,
   joueurs,
@@ -396,7 +403,7 @@ export function Slide({
    * lui qui sait où l'image se trouve et de combien elle est recadrée.
    */
   const yeux = (pions ?? [])
-    .filter((p) => p.characterId != null)
+    .filter((p) => p.characterId != null && !p.pnj)
     .map((p) => ({ x: p.x, y: p.y, cap: p.rotation, characterId: p.characterId as number }))
 
   /*
@@ -414,6 +421,7 @@ export function Slide({
         pions={pions ?? []}
         pionSize={pionSize}
         focusPionId={focusPionId ?? null}
+        pionEnJeuId={pionEnJeuId ?? null}
         pionLabels={pionLabels}
         pionPv={pionPv}
         joueurs={joueurs ?? []}
@@ -553,6 +561,26 @@ export function Slide({
     )
   }
 
+  if (slide.type === 'presentation') {
+    return (
+      <div className={cls} key={`pres-${slide.characterId}`}>
+        <Presentation p={slide} />
+        {texte}
+        {bandeau}
+      </div>
+    )
+  }
+
+  if (slide.type === 'attente') {
+    return (
+      <div className={cls} key="attente">
+        <Attente p={slide} />
+        {texte}
+        {bandeau}
+      </div>
+    )
+  }
+
   if (slide.type === 'plate') {
     return (
       <div className={cls} key={`plate-${slide.title}`}>
@@ -578,6 +606,262 @@ export function Slide({
     </div>
   )
 }
+
+/* ============================================================
+   Un joueur présenté à la table
+   ============================================================ */
+
+/** Un tirage qui ne change pas d'un écran à l'autre : le moniteur montre la même gerbe. */
+function tirage(graine: number): () => number {
+  let a = graine * 2654435761
+  return () => {
+    a = (a + 0x6d2b79f5) | 0
+    let t = Math.imul(a ^ (a >>> 15), 1 | a)
+    t = (t + Math.imul(t ^ (t >>> 7), 61 | t)) ^ t
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296
+  }
+}
+
+/**
+ * Le portrait entre, le nom suit, et les émojis du personnage jaillissent de
+ * derrière lui — une gerbe d'abord, puis une montée lente qui ne s'arrête pas
+ * tant que l'écran reste là. Tout est en unités du cadre : la même image dans
+ * le moniteur et chez les joueurs.
+ */
+function Presentation({ p }: { p: Extract<SlidePayload, { type: 'presentation' }> }): JSX.Element {
+  const emojis = p.emojis.length ? p.emojis : ['✨']
+  const { gerbe, montee } = useMemo(() => {
+    const r = tirage(p.characterId + 1)
+    const gerbe = Array.from({ length: 28 }, (_, i) => {
+      const angle = r() * Math.PI * 2
+      const loin = 34 + r() * 30
+      return {
+        e: emojis[i % emojis.length],
+        style: {
+          '--dx': `${Math.cos(angle) * loin * 1.5}cqh`,
+          '--dy': `${Math.sin(angle) * loin}cqh`,
+          '--rot': `${(r() - 0.5) * 140}deg`,
+          '--t': `${5 + r() * 5}cqh`,
+          animationDelay: `${0.25 + r() * 0.7}s`,
+          animationDuration: `${1.6 + r() * 1.2}s`
+        } as React.CSSProperties
+      }
+    })
+    const montee = Array.from({ length: 22 }, (_, i) => ({
+      e: emojis[(i * 3 + 1) % emojis.length],
+      style: {
+        left: `${3 + r() * 94}%`,
+        '--t': `${3.5 + r() * 5}cqh`,
+        '--sway': `${(r() - 0.5) * 16}cqh`,
+        '--rot': `${(r() - 0.5) * 60}deg`,
+        animationDelay: `${1.4 + r() * 9}s`,
+        animationDuration: `${7 + r() * 6}s`
+      } as React.CSSProperties
+    }))
+    return { gerbe, montee }
+  }, [p.characterId, emojis.join('')])
+
+  return (
+    <div className={`pres${p.color ? ` c-${p.color}` : ''}`}>
+      <div className="pres-montee" aria-hidden>
+        {montee.map((m, i) => (
+          <span key={i} style={m.style}>
+            {m.e}
+          </span>
+        ))}
+      </div>
+      <div className="pres-scene">
+        <div className="pres-portrait">
+          <div className="pres-gerbe" aria-hidden>
+            {gerbe.map((g, i) => (
+              <span key={i} style={g.style}>
+                {g.e}
+              </span>
+            ))}
+          </div>
+          <div className="pres-cadre">
+            {p.url ? (
+              <img src={p.url} alt={p.name} draggable={false} />
+            ) : (
+              <span className="pres-init">{initialesDe(p.name)}</span>
+            )}
+          </div>
+        </div>
+        <div className="pres-texte">
+          <div className="pres-kicker">Entre en scène</div>
+          <div className="pres-nom">{p.name}</div>
+          {p.occupation ? <div className="pres-occ">{p.occupation}</div> : null}
+          {p.player ? <div className="pres-joueur">joué par {p.player}</div> : null}
+        </div>
+      </div>
+    </div>
+  )
+}
+
+/* ============================================================
+   Ça commence bientôt
+   ============================================================ */
+
+/** « 4:07 », « 1:02:30 » : le temps qui reste, à la seconde. */
+function compte(ms: number): string {
+  const t = Math.max(0, Math.ceil(ms / 1000))
+  const h = Math.floor(t / 3600)
+  const m = Math.floor((t % 3600) / 60)
+  const sec = String(t % 60).padStart(2, '0')
+  return h ? `${h}:${String(m).padStart(2, '0')}:${sec}` : `${m}:${sec}`
+}
+
+/**
+ * L'écran d'avant la partie. Un ciel de nuit où dérivent trois lueurs, une
+ * poussière qui scintille, les émojis qui montent ; au centre le titre, que
+ * traverse un reflet, et le compte à rebours dans son anneau qui se vide.
+ * En bas, ceux qu'on attend, qui flottent chacun à son rythme.
+ */
+function Attente({ p }: { p: Extract<SlidePayload, { type: 'attente' }> }): JSX.Element {
+  const [maintenant, setMaintenant] = useState(() => Date.now())
+  useEffect(() => {
+    if (p.fin == null) return
+    const t = setInterval(() => setMaintenant(Date.now()), 250)
+    return () => clearInterval(t)
+  }, [p.fin])
+
+  const emojis = p.emojis.length ? p.emojis : ['✨']
+  const { poussiere, montee } = useMemo(() => {
+    const r = tirage(7)
+    const poussiere = Array.from({ length: 46 }, () => ({
+      left: `${r() * 100}%`,
+      top: `${r() * 100}%`,
+      '--t': `${0.25 + r() * 0.5}cqh`,
+      animationDelay: `${-r() * 6}s`,
+      animationDuration: `${3 + r() * 5}s`
+    })) as React.CSSProperties[]
+    const montee = Array.from({ length: 18 }, (_, i) => ({
+      e: emojis[i % emojis.length],
+      style: {
+        left: `${2 + r() * 96}%`,
+        '--t': `${3 + r() * 4.5}cqh`,
+        '--sway': `${(r() - 0.5) * 18}cqh`,
+        '--rot': `${(r() - 0.5) * 70}deg`,
+        animationDelay: `${-r() * 14}s`,
+        animationDuration: `${10 + r() * 8}s`
+      } as React.CSSProperties
+    }))
+    return { poussiere, montee }
+  }, [emojis.join('')])
+
+  const reste = p.fin != null ? p.fin - maintenant : null
+  const total = p.fin != null ? Math.max(1, p.fin - p.debut) : 1
+  const part = reste != null ? Math.max(0, Math.min(1, reste / total)) : 0
+  const fini = reste != null && reste <= 0
+  /* L'anneau : un cercle de rayon 45 dans une boîte de 100. */
+  const tour = 2 * Math.PI * 45
+
+  return (
+    <div
+      className="att"
+      style={
+        p.lueurs
+          ? ({ '--l1': p.lueurs[0], '--l2': p.lueurs[1], '--l3': p.lueurs[2] } as React.CSSProperties)
+          : undefined
+      }
+    >
+      <div className="att-lueur l1" />
+      <div className="att-lueur l2" />
+      <div className="att-lueur l3" />
+      <div className="att-poussiere" aria-hidden>
+        {poussiere.map((st, i) => (
+          <i key={i} style={st} />
+        ))}
+      </div>
+      <div className="pres-montee att-montee" aria-hidden>
+        {montee.map((m, i) => (
+          <span key={i} style={m.style}>
+            {m.e}
+          </span>
+        ))}
+      </div>
+
+      <div className="att-centre">
+        {p.sousTitre ? <div className="att-sous">{p.sousTitre}</div> : null}
+        <div className="att-titre">
+          {p.titre}
+          {p.fin == null ? (
+            <span className="att-points" aria-hidden>
+              <i>.</i>
+              <i>.</i>
+              <i>.</i>
+            </span>
+          ) : null}
+        </div>
+        {reste != null ? (
+          <div className={`att-compte${fini ? ' fini' : ''}`}>
+            <svg viewBox="0 0 100 100" aria-hidden>
+              <circle className="fond" cx="50" cy="50" r="45" />
+              <circle
+                className="reste"
+                cx="50"
+                cy="50"
+                r="45"
+                strokeDasharray={tour}
+                strokeDashoffset={tour * (1 - part)}
+              />
+            </svg>
+            <span className="att-chiffres">{fini ? 'C’est l’heure !' : compte(reste)}</span>
+          </div>
+        ) : null}
+      </div>
+
+      {p.joueurs.length ? (
+        <div className="att-table">
+          {/* Le MJ au-dessus, ceux qu'il attend en rangée dessous. */}
+          {p.joueurs
+            .filter((j) => j.mj)
+            .map((j) => (
+              <div key="mj" className="att-joueur mj c-brass" style={{ animationDelay: '0.2s, 0s' }}>
+                <div className="att-face">
+                  {urlPortraitMj(j.url) ? (
+                    <Visage url={urlPortraitMj(j.url)!} cadre={j.cadre} alt={j.name} />
+                  ) : (
+                    <b>🎲</b>
+                  )}
+                </div>
+                <div className="att-nom">{j.name}</div>
+                {j.player ? <div className="att-qui">{j.player}</div> : null}
+              </div>
+            ))}
+          {p.joueurs.some((j) => !j.mj) ? <div className="att-table-dit">Autour de la table</div> : null}
+          <div className="att-joueurs">
+            {p.joueurs.filter((j) => !j.mj).map((j, i) => (
+              <div
+                key={j.id}
+                className={`att-joueur${j.color ? ` c-${j.color}` : ''}`}
+                style={{ animationDelay: `${0.3 + i * 0.15}s, ${-i * 0.7}s` }}
+              >
+                <div className="att-face">
+                  {j.url ? (
+                    <Visage url={j.url} cadre={j.cadre} alt={j.name} />
+                  ) : (
+                    <b>{initialesDe(j.name)}</b>
+                  )}
+                </div>
+                <div className="att-nom">{j.name}</div>
+                {j.player ? <div className="att-qui">{j.player}</div> : null}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+const initialesDe = (nom: string): string =>
+  nom
+    .split(/\s+/)
+    .filter(Boolean)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase() ?? '')
+    .join('')
 
 /* ============================================================
    Le texte posé sur l'écran
@@ -1528,6 +1812,7 @@ function aideDuPion(p: Pion, etat: EtatPion | null, live: boolean, suivi = false
   const lignes = [p.label]
   if (etat) lignes.push(etat === 'ko' ? 'À terre' : 'Blessé')
   if (p.cache) lignes.push('Caché — les joueurs ne le voient pas')
+  else if (p.anonyme) lignes.push('Sans nom — les joueurs ne savent pas qui c’est')
   if (suivi) lignes.push('L’écran le suit — agrandis, l’image restera sur lui')
   if (live) lignes.push('Molette : tourner · clic droit : calque, cachette')
   return lignes.join('\n')
@@ -1601,6 +1886,7 @@ function PionLayer({
   pions,
   pionSize,
   focusPionId,
+  pionEnJeuId,
   pionLabels,
   pionPv,
   joueurs,
@@ -1625,6 +1911,8 @@ function PionLayer({
    * ferait rien voir du tout : il n'y a pas encore de quoi se décaler.
    */
   focusPionId: number | null
+  /** Celui qui joue : son pion porte le halo des tours. */
+  pionEnJeuId: number | null
   pointer: Pointer | null
   /** Côté MJ : les pions se saisissent et portent leur croix. */
   live: boolean
@@ -1682,7 +1970,7 @@ function PionLayer({
              regarde, et son visage reste droit. */
           className={`pion c-${p.color}${etat ? ` ${etat}` : ''}${p.cache ? ' embusque' : ''}${
             p.itemId != null ? ' objet' : ''
-          }${p.id === focusPionId ? ' suivi' : ''}`}
+          }${p.id === focusPionId ? ' suivi' : ''}${p.id === pionEnJeuId ? ' en-jeu' : ''}`}
           style={(() => {
             const q = repere ? repere.pionVersEcran(p.x, p.y) : { x: p.x, y: p.y }
             return {
@@ -1712,13 +2000,14 @@ function PionLayer({
           {/* Un cercle à part, et non `::before` : la blessure et la mise à
               terre tiennent déjà les deux pseudo-éléments du jeton. */}
           {p.id === focusPionId ? <span className="viseur" /> : null}
+          {p.id === pionEnJeuId ? <span className="tour-halo" /> : null}
           {p.url ? (
             <Visage url={p.url} cadre={p.cadre} />
           ) : (
             <span className="ini">{p.initials}</span>
           )}
           {p.rotation && p.itemId == null ? <span className="nez" /> : null}
-          {pionLabels ? <span className="lab">{p.label}</span> : null}
+          {pionLabels && p.label ? <span className="lab">{p.label}</span> : null}
           {pionPv && j?.pv ? (
             <span className="pv" title={j.pv.label}>
               {j.pv.value}

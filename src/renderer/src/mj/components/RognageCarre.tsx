@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
 import type { CadreCarre } from '@shared/types'
 import { styleCarre } from '../../shared/Visage'
+import { Valeur } from './Valeur'
 
 /*
- * Tailler le carré du pion dans un portrait.
+ * Tailler le carré du pion dans un portrait — ou, avec `rapport`, un cadre
+ * d'autres proportions : le bandeau d'une carte de l'arborescence.
  *
  * Le portrait de la fiche est plus haut que large ; le pion, lui, est rond, et
  * le centre de l'image tombe souvent sur le menton. On choisit donc le carré à
@@ -28,27 +30,30 @@ interface Vise {
   cy: number
 }
 
+/** Le plus grand cadre aux proportions `r` (largeur / hauteur) que l'image contienne, en pixels. */
+const plusGrand = (W: number, H: number, r: number): number => Math.min(W, H * r)
+
 /** Le carré que donne une visée, ramené dans l'image. */
-function carreDe(v: Vise, W: number, H: number): CadreCarre {
-  const cote = Math.min(W, H) / v.z
-  const w = cote / W
-  const h = cote / H
+function carreDe(v: Vise, W: number, H: number, r = 1): CadreCarre {
+  const large = plusGrand(W, H, r) / v.z
+  const w = large / W
+  const h = large / r / H
   return { x: borne(v.cx - w / 2, 0, 1 - w), y: borne(v.cy - h / 2, 0, 1 - h), w, h }
 }
 
 /** La visée d'un carré — et celle du centre quand il n'y en a pas. */
-function viseDe(c: CadreCarre | null, W: number, H: number): Vise {
+function viseDe(c: CadreCarre | null, W: number, H: number, r = 1): Vise {
   if (!c) return { z: 1, cx: 0.5, cy: 0.5 }
   return {
-    z: borne(Math.min(W, H) / (c.w * W), 1, SERRE_MAX),
+    z: borne(plusGrand(W, H, r) / (c.w * W), 1, SERRE_MAX),
     cx: c.x + c.w / 2,
     cy: c.y + c.h / 2
   }
 }
 
 /** Une visée dont le carré déborde est ramenée au bord : on ne tire pas dans le vide. */
-function recale(v: Vise, W: number, H: number): Vise {
-  const c = carreDe(v, W, H)
+function recale(v: Vise, W: number, H: number, r = 1): Vise {
+  const c = carreDe(v, W, H, r)
   return { z: v.z, cx: c.x + c.w / 2, cy: c.y + c.h / 2 }
 }
 
@@ -56,12 +61,15 @@ export function RognageCarre({
   titre,
   url,
   cadre,
+  rapport = 1,
   onValider,
   onClose
 }: {
   titre: string
   url: string
   cadre: CadreCarre | null
+  /** Largeur sur hauteur du cadre à tailler ; 1, le carré du pion. */
+  rapport?: number
   /** null : revenir au centre, sans carré enregistré. */
   onValider: (c: CadreCarre | null) => void
   onClose: () => void
@@ -82,7 +90,7 @@ export function RognageCarre({
       const H = img.naturalHeight
       if (!W || !H) return
       setNat({ W, H })
-      setVise(viseDe(cadre, W, H))
+      setVise(viseDe(cadre, W, H, rapport))
     }
     img.src = url
     // Le carré de départ n'est lu qu'à l'ouverture.
@@ -100,10 +108,12 @@ export function RognageCarre({
   const poser = (v: Vise): void => {
     if (!nat) return
     setAuCentre(false)
-    setVise(recale(v, nat.W, nat.H))
+    setVise(recale(v, nat.W, nat.H, rapport))
   }
 
-  const carre = nat ? carreDe(vise, nat.W, nat.H) : null
+  const carre = nat ? carreDe(vise, nat.W, nat.H, rapport) : null
+  /* Un autre cadre que le carré : celui d'une carte, pas de pion rond. */
+  const bandeau = rapport !== 1
 
   /* La molette serre autour du curseur : le point visé reste sous la main. */
   const molette = (e: React.WheelEvent): void => {
@@ -127,7 +137,7 @@ export function RognageCarre({
 
   return (
     <div className="scrim par-dessus" onClick={onClose}>
-      <div className="modal rc-fenetre" onClick={(e) => e.stopPropagation()}>
+      <div className={`modal rc-fenetre${bandeau ? ' rc-bandeau' : ''}`} onClick={(e) => e.stopPropagation()}>
         <header>
           <h3>{titre}</h3>
         </header>
@@ -136,6 +146,7 @@ export function RognageCarre({
             <div
               ref={scene}
               className="rc-scene"
+              style={bandeau ? { aspectRatio: rapport } : undefined}
               onWheel={molette}
               onDoubleClick={centre}
               onPointerDown={(e) => {
@@ -146,7 +157,7 @@ export function RognageCarre({
                 const p = prise.current
                 const b = scene.current?.getBoundingClientRect()
                 if (!p || !b || !nat) return
-                const c = carreDe(p.de, nat.W, nat.H)
+                const c = carreDe(p.de, nat.W, nat.H, rapport)
                 /* On tire l'image : le carré part dans l'autre sens. */
                 poser({
                   z: p.de.z,
@@ -161,11 +172,18 @@ export function RognageCarre({
             >
               {carre ? <img src={url} alt="" draggable={false} style={styleCarre(carre)} /> : null}
               {/* Le rond du pion, et l'ombre de ce qu'il ne montrera pas. */}
-              <span className="rc-rond" />
+              {bandeau ? <span className="rc-cadre" /> : <span className="rc-rond" />}
             </div>
 
             <div className="rc-cote">
-              <span className="eyebrow">Sur la table</span>
+              <span className="eyebrow">{bandeau ? 'Sur la carte' : 'Sur la table'}</span>
+              {bandeau ? (
+                <div className="rc-apercus">
+                  <span className="rc-apercu" style={{ width: 208, height: Math.round(208 / rapport) }}>
+                    {carre ? <img src={url} alt="" draggable={false} style={styleCarre(carre)} /> : null}
+                  </span>
+                </div>
+              ) : (
               <div className="rc-apercus">
                 {[64, 40].map((t) => (
                   <span key={t} className="rc-apercu rond" style={{ width: t, height: t }}>
@@ -176,6 +194,7 @@ export function RognageCarre({
                   {carre ? <img src={url} alt="" draggable={false} style={styleCarre(carre)} /> : null}
                 </span>
               </div>
+              )}
               <label className="rc-serre">
                 <span className="eyebrow">Serrer</span>
                 <input
@@ -187,9 +206,23 @@ export function RognageCarre({
                   onChange={(e) => poser({ ...vise, z: Number(e.target.value) })}
                   disabled={!nat}
                 />
+                <Valeur
+                  className="num"
+                  value={vise.z}
+                  min={1}
+                  max={SERRE_MAX}
+                  step={0.05}
+                  decimales={2}
+                  unite=" ×"
+                  disabled={!nat}
+                  label="Serrer"
+                  onChange={(v) => poser({ ...vise, z: v })}
+                />
               </label>
               <p className="aide">
-                Glisse l’image pour placer le visage, serre à la molette ou à la réglette.
+                {bandeau
+                  ? 'Glisse l’image pour choisir ce qu’on voit, serre à la molette ou à la réglette.'
+                  : 'Glisse l’image pour placer le visage, serre à la molette ou à la réglette.'}{' '}
                 Double-clic : retour au centre.
               </p>
             </div>

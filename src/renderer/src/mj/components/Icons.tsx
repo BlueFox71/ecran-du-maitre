@@ -291,8 +291,28 @@ export const IconCadrage = (p: P = {}): JSX.Element =>
     p
   )
 
+/** L'échelle d'un plan : une règle graduée, posée en biais. */
+export const IconRegle = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M3 16 16 3l5 5L8 21z" />
+      <path d="M7 12l2 2M10 9l2 2M13 6l2 2" />
+    </>,
+    p
+  )
+
 /** Le jalon d'un lieu : un rond vide tant que le groupe n'y est pas passé. */
 export const IconCercle = (p: P = {}): JSX.Element => box(<circle cx="12" cy="12" r="7" />, p)
+
+/** Le triangle qui prévient : un objet qu'on croise en plusieurs lieux. */
+export const IconAlerte = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M12 4 21 19.5H3z" />
+      <path d="M12 10v4.2M12 16.8v.2" />
+    </>,
+    p
+  )
 
 /** Le soleil du réglage de lumière : on éclaircit la carte, pas le lieu. */
 export const IconSoleil = (p: P = {}): JSX.Element =>
@@ -575,6 +595,49 @@ export const IconClavier = (p: P = {}): JSX.Element =>
     <>
       <rect x="2" y="6" width="20" height="12" rx="2" />
       <path d="M6 10h.01M10 10h.01M14 10h.01M18 10h.01M8 14h8" />
+    </>,
+    p
+  )
+
+/** Les tours : un sablier — le temps de chacun, l'un après l'autre. */
+export const IconTours = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M6 3h12M6 21h12" />
+      <path d="M7 3c0 5 10 5 10 9s-10 4-10 9" />
+      <path d="M17 3c0 5-10 5-10 9s10 4 10 9" />
+    </>,
+    p
+  )
+
+/** La trame : trois cartes reliées, l'une ouvre la voie aux deux autres. */
+export const IconTrame = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <rect x="2.5" y="9" width="6" height="6" rx="1" />
+      <rect x="15.5" y="3.5" width="6" height="6" rx="1" />
+      <rect x="15.5" y="14.5" width="6" height="6" rx="1" />
+      <path d="M8.5 12c4 0 3-5.5 7-5.5M8.5 12c4 0 3 5.5 7 5.5" />
+    </>,
+    p
+  )
+
+/** Rogner : les deux équerres du massicot. */
+export const IconCrop = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M6 2.5V18h15.5" />
+      <path d="M2.5 6H18v15.5" />
+    </>,
+    p
+  )
+
+export const IconSablier = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M6 3h12M6 21h12" />
+      <path d="M7 3c0 5 10 5 10 9s-10 4-10 9" />
+      <path d="M17 3c0 5-10 5-10 9s10 4 10 9" />
     </>,
     p
   )

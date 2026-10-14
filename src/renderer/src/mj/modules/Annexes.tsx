@@ -3,7 +3,8 @@ import { useStore } from '../store'
 import { IconClose, IconDoc, IconLink, IconPen, IconPlus, IconSearch } from '../components/Icons'
 import { SousMenuPreparation } from '../components/SousMenuPreparation'
 import { TexteEnPlace } from '../components/TexteEnPlace'
-import type { UiFolder, UiItem } from '../../../../preload/index'
+import type { UiItem } from '../../../../preload/index'
+import { DOSSIER_ANNEXES, dossierDeLApp } from '@shared/dossierDeLApp'
 
 /* ============================================================
    Documents annexes : ce qu'on garde sous la main toute la séance —
@@ -11,8 +12,6 @@ import type { UiFolder, UiItem } from '../../../../preload/index'
    en préparant ; ils sortaient autrefois d'un volet de la Chronologie.
    ============================================================ */
 
-/** Le dossier où naissent les textes écrits pour les annexes, à la racine de la campagne. */
-const DOSSIER_ANNEXES = 'Annexes'
 
 export function Annexes(): JSX.Element {
   const s = useStore()
@@ -21,14 +20,10 @@ export function Annexes(): JSX.Element {
   /* Le texte qu'on écrit sur place, comme dans la Chronologie. */
   const [enEdition, setEnEdition] = useState<number | null>(null)
 
-  /* Les annexes valent pour toute la campagne : leurs textes vont dans un
-     dossier « Annexes » à la racine, créé au premier texte. */
-  const dossierDesAnnexes = async (): Promise<string> => {
-    const existe = (ns: UiFolder[]): boolean =>
-      ns.some((f) => f.relPath === DOSSIER_ANNEXES || existe(f.children))
-    if (existe(useStore.getState().tree)) return DOSSIER_ANNEXES
-    return window.jdr.folders.create('', DOSSIER_ANNEXES)
-  }
+  /* Les annexes valent pour toute la campagne : leurs textes vont dans le
+     dossier « Annexes » de l'app, créé au premier texte. */
+  const dossierDesAnnexes = (): Promise<string> =>
+    window.jdr.folders.assurer(dossierDeLApp(null, DOSSIER_ANNEXES))
 
   const creation = useRef(false)
   const creerTexte = async (): Promise<void> => {

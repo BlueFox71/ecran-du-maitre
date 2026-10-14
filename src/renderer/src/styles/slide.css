@@ -549,6 +549,40 @@
   opacity: 0.85;
   pointer-events: none;
 }
+/*
+ * Celui qui joue, pendant les tours : un halo doré qui bat autour du jeton,
+ * chez le MJ comme à la table. Doré et non à sa couleur : c'est l'annonce de
+ * la table, la même pour tout le monde, et le bandeau du haut le dit pareil.
+ */
+.pion.en-jeu {
+  box-shadow:
+    0 0 calc(var(--ps, 6) * var(--pz, 1) * 0.35cqw) calc(var(--ps, 6) * var(--pz, 1) * 0.08cqw) rgba(216, 169, 74, 0.55),
+    0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.pion > .tour-halo {
+  position: absolute;
+  inset: calc(var(--ps, 6) * var(--pz, 1) * -0.22cqw);
+  border-radius: 99px;
+  border: calc(var(--ps, 6) * var(--pz, 1) * 0.04cqw + 1px) solid #d8a94a;
+  pointer-events: none;
+  animation: tour-bat 1.6s ease-in-out infinite;
+}
+@keyframes tour-bat {
+  0%,
+  100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.12);
+    opacity: 0.5;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pion > .tour-halo {
+    animation: none;
+  }
+}
 /* Les couleurs des pions viennent des jetons du thème. */
 /*
  * La correspondance nom de couleur → anneau et fond, en un seul endroit pour
@@ -1318,4 +1352,526 @@ ul[data-type='taskList'] li > div p {
 .lampe-icone.mj-seul {
   border-style: dashed;
   opacity: 0.8;
+}
+
+/* ---- un joueur présenté à la table ----
+   Le portrait entre, le nom suit, et ses émojis jaillissent de derrière lui :
+   une gerbe d'abord, puis une montée lente. Tout est en unités du cadre
+   (cqh), pour la même image dans le moniteur et chez les joueurs. La couleur
+   du personnage, posée par .c-<couleur>, borde le portrait et teinte le fond. */
+.sl-presentation {
+  container-type: size;
+  background: #05080a;
+}
+.pres {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  --pres-teinte: var(--pion-ring, #d8a94a);
+  background:
+    radial-gradient(55% 75% at 34% 50%, color-mix(in srgb, var(--pres-teinte) 26%, transparent) 0%, transparent 70%),
+    radial-gradient(90% 120% at 80% 10%, #1b232a 0%, #05080a 70%);
+}
+.pres-scene {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7cqh;
+  padding: 0 8cqh;
+}
+.pres-portrait {
+  position: relative;
+  flex: none;
+  height: 62cqh;
+  aspect-ratio: 1 / 1.18;
+}
+.pres-cadre {
+  position: relative;
+  z-index: 1;
+  width: 100%;
+  height: 100%;
+  border-radius: 1.6cqh;
+  overflow: hidden;
+  background: #11181d;
+  box-shadow:
+    0 0 0 0.7cqh var(--pres-teinte),
+    0 0 6cqh color-mix(in srgb, var(--pres-teinte) 55%, transparent),
+    0 3cqh 6cqh rgba(0, 0, 0, 0.7);
+  animation: pres-entre 0.9s cubic-bezier(0.2, 1.3, 0.4, 1) both;
+}
+.pres-cadre img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pres-init {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
+  font-size: 18cqh;
+  font-weight: 700;
+  color: var(--pres-teinte);
+}
+@keyframes pres-entre {
+  from {
+    opacity: 0;
+    transform: scale(0.7) rotate(-4deg);
+  }
+}
+
+.pres-texte {
+  /* Devant la gerbe : un émoji ne doit jamais cacher le nom. */
+  position: relative;
+  z-index: 2;
+  max-width: 46%;
+  min-width: 0;
+}
+.pres-texte > * {
+  animation: pres-texte 0.8s ease both;
+}
+.pres-kicker {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 2.2cqh;
+  letter-spacing: 0.32em;
+  text-transform: uppercase;
+  color: var(--pres-teinte);
+  animation-delay: 0.45s;
+}
+.pres-nom {
+  margin-top: 1.2cqh;
+  font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
+  font-size: 10cqh;
+  font-weight: 700;
+  line-height: 1.02;
+  color: #f2ece0;
+  text-shadow: 0 0.6cqh 3cqh rgba(0, 0, 0, 0.8);
+  overflow-wrap: anywhere;
+  animation-delay: 0.6s;
+}
+.pres-occ {
+  margin-top: 1.6cqh;
+  font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
+  font-style: italic;
+  font-size: 3.8cqh;
+  color: #d9d1bf;
+  animation-delay: 0.8s;
+}
+.pres-joueur {
+  margin-top: 3cqh;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 2.4cqh;
+  letter-spacing: 0.14em;
+  color: #c9a961;
+  animation-delay: 1s;
+}
+@keyframes pres-texte {
+  from {
+    opacity: 0;
+    transform: translateX(-3cqh);
+  }
+}
+
+/* La gerbe part du centre du portrait, derrière lui, une seule fois. */
+.pres-gerbe {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  z-index: 0;
+}
+.pres-gerbe span {
+  position: absolute;
+  left: 0;
+  top: 0;
+  font-size: var(--t);
+  line-height: 1;
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.3);
+  animation-name: pres-gerbe;
+  animation-timing-function: cubic-bezier(0.15, 0.8, 0.3, 1);
+  animation-fill-mode: forwards;
+}
+@keyframes pres-gerbe {
+  0% {
+    opacity: 0;
+    transform: translate(-50%, -50%) scale(0.3);
+  }
+  12% {
+    opacity: 1;
+  }
+  70% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))) rotate(var(--rot)) scale(1.1);
+  }
+}
+
+/* La montée : des émojis qui remontent du bas de l'écran, sans fin. */
+.pres-montee {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.pres-montee span {
+  position: absolute;
+  bottom: -10cqh;
+  font-size: var(--t);
+  line-height: 1;
+  opacity: 0;
+  animation-name: pres-monte;
+  animation-timing-function: linear;
+  animation-iteration-count: infinite;
+  animation-fill-mode: both;
+}
+@keyframes pres-monte {
+  0% {
+    opacity: 0;
+    transform: translate(0, 0) rotate(0deg);
+  }
+  10% {
+    opacity: 0.5;
+  }
+  50% {
+    transform: translate(var(--sway), -60cqh) rotate(calc(var(--rot) / 2));
+  }
+  85% {
+    opacity: 0.35;
+  }
+  100% {
+    opacity: 0;
+    transform: translate(0, -120cqh) rotate(var(--rot));
+  }
+}
+
+/* ---- ça commence bientôt ----
+   Un ciel de nuit : trois lueurs qui dérivent lentement, une poussière qui
+   scintille, les émojis qui montent (ceux de la présentation, .pres-montee).
+   Au centre le titre, traversé d'un reflet, et le compte à rebours dans son
+   anneau. En bas, ceux qu'on attend, qui flottent chacun à son rythme. */
+.sl-attente {
+  container-type: size;
+  background: #04070a;
+}
+/* En colonne : le titre en haut, la table en bas, l'air entre les deux.
+   Posés en absolu, le MJ au-dessus des joueurs venait mordre l'anneau. */
+.att {
+  position: absolute;
+  inset: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 8cqh 0 4cqh;
+  background: radial-gradient(120% 90% at 50% 110%, #12202a 0%, #070c10 55%, #030507 100%);
+}
+/* Un dégradé qui s'éteint de lui-même, et rien d'autre : avec un flou et un
+   mode de fusion, Chromium dessinait le bord du calque en mouvement comme un
+   cadre noir qui se promenait sur l'écran. */
+.att-lueur {
+  position: absolute;
+  width: 110cqh;
+  height: 110cqh;
+  opacity: 0.85;
+  pointer-events: none;
+}
+/* Les trois teintes se choisissent dans la Régie (--l1, --l2, --l3). */
+.att-lueur.l1 {
+  left: -30cqh;
+  top: -45cqh;
+  background: radial-gradient(
+    closest-side,
+    var(--l1, #8a6a2a) 0%,
+    color-mix(in srgb, var(--l1, #8a6a2a) 35%, transparent) 45%,
+    transparent 100%
+  );
+  animation: att-derive 26s ease-in-out infinite alternate;
+}
+.att-lueur.l2 {
+  right: -35cqh;
+  top: -10cqh;
+  background: radial-gradient(
+    closest-side,
+    var(--l2, #6b2a2a) 0%,
+    color-mix(in srgb, var(--l2, #6b2a2a) 35%, transparent) 45%,
+    transparent 100%
+  );
+  animation: att-derive 32s ease-in-out -8s infinite alternate-reverse;
+}
+.att-lueur.l3 {
+  left: 20%;
+  bottom: -60cqh;
+  background: radial-gradient(
+    closest-side,
+    var(--l3, #3b3a7a) 0%,
+    color-mix(in srgb, var(--l3, #3b3a7a) 35%, transparent) 45%,
+    transparent 100%
+  );
+  animation: att-derive 38s ease-in-out -14s infinite alternate;
+}
+@keyframes att-derive {
+  0% {
+    transform: translate(0, 0) scale(1);
+  }
+  50% {
+    transform: translate(18cqh, 10cqh) scale(1.2);
+  }
+  100% {
+    transform: translate(-12cqh, 16cqh) scale(0.9);
+  }
+}
+
+.att-poussiere i {
+  position: absolute;
+  width: var(--t);
+  height: var(--t);
+  border-radius: 50%;
+  background: #f3e2b5;
+  box-shadow: 0 0 1cqh #f3e2b5;
+  animation-name: att-scintille;
+  animation-timing-function: ease-in-out;
+  animation-iteration-count: infinite;
+}
+@keyframes att-scintille {
+  0%,
+  100% {
+    opacity: 0.05;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 0.8;
+    transform: translateY(-1.5cqh);
+  }
+}
+.att-montee span {
+  filter: drop-shadow(0 0 1.2cqh rgba(0, 0, 0, 0.6));
+}
+
+.att-centre {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 0 8cqh;
+  z-index: 2;
+}
+.att-sous {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 2.3cqh;
+  letter-spacing: 0.4em;
+  text-transform: uppercase;
+  color: #c9a961;
+  animation: att-monte 1s ease 0.2s both;
+}
+.att-titre {
+  margin-top: 1.6cqh;
+  font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
+  font-size: 8.5cqh;
+  font-weight: 700;
+  line-height: 1.05;
+  /* Un reflet qui passe sur les lettres, de temps en temps. */
+  background: linear-gradient(100deg, #efe6d2 0%, #efe6d2 40%, #fff6dc 48%, #e6be6a 50%, #fff6dc 52%, #efe6d2 60%, #efe6d2 100%);
+  background-size: 300% 100%;
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  filter: drop-shadow(0 0.6cqh 2.4cqh rgba(0, 0, 0, 0.75));
+  animation:
+    att-monte 1.1s ease 0.4s both,
+    att-reflet 6s ease-in-out 1.6s infinite;
+}
+@keyframes att-reflet {
+  0% {
+    background-position: 100% 0;
+  }
+  45%,
+  100% {
+    background-position: 0% 0;
+  }
+}
+@keyframes att-monte {
+  from {
+    opacity: 0;
+    transform: translateY(3cqh);
+  }
+}
+.att-points i {
+  font-style: normal;
+  animation: att-point 1.6s ease-in-out infinite;
+}
+.att-points i:nth-child(2) {
+  animation-delay: 0.25s;
+}
+.att-points i:nth-child(3) {
+  animation-delay: 0.5s;
+}
+@keyframes att-point {
+  0%,
+  100% {
+    opacity: 0.15;
+  }
+  40% {
+    opacity: 1;
+  }
+}
+
+.att-compte {
+  position: relative;
+  margin-top: 3cqh;
+  width: 18cqh;
+  height: 18cqh;
+  display: grid;
+  place-items: center;
+  animation: att-monte 1s ease 0.7s both;
+}
+.att-compte svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transform: rotate(-90deg);
+}
+.att-compte circle {
+  fill: none;
+  stroke-width: 2.2;
+}
+.att-compte .fond {
+  stroke: rgba(239, 230, 210, 0.1);
+}
+.att-compte .reste {
+  stroke: #d8a94a;
+  stroke-linecap: round;
+  filter: drop-shadow(0 0 1.5px #d8a94a);
+  transition: stroke-dashoffset 0.25s linear;
+}
+.att-chiffres {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 4.2cqh;
+  font-weight: 500;
+  color: #f2ece0;
+}
+.att-compte.fini .att-chiffres {
+  font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
+  font-size: 3.4cqh;
+  font-weight: 700;
+  color: #e6be6a;
+  animation: att-pouls 1.2s ease-in-out infinite;
+}
+@keyframes att-pouls {
+  50% {
+    transform: scale(1.12);
+  }
+}
+
+.att-table {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.att-table-dit {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.7cqh;
+  letter-spacing: 0.34em;
+  text-transform: uppercase;
+  color: rgba(239, 230, 210, 0.45);
+  margin-bottom: 2.2cqh;
+  animation: att-monte 1s ease 0.9s both;
+}
+.att-joueurs {
+  display: flex;
+  justify-content: center;
+  gap: 4cqh;
+  flex-wrap: wrap;
+  max-width: 92%;
+}
+.att-joueur {
+  width: 12cqh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation:
+    att-arrive 0.8s cubic-bezier(0.2, 1.4, 0.4, 1) both,
+    att-flotte 4.2s ease-in-out infinite;
+}
+@keyframes att-arrive {
+  from {
+    opacity: 0;
+    transform: translateY(4cqh) scale(0.6);
+  }
+}
+@keyframes att-flotte {
+  50% {
+    translate: 0 -1.2cqh;
+  }
+}
+.att-face {
+  position: relative;
+  width: 9.5cqh;
+  height: 9.5cqh;
+  border-radius: 50%;
+  overflow: hidden;
+  background: #11181d;
+  box-shadow:
+    0 0 0 0.45cqh var(--pion-ring, #d8a94a),
+    0 0 3cqh color-mix(in srgb, var(--pion-ring, #d8a94a) 45%, transparent);
+  display: grid;
+  place-items: center;
+}
+.att-face > img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.att-face b {
+  font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
+  font-size: 4cqh;
+  color: var(--pion-ring, #d8a94a);
+}
+.att-nom {
+  margin-top: 1.6cqh;
+  font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
+  font-size: 2.1cqh;
+  font-weight: 600;
+  color: #efe6d2;
+  line-height: 1.15;
+}
+.att-qui {
+  margin-top: 0.4cqh;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 1.5cqh;
+  color: #c9a961;
+}
+
+/* Le MJ, au-dessus de la rangée : un peu plus grand, cerclé de laiton. */
+.att-joueur.mj {
+  width: 22cqh;
+  margin-bottom: 2.6cqh;
+}
+.att-joueur.mj .att-face {
+  width: 11cqh;
+  height: 11cqh;
+  box-shadow:
+    0 0 0 0.45cqh #d8a94a,
+    0 0 0 1.1cqh rgba(216, 169, 74, 0.18),
+    0 0 4cqh rgba(216, 169, 74, 0.5);
+}
+.att-joueur.mj .att-face b {
+  font-size: 5cqh;
+}
+.att-joueur.mj .att-qui {
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  font-size: 1.3cqh;
 }

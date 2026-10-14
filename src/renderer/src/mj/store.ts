@@ -10,6 +10,7 @@ import {
   type ReglagesPoste
 } from '@shared/reglages'
 import type { UiFolder, UiItem } from '../../../preload/index'
+import { dansLApp } from '@shared/dossierDeLApp'
 import type {
   Beat,
   CampaignPlayer,
@@ -18,6 +19,7 @@ import type {
   CharacterLogEntry,
   DisplayState,
   GameSession,
+  Inventaire,
   LibraryRoot,
   MobileInfo,
   MobileNudge,
@@ -31,6 +33,7 @@ import type {
   Roll,
   ScreenInfo,
   SheetTemplate,
+  ToursMj,
   Transition
 } from '@shared/types'
 
@@ -42,6 +45,7 @@ export type ViewId =
   | 'places'
   | 'objets'
   | 'timeline'
+  | 'trame'
   | 'annexes'
   | 'notes'
   | 'sheets'
@@ -69,6 +73,8 @@ interface State {
   version: string
 
   display: DisplayState | null
+  /** Les tours vus du MJ — cachés compris. `null` hors combat. */
+  tours: ToursMj | null
   screens: ScreenInfo[]
   /**
    * Le visuel qu'on arrange — Visuel 1 ou Visuel 2. Il vit ici, et non dans la
@@ -128,6 +134,8 @@ interface State {
    */
   objets: Objet[]
   objetFamilles: ObjetFamille[]
+  /** Les inventaires partagés — le camion, la malle —, ouverts ou non aux téléphones. */
+  inventaires: Inventaire[]
   /** Francs, pièces d'or, crédits : l'unité de valeur de la campagne. */
   uniteValeur: string
   currentObjetId: number | null
@@ -261,6 +269,7 @@ export const useStore = create<State>((set, get) => ({
   version: '',
 
   display: null,
+  tours: null,
   screens: [],
   visuel: 1,
   transition: CAMPAGNE_DEFAUT.basculeMode,
@@ -282,6 +291,7 @@ export const useStore = create<State>((set, get) => ({
 
   objets: [],
   objetFamilles: [],
+  inventaires: [],
   uniteValeur: 'pièces',
   currentObjetId: null,
 
@@ -389,18 +399,33 @@ export const useStore = create<State>((set, get) => ({
     set({ display, screens, visuel: display.liveSlot === 0 ? 1 : 0 })
 
     api.display.onState((d) => set({ display: d }))
+    set({ tours: await api.tours.etat() })
+    api.tours.onState((t) => set({ tours: t }))
     /* La pile de Ctrl+Z vit côté base : elle dit ici ce qu'elle tient. */
     set({ defaireEtat: await api.defaire.etat() })
     api.defaire.onEtat((e) => set({ defaireEtat: e }))
+    /* Les pièces d'un étage ont suivi ses murs, côté serveur : on relit les
+       lieux, et l'on dit les lieux qu'une coupe vient de faire naître. */
+    api.places.onRecales(({ suites }) => {
+      void get().refreshPlaces()
+      for (const t of suites) get().toast(t)
+    })
     api.display.onScreens((s) => set({ screens: s }))
     // Le dossier de campagne a bougé sur le disque : on relit la bibliothèque.
     api.library.onChanged(() => {
       void get().refreshLibrary()
       void get().refreshAnnexes()
+      /* Les textes des moments aussi : la Chronologie tient sa propre copie,
+         qu'un texte réécrit hors de l'application doit renouveler. */
+      void get().refreshTimeline()
+      /* Et les lieux : leur description s'écrit aussi dans un fichier. */
+      void get().refreshPlaces()
       /* Un fichier effacé du disque disparaît de la pochette par cascade : la
          page doit le perdre aussi, sans quoi elle montrerait une carte vide. */
       void get().refreshPochette()
     })
+    /* Un PNJ réécrit dans son fichier texte, ou né d'un fichier neuf. */
+    api.characters.onRelus?.(() => void get().refreshCharacters())
     /* Un joueur vient d'ouvrir un document sur son téléphone. */
     api.pochette.onChanged(() => void get().refreshPochette())
     /* Un joueur vient de ranger une de ses affaires depuis son téléphone : la
@@ -408,7 +433,11 @@ export const useStore = create<State>((set, get) => ({
     /* Garde-fou : le pont n'expose `onChanged` que depuis la réserve d'objets,
        et un pont plus ancien que l'interface faisait planter tout le magasin —
        la campagne restait en « ouverture » pour toujours. */
-    api.objets.onChanged?.(() => void get().refreshObjets())
+    api.objets.onChanged?.((geste) => {
+      void get().refreshObjets()
+      /* Un joueur a pioché dans un inventaire, ou y a remis quelque chose. */
+      if (geste) get().toast(geste)
+    })
 
     await Promise.all([
       get().refreshReglages(),
@@ -456,6 +485,7 @@ export const useStore = create<State>((set, get) => ({
       objets: r.objets,
       objetFamilles: r.familles,
       uniteValeur: r.unite,
+      inventaires: r.inventaires ?? [],
       currentObjetId: r.objets.some((o) => o.id === cur) ? cur : (r.objets[0]?.id ?? null)
     })
   },
@@ -574,6 +604,10 @@ function focaliser(
     'session' | 'sessions' | 'toutLaCampagne' | 'arbreComplet' | 'orphelinsComplets' | 'allItems'
   >
 ): Pick<State, 'tree' | 'orphans' | 'fichiers'> {
+  /* Les textes que l'app range dans son dossier (lieux, moments, annexes,
+     notes) ne sont pas des fichiers du MJ : ils ne se cherchent pas dans la
+     Bibliothèque, ils se lisent depuis leurs modules. */
+  const aMoi = s.allItems.filter((i) => !dansLApp(i.relPath))
   const ici = s.session?.folderRel
   const dedans = (rel: string, dossier: string): boolean =>
     rel === dossier || rel.startsWith(dossier + '/')
@@ -584,7 +618,7 @@ function focaliser(
           .filter((r): r is string => !!r && !dedans(ici, r))
       : []
   if (!caches.length)
-    return { tree: s.arbreComplet, orphans: s.orphelinsComplets, fichiers: s.allItems }
+    return { tree: s.arbreComplet, orphans: s.orphelinsComplets, fichiers: aMoi }
 
   const cache = (rel: string | null): boolean => !!rel && caches.some((c) => dedans(rel, c))
   const elaguer = (dossiers: UiFolder[]): UiFolder[] =>
@@ -594,7 +628,7 @@ function focaliser(
   return {
     tree: elaguer(s.arbreComplet),
     orphans: s.orphelinsComplets,
-    fichiers: s.allItems.filter((i) => !cache(i.relPath))
+    fichiers: aMoi.filter((i) => !cache(i.relPath))
   }
 }
 

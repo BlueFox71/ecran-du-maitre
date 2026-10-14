@@ -505,6 +505,14 @@ function etatJoueur(playerId: number) {
      * le sac du voisin.
      */
     objets: perso ? objets.objetsDe(perso.id) : [],
+    /* Les inventaires que le MJ a ouverts à la table, et ce qu'ils contiennent :
+       chacun y pioche. Fermés, ils n'existent pas pour le téléphone. */
+    inventaires: perso
+      ? objets
+          .listInventaires()
+          .filter((i) => i.ouvert)
+          .map((i) => ({ id: i.id, nom: i.nom, contenu: objets.contenuInventaire(i.id) }))
+      : [],
     emplacements: EMPLACEMENTS_OBJET.map((e) => ({ cle: e.cle, nom: e.nom })),
 
     /* Le lieu et les pions ne sortent que si l'écran n'est pas gelé. */
@@ -527,6 +535,7 @@ function etatJoueur(playerId: number) {
            et l'ombre qu'il montrerait ne serait pas celle de la table. */
         rotation: p.rotation,
         characterId: p.characterId,
+        pnj: p.pnj,
         url: httpMedia(relDeUrl(p.url)),
         cadre: p.cadre,
         mien: perso != null && p.characterId === perso.id,
@@ -540,7 +549,30 @@ function etatJoueur(playerId: number) {
      * `/api/calque` quand il le voit changer. C'est exactement ce que fait la
      * fenêtre des joueurs.
      */
-    calqueRev: d.calqueRev
+    calqueRev: d.calqueRev,
+    /*
+     * À qui le tour. On reprend la vue des joueurs, déjà taillée — les
+     * participants cachés n'y sont pas —, et on y marque le sien : c'est le
+     * téléphone qui dira « C'est ton tour » et combien d'autres passent avant.
+     */
+    tour: d.tour
+      ? {
+          round: d.tour.round,
+          curseur: d.tour.curseur,
+          actifCache: d.tour.actifCache,
+          ordre: d.tour.ordre.map((e) => ({
+            nom: e.nom,
+            color: e.color,
+            initials: e.initials,
+            url: httpMedia(relDeUrl(e.url)),
+            cadre: e.cadre,
+            fait: e.fait,
+            mien: perso != null && e.characterId === perso.id
+          }))
+        }
+      : null,
+    /* Le pion qui joue porte un halo sur le plan du téléphone aussi. */
+    pionEnJeuId: d.frozen ? null : (d.tour?.pionEnJeuId ?? null)
   }
 }
 
@@ -672,8 +704,12 @@ function router(req: IncomingMessage, res: ServerResponse): void {
     if (chemin === '/api/couleur') return void lireJson(req, res, (b) => couleur(res, url, b))
     if (chemin === '/api/pochette/lu') return void lireJson(req, res, (b) => pocheLu(res, url, b))
     if (chemin === '/api/equiper') return void lireJson(req, res, (b) => equiper(res, url, b))
+    if (chemin === '/api/prendre') return void lireJson(req, res, (b) => prendre(res, url, b))
+    if (chemin === '/api/remettre') return void lireJson(req, res, (b) => remettre(res, url, b))
     if (chemin === '/api/oublier') return void lireJson(req, res, () => oublier(res, url))
     if (chemin.startsWith('/assets/')) return statique(res, chemin, req)
+    /* Le manifeste et les icônes de l'écran d'accueil. */
+    if (chemin.startsWith('/portable/')) return statique(res, chemin, req)
     json(res, 404, { erreur: 'Rien ici.' })
   } catch (e) {
     console.error('[portable]', e)
@@ -762,6 +798,7 @@ const TYPES: Record<string, string> = {
   '.js': 'text/javascript; charset=utf-8',
   '.css': 'text/css; charset=utf-8',
   '.json': 'application/json',
+  '.webmanifest': 'application/manifest+json',
   '.png': 'image/png',
   '.jpg': 'image/jpeg',
   '.jpeg': 'image/jpeg',
@@ -1020,6 +1057,61 @@ function equiper(res: ServerResponse, url: URL, corps: any): void {
   /* Le poste du MJ suit, et les téléphones aussi — celui du joueur, qui vient
      d'agir, et son second appareil s'il en a un. */
   versMj('objets:changes', null)
+  broadcast()
+  json(res, 200, { ok: true })
+}
+
+/** Un inventaire ouvert, ou rien : un téléphone ne touche pas à ce que le MJ a fermé. */
+function inventaireOuvert(id: number | null): { id: number; nom: string } | null {
+  if (id == null) return null
+  return objets.listInventaires().find((i) => i.id === id && i.ouvert) ?? null
+}
+
+/**
+ * Le joueur pioche dans un inventaire ouvert : l'objet tombe dans son sac. Le
+ * MJ le voit passer, sur sa réserve et dans le journal de l'inventaire.
+ */
+function prendre(res: ServerResponse, url: URL, corps: any): void {
+  const ap = exige(res, url)
+  if (!ap) return
+  const joueur = players.getPlayer(ap.playerId)
+  const perso = joueur?.characterId != null ? chars.getCharacter(joueur.characterId) : null
+  if (!perso) return json(res, 409, { erreur: 'Aucun personnage ne t’est attribué.' })
+
+  const placementId = Number(corps.placementId)
+  if (!Number.isInteger(placementId)) return json(res, 400, { erreur: 'Objet inconnu.' })
+  const inv = inventaireOuvert(objets.inventaireDe(placementId))
+  if (!inv) return json(res, 409, { erreur: 'Cet objet n’est plus disponible.' })
+
+  const nom = objets.prendre(placementId, perso.id)
+  if (!nom) return json(res, 409, { erreur: 'Cet objet n’est plus disponible.' })
+  const texte = `${perso.name} a pris ${nom}`
+  objets.noter(inv.id, texte)
+  versMj('objets:changes', `${texte} dans ${inv.nom}`)
+  broadcast()
+  json(res, 200, { ok: true })
+}
+
+/** Le joueur remet une de ses affaires dans un inventaire ouvert. */
+function remettre(res: ServerResponse, url: URL, corps: any): void {
+  const ap = exige(res, url)
+  if (!ap) return
+  const joueur = players.getPlayer(ap.playerId)
+  const perso = joueur?.characterId != null ? chars.getCharacter(joueur.characterId) : null
+  if (!perso) return json(res, 409, { erreur: 'Aucun personnage ne t’est attribué.' })
+
+  const placementId = Number(corps.placementId)
+  if (!Number.isInteger(placementId)) return json(res, 400, { erreur: 'Objet inconnu.' })
+  if (objets.porteurDe(placementId) !== perso.id)
+    return json(res, 403, { erreur: 'Cet objet n’est pas à toi.' })
+  const inv = inventaireOuvert(Number(corps.inventaireId))
+  if (!inv) return json(res, 409, { erreur: 'Cet inventaire est fermé.' })
+
+  const nom = objets.remettre(placementId, inv.id)
+  if (!nom) return json(res, 409, { erreur: 'Objet inconnu.' })
+  const texte = `${perso.name} a remis ${nom}`
+  objets.noter(inv.id, texte)
+  versMj('objets:changes', `${texte} dans ${inv.nom}`)
   broadcast()
   json(res, 200, { ok: true })
 }

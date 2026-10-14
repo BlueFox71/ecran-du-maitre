@@ -16,7 +16,15 @@ import { IconCheck } from './Icons'
  * pour la souris, et il a nos couleurs — y compris en thème clair, ce que le
  * menu de Windows ne saurait pas faire.
  */
-export type Rubrique = 'ecran' | 'table' | 'murs' | 'biblio' | 'portables' | 'poste' | 'touches'
+export type Rubrique =
+  | 'ecran'
+  | 'table'
+  | 'murs'
+  | 'biblio'
+  | 'mj'
+  | 'portables'
+  | 'poste'
+  | 'touches'
 
 export function Menubar({
   onFiche,
@@ -159,7 +167,7 @@ export function Menubar({
 
       <Menu nom="Écran joueurs" id="ecranj" ouvert={ouvert} onOuvrir={setOuvert}>
         <Mi
-          label={s.display?.playerOpen ? 'Fermer l’écran' : 'Ouvrir l’écran'}
+          label={s.display?.playerOpen ? 'Fermer l’écran' : 'Projeter l’écran'}
           acc="F5"
           on={() => void window.jdr.display.togglePlayer()}
         />

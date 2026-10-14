@@ -54,6 +54,14 @@ export function TexteEnPlace({
     }
   })
 
+  /* Le fichier réécrit hors de l'application (l'explorateur, une autre
+     session) : la page ouverte le reprend, tant qu'on n'y a rien changé
+     soi-même — sinon notre frappe l'emporte, comme au dernier enregistrement. */
+  useEffect(() => {
+    if (!editor || etat !== 'saved' || item.body == null) return
+    if (item.body !== editor.getHTML()) editor.commands.setContent(item.body, false)
+  }, [editor, item.body, etat])
+
   // Un personnage renommé ou recoloré : ses tags suivent.
   useEffect(() => {
     if (editor) resynchroniserTags(editor, s.characters)

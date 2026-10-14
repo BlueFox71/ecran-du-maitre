@@ -1,14 +1,15 @@
 import { useStore, type ViewId } from '../store'
 
 /* ============================================================
-   Préparation de la séance : deux pages sœurs, la Chronologie et les
-   documents annexes. Le même sous-menu les coiffe toutes les deux, et
+   Préparation de la séance : trois pages sœurs, la Chronologie, la
+   Arborescence et les documents annexes. Le même sous-menu les coiffe toutes les deux, et
    le rail les range sous une seule entrée qui se déplie.
    ============================================================ */
 
 /** Les pages de la préparation, dans l'ordre du sous-menu et du rail. */
 export const PAGES_PREPARATION: { id: ViewId; label: string }[] = [
   { id: 'timeline', label: 'Chronologie' },
+  { id: 'trame', label: 'Arborescence' },
   { id: 'annexes', label: 'Documents annexes' }
 ]
 

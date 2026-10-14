@@ -88,6 +88,25 @@ export interface Zone {
   h: number
 }
 
+/**
+ * L'échelle d'un plan, et la taille que les pions en tirent (voir
+ * `src/main/db/repos/echelle.ts`).
+ */
+export interface EchellePlan {
+  /** Le lieu qui porte le plan : l'étage, pour une pièce découpée. */
+  planId: number
+  /** Combien de mètres fait la largeur de l'image ; `null`, on ne sait pas. */
+  metres: number | null
+  /** Fixée au trait, estimée d'après les portes, ou inconnue. */
+  source: 'trait' | 'portes' | null
+  /** Les portes posées sur ce plan. */
+  portes: number
+  /** La taille des pions est-elle réglée à la main sur ce lieu ? */
+  pionMain: boolean
+  /** La taille d'un pion à l'écran, en pour cent de la largeur du plan. */
+  pionPourcent: number
+}
+
 export interface Place {
   id: number
   tier: PlaceTier
@@ -130,6 +149,12 @@ export interface Place {
    */
   lumGarde: boolean
   /**
+   * Ce lieu n'est qu'une pièce. Les murs tracés sur son plan referment le lieu
+   * lui-même : ils ne proposent pas de pièces à nommer, et le lieu ne devient
+   * jamais l'étage d'autres lieux.
+   */
+  pieceUnique: boolean
+  /**
    * Jusqu'où un regard porte sur cette carte, en part de sa largeur.
    *
    * `null` — sans limite : le regard va jusqu'au mur, comme avant. Sinon, il
@@ -137,6 +162,18 @@ export interface Place {
    * pas d'un coup d'œil depuis la porte.
    */
   regardPortee: number | null
+  /**
+   * Le soleil ou la lune qui éclaire cette carte du dehors ; `null`, aucun.
+   * Son cap se compte depuis le nord, pas depuis le haut de l'image.
+   */
+  astre: Astre | null
+  /** Où pointe le nord sur l'image, en degrés : 0 le haut, 90 la droite. */
+  nord: number
+  /**
+   * Le soleil ou la lune de **tous** les lieux de cet espace — un espace
+   * seulement, `null` ailleurs. Posé, il prime sur ce que chaque lieu règle.
+   */
+  ciel: Astre | null
   /**
    * La largeur que prennent les ouvertures posées sur cette carte, en part du
    * plan. `null`, c'est la largeur d'usine — on n'a rien réglé.
@@ -178,7 +215,17 @@ export interface Lumiere {
    * joueurs ne voient que la lueur, sauf si le MJ leur montre l'objet.
    */
   icone: boolean
+  /**
+   * De combien de degrés s'ouvre le faisceau. 360 : tout autour, la lampe
+   * ordinaire ; moins, une lumière **directive** — torche, phare, soupirail.
+   */
+  ouverture: number
+  /** Où pointe le faisceau, en degrés, 0 vers le haut — comme un pion. */
+  cap: number
 }
+
+/** Les faisceaux proposés d'un clic à une lumière directive. */
+export const FAISCEAUX_LUMIERE = [30, 60, 90, 120, 180]
 
 /** Les teintes proposées d'un clic — au-delà, on choisit la sienne. */
 export const TEINTES_LUMIERE: { cle: string; label: string }[] = [
@@ -216,11 +263,56 @@ export interface CalqueBrouillard {
    *
    * Un objet de la réserve dont un effet parle d'éclairer — « Éclaire », «
    * Éclairage », « Lumière » — allume une lampe sur le pion du personnage qui
-   * le porte, et elle le suit. Le rayon se lit dans le détail de l'effet s'il
-   * y a un pourcentage ; sinon c'est celui d'une torche.
+   * le porte, et elle le suit. Le rayon se lit dans le détail de l'effet ;
+   * sans portée, c'est celui d'une torche. `ouverture`, le faisceau en
+   * degrés, tourné comme le pion — 360, tout autour.
    */
-  porteurs: { characterId: number; rayon: number; objet: string }[]
+  porteurs: { characterId: number; rayon: number; ouverture: number; objet: string }[]
+  /** Le soleil ou la lune de cette carte ; `null`, la nuit noire d'avant. */
+  astre: Astre | null
 }
+
+/**
+ * La lumière du dehors.
+ *
+ * Le soleil et la lune sont si loin que leurs rayons arrivent parallèles : on
+ * ne les pose pas sur la carte — il n'y a pas la place autour d'un bâtiment —,
+ * on dit **d'où vient la lumière**. Dehors, tout est éclairé ; dans les
+ * pièces, seul ce qui entre par les fenêtres et les portes ouvertes, en
+ * traits parallèles que les murs arrêtent.
+ */
+export type NatureAstre = 'soleil' | 'lune'
+
+export interface Astre {
+  nature: NatureAstre
+  /**
+   * D'où vient la lumière, en degrés. Sur un lieu ou un espace, depuis le
+   * nord (90 l'est) ; dans le calque, depuis le haut de l'image (90 la droite).
+   */
+  cap: number
+}
+
+/**
+ * La lumière du dehors d'un lieu, telle qu'elle tombe sur son plan.
+ *
+ * `astre` est déjà tourné dans le repère de l'image (0 le haut) : c'est ce que
+ * le calque dessine. `general` dit que l'espace règle le ciel pour tous ses
+ * lieux — on ne le change alors plus lieu par lieu.
+ */
+export interface CielDuLieu {
+  astre: Astre | null
+  nord: number
+  general: { espaceId: number; nom: string; astre: Astre } | null
+}
+
+/** D'où vient la lumière, en mots : le vent le plus proche d'un cap compté depuis le nord. */
+export function ventDe(cap: number): string {
+  const VENTS = ['du nord', 'du nord-est', 'de l’est', 'du sud-est', 'du sud', 'du sud-ouest', 'de l’ouest', 'du nord-ouest']
+  return VENTS[((Math.round(cap / 45) % 8) + 8) % 8]
+}
+
+/** La force de chaque astre : la lune éclaire, mais à moitié. */
+export const FORCE_ASTRE: Record<NatureAstre, number> = { soleil: 1, lune: 0.5 }
 
 export interface Beat {
   id: number
@@ -233,6 +325,81 @@ export interface Beat {
   placeId: number | null
   items: Item[]
   /** Les PNJ que ce moment met en scène : la Régie les range devant les autres. */
+  pnjIds: number[]
+}
+
+/** Ce qu'est une carte de la trame : le départ, ce qui se passe, ce qu'ils doivent obtenir, une issue. */
+export type TrameType = 'ouverture' | 'scene' | 'objectif' | 'fin'
+
+/** Une carte de la trame de la séance — le MJ seul la voit. */
+export interface TrameCarte {
+  id: number
+  sessionId: number
+  type: TrameType
+  titre: string
+  resume: string
+  x: number
+  y: number
+  /** Plusieurs flèches entrantes : les faut-il toutes, ou une suffit-elle ? */
+  regle: 'et' | 'ou'
+  fait: boolean
+  /** L'image de la carte, prise dans la Bibliothèque. */
+  itemId: number | null
+  /** Le morceau de l'image qu'on voit dans le bandeau ; null, le centre. */
+  imageCadre: CadreCarre | null
+  beatId: number | null
+  placeId: number | null
+  pnjIds: number[]
+}
+
+/** « Ceci ouvre la voie à cela », avec ce qui fait passer, en quelques mots. */
+export interface TrameLien {
+  id: number
+  de: number
+  a: number
+  mot: string
+}
+
+export interface Trame {
+  cartes: TrameCarte[]
+  liens: TrameLien[]
+}
+
+/* ---------- La fiche d'un lieu : le MJ seul la voit ---------- */
+
+/** Un scénario possible des joueurs dans ce lieu. Son numéro, c'est sa place. */
+export interface LieuScenario {
+  id: number
+  placeId: number
+  titre: string
+  info: string
+}
+
+/** Ce qu'on découvre là, ou ce que les joueurs y déclenchent. */
+export type SorteCarte = 'decouverte' | 'declencheur'
+
+/**
+ * Une découverte ou un déclencheur : « si… alors… ». Cochée, elle descend en
+ * bas de la liste ; décochée, elle remonte en haut.
+ */
+export interface LieuCarte {
+  id: number
+  placeId: number
+  sorte: SorteCarte
+  titre: string
+  si: string
+  alors: string
+  fait: boolean
+  /** Le moment où mène un déclencheur. */
+  beatId: number | null
+  objetIds: number[]
+  pnjIds: number[]
+}
+
+export interface FicheDuLieu {
+  scenarios: LieuScenario[]
+  cartes: LieuCarte[]
+  /** Les PNJ qu'on rencontre dans ce lieu, dans l'ordre où on les a mis. */
   pnjIds: number[]
 }
 
@@ -476,6 +643,14 @@ export interface Character {
   /** Le carré qu'on taille dans son portrait pour le pion ; null, le centre. */
   portraitCadre: CadreCarre | null
   age: string | null
+  /** Son histoire, écrite par le joueur ou le MJ. Les joueurs seulement. */
+  biographie: string | null
+  /** Où il est né — un lieu dit en toutes lettres, pas une fiche de lieu. */
+  lieuNaissance: string | null
+  /** La ville où il vit au début de la partie. */
+  ville: string | null
+  /** Ce qui jaillit derrière lui quand on le présente à l'écran : cinq au plus. */
+  emojis: string[]
   /**
    * Nom d'un jeton de couleur — la même liste que les pions. C'est elle qui
    * cercle le pion du personnage sur l'écran des joueurs ; `null` laisse la
@@ -590,6 +765,10 @@ export interface ObjetFamille {
   ord: number
   /** Livrée avec l'application : on peut la renommer, pas s'étonner qu'elle soit là. */
   builtin: boolean
+  /** Un de ses objets est posé dans une autre séance : on ne la touche plus, on la masque. */
+  verrouillee: boolean
+  /** Masquée dans la séance ouverte — depuis celle-ci ou une d'avant. */
+  masquee: boolean
 }
 
 export const GLYPHES_OBJET = [
@@ -685,8 +864,8 @@ export function ditEmplacements(cles: string[] | undefined): string {
 /** L'unité de valeur par défaut d'une campagne neuve. */
 export const UNITE_VALEUR_PAR_DEFAUT = 'pièces'
 
-/** Là où se trouve un exemplaire : un lieu, un PNJ, un joueur. */
-export type PortObjet = 'lieu' | 'pnj' | 'pj'
+/** Là où se trouve un exemplaire : un lieu, un PNJ, un joueur, un inventaire partagé. */
+export type PortObjet = 'lieu' | 'pnj' | 'pj' | 'inventaire'
 
 /**
  * Un exemplaire posé quelque part.
@@ -702,7 +881,8 @@ export interface ObjetPlacement {
   port: PortObjet
   placeId: number | null
   characterId: number | null
-  /** Le nom du lieu ou du personnage, tel qu'on le lit dans la fiche. */
+  inventaireId: number | null
+  /** Le nom du lieu, du personnage ou de l'inventaire, tel qu'on le lit dans la fiche. */
   cible: string
   /** Où exactement : « tiroir fermé », « sur l'évier ». */
   precision: string | null
@@ -711,8 +891,23 @@ export interface ObjetPlacement {
    * sac. Équiper et ranger sont donc le même exemplaire, à une colonne près.
    */
   emplacement: string | null
+  /** Le lieu d'où il est parti la première fois qu'on l'a donné : sa fiche s'en souvient. */
+  origineLieuId: number | null
   qte: number
   etat: 'cache' | 'trouve' | 'porte'
+}
+
+/**
+ * Un inventaire partagé : le camion, la malle. Le MJ le remplit depuis la
+ * réserve ; ouvert, il se voit sur les téléphones et chacun y pioche — l'objet
+ * tombe dans son sac — ou y remet ce qu'il porte.
+ */
+export interface Inventaire {
+  id: number
+  nom: string
+  ouvert: boolean
+  /** Ce qui est passé par là depuis le lancement de l'app, le plus récent en dernier. */
+  journal: { heure: string; texte: string }[]
 }
 
 /* ---------- Jets de dés ---------- */
@@ -908,6 +1103,7 @@ export function murArreteVue(m: Mur): boolean {
 export function rideauTire(m: Mur): boolean {
   return m.nature === 'rideau' && !m.ouvert
 }
+
 
 /** Cette ouverture laisse-t-elle passer le pas ? la vue ? */
 export function ouvertureLaissePasser(o: Ouverture, quoi: 'pas' | 'vue'): boolean {
@@ -1161,6 +1357,42 @@ export type SlidePayload = (
   | { type: 'collage'; layout: CollageLayout; cells: (CollageCell | null)[] }
   | { type: 'text'; title: string; html: string; kicker?: string }
   | { type: 'plate'; title: string; subtitle?: string }
+  | {
+      /** Un joueur présenté à la table : son portrait, son nom, ses émojis. */
+      type: 'presentation'
+      characterId: number
+      name: string
+      occupation?: string
+      player?: string
+      url: string | null
+      /** Nom du jeton de couleur du personnage — il borde le portrait. */
+      color: string | null
+      emojis: string[]
+    }
+  | {
+      /** L'écran d'avant la partie : « ça commence bientôt ». */
+      type: 'attente'
+      titre: string
+      sousTitre?: string
+      emojis: string[]
+      /** Lancé à cet instant (ms) ; sert à la jauge du compte à rebours. */
+      debut: number
+      /** L'heure dite (ms) ; null : pas de compte à rebours. */
+      fin: number | null
+      /** Les trois lueurs du fond, en hexadécimal ; absentes, celles d'usine. */
+      lueurs?: [string, string, string]
+      /** Ceux qu'on attend autour de la table. */
+      joueurs: {
+        id: number
+        name: string
+        player?: string
+        url: string | null
+        cadre: CadreCarre | null
+        color: string | null
+        /** Le maître du jeu : au centre de la rangée, marqué comme tel. */
+        mj?: boolean
+      }[]
+    }
 ) & {
   /** Les textes posés sur cet écran, du fond vers le dessus. */
   texts?: TextOverlay[]
@@ -1195,6 +1427,8 @@ export interface Pion {
   id: number
   placeId: number
   characterId: number | null
+  /** Le pion d'un PNJ à fiche : il est sur la table, mais n'a pas de regard. */
+  pnj: boolean
   itemId: number | null
   label: string
   /** Portrait ou image du pion, déjà servie en jdr://. */
@@ -1223,6 +1457,11 @@ export interface Pion {
    * le moniteur du rail ne ment pas en ne le montrant pas.
    */
   cache: boolean
+  /**
+   * Montré sans son nom : les joueurs voient le jeton, pas qui c'est. Le nom
+   * reste au MJ — `listPionsVus` l'efface avant qu'il ne parte.
+   */
+  anonyme: boolean
 }
 
 /**
@@ -1353,7 +1592,93 @@ export interface AudioState {
   volume: number
 }
 
+/* ---------- Les tours : à qui de jouer ---------- */
+
+/**
+ * Quelqu'un qui prend part aux tours : un personnage (joueur ou PNJ à fiche)
+ * ou un pion nommé, sans fiche. On le reconnaît à `cle` — `c12` pour le
+ * personnage 12, `p7` pour le pion 7 —, qui ne change pas quand on retrie.
+ */
+export interface EntrantTour {
+  cle: string
+  characterId: number | null
+  /** Le pion nommé, pour qui n'a pas de fiche. */
+  pionId: number | null
+  kind: CharacterKind
+  nom: string
+  /** Nom d'un jeton de couleur, la même liste que les pions. */
+  color: string
+  /** Portrait, déjà servi en jdr:// ; null, on montre ses initiales. */
+  url: string | null
+  cadre: CadreCarre | null
+  initials: string
+  /** Le dé lancé à la table — `null` tant qu'on ne l'a pas noté. */
+  de: number | null
+  /** Ce qu'on y ajoute : la carac de la fiche, ou un nombre écrit à la main. */
+  carac: number
+  /**
+   * Montré aux joueurs. Un PJ l'est toujours ; un PNJ caché joue quand même,
+   * mais l'écran et les portables disent « quelqu'un d'autre ».
+   */
+  montre: boolean
+}
+
+/** L'initiative : le dé plus la carac. Un dé pas encore noté compte pour zéro. */
+export const totalTour = (e: EntrantTour): number => (e.de ?? 0) + e.carac
+
+/**
+ * Les tours vus du MJ — tout le monde, cachés compris. Cet objet ne part
+ * **jamais** vers les joueurs : ils reçoivent `TourVu`, taillé dedans.
+ */
+export interface ToursMj {
+  /** On note l'initiative, ou on joue. */
+  phase: 'prep' | 'combat'
+  /** Le combat a-t-il déjà commencé ? Revoir l'initiative ne le recommence pas. */
+  demarre: boolean
+  round: number
+  /** L'indice, dans `entrants`, de celui qui joue. */
+  actif: number
+  entrants: EntrantTour[]
+  /** La carac du gabarit qui s'ajoute au dé — DEX par défaut. */
+  caracKey: string | null
+}
+
+/** Un participant tel que les joueurs le voient. */
+export interface EntrantVu {
+  nom: string
+  color: string
+  url: string | null
+  cadre: CadreCarre | null
+  initials: string
+  characterId: number | null
+  /** Il a déjà joué ce round. */
+  fait: boolean
+}
+
+/**
+ * Les tours tels que l'écran des joueurs et les portables les montrent : les
+ * seuls participants montrés, et rien qui trahisse les autres.
+ */
+export interface TourVu {
+  round: number
+  ordre: EntrantVu[]
+  /**
+   * Celui qui joue, dans `ordre` — ou, quand c'est un caché, celui qui jouera
+   * juste après lui.
+   */
+  curseur: number
+  /** Celui qui joue est caché aux joueurs : « quelqu'un d'autre ». */
+  actifCache: boolean
+  /** Le pion qui porte le halo, s'il est sur le lieu à l'écran. */
+  pionEnJeuId: number | null
+}
+
 export interface DisplayState {
+  /**
+   * À qui le tour, tel que les joueurs le voient — `null` hors combat. Les
+   * participants cachés n'y entrent pas : la vue du MJ voyage à part.
+   */
+  tour: TourVu | null
   /** Ce qui est à l'écran : toujours `slots[liveSlot]`. */
   slide: SlidePayload
   /**

@@ -15,10 +15,42 @@
  */
 import { useState } from 'react'
 import { useStore } from '../store'
-import { IconClose, IconDonner, IconPlus, glypheObjet } from './Icons'
+import { IconAlerte, IconClose, IconDonner, IconPlus, glypheObjet } from './Icons'
 import { Pop } from './Pop'
 import { MenuDonner } from './MenuDonner'
 import type { Objet, ObjetPlacement } from '@shared/types'
+
+/**
+ * Les lieux où l'objet est posé, sauf celui qu'on regarde.
+ *
+ * Un même objet rangé dans deux pièces, c'est souvent un oubli : on l'a posé
+ * ici, puis là, sans le reprendre du premier. Les noms sont dédoublonnés : deux
+ * exemplaires dans la même cave ne font qu'un lieu.
+ */
+export function lieuxDe(o: Objet, sauf: number | null = null): string[] {
+  const vus = new Map<number, string>()
+  for (const p of o.placements)
+    if (p.port === 'lieu' && p.placeId != null && p.placeId !== sauf) vus.set(p.placeId, p.cible)
+  return [...vus.values()]
+}
+
+/**
+ * Le badge qui prévient. On lui donne les **autres** lieux : vide, il ne dit
+ * rien — un objet en un seul endroit n'a rien d'étonnant.
+ */
+export function AlerteLieux({ lieux }: { lieux: string[] }): JSX.Element | null {
+  if (lieux.length === 0) return null
+  const dit =
+    lieux.length > 1
+      ? `Attention, il apparaît déjà dans les lieux suivants : ${lieux.join(', ')}`
+      : `Attention, il apparaît déjà dans le lieu suivant : ${lieux[0]}`
+  return (
+    <span className="alerte-lieux" title={dit} aria-label={dit} role="img">
+      <IconAlerte />
+      {lieux.length > 1 ? <span className="num">{lieux.length}</span> : null}
+    </span>
+  )
+}
 
 interface Ici {
   o: Objet
@@ -64,6 +96,12 @@ export function ObjetsDuLieu({ placeId }: { placeId: number }): JSX.Element {
                   {x.o.nom}
                   {x.p.precision ? <em> — {x.p.precision}</em> : null}
                 </span>
+                {lieuxDe(x.o, placeId).length ? (
+                  <AlerteLieux lieux={lieuxDe(x.o, placeId)} />
+                ) : (
+                  /* Toujours une case : la grille de la ligne compte ses colonnes. */
+                  <span />
+                )}
                 {x.p.qte > 1 ? <span className="q num">×{x.p.qte}</span> : <span />}
                 <button
                   className={`ou-etat ${x.p.etat}`}
@@ -143,6 +181,7 @@ export function ObjetsDuLieu({ placeId }: { placeId: number }): JSX.Element {
                 >
                   <span className="gl">{glypheObjet(f?.glyphe ?? 'outils', 'glyphe')}</span>
                   {o.nom}
+                  <AlerteLieux lieux={lieuxDe(o)} />
                   {!o.unique ? <span className="det">×{o.qte}</span> : null}
                 </button>
               )

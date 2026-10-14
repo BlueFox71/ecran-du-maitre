@@ -19,16 +19,28 @@ import {
   OUVERTURE_NATURES,
   OUVERTURE_REGARD,
   TEINTES_LUMIERE,
+  FORCE_ASTRE,
+  ventDe,
+  FAISCEAUX_LUMIERE,
+  type Astre,
+  type CielDuLieu,
   type Lumiere,
   type Mur,
   type NatureMur,
   type NatureOuverture,
   type Ouverture,
+  type Place,
   type PointMur
 } from '@shared/types'
 import { centreDe, contourDesMurs, formesDesMurs, type Forme } from '@shared/pieces'
-import { accrocherAuMur, bordsOuverture, LARGEUR_DEFAUT } from '@shared/ouvertures'
+import {
+  accrocherAuMur,
+  bordsOuverture,
+  LARGEUR_DEFAUT,
+  longueurDuMur
+} from '@shared/ouvertures'
 import { useStore } from '../store'
+import { ApercuDuCiel } from './ApercuDuCiel'
 import {
   barrieres,
   bords,
@@ -48,12 +60,32 @@ import {
   pasContraint,
   polygone,
   soustraireTrace,
+  lueurDuDehors,
   type Pt
 } from '@shared/murs'
 import { BoutonEquerre } from './BoutonEquerre'
+import { Valeur } from './Valeur'
+import {
+  CLAIR_DE_TORCHE,
+  DegradesLueurs,
+  LumiereDuDehors,
+  MELANGE_LUMIERE,
+  MELANGE_OMBRE,
+  empreinteDehors,
+  empreinteLueurs,
+  halosDesLampes,
+  FlouRegard,
+  TEINTE_TORCHE,
+  CouchesRegard,
+  DegradesDuRegard,
+  couchesDuRegard,
+  type Dehors,
+  type Lueur
+} from '../../shared/Lueur'
 import {
   IconAimant,
   IconCheck,
+  IconClose,
   IconSoleil,
   IconFusion,
   IconGomme,
@@ -175,6 +207,8 @@ export const TORCHE = 0.14
    ============================================================ */
 
 export function useMurs(placeId: number): {
+  /** Relire le plan tel que la base le rend — après un rognage, un calage. */
+  relire: () => Promise<void>
   liste: Mur[]
   /** Les portes et les fenêtres posées sur ces murs. */
   ouvertures: Ouverture[]
@@ -194,10 +228,14 @@ export function useMurs(placeId: number): {
       allumee?: boolean
       teinte?: string
       garde?: boolean
+      ouverture?: number
+      cap?: number
     }
   ) => Promise<void>
   /** La même lampe, un peu plus loin : on règle une fois, on sème ensuite. */
   dupliquerLumiere: (id: number) => Promise<void>
+  /** La même porte ou fenêtre, un peu plus loin sur le même mur. */
+  dupliquerOuverture: (id: number) => Promise<void>
   oterLumiere: (id: number) => Promise<void>
   /** Ce que les murs referment — recalculé à chaque changement du calque. */
   formes: Forme[]
@@ -215,6 +253,12 @@ export function useMurs(placeId: number): {
    */
   apercuLum: boolean
   setApercuLum: (v: boolean) => void
+  /**
+   * « Test lumière », tenu au bouton : le plan dans le noir, rien que ce que
+   * les lampes touchent — quel que soit l'outil en main.
+   */
+  testLum: boolean
+  setTestLum: (v: boolean) => void
   gomme: number
   setGomme: (r: number) => void
   /** La part de la carte jamais vue pendant l'essai, de 0 à 1. */
@@ -258,6 +302,27 @@ export function useMurs(placeId: number): {
   lumGarde: boolean
   reglerLumGarde: (garde: boolean) => Promise<void>
   /**
+   * Le soleil ou la lune qui éclaire cette carte, tourné dans le repère de
+   * l'image : celui de l'espace s'il le règle pour tous, sinon celui du lieu.
+   */
+  astre: Astre | null
+  /** Celui que ce lieu règle pour lui seul, son cap compté depuis le nord. */
+  astreLieu: Astre | null
+  reglerAstre: (astre: Astre | null) => Promise<void>
+  /** L'espace qui règle le ciel pour tous ses lieux ; le lieu ne le règle plus. */
+  cielGeneral: CielDuLieu['general']
+  /**
+   * Ce plan est celui d'un espace : sa lumière du dehors est le ciel de tous
+   * ses lieux, et `reglerAstre` l'écrit là.
+   */
+  espace: Place | null
+  /** Où pointe le nord sur ce plan, en degrés : 0 le haut de l'image. */
+  nord: number
+  reglerNord: (nord: number) => Promise<void>
+  /** Ne voir que la lumière du soleil ou de la lune, sans les lampes. */
+  voirAstre: boolean
+  setVoirAstre: (v: boolean) => void
+  /**
    * Jusqu'où le regard porte sur cette carte, en part de sa largeur.
    * `null`, sans limite — il ne s'arrête qu'aux murs.
    */
@@ -266,7 +331,7 @@ export function useMurs(placeId: number): {
   poserOuverture: (murId: number, nature: NatureOuverture, d: number) => Promise<void>
   reglerOuverture: (
     id: number,
-    patch: { d?: number; largeur?: number; ouverte?: boolean; verrouillee?: boolean }
+    patch: { murId?: number; d?: number; largeur?: number; ouverte?: boolean; verrouillee?: boolean }
   ) => Promise<void>
   oterOuverture: (id: number) => Promise<void>
   couper: (id: number, pieces: PointMur[][]) => Promise<void>
@@ -307,6 +372,7 @@ export function useMurs(placeId: number): {
   const [aimant, setAimant] = useState(true)
   const [loupe, setLoupe] = useState(true)
   const [apercuLum, setApercuLum] = useState(false)
+  const [testLum, setTestLum] = useState(false)
   const [gomme, setGomme] = useState(GOMME.rayon)
   const [noir, setNoir] = useState<number | null>(null)
   const [choisi, setChoisi] = useState<number | null>(null)
@@ -329,6 +395,11 @@ export function useMurs(placeId: number): {
     setLargeurDefaut(lieu?.ouvLargeur ?? null)
     setLumGarde(!!lieu?.lumGarde)
     setRegardPortee(lieu?.regardPortee ?? null)
+    setAstreLieu(lieu?.astre ?? null)
+    setEspace(lieu?.tier === 'espace' ? lieu : null)
+    const ciel = await window.jdr.places.ciel(placeId)
+    setNord(ciel.nord)
+    setCielGeneral(ciel.general)
   }
 
   /*
@@ -480,6 +551,17 @@ export function useMurs(placeId: number): {
   const [largeurDefaut, setLargeurDefaut] = useState<number | null>(null)
   /** Et si ce qu'elle éclaire reste découvert. */
   const [lumGarde, setLumGarde] = useState(false)
+  const [astreLieu, setAstreLieu] = useState<Astre | null>(null)
+  const [cielGeneral, setCielGeneral] = useState<CielDuLieu['general']>(null)
+  const [espace, setEspace] = useState<Place | null>(null)
+  const [nord, setNord] = useState(0)
+  const [voirAstre, setVoirAstre] = useState(false)
+  /* Ce qui tombe sur le plan : le ciel de l'espace prime, et le nord du plan
+     remet le cap à l'endroit de l'image. */
+  const astre = useMemo<Astre | null>(() => {
+    const a = cielGeneral?.astre ?? (espace ? null : astreLieu)
+    return a ? { nature: a.nature, cap: (((a.cap + nord) % 360) + 360) % 360 } : null
+  }, [cielGeneral?.astre.nature, cielGeneral?.astre.cap, astreLieu?.nature, astreLieu?.cap, nord, espace])
   /** Et jusqu'où l'on voit, ici. */
   const [regardPortee, setRegardPortee] = useState<number | null>(null)
 
@@ -487,6 +569,28 @@ export function useMurs(placeId: number): {
     await window.jdr.places.regardPortee(placeId, portee)
     setRegardPortee(portee)
     /* La portée change ce que le pion voit : on repart d'une maison noire. */
+    setEssai((e) => (e ? { ...e, reprise: Date.now() } : e))
+  }
+
+  /* Le soleil ou la lune : l'écran suit tout de suite, la base derrière. */
+  const reglerAstre = async (a: Astre | null): Promise<void> => {
+    if (espace) {
+      /* Le plan d'un espace : on règle le ciel de tous ses lieux. */
+      setCielGeneral(a ? { espaceId: espace.id, nom: espace.name, astre: a } : null)
+      if (!a) setVoirAstre(false)
+      await window.jdr.places.cielEspace(espace.id, a)
+      setEssai((e) => (e ? { ...e, reprise: Date.now() } : e))
+      return
+    }
+    setAstreLieu(a)
+    if (!a && !cielGeneral) setVoirAstre(false)
+    await window.jdr.places.astre(placeId, a)
+    setEssai((e) => (e ? { ...e, reprise: Date.now() } : e))
+  }
+
+  const reglerNord = async (n: number): Promise<void> => {
+    setNord((((n % 360) + 360) % 360))
+    await window.jdr.places.nord(placeId, n)
     setEssai((e) => (e ? { ...e, reprise: Date.now() } : e))
   }
 
@@ -531,6 +635,8 @@ export function useMurs(placeId: number): {
       allumee?: boolean
       teinte?: string
       garde?: boolean
+      ouverture?: number
+      cap?: number
     }
   ): Promise<void> => {
     await window.jdr.lumieres.update(id, patch)
@@ -556,7 +662,9 @@ export function useMurs(placeId: number): {
         y: av.y + ecart > 0.98 ? Math.max(0.02, av.y - ecart) : av.y + ecart,
         clair: av.clair,
         penombre: av.penombre,
-        teinte: av.teinte
+        teinte: av.teinte,
+        ouverture: av.ouverture,
+        cap: av.cap
       })
       /* Une bougie soufflée se duplique soufflée : on copie la lampe, pas son état d'usine. */
       if (c && !av.allumee) await window.jdr.lumieres.update(c.id, { allumee: false })
@@ -603,9 +711,46 @@ export function useMurs(placeId: number): {
 
   const reglerOuverture = async (
     id: number,
-    patch: { d?: number; largeur?: number; ouverte?: boolean; verrouillee?: boolean }
+    patch: { murId?: number; d?: number; largeur?: number; ouverte?: boolean; verrouillee?: boolean }
   ): Promise<void> => {
     await window.jdr.ouvertures.update(id, patch)
+    await relire()
+  }
+
+  /**
+   * Dupliquer une ouverture : même nature, même largeur, même état, sur le
+   * même mur — décalée d'une largeur et demie, du côté où il reste de la
+   * place. Une rangée de fenêtres se règle une fois et se sème ensuite. La
+   * copie devient l'ouverture choisie, prête à glisser à sa place.
+   */
+  const dupliquerOuverture = async (id: number): Promise<void> => {
+    const av = ouvertures.find((o) => o.id === id)
+    const mur = av ? liste.find((x) => x.id === av.murId) : undefined
+    if (!av || !mur) return
+    /* La longueur du mur, en fractions de la carte : assez juste pour un
+       décalage, qu'on reprend de toute façon à la main. */
+    let long = 0
+    for (let i = 0; i + 1 < mur.pts.length; i++)
+      long += Math.hypot(mur.pts[i + 1][0] - mur.pts[i][0], mur.pts[i + 1][1] - mur.pts[i][1])
+    const ecart = Math.min(0.4, Math.max(0.02, (av.largeur * 1.5) / (long || 1)))
+    const d = av.d + ecart <= 0.98 ? av.d + ecart : Math.max(0.02, av.d - ecart)
+    const copie = await enUnGeste(async () => {
+      const c = await window.jdr.ouvertures.add({
+        murId: av.murId,
+        nature: av.nature,
+        d,
+        largeur: av.largeur
+      })
+      if (c && (av.ouverte || av.verrouillee))
+        await window.jdr.ouvertures.update(c.id, {
+          ouverte: av.ouverte,
+          verrouillee: av.verrouillee
+        })
+      return c
+    })
+    if (!copie) return
+    setOuvChoisie(copie.id)
+    setChoisi(null)
     await relire()
   }
 
@@ -703,6 +848,7 @@ export function useMurs(placeId: number): {
   const defaire = (): Promise<void> => useStore.getState().defaire()
 
   return {
+    relire,
     liste,
     ouvertures,
     formes,
@@ -714,6 +860,7 @@ export function useMurs(placeId: number): {
     poserLumiere,
     reglerLumiere,
     dupliquerLumiere,
+    dupliquerOuverture,
     oterLumiere,
     formeVisee,
     setFormeVisee,
@@ -727,6 +874,8 @@ export function useMurs(placeId: number): {
     setLoupe,
     apercuLum,
     setApercuLum,
+    testLum,
+    setTestLum,
     gomme,
     setGomme,
     noir,
@@ -745,6 +894,15 @@ export function useMurs(placeId: number): {
     reglerLargeurDefaut,
     lumGarde,
     reglerLumGarde,
+    astre,
+    astreLieu,
+    reglerAstre,
+    cielGeneral,
+    espace,
+    nord,
+    reglerNord,
+    voirAstre,
+    setVoirAstre,
     regardPortee,
     reglerRegardPortee,
     poserOuverture,
@@ -840,7 +998,7 @@ const OUTILS: {
  *
  * Deux temps, donc deux boutons : on entre dans la désignation, puis on crée.
  */
-function FormerPiece({
+export function FormerPiece({
   m,
   onNommer
 }: {
@@ -930,6 +1088,392 @@ function FormerPiece({
   )
 }
 
+/**
+ * « Test lumière » : tenu, pas cliqué — on regarde, on lâche, on reprend où
+ * l'on était. La capture du pointeur garde le test tant que le doigt appuie,
+ * même s'il glisse hors du bouton. Dans la barre des murs et dans celle d'une
+ * lampe : c'est en réglant une lampe qu'on veut voir ce qu'elle donne.
+ */
+export function BoutonTestLumiere({ m }: { m: ReturnType<typeof useMurs> }): JSX.Element {
+  return (
+    <button
+      className={`btn btn-sm${m.testLum ? ' btn-on' : ''}`}
+      aria-pressed={m.testLum}
+      disabled={!m.lumieres.length && !m.astre}
+      title={
+        m.lumieres.length || m.astre
+          ? 'Maintenir appuyé : le plan dans le noir, avec ce que toutes les lampes éclairent — murs compris'
+          : 'Pose d’abord une lumière : il n’y aurait rien à montrer'
+      }
+      onPointerDown={(e) => {
+        if (e.button !== 0) return
+        e.currentTarget.setPointerCapture(e.pointerId)
+        m.setTestLum(true)
+      }}
+      onPointerUp={() => m.setTestLum(false)}
+      onPointerCancel={() => m.setTestLum(false)}
+      onLostPointerCapture={() => m.setTestLum(false)}
+    >
+      <IconSoleil />
+      Test lumière
+    </button>
+  )
+}
+
+/**
+ * La barre d'une lampe : elle prend la place de celle des murs dès qu'on
+ * clique une lampe sur la carte, et la rend quand on la lâche. Les réglages se
+ * font au-dessus de ce qu'ils changent, le plan sous les yeux.
+ */
+export function BarreLumiere({ m }: { m: ReturnType<typeof useMurs> }): JSX.Element | null {
+  const lampe = m.lumieres.find((x) => x.id === m.lumChoisie) ?? null
+  if (!lampe) return null
+  const regler = (patch: Parameters<typeof m.reglerLumiere>[1]): void =>
+    void m.reglerLumiere(lampe.id, patch)
+  return (
+    <>
+      <span className="eyebrow">Lumière</span>
+
+      {/* Tout autour, ou un faisceau : la lampe de chevet ou la torche. */}
+      <div className="lb-groupe">
+        <button
+          className="btn btn-sm"
+          aria-pressed={lampe.ouverture >= 360}
+          title="Une lampe ordinaire : elle éclaire dans toutes les directions"
+          onClick={() => regler({ ouverture: 360 })}
+        >
+          Tout autour
+        </button>
+        {FAISCEAUX_LUMIERE.map((o) => (
+          <button
+            key={o}
+            className="btn btn-sm"
+            aria-pressed={lampe.ouverture === o}
+            title={`Directive — un faisceau de ${o}°`}
+            onClick={() => regler({ ouverture: o })}
+          >
+            {o}°
+          </button>
+        ))}
+      </div>
+      {lampe.ouverture < 360 ? (
+        <label className="murs-reglage lb-reglage" title="Molette sur la lampe pour l’orienter">
+          <span>Direction</span>
+          <input
+            type="range"
+            min={0}
+            max={359}
+            step={1}
+            value={Math.round(lampe.cap)}
+            onChange={(e) => regler({ cap: Number(e.target.value) })}
+          />
+          <Valeur
+            className="num"
+            value={Math.round(lampe.cap)}
+            min={0}
+            max={359}
+            unite="°"
+            label="Direction"
+            onChange={(v) => regler({ cap: v })}
+          />
+        </label>
+      ) : null}
+
+      <span className="murs-sep" />
+      <label className="murs-reglage lb-reglage" title="Le plein jour, autour de la lampe">
+        <span>Clair</span>
+        <input
+          type="range"
+          min={1}
+          max={60}
+          step={0.5}
+          value={Math.round(lampe.clair * 1000) / 10}
+          onChange={(e) => regler({ clair: Number(e.target.value) / 100 })}
+        />
+        <Valeur
+          className="num"
+          value={lampe.clair * 100}
+          min={1}
+          max={60}
+          step={0.5}
+          decimales={1}
+          unite=" %"
+          label="Clair"
+          onChange={(v) => regler({ clair: v / 100 })}
+        />
+      </label>
+      <label className="murs-reglage lb-reglage" title="Jusqu’où la lueur porte, en s’éteignant">
+        <span>Pénombre</span>
+        <input
+          type="range"
+          min={1}
+          max={80}
+          step={0.5}
+          value={Math.round(lampe.penombre * 1000) / 10}
+          onChange={(e) => regler({ penombre: Number(e.target.value) / 100 })}
+        />
+        <Valeur
+          className="num"
+          value={lampe.penombre * 100}
+          min={1}
+          max={80}
+          step={0.5}
+          decimales={1}
+          unite=" %"
+          label="Pénombre"
+          onChange={(v) => regler({ penombre: v / 100 })}
+        />
+      </label>
+
+      <span className="murs-sep" />
+      {/* Les pastilles seules : le nom de chaque teinte est dans l'info-bulle. */}
+      <div className="murs-teintes lb-teintes">
+        {TEINTES_LUMIERE.map((t) => (
+          <button
+            key={t.cle}
+            className={`lteinte${lampe.teinte === t.cle ? ' on' : ''}`}
+            style={{ ['--t' as string]: t.cle } as React.CSSProperties}
+            aria-pressed={lampe.teinte === t.cle}
+            title={`${t.label} — la couleur ne change rien à ce qui est vu`}
+            onClick={() => regler({ teinte: t.cle })}
+          >
+            <i />
+            {t.label}
+          </button>
+        ))}
+        <label
+          className={`lteinte libre${
+            TEINTES_LUMIERE.some((t) => t.cle === lampe.teinte) ? '' : ' on'
+          }`}
+          style={{ ['--t' as string]: lampe.teinte } as React.CSSProperties}
+          title="Une couleur à toi"
+        >
+          <i />
+          La tienne
+          <input
+            type="color"
+            value={lampe.teinte}
+            onChange={(e) => regler({ teinte: e.target.value })}
+          />
+        </label>
+      </div>
+
+      <span className="murs-sep" />
+      <button
+        className={`btn btn-sm${lampe.allumee ? ' btn-on' : ''}`}
+        aria-pressed={lampe.allumee}
+        title="On souffle une bougie en pleine partie : la pièce retombe dans le noir"
+        onClick={() => regler({ allumee: !lampe.allumee })}
+      >
+        <IconSoleil />
+        {lampe.allumee ? 'Allumée' : 'Éteinte'}
+      </button>
+      <button
+        className="btn btn-sm"
+        title="Poser la même lampe à côté — mêmes rayons, même état ; la copie est aussitôt choisie"
+        onClick={() => void m.dupliquerLumiere(lampe.id)}
+      >
+        <IconPlus />
+        Dupliquer
+      </button>
+      <button
+        className="btn btn-sm btn-ghost btn-danger"
+        title="Retirer cette lumière — Suppr"
+        onClick={() => void m.oterLumiere(lampe.id)}
+      >
+        <IconTrash />
+        Retirer
+      </button>
+      <span className="murs-sep" />
+      <BoutonTestLumiere m={m} />
+      <div className="spacer" />
+      {/* Lâcher la lampe : la barre des murs revient. */}
+      <button
+        className="btn btn-sm btn-ghost"
+        title="Revenir à la barre des murs — Échap"
+        onClick={() => m.setLumChoisie(null)}
+      >
+        <IconClose />
+        Fermer
+      </button>
+      {/* La seconde ligne, comme l'aide de la barre des murs : les deux barres
+          ont ainsi la même hauteur, et la carte ne saute pas quand on passe
+          de l'une à l'autre. */}
+      <span className="note lb-note">
+        Glisse la pastille pour la déplacer
+        {lampe.ouverture < 360 ? ' · molette dessus pour l’orienter' : ''} · <b>Suppr</b>{' '}
+        l’efface · <b>Échap</b> revient aux murs.
+      </span>
+    </>
+  )
+}
+
+/**
+ * La barre d'une ouverture choisie — porte, fenêtre — à la place de celle des
+ * murs, comme celle d'une lampe.
+ */
+export function BarreOuverture({ m }: { m: ReturnType<typeof useMurs> }): JSX.Element | null {
+  const ouv = m.ouvertures.find((x) => x.id === m.ouvChoisie) ?? null
+  if (!ouv) return null
+  return (
+    <>
+      <span className="eyebrow">{OUVERTURE_NATURES[ouv.nature].label}</span>
+      <label className="murs-reglage lb-reglage">
+        <span>Largeur</span>
+        <input
+          type="range"
+          min={1}
+          max={30}
+          step={0.5}
+          value={Math.round(ouv.largeur * 1000) / 10}
+          onChange={(e) => void m.reglerOuverture(ouv.id, { largeur: Number(e.target.value) / 100 })}
+        />
+        <Valeur
+          className="num"
+          value={ouv.largeur * 100}
+          min={1}
+          max={30}
+          step={0.5}
+          decimales={1}
+          unite=" %"
+          label="Largeur"
+          onChange={(v) => void m.reglerOuverture(ouv.id, { largeur: v / 100 })}
+        />
+      </label>
+      <LargeurDefaut m={m} largeur={ouv.largeur} />
+      <span className="murs-sep" />
+      <label className="murs-reglage lb-reglage">
+        <span>Place</span>
+        <input
+          type="range"
+          min={0}
+          max={100}
+          step={0.5}
+          value={Math.round(ouv.d * 1000) / 10}
+          onChange={(e) => void m.reglerOuverture(ouv.id, { d: Number(e.target.value) / 100 })}
+        />
+        <Valeur
+          className="num"
+          value={ouv.d * 100}
+          min={0}
+          max={100}
+          step={0.5}
+          unite=" %"
+          label="Place sur le mur"
+          onChange={(v) => void m.reglerOuverture(ouv.id, { d: v / 100 })}
+        />
+      </label>
+      {ouv.nature === 'porte' ? (
+        <>
+          <span className="murs-sep" />
+          <button
+            className="btn btn-sm"
+            aria-pressed={ouv.ouverte}
+            disabled={ouv.verrouillee}
+            title={
+              ouv.verrouillee
+                ? 'Déverrouille-la d’abord : une porte à clé ne s’ouvre pas'
+                : 'Ouvrir ou refermer cette porte'
+            }
+            onClick={() => void m.basculerPorte(ouv.id)}
+          >
+            {ouv.ouverte ? 'Ouverte' : 'Fermée'}
+          </button>
+          <button
+            className="btn btn-sm"
+            aria-pressed={ouv.verrouillee}
+            title="Les joueurs ne l’ouvrent pas ; toi seul l’accordes"
+            onClick={() => void m.verrouiller(ouv.id, !ouv.verrouillee)}
+          >
+            <IconVerrou />
+            Verrouillée
+          </button>
+        </>
+      ) : null}
+      <span className="murs-sep" />
+      <button
+        className="btn btn-sm"
+        title={`Poser la même ${OUVERTURE_NATURES[ouv.nature].label.toLowerCase()} un peu plus loin sur ce mur — même largeur, même état ; la copie est aussitôt choisie`}
+        onClick={() => void m.dupliquerOuverture(ouv.id)}
+      >
+        <IconPlus />
+        Dupliquer
+      </button>
+      <button className="btn btn-sm btn-ghost btn-danger" onClick={() => void m.oterOuverture(ouv.id)}>
+        <IconTrash />
+        Ôter
+      </button>
+      <div className="spacer" />
+      <button
+        className="btn btn-sm btn-ghost"
+        title="Revenir à la barre des murs — Échap"
+        onClick={() => m.setOuvChoisie(null)}
+      >
+        <IconClose />
+        Fermer
+      </button>
+      <span className="note lb-note">
+        Posée sur un mur, elle en prend la direction · <b>glisse-la</b> à la souris : elle suit
+        son mur, et passe sur un autre si tu l’en approches · <b>Échap</b> revient aux murs.
+      </span>
+    </>
+  )
+}
+
+/** La barre d'un trait choisi : sa nature, le coin, l'effacer. */
+export function BarreTrait({ m }: { m: ReturnType<typeof useMurs> }): JSX.Element | null {
+  const trait = m.liste.find((x) => x.id === m.choisi) ?? null
+  if (!trait) return null
+  const ouvs = m.ouvertures.filter((o) => o.murId === trait.id).length
+  return (
+    <>
+      <span className="eyebrow">Trait</span>
+      <span className="murs-cap">
+        {trait.pts.length - 1} segment{trait.pts.length > 2 ? 's' : ''}
+        {ouvs ? ` · ${ouvs} ouverture${ouvs > 1 ? 's' : ''}` : ''}
+      </span>
+      <span className="murs-sep" />
+      {(Object.keys(MUR_NATURES) as NatureMur[]).map((n) => (
+        <button
+          key={n}
+          className={`murs-nat n-${n}`}
+          aria-pressed={trait.nature === n}
+          title={MUR_NATURES[n].quoi}
+          onClick={() => void m.changerNature(trait.id, n)}
+        >
+          <i />
+          {MUR_NATURES[n].label}
+        </button>
+      ))}
+      <span className="murs-sep" />
+      <button
+        className={`btn btn-sm${m.joindre ? ' btn-on' : ''}`}
+        title="Puis clique un second mur : les deux se prolongent jusqu’à se rejoindre en un coin (raccourci : Maj + clic)"
+        onClick={() => m.setJoindre(!m.joindre)}
+      >
+        ⌐ {m.joindre ? 'Clique le second mur…' : 'Joindre en coin'}
+      </button>
+      <button className="btn btn-sm btn-ghost btn-danger" onClick={() => void m.effacer(trait.id)}>
+        <IconTrash />
+        Effacer
+      </button>
+      <div className="spacer" />
+      <button
+        className="btn btn-sm btn-ghost"
+        title="Revenir à la barre des murs — Échap"
+        onClick={() => m.setChoisi(null)}
+      >
+        <IconClose />
+        Fermer
+      </button>
+      <span className="note lb-note">
+        Glisse un côté pour le déplacer, tire ses poignées, <b>double-clic</b> ajoute un sommet,{' '}
+        <b>Alt + clic</b> le coupe, <b>Suppr</b> l’efface · <b>Échap</b> revient aux murs.
+      </span>
+    </>
+  )
+}
+
 export function BarreMurs({
   m,
   onFormer
@@ -981,6 +1525,8 @@ export function BarreMurs({
         </button>
       ) : null}
 
+      {!enEssai ? <BoutonTestLumiere m={m} /> : null}
+
       <span className="murs-sep" />
 
       <button
@@ -993,7 +1539,8 @@ export function BarreMurs({
       >
         <IconAimant />
       </button>
-      <FormerPiece m={m} onNommer={onFormer} />
+      {/* Sans `onFormer`, le lieu n'est qu'une pièce : rien à former. */}
+      {onFormer ? <FormerPiece m={m} onNommer={onFormer} /> : null}
       <button
         className="btn btn-sm btn-ico"
         aria-pressed={m.loupe}
@@ -1038,6 +1585,7 @@ export function CalqueMurs({
   aimant,
   loupe,
   apercuLum = false,
+  testLum = false,
   gomme,
   carte,
   choisi,
@@ -1053,20 +1601,26 @@ export function CalqueMurs({
   joindre = false,
   onJoindreFini,
   onBasculerPorte,
+  onDeplacerOuverture,
   onVerrouiller,
   onAccorder,
   onGommer,
   onGommeTaille,
   onBrouillard,
   essai,
+  pionPourcent,
   onEssai,
   traitsCaches = false,
   largeurOuv = LARGEUR_DEFAUT,
   lumieres = [],
   lumChoisie = null,
   lumGarde = false,
-  regardPortee = null,
+  astre = null,
+  nord = 0,
+  voirAstre = false,
+  regardPortee: porteeReglee = null,
   onLumChoisie,
+  onOutil,
   onPoserLumiere,
   onReglerLumiere,
   onOterLumiere
@@ -1095,13 +1649,21 @@ export function CalqueMurs({
   lumChoisie?: number | null
   /** Sur cette carte, une zone éclairée reste-t-elle découverte ? */
   lumGarde?: boolean
+  /** Le soleil ou la lune de cette carte. */
+  astre?: Astre | null
+  /** Où pointe le nord sur ce plan, en degrés : 0 le haut de l'image. */
+  nord?: number
+  /** Ne montrer que sa lumière : le plan au noir, sans les lampes. */
+  voirAstre?: boolean
   /** Jusqu'où le regard porte, en part de la largeur ; `null`, sans limite. */
   regardPortee?: number | null
   onLumChoisie?: (id: number | null) => void
+  /** Reposer l'outil : Échap ou clic droit ramènent à la Sélection. */
+  onOutil?: (o: OutilMur) => void
   onPoserLumiere?: (x: number, y: number) => void
   onReglerLumiere?: (
     id: number,
-    patch: { x?: number; y?: number; allumee?: boolean }
+    patch: { x?: number; y?: number; allumee?: boolean; cap?: number }
   ) => void
   onOterLumiere?: (id: number) => void
   mode: 'lecture' | 'edition'
@@ -1112,6 +1674,8 @@ export function CalqueMurs({
   loupe?: boolean
   /** Montrer la carte comme la lumière la laisse : ombre et lueur, rien d'autre. */
   apercuLum?: boolean
+  /** Le même, en plein noir et quel que soit l'outil : « Test lumière », tenu. */
+  testLum?: boolean
   /** Le rayon de la gomme, en pixels de mise en page. */
   gomme?: number
   /** L'image de la carte : c'est elle que la loupe agrandit. */
@@ -1136,15 +1700,19 @@ export function CalqueMurs({
   joindre?: boolean
   onJoindreFini?: () => void
   onBasculerPorte?: (id: number) => void
+  /** Une ouverture glissée : son mur (peut-être un autre) et sa place, de 0 à 1. */
+  onDeplacerOuverture?: (id: number, d: number, murId: number) => void
   onVerrouiller?: (id: number, v: boolean) => void
   onAccorder?: (id: number) => void
   essai?: EssaiPion | null
+  /** La taille d'un pion, en pour cent de la largeur du plan : le pion d'essai suit l'échelle. */
+  pionPourcent?: number
   /** Pendant le test : la carte comme les joueurs la voient, sans les traits. */
   traitsCaches?: boolean
   onEssai?: (e: EssaiPion) => void
 }): JSX.Element {
   const hote = useRef<HTMLDivElement>(null)
-  const masque = useId().replace(/:/g, '')
+  const propre = useId().replace(/:/g, '')
   const [boite, setBoite] = useState({ w: 0, h: 0 })
 
   /*
@@ -1192,8 +1760,15 @@ export function CalqueMurs({
   const [refus, setRefus] = useState<number | null>(null)
   /** La lumière qu'on traîne : on la suit à l'écran avant de l'écrire. */
   const [lumGlissee, setLumGlissee] = useState<{ id: number; x: number; y: number } | null>(null)
+  /* Une porte ou une fenêtre qu'on fait glisser : elle suit son mur, et passe
+     sur un autre quand le curseur s'en approche. */
+  const [ouvGlissee, setOuvGlissee] = useState<{ id: number; d: number; murId: number } | null>(
+    null
+  )
+  /** Le geste en cours est parti du vide, en Sélection : il recadre le plan. */
+  const fond = useRef(false)
   const prise = useRef<{
-    quoi: 'poignee' | 'pion' | 'lum' | 'trait'
+    quoi: 'poignee' | 'pion' | 'lum' | 'trait' | 'ouv'
     id: number
     i: number
     /** Pour un trait : là où on l'a attrapé. */
@@ -1481,7 +2056,67 @@ export function CalqueMurs({
         equerre = { sommet: dernier, depuis: avant, vers: q }
     }
 
+    /*
+     * L'équerre sur le mur d'appui : le trait part d'une cloison déjà posée
+     * (son bout ou son milieu) et la quitte à angle droit. C'est le geste de
+     * la pièce qu'on recoupe ; sur un mur de biais, l'angle droit ne se tient
+     * pas à la main — l'aimant l'y amène quand on en est à quelques degrés,
+     * et l'équerre le dit.
+     */
+    if (!equerre && encours && encours.length >= 1) {
+      const dernier = encours[encours.length - 1]
+      const bx = q.x - dernier.x
+      const by = q.y - dernier.y
+      const nb = Math.hypot(bx, by)
+      if (nb > 6)
+        for (const d of appuisDe(dernier, tenus)) {
+          if (Math.abs((d.x * bx + d.y * by) / nb) >= 0.07) continue
+          /* Sur la perpendiculaire, à la même distance du mur. */
+          const nx = -d.y
+          const ny = d.x
+          const t = bx * nx + by * ny
+          const droit = { x: dernier.x + nx * t, y: dernier.y + ny * t }
+          /* Redressé, le point quitte les alignements qu'il suivait : leurs
+             pointillés mentiraient. */
+          const bouge = Math.hypot(droit.x - q.x, droit.y - q.y) > 0.5
+          return {
+            p: droit,
+            lignes: bouge ? [] : lignes,
+            equerre: {
+              sommet: dernier,
+              depuis: { x: dernier.x + d.x * 20, y: dernier.y + d.y * 20 },
+              vers: droit
+            }
+          }
+        }
+    }
+
     return { p: q, lignes, equerre }
+  }
+
+  /**
+   * Les murs qui passent par ce point — par un bout ou en leur milieu —, en
+   * directions unitaires. Un coin en donne deux. On laisse de côté les traits
+   * qu'on est en train de tirer.
+   */
+  const appuisDe = (pt: Pt, tenus: Set<number> | null): Pt[] => {
+    const out: Pt[] = []
+    for (const m of murs) {
+      if (tenus?.has(m.id)) continue
+      const pts = m.pts.map(enPx)
+      for (let i = 0; i < pts.length - 1; i++) {
+        const a = pts[i]
+        const b = pts[i + 1]
+        const dx = b.x - a.x
+        const dy = b.y - a.y
+        const l = Math.hypot(dx, dy)
+        if (l < 1) continue
+        const t = Math.max(0, Math.min(1, ((pt.x - a.x) * dx + (pt.y - a.y) * dy) / (l * l)))
+        if (Math.hypot(pt.x - (a.x + t * dx), pt.y - (a.y + t * dy)) < 1.5)
+          out.push({ x: dx / l, y: dy / l })
+      }
+    }
+    return out
   }
 
   /** Le point corrigé, pour qui n'a que faire des guides. */
@@ -1560,6 +2195,21 @@ export function CalqueMurs({
     if (pts) poserEtPercer([pts])
   }
 
+  /**
+   * Renoncer, d'un cran : Échap ou clic droit.
+   *
+   * Le trait en cours se termine ; puis ce qui est choisi se lâche, et sa barre
+   * rend la place à celle des murs ; puis l'outil armé par mégarde — Lumière,
+   * Porte, Gomme… — se repose, et l'on revient à la Sélection.
+   */
+  const renoncer = (): void => {
+    if (encours) finirTrace()
+    else if (lumChoisie != null) onLumChoisie?.(null)
+    else if (ouvChoisie != null) onOuvChoisie?.(null)
+    else if (outil && outil !== 'selection' && onOutil) onOutil('selection')
+    else onChoisir?.(null)
+  }
+
   /* Le clavier finit le trait et efface le trait choisi. L'écouteur est sur la
      fenêtre : un calque en SVG ne prend pas le focus, et on ne va pas demander
      au MJ de cliquer quelque part avant d'appuyer sur Échap. */
@@ -1569,8 +2219,7 @@ export function CalqueMurs({
       const cible = e.target as HTMLElement | null
       if (cible && /^(INPUT|TEXTAREA|SELECT)$/.test(cible.tagName)) return
       if (e.key === 'Escape') {
-        if (encours) finirTrace()
-        else onChoisir?.(null)
+        renoncer()
       } else if (e.key === 'Enter' && encours) {
         finirTrace()
       } else if ((e.key === 'Delete' || e.key === 'Backspace') && !encours) {
@@ -1594,14 +2243,28 @@ export function CalqueMurs({
   /* La molette tourne le pion d'essai, comme en régie : douze crans pour un
      tour, au doigt fin avec Maj. Posée à la main, en non passif, pour retenir
      l'agrandissement de l'image qui se trouve dessous. */
+  /* Une lampe directive s'oriente de même : la molette sur sa pastille. */
+  const directives = edition && !!onReglerLumiere && lumieres.some((l) => l.ouverture < 360)
   useEffect(() => {
     const el = hote.current
     const gommeActive = edition && outil === 'gomme' && !!onGommeTaille
-    if (!el || (!essai && !gommeActive)) return
+    if (!el || (!essai && !gommeActive && !directives)) return
     const h = (e: WheelEvent): void => {
+      const sens = e.deltaY < 0 ? 1 : -1
+      const visee = !essai
+        ? (e.target as Element | null)?.closest?.('[data-lum]')?.getAttribute('data-lum')
+        : null
+      const lampe = visee ? lumieres.find((l) => l.id === Number(visee)) : undefined
+      if (lampe && lampe.ouverture < 360) {
+        e.preventDefault()
+        e.stopPropagation()
+        const pas = (e.shiftKey ? 5 : 15) * -sens
+        onReglerLumiere?.(lampe.id, { cap: (lampe.cap + pas + 360) % 360 })
+        return
+      }
+      if (!essai && !gommeActive) return
       e.preventDefault()
       e.stopPropagation()
-      const sens = e.deltaY < 0 ? 1 : -1
       if (essai && onEssai) {
         const pas = (e.shiftKey ? 5 : 30) * -sens
         onEssai({ ...essai, cap: (essai.cap + pas + 360) % 360 })
@@ -1613,7 +2276,7 @@ export function CalqueMurs({
     }
     el.addEventListener('wheel', h, { passive: false })
     return () => el.removeEventListener('wheel', h)
-  }, [essai, onEssai, edition, outil, onGommeTaille, rayonGomme])
+  }, [essai, onEssai, edition, outil, onGommeTaille, rayonGomme, directives, lumieres, onReglerLumiere])
 
   const barrieresPas = barrieres(murs, 'pas', enPx, ouvertures)
 
@@ -1645,6 +2308,10 @@ export function CalqueMurs({
    */
   useEffect(() => setConnu(null), [essai?.reprise, essai === null])
 
+  /* Une lampe en main passe avant le réglage : le pion voit aussi loin
+     qu'elle éclaire, et la portée du regard du volet ne compte plus. */
+  const regardPortee = essai && essai.lampe > 0 ? essai.lampe : porteeReglee
+
   const barrieresVue = useMemo(
     () => (w > 0 && h > 0 ? barrieres(murs, 'vue', enPx, ouvertures).concat(bords(w, h)) : []),
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -1661,6 +2328,84 @@ export function CalqueMurs({
           regardPortee ? regardPortee * w : Infinity
         )
       : null
+  /**
+   * Le regard sans limite : ce qu'il voit **de la lumière**. La portée dit
+   * jusqu'où l'on distingue les choses dans le noir — face à lui, sans mur
+   * devant, le pion voit jusque-là, éclairé ou pas. Au-delà, il ne voit que
+   * ce qu'une lampe éclaire. Sans portée, les deux se confondent.
+   */
+  const loin =
+    essai && w > 0 && h > 0 && regardPortee
+      ? champDeVision(barrieresVue, { x: essai.x * w, y: essai.y * h }, essai.cap, essai.ouverture)
+      : vision
+  /** Ce qu'il voit sans lumière : le regard, jusqu'à la portée. */
+  const proche = regardPortee && vision && vision.length > 2 ? vision : null
+  /** Le fondu de ce regard proche : net près du pion, effacé au bout. */
+  const fondu =
+    proche && essai && regardPortee
+      ? {
+          id: `rg-${propre}-${Math.round(essai.x * w)}-${Math.round(essai.y * h)}-${Math.round(regardPortee * 1000)}`,
+          c: { x: essai.x * w, y: essai.y * h },
+          r: regardPortee * w
+        }
+      : null
+  /**
+   * Le regard en couches : ses côtés, flous, et sa part nette — chacun vu
+   * directement ou à travers une vitre, qui le voile encore. Deux mesures :
+   * sans limite, pour ce qu'une lampe éclaire ; jusqu'à la portée, pour ce
+   * qu'on distingue dans le noir.
+   */
+  const sansVitres = useMemo(
+    () =>
+      w > 0 && h > 0 && ouvertures.some((o) => o.nature === 'vitre')
+        ? barrieres(
+            murs,
+            'vue',
+            enPx,
+            ouvertures.filter((o) => o.nature !== 'vitre')
+          ).concat(bords(w, h))
+        : null,
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [murs, ouvertures, w, h]
+  )
+  const couches =
+    essai && w > 0 && h > 0
+      ? (() => {
+          const oeil = { x: essai.x * w, y: essai.y * h }
+          const loinC = couchesDuRegard(barrieresVue, sansVitres, oeil, essai.cap, essai.ouverture, null)
+          return {
+            loin: loinC,
+            proche: regardPortee
+              ? couchesDuRegard(barrieresVue, sansVitres, oeil, essai.cap, essai.ouverture, regardPortee * w)
+              : []
+          }
+        })()
+      : { loin: [], proche: [] }
+
+  /* Les bords des cônes, adoucis : tout le regard passe par un léger flou. */
+  const flou = `flou-${propre}-${Math.round(w)}`
+  /**
+   * Le regard, dans un masque d'ombre (blanc = l'ombre). Sous la lampe, ce qui
+   * est éclairé au loin, puis ce qu'on distingue jusqu'à la portée, en fondu ;
+   * sans lampe, le regard seul.
+   */
+  const regardDansLOmbre = (): JSX.Element => (
+    <g filter={`url(#${flou})`}>
+      {sousLaLampe ? (
+        <>
+          <g mask={`url(#lum-${masque})`}>
+            <CouchesRegard couches={couches.loin} />
+          </g>
+          <CouchesRegard couches={couches.proche} fondu={fondu?.id ?? null} />
+        </>
+      ) : (
+        <CouchesRegard
+          couches={regardPortee ? couches.proche : couches.loin}
+          fondu={regardPortee ? (fondu?.id ?? null) : null}
+        />
+      )}
+    </g>
+  )
 
   /**
    * Les ronds de lumière, arrêtés par les mêmes murs que la vue.
@@ -1676,24 +2421,43 @@ export function CalqueMurs({
    * la lumière la laisse. Sans lui, on règle des rayons en imaginant leur
    * effet ; avec lui, on voit tout de suite ce qui restera dans le noir.
    */
-  const ombreEtLumiere = !!apercuLum && outil === 'lumiere' && edition && !essai
+  /* « Voir soleil/lune » : l'astre seul, sans les lampes, dans le même noir
+     que « Test lumière ». */
+  const astreSeul = voirAstre && !!astre
+  const plein = testLum || astreSeul
+  const ombreEtLumiere =
+    ((!!apercuLum && outil === 'lumiere') || plein) && edition && !essai
 
-  const eclairages = useMemo(() => {
+  const eclairages = useMemo((): Lueur[] => {
     if ((!essai && !ombreEtLumiere) || w <= 0 || h <= 0) return []
-    const ronds = lumieres
-      .filter((l) => l.allumee)
-      .map((l) => champDeVision(barrieresVue, { x: l.x * w, y: l.y * h }, 0, 360, l.penombre * w))
-    if (essai && essai.lampe > 0)
-      ronds.push(
-        champDeVision(
-          barrieresVue,
-          { x: essai.x * w, y: essai.y * h },
-          0,
-          360,
-          essai.lampe * w
-        )
-      )
-    return ronds.filter((p) => p.length > 2)
+    const ronds: Lueur[] = lumieres
+      .filter((l) => l.allumee && !(astreSeul && !essai))
+      /* Une lampe directive n'éclaire que son faisceau — le même secteur que
+         le regard d'un pion. */
+      .map((l) => {
+        const c = { x: l.x * w, y: l.y * h }
+        return {
+          pts: champDeVision(barrieresVue, c, l.cap, l.ouverture, l.penombre * w),
+          c,
+          r: l.penombre * w,
+          f: l.clair / l.penombre
+        }
+      })
+    if (essai && essai.lampe > 0) {
+      const c = { x: essai.x * w, y: essai.y * h }
+      ronds.push({
+        pts: champDeVision(barrieresVue, c, 0, 360, essai.lampe * w),
+        c,
+        r: essai.lampe * w,
+        f: CLAIR_DE_TORCHE
+      })
+    }
+    /* Les halos des lampes orientées, en dernier : `teintes` ne lit que les
+       premiers rangs, ceux des lampes. */
+    if (!(astreSeul && !essai)) ronds.push(...halosDesLampes(lumieres, barrieresVue, w, h))
+    /* On ne filtre pas : `teintes` lit ce tableau au rang de chaque lampe. Un
+       polygone vide ne se dessine pas, il ne fausse rien. */
+    return ronds
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [
     essai?.x,
@@ -1701,11 +2465,31 @@ export function CalqueMurs({
     essai?.lampe,
     essai === null,
     ombreEtLumiere,
+    astreSeul,
     lumieres,
     barrieresVue,
     w,
     h
   ])
+
+  /* Le soleil ou la lune : dehors éclairé, et ce qui entre par les fenêtres. */
+  const dehors = useMemo((): Dehors | null => {
+    if (!astre || (!essai && !ombreEtLumiere) || w <= 0 || h <= 0) return null
+    return {
+      dedans: lueurDuDehors(murs, ouvertures, astre.cap, w, h),
+      pieces: formesDesMurs(murs).map((f) => f.pts.map(enPx)),
+      force: FORCE_ASTRE[astre.nature]
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [astre?.nature, astre?.cap, essai === null, ombreEtLumiere, murs, ouvertures, w, h])
+
+  /* Les masques portent l'empreinte des lueurs : imbriqués, ils ne se
+     repeindraient pas quand on tire un rayon (voir Lueur.tsx). */
+  const empreinte = useMemo(
+    () => `${empreinteLueurs(eclairages)}${empreinteDehors(dehors)}`,
+    [eclairages, dehors]
+  )
+  const masque = `${propre}-${empreinte}`
 
   /**
    * L'éclairage commande-t-il ce qu'on voit ?
@@ -1716,7 +2500,7 @@ export function CalqueMurs({
    * fois dans le regard et dans la lueur. Toutes soufflées, il ne reste que ce
    * qu'on a au bout des bras — c'est bien ce qu'on veut d'une maison éteinte.
    */
-  const sousLaLampe = lumieres.length > 0 || (essai?.lampe ?? 0) > 0
+  const sousLaLampe = lumieres.length > 0 || (essai?.lampe ?? 0) > 0 || !!astre
 
   /**
    * Les ronds qui ont une couleur à dire.
@@ -1730,14 +2514,17 @@ export function CalqueMurs({
        repart donc du même filtre pour que les rangs se correspondent, et on
        écarte le blanc ensuite. Filtrer avant décalerait tout d'un cran. */
     const allumees = lumieres.filter((l) => l.allumee)
-    return allumees
-      .map((l, i) => ({ teinte: l.teinte, rond: eclairages[i] }))
-      .filter(
-        (t): t is { teinte: string; rond: Pt[] } =>
-          !!t.rond && t.teinte !== '#ffffff' && t.teinte !== '#fff'
-      )
+    const lampes = allumees.map((l, i) => ({ teinte: l.teinte, rond: eclairages[i]?.pts }))
+    /* La lampe que porte le pion d'essai : une flamme, jaune. Elle vient
+       juste après les lampes du plan dans `eclairages`. */
+    if (essai && essai.lampe > 0)
+      lampes.push({ teinte: TEINTE_TORCHE, rond: eclairages[allumees.length]?.pts })
+    return lampes.filter(
+      (t): t is { teinte: string; rond: Pt[] } =>
+        !!t.rond && t.rond.length > 2 && t.teinte !== '#ffffff' && t.teinte !== '#fff'
+    )
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [lumieres, eclairages])
+  }, [lumieres, eclairages, essai?.lampe])
 
   /* Les pièces qu'une porte ouverte découvre : elles ne dépendent que des
      murs, pas de l'endroit où se tient le pion. */
@@ -1751,9 +2538,9 @@ export function CalqueMurs({
   )
 
   useEffect(() => {
-    if (!essai || !carreaux || !vision) return
+    if (!essai || !carreaux || !vision || !loin) return
     const cle = `${carreaux.cols}x${carreaux.rows}`
-    const neuf = casesVues(vision, carreaux)
+    const neuf = casesVues(loin, carreaux)
     /* On ne retient que ce qu'on a pu voir : le regard, croisé avec la
        lumière. Ce qu'on traverse dans le noir ne s'apprend pas. */
     if (sousLaLampe) {
@@ -1769,14 +2556,31 @@ export function CalqueMurs({
        * mémoire : il ne reste que ce qu'on a sous les pieds.
        */
       const eclairees = new Set<number>()
-      for (const rond of eclairages) for (const c of casesVues(rond, carreaux)) eclairees.add(c)
+      for (const rond of eclairages) for (const c of casesVues(rond.pts, carreaux)) eclairees.add(c)
+      if (dehors) {
+        /* Dehors, tout est éclairé ; dedans, ce que l'astre fait entrer. */
+        const dansLesPieces = new Set<number>()
+        for (const p of dehors.pieces) for (const c of casesVues(p, carreaux)) dansLesPieces.add(c)
+        for (let c = 0; c < carreaux.cols * carreaux.rows; c++)
+          if (!dansLesPieces.has(c)) eclairees.add(c)
+        for (const c of casesVues(dehors.dedans, carreaux)) eclairees.add(c)
+      }
       if (lumGarde) {
         for (const c of [...neuf]) if (!eclairees.has(c)) neuf.delete(c)
         if (parLesPortes) for (const c of parLesPortes) if (eclairees.has(c)) neuf.add(c)
+        /* Ce qu'il distingue sans lumière, jusqu'à sa portée. */
+        if (proche) for (const c of casesVues(proche, carreaux)) neuf.add(c)
       } else {
         neuf.clear()
       }
-    } else if (parLesPortes) for (const c of parLesPortes) neuf.add(c)
+    } else if (lumGarde) {
+      if (parLesPortes) for (const c of parLesPortes) neuf.add(c)
+    } else {
+      /* Sans lampe, tout est éclairé — et la case décide encore : décochée,
+         ce qu'on ne regarde plus retombe au noir. Le test retenait tout,
+         case ou pas, alors que les joueurs, eux, ne retenaient rien. */
+      neuf.clear()
+    }
     /*
      * Ce qu'on a sous les pieds.
      *
@@ -1786,7 +2590,7 @@ export function CalqueMurs({
      * traînée de cases connues, un chemin de mie de pain dans une maison
      * qu'on voulait noire.
      */
-    if (!sousLaLampe || lumGarde)
+    if (lumGarde)
       for (const c of casesAutour({ x: essai.x * w, y: essai.y * h }, carreaux.taille * 2, carreaux))
         neuf.add(c)
     setConnu((cur) => {
@@ -1804,7 +2608,9 @@ export function CalqueMurs({
     essai?.cap,
     essai?.ouverture,
     essai?.reprise,
+    regardPortee,
     eclairages,
+    dehors,
     lumGarde,
     parLesPortes,
     carreaux,
@@ -1844,10 +2650,28 @@ export function CalqueMurs({
 
   const surPointerDown = (e: React.PointerEvent): void => {
     if (e.button === 2) return
-    /* Le cadre qui nous porte recadre l'image au glisser : tant qu'on trace,
-       il ne doit pas voir passer le geste. */
-    e.stopPropagation()
     const p = position(e)
+    /* Le cadre qui nous porte recadre l'image au glisser : tant qu'on trace,
+       il ne doit pas voir passer le geste. En Sélection, un clic dans le vide
+       — ni lampe, ni ouverture, ni sommet, ni trait — lui revient : on
+       déplace le plan zoomé comme partout ailleurs. */
+    fond.current =
+      edition &&
+      !attenteDepart &&
+      !pourPiece &&
+      (!outil || outil === 'selection') &&
+      !e.shiftKey &&
+      !e.altKey &&
+      !lumiereSous(p) &&
+      !ouvertureSous(p) &&
+      !murs.some((m) =>
+        m.pts.some((q) => {
+          const r = enPx(q)
+          return Math.hypot(p.x - r.x, p.y - r.y) < (m.id === choisi ? 13 : 9)
+        })
+      ) &&
+      !murSous(murs, p, enPx, 12)
+    if (!fond.current) e.stopPropagation()
 
     /* On attend le départ : ce clic-là ne fait rien d'autre que le poser. */
     if (attenteDepart) {
@@ -1940,6 +2764,9 @@ export function CalqueMurs({
     if (ouv) {
       onOuvChoisie?.(ouv.id)
       onChoisir?.(null)
+      prise.current = { quoi: 'ouv', id: ouv.id, i: 0 }
+      setOuvGlissee({ id: ouv.id, d: ouv.d, murId: ouv.murId })
+      e.currentTarget.setPointerCapture(e.pointerId)
       return
     }
     /* Puis un sommet — celui du trait déjà choisi d'abord, puis n'importe
@@ -2060,7 +2887,8 @@ export function CalqueMurs({
   }
 
   const surPointerMove = (e: React.PointerEvent): void => {
-    e.stopPropagation()
+    /* Un glisser parti du vide en Sélection appartient au cadre. */
+    if (!(fond.current && e.buttons)) e.stopPropagation()
     const p = position(e)
     setSurvol(p)
     const t = prise.current
@@ -2085,6 +2913,28 @@ export function CalqueMurs({
     }
     if (t?.quoi === 'lum') {
       setLumGlissee({ id: t.id, x: Math.max(0, Math.min(w, p.x)), y: Math.max(0, Math.min(h, p.y)) })
+      return
+    }
+    if (t?.quoi === 'ouv') {
+      /* Elle reste sur son mur — celui où elle est en ce moment —, sauf si le
+         curseur vient tout près d'un autre : elle y passe, comme à la pose. Loin
+         de tout mur, elle suit le sien sans le quitter. */
+      const o = ouvertures.find((x) => x.id === t.id)
+      if (!o) return
+      const actuel = ouvGlissee?.id === t.id ? ouvGlissee.murId : o.murId
+      const proche = accrocherAuMur(murs, enFrac(p), PORTEE_OUVERTURE)
+      const murId = proche ? proche.murId : actuel
+      const mur = murs.find((x) => x.id === murId)
+      if (!mur) return
+      const sur =
+        proche && proche.murId === murId
+          ? proche
+          : accrocherAuMur([{ ...mur, nature: 'mur' }], enFrac(p), Infinity)
+      if (!sur) return
+      /* Elle ne déborde pas du mur : son milieu reste à une demi-largeur des bouts. */
+      const L = longueurDuMur(mur.pts)
+      const demi = L > 0 ? Math.min(0.5, o.largeur / L / 2) : 0
+      setOuvGlissee({ id: t.id, murId, d: Math.min(1 - demi, Math.max(demi, sur.d)) })
       return
     }
     if (t?.quoi === 'trait' && apercu && t.de) {
@@ -2117,6 +2967,7 @@ export function CalqueMurs({
   }
 
   const surPointerUp = (e: React.PointerEvent): void => {
+    fond.current = false
     const t = prise.current
     prise.current = null
     if (ronds) {
@@ -2135,6 +2986,19 @@ export function CalqueMurs({
       e.currentTarget.releasePointerCapture?.(e.pointerId)
       if (lumGlissee) onReglerLumiere?.(t.id, { x: lumGlissee.x / w, y: lumGlissee.y / h })
       setLumGlissee(null)
+      return
+    }
+    if (t?.quoi === 'ouv') {
+      e.currentTarget.releasePointerCapture?.(e.pointerId)
+      const avant = ouvertures.find((x) => x.id === t.id)
+      /* Un simple clic la choisit sans rien écrire. */
+      if (
+        ouvGlissee &&
+        avant &&
+        (ouvGlissee.murId !== avant.murId || Math.abs(ouvGlissee.d - avant.d) > 0.0005)
+      )
+        onDeplacerOuverture?.(t.id, ouvGlissee.d, ouvGlissee.murId)
+      setOuvGlissee(null)
       return
     }
     if (t?.quoi === 'poignee' || t?.quoi === 'trait') {
@@ -2391,7 +3255,10 @@ export function CalqueMurs({
    * alors même qu'on passe par là.
    */
   const ouverturesSvg = (): JSX.Element[] =>
-    ouvertures.map((o) => {
+    ouvertures.map((tenue) => {
+      /* Celle qu'on glisse se dessine où la main la tient. */
+      const o =
+        ouvGlissee?.id === tenue.id ? { ...tenue, d: ouvGlissee.d, murId: ouvGlissee.murId } : tenue
       const mur = murs.find((x) => x.id === o.murId)
       if (!mur) return <g key={o.id} />
       const b = bordsOuverture(mur, o)
@@ -2402,7 +3269,9 @@ export function CalqueMurs({
          l'on veut lire d'un coup d'œil par où le pion passe. En tracé, elle se
          montre **toujours fermée** — sans quoi on ne voit plus où elle est au
          moment même où l'on travaille dessus. Son état, lui, ne change pas. */
-      const franchie = ouverte && !!essai
+      /* Pendant un aperçu de lumière, elle se montre telle qu'elle est : une
+         porte ouverte laisse passer le jour, il faut qu'on la voie ouverte. */
+      const franchie = ouverte && (!!essai || ombreEtLumiere)
       const milieu = { x: (a.x + z.x) / 2, y: (a.y + z.y) / 2 }
       return (
         <g
@@ -2453,11 +3322,30 @@ export function CalqueMurs({
              quelle que soit la couleur qu'on lui a donnée. */
           style={l.allumee ? ({ '--lum': l.teinte } as React.CSSProperties) : undefined}
         >
-          {edition && !essai ? (
-            <>
-              <circle cx={c.x} cy={c.y} r={l.penombre * w} className="penombre" />
-              <circle cx={c.x} cy={c.y} r={l.clair * w} className="clair" />
-            </>
+          {/* Pendant « Test lumière », pas de pointillés : on regarde la lueur,
+              pas ses réglages. */}
+          {edition && !essai && !plein ? (
+            l.ouverture < 360 ? (
+              /* Directive : ses deux rayons en part de gâteau. */
+              <>
+                <path d={secteur(c, l.penombre * w, l.cap, l.ouverture)} className="penombre" />
+                <path d={secteur(c, l.clair * w, l.cap, l.ouverture)} className="clair" />
+              </>
+            ) : (
+              <>
+                <circle cx={c.x} cy={c.y} r={l.penombre * w} className="penombre" />
+                <circle cx={c.x} cy={c.y} r={l.clair * w} className="clair" />
+              </>
+            )
+          ) : null}
+          {/* Le nez du faisceau : où elle pointe, même sans ses rayons. */}
+          {l.ouverture < 360 ? (
+            <path
+              className="faisceau"
+              d={`M${c.x} ${c.y}L${c.x + Math.sin((l.cap * Math.PI) / 180) * 17} ${
+                c.y - Math.cos((l.cap * Math.PI) / 180) * 17
+              }`}
+            />
           ) : null}
           <circle cx={c.x} cy={c.y} r={9} className="pastille" data-lum={l.id} />
           <path
@@ -2468,15 +3356,75 @@ export function CalqueMurs({
           />
           <circle cx={c.x} cy={c.y} r={3.4} className="meche" />
           <title>
-            {l.allumee
+            {(l.allumee
               ? `Lumière allumée — clair ${(l.clair * 100).toFixed(0)} %, pénombre ${(
                   l.penombre * 100
                 ).toFixed(0)} %`
-              : 'Lumière éteinte'}
+              : 'Lumière éteinte') +
+              (l.ouverture < 360
+                ? ` · faisceau de ${l.ouverture}°, cap ${Math.round(l.cap)}° — molette pour l’orienter`
+                : '')}
           </title>
         </g>
       )
     })
+
+  /**
+   * D'où vient la lumière du dehors : un soleil ou une lune au bord du plan,
+   * et une flèche vers l'intérieur. Pour le MJ seul, en tracé.
+   */
+  /** Le point du bord du plan dans une direction, rentré d'une marge. */
+  const auBord = (deg: number): { c: { x: number; y: number }; dx: number; dy: number } => {
+    const a = (deg * Math.PI) / 180
+    const dx = Math.sin(a)
+    const dy = -Math.cos(a)
+    const k = Math.min(
+      Math.abs(dx) > 1e-6 ? (w / 2 - 22) / Math.abs(dx) : Infinity,
+      Math.abs(dy) > 1e-6 ? (h / 2 - 22) / Math.abs(dy) : Infinity
+    )
+    return { c: { x: w / 2 + dx * k, y: h / 2 + dy * k }, dx, dy }
+  }
+
+  /* Le nord du plan, au bord : c'est lui qui tourne le soleil sur cette carte. */
+  const nordSvg = (): JSX.Element | null => {
+    if (!edition || w <= 0 || h <= 0) return null
+    const { c, dx, dy } = auBord(nord)
+    /* Une pointe tournée vers le bord : le nord est par là. */
+    const px = -dy
+    const py = dx
+    return (
+      <g className="nord-repere" pointerEvents="none">
+        <path
+          d={`M${c.x + dx * 13} ${c.y + dy * 13}L${c.x + px * 5} ${c.y + py * 5}L${c.x - px * 5} ${c.y - py * 5}Z`}
+          className="pointe"
+        />
+        <circle cx={c.x} cy={c.y} r={9} className="disque" />
+        <text x={c.x} y={c.y} className="signe">
+          N
+        </text>
+        <title>Le nord de ce plan — réglé dans « La lumière du dehors »</title>
+      </g>
+    )
+  }
+
+  const astreSvg = (): JSX.Element | null => {
+    if (!astre || !edition || w <= 0 || h <= 0) return null
+    const { c, dx, dy } = auBord(astre.cap)
+    const bout = { x: c.x - dx * 46, y: c.y - dy * 46 }
+    return (
+      <g className={`astre-repere ${astre.nature}`} pointerEvents="none">
+        <path d={`M${c.x - dx * 15} ${c.y - dy * 15}L${bout.x} ${bout.y}`} className="fleche" />
+        <circle cx={bout.x} cy={bout.y} r={3} className="pointe" />
+        <circle cx={c.x} cy={c.y} r={12} className="disque" />
+        <text x={c.x} y={c.y} className="signe">
+          {astre.nature === 'soleil' ? '☀' : '☾'}
+        </text>
+        <title>
+          {astre.nature === 'soleil' ? 'Le soleil' : 'La lune'} — sa lumière vient d’ici
+        </title>
+      </g>
+    )
+  }
 
   /** Les pièces que les murs referment, et le nom de celles qui en ont un. */
   const formesSvg = (): JSX.Element[] =>
@@ -2554,12 +3502,17 @@ export function CalqueMurs({
         if (outil === 'selection' && !pourPiece && ajouterSommet(position(e))) e.preventDefault()
       }}
       onContextMenu={(e) => {
-        if (!edition || !encours) return
+        if (!edition) return
+        /* Le clic droit renonce, comme Échap — et n'ouvre pas de menu. */
         e.preventDefault()
-        finirTrace()
+        renoncer()
       }}
     >
       <svg width={w} height={h} viewBox={`0 0 ${Math.max(1, w)} ${Math.max(1, h)}`}>
+        {/* Le flou des bords : celui du regard, et celui des lampes. */}
+        <defs>
+          <FlouRegard id={flou} w={w} h={h} />
+        </defs>
         {/* Ce que le pion d'essai voit. On ne peint pas la lumière : on retire
             l'ombre de ce qu'il voit, et le reste de la carte reste dans le noir. */}
         {vision && vision.length > 2 ? (
@@ -2568,23 +3521,36 @@ export function CalqueMurs({
               {/* Le masque de la lumière : blanc là où la lueur porte. Tout ce
                   qu'on veut croiser avec elle se peint à travers lui. */}
               <mask id={`lum-${masque}`}>
-                {eclairages.map((rond, i) => (
-                  <polygon key={i} points={polygone(rond)} fill="#fff" />
-                ))}
+                <DegradesLueurs lueurs={eclairages} id={`g-${masque}`} />
+                {/* Le même flou que le regard : une lueur arrêtée par un mur,
+                    ou le bord d'un faisceau, ne fait pas un trait net. */}
+                <g filter={`url(#${flou})`}>
+                  {eclairages.map((rond, i) => (
+                    <polygon
+                      key={i}
+                      points={polygone(rond.pts)}
+                      fill={`url(#g-${masque}-${i})`}
+                      style={MELANGE_LUMIERE}
+                    />
+                  ))}
+                  {dehors ? <LumiereDuDehors dehors={dehors} w={w} h={h} /> : null}
+                </g>
               </mask>
+              {fondu ? (
+                <DegradesDuRegard id={fondu.id} c={fondu.c} r={fondu.r} couches={couches.proche} />
+              ) : null}
               {/* Le regard seul : il sert à ne teinter que ce que le pion voit. */}
               <mask id={`regard-${masque}`}>
-                <polygon points={polygone(vision)} fill="#fff" />
+                <polygon points={polygone(loin!)} fill="#fff" />
               </mask>
               <mask id={`vu-${masque}`}>
                 <rect x="0" y="0" width={w} height={h} fill="#fff" />
+                {/* Vu = regard ∩ lumière : on retire l'ombre là où les deux se
+                    superposent — et, jusqu'à la portée, partout où il regarde.
+                    Ses bords, à moitié. */}
+                {regardDansLOmbre()}
                 {sousLaLampe ? (
                   <>
-                    {/* Vu = regard ∩ lumière : on retire l'ombre là où les
-                        deux se superposent, et nulle part ailleurs. */}
-                    <g mask={`url(#lum-${masque})`}>
-                      <polygon points={polygone(vision)} fill="#000" />
-                    </g>
                     {/* Ce qu'on a au bout des bras, lampe ou pas. */}
                     <circle
                       cx={essai!.x * w}
@@ -2593,9 +3559,7 @@ export function CalqueMurs({
                       fill="#000"
                     />
                   </>
-                ) : (
-                  <polygon points={polygone(vision)} fill="#000" />
-                )}
+                ) : null}
               </mask>
             </defs>
             <rect
@@ -2613,13 +3577,7 @@ export function CalqueMurs({
                 <defs>
                   <mask id={`noir-${masque}`}>
                     <path d={inconnu} fill="#fff" />
-                    {sousLaLampe ? (
-                      <g mask={`url(#lum-${masque})`}>
-                        <polygon points={polygone(vision)} fill="#000" />
-                      </g>
-                    ) : (
-                      <polygon points={polygone(vision)} fill="#000" />
-                    )}
+                    {regardDansLOmbre()}
                   </mask>
                 </defs>
                 <rect
@@ -2635,7 +3593,7 @@ export function CalqueMurs({
             {/* La couleur des lampes, mais seulement là où le pion voit :
                 une lueur orange dans son dos ne le concerne pas. */}
             {sousLaLampe ? (
-              <g mask={`url(#regard-${masque})`}>
+              <g mask={`url(#regard-${masque})`} filter={`url(#${flou})`}>
                 {teintes.map((t, i) => (
                   <polygon
                     key={`t${i}`}
@@ -2647,26 +3605,47 @@ export function CalqueMurs({
               </g>
             ) : null}
             {sousLaLampe ? (
-              <g mask={`url(#lum-${masque})`}>
-                <polygon points={polygone(vision)} className="murs-vu" />
+              /* Un seul voile pour les deux : là où ils se recouvrent, il ne
+                 doit pas se voir deux fois plus. */
+              /* Le même flou que le regard : son bord ne doit pas faire un
+                 trait net par-dessus l'ombre adoucie. */
+              <g className="murs-vu" filter={`url(#${flou})`}>
+                <g mask={`url(#lum-${masque})`}>
+                  <polygon points={polygone(loin!)} />
+                </g>
+                {proche ? <polygon points={polygone(proche)} /> : null}
               </g>
             ) : (
-              <polygon points={polygone(vision)} className="murs-vu" />
+              <g className="murs-vu" filter={`url(#${flou})`}>
+                <polygon points={polygone(vision)} />
+              </g>
             )}
           </>
         ) : null}
 
         {lumieresSvg()}
+        {nordSvg()}
+        {astreSvg()}
         {/* Ombre et lumière, sans personne au milieu : on ne montre pas un
             champ de vision, on montre ce que les lampes touchent. */}
-        {ombreEtLumiere && lumieres.length ? (
+        {ombreEtLumiere && (lumieres.length || dehors) ? (
           <>
             <defs>
               <mask id={`seul-${masque}`}>
                 <rect x="0" y="0" width={w} height={h} fill="#fff" />
-                {eclairages.map((rond, i) => (
-                  <polygon key={i} points={polygone(rond)} fill="#000" />
-                ))}
+                {/* L'ombre recule en plein jour, revient à moitié en pénombre. */}
+                <DegradesLueurs lueurs={eclairages} id={`go-${masque}`} ombre />
+                <g filter={`url(#${flou})`}>
+                  {eclairages.map((rond, i) => (
+                    <polygon
+                      key={i}
+                      points={polygone(rond.pts)}
+                      fill={`url(#go-${masque}-${i})`}
+                      style={MELANGE_OMBRE}
+                    />
+                  ))}
+                  {dehors ? <LumiereDuDehors dehors={dehors} w={w} h={h} ombre /> : null}
+                </g>
               </mask>
             </defs>
             <rect
@@ -2674,22 +3653,27 @@ export function CalqueMurs({
               y="0"
               width={w}
               height={h}
-              className="murs-ombre ombre-seule"
+              className={`murs-ombre ombre-seule${plein ? ' ombre-test' : ''}`}
               mask={`url(#seul-${masque})`}
             />
             {/* La couleur de chaque lampe, posée sur ce qu'elle touche. */}
-            {teintes.map((t, i) => (
-              <polygon
-                key={`t${i}`}
-                points={polygone(t.rond)}
-                className="lueur-teinte"
-                fill={t.teinte}
-              />
-            ))}
-            {/* Le bord de chaque lueur : on voit jusqu'où elle porte. */}
-            {eclairages.map((rond, i) => (
-              <polygon key={i} points={polygone(rond)} className="lueur-bord" />
-            ))}
+            <g filter={`url(#${flou})`}>
+              {teintes.map((t, i) => (
+                <polygon
+                  key={`t${i}`}
+                  points={polygone(t.rond)}
+                  className="lueur-teinte"
+                  fill={t.teinte}
+                />
+              ))}
+            </g>
+            {/* Le bord de chaque lueur : on voit jusqu'où elle porte. Pas
+                pendant le test, qui montre la carte comme les joueurs. */}
+            {plein
+              ? null
+              : eclairages.map((rond, i) => (
+                  <polygon key={i} points={polygone(rond.pts)} className="lueur-bord" />
+                ))}
           </>
         ) : null}
 
@@ -2734,7 +3718,7 @@ export function CalqueMurs({
           </g>
         ) : null}
 
-        {essai ? <PionEssai essai={essai} w={w} h={h} /> : null}
+        {essai ? <PionEssai essai={essai} w={w} h={h} pourcent={pionPourcent} /> : null}
 
         {/* La loupe, en dernier : elle passe par-dessus tout le reste. */}
         {loupeVisible && vise ? (
@@ -2785,20 +3769,36 @@ export function CalqueMurs({
   )
 }
 
-/** Le pion d'essai : un jeton, et un nez qui dit où il regarde. */
-function PionEssai({ essai, w, h }: { essai: EssaiPion; w: number; h: number }): JSX.Element {
+/**
+ * Le pion d'essai : un jeton, et un nez qui dit où il regarde. Il a la taille
+ * des pions de ce lieu (1,5 m à l'échelle) ; trop petit pour son mot, il se tait.
+ */
+function PionEssai({
+  essai,
+  w,
+  h,
+  pourcent
+}: {
+  essai: EssaiPion
+  w: number
+  h: number
+  pourcent?: number
+}): JSX.Element {
   const x = essai.x * w
   const y = essai.y * h
+  const r = pourcent ? Math.max(4, (pourcent / 100) * w * 0.5) : 18
   const a = ((essai.cap - 90) * Math.PI) / 180
-  const bout = (r: number, d: number): string =>
-    `${(x + Math.cos(a + d) * r).toFixed(1)},${(y + Math.sin(a + d) * r).toFixed(1)}`
+  const bout = (d: number, ang: number): string =>
+    `${(x + Math.cos(a + ang) * d).toFixed(1)},${(y + Math.sin(a + ang) * d).toFixed(1)}`
   return (
     <g className="pion-essai">
-      <polygon points={`${bout(28, 0)} ${bout(17, 0.46)} ${bout(17, -0.46)}`} className="nez" />
-      <circle cx={x} cy={y} r={18} className="jeton" />
-      <text x={x} y={y + 4} textAnchor="middle" className="ini">
-        essai
-      </text>
+      <polygon points={`${bout(r * 1.55, 0)} ${bout(r * 0.95, 0.46)} ${bout(r * 0.95, -0.46)}`} className="nez" />
+      <circle cx={x} cy={y} r={r} className="jeton" style={{ strokeWidth: Math.min(3.5, r * 0.22) }} />
+      {r >= 14 ? (
+        <text x={x} y={y + 4} textAnchor="middle" className="ini">
+          essai
+        </text>
+      ) : null}
     </g>
   )
 }
@@ -2811,7 +3811,9 @@ export function VoletMurs({
   m,
   nomDeForme,
   onNommer,
-  onEffacerPiece
+  onEffacerPiece,
+  pieceUnique = false,
+  onPieceUnique
 }: {
   m: ReturnType<typeof useMurs>
   /** Le nom du lieu qui occupe cette forme, s'il en a un. */
@@ -2820,12 +3822,13 @@ export function VoletMurs({
   onNommer?: (f: Forme, nom: string) => void
   /** Effacer le lieu qui occupe cette forme — le contour, lui, reste aux murs. */
   onEffacerPiece?: (f: Forme) => void
+  /** Le lieu n'est qu'une pièce : ce que les murs referment, c'est lui. */
+  pieceUnique?: boolean
+  /** Choisir entre une pièce unique et un plan à découper — absent, pas de choix. */
+  onPieceUnique?: (unique: boolean) => void
 }): JSX.Element {
   const [renomme, setRenomme] = useState<number | null>(null)
   const compte = (n: NatureMur): number => m.liste.filter((x) => x.nature === n).length
-  const trait = m.liste.find((x) => x.id === m.choisi) ?? null
-  const ouv = m.ouvertures.find((x) => x.id === m.ouvChoisie) ?? null
-  const lampe = m.lumieres.find((x) => x.id === m.lumChoisie) ?? null
   const allumees = m.lumieres.filter((l) => l.allumee).length
   const essai = m.essai
   const portes = m.ouvertures.filter((x) => x.nature === 'porte')
@@ -2938,7 +3941,17 @@ export function VoletMurs({
                     m.setEssai({ ...essai, lampe: Number(e.target.value) / 100 })
                   }
                 />
-                <b className="num">{(essai.lampe * 100).toFixed(1)} %</b>
+                <Valeur
+                  className="num"
+                  value={essai.lampe * 100}
+                  min={3}
+                  max={60}
+                  step={0.5}
+                  decimales={1}
+                  unite=" %"
+                  label="Portée de sa lampe"
+                  onChange={(v) => m.setEssai({ ...essai, lampe: v / 100 })}
+                />
               </label>
             ) : null}
           </div>
@@ -2978,114 +3991,45 @@ export function VoletMurs({
         </>
       ) : (
         <>
-          {/* Ce qu'on vient de choisir passe devant : une lampe cliquée sur la
-              carte doit ouvrir ses réglages sous les yeux, pas trois écrans
-              plus bas. Le reste du volet ne bouge pas. */}
-          {lampe ? (
-            <div className="fl-bloc">
-              <span className="eyebrow">Lumière</span>
-              <p className="texte">
-                Elle éclaire tout autour, jusqu'à ce qu'un mur l'arrête. Les joueurs ne découvrent
-                que ce qui tombe à la fois dans leur regard et dans sa lueur.
-              </p>
-              <label className="murs-reglage">
-                <span>Clair</span>
-                <input
-                  type="range"
-                  min={1}
-                  max={60}
-                  step={0.5}
-                  value={Math.round(lampe.clair * 1000) / 10}
-                  onChange={(e) =>
-                    void m.reglerLumiere(lampe.id, { clair: Number(e.target.value) / 100 })
-                  }
-                />
-                <b className="num">{(lampe.clair * 100).toFixed(1)} %</b>
-              </label>
-              <label className="murs-reglage">
-                <span>Pénombre</span>
-                <input
-                  type="range"
-                  min={1}
-                  max={80}
-                  step={0.5}
-                  value={Math.round(lampe.penombre * 1000) / 10}
-                  onChange={(e) =>
-                    void m.reglerLumiere(lampe.id, { penombre: Number(e.target.value) / 100 })
-                  }
-                />
-                <b className="num">{(lampe.penombre * 100).toFixed(1)} %</b>
-              </label>
-              <div className="murs-teintes">
-                {TEINTES_LUMIERE.map((t) => (
-                  <button
-                    key={t.cle}
-                    className={`lteinte${lampe.teinte === t.cle ? ' on' : ''}`}
-                    style={{ ['--t' as string]: t.cle } as React.CSSProperties}
-                    aria-pressed={lampe.teinte === t.cle}
-                    title={`${t.label} — la couleur ne change rien à ce qui est vu`}
-                    onClick={() => void m.reglerLumiere(lampe.id, { teinte: t.cle })}
-                  >
-                    <i />
-                    {t.label}
-                  </button>
-                ))}
-                <label
-                  className={`lteinte libre${
-                    TEINTES_LUMIERE.some((t) => t.cle === lampe.teinte) ? '' : ' on'
-                  }`}
-                  style={{ ['--t' as string]: lampe.teinte } as React.CSSProperties}
-                  title="Une couleur à toi"
-                >
-                  <i />
-                  La tienne
-                  <input
-                    type="color"
-                    value={lampe.teinte}
-                    onChange={(e) => void m.reglerLumiere(lampe.id, { teinte: e.target.value })}
-                  />
-                </label>
-              </div>
-              <div className="murs-rangee">
-                <button
-                  className={`btn btn-sm${lampe.allumee ? ' btn-on' : ''}`}
-                  aria-pressed={lampe.allumee}
-                  title="On souffle une bougie en pleine partie : la pièce retombe dans le noir"
-                  onClick={() => void m.reglerLumiere(lampe.id, { allumee: !lampe.allumee })}
-                >
-                  <IconSoleil />
-                  {lampe.allumee ? 'Allumée' : 'Éteinte'}
-                </button>
-                <button
-                  className="btn btn-sm"
-                  title="Poser la même lampe à côté — mêmes rayons, même état"
-                  onClick={() => void m.dupliquerLumiere(lampe.id)}
-                >
-                  <IconPlus />
-                  Dupliquer
-                </button>
-                <button
-                  className="btn btn-sm btn-ghost btn-danger"
-                  title="Retirer cette lumière"
-                  onClick={() => void m.oterLumiere(lampe.id)}
-                >
-                  <IconTrash />
-                  Retirer
-                </button>
-              </div>
-              <p className="aide" style={{ wordBreak: 'normal' }}>
-                Glisse la pastille pour la déplacer · <b>Suppr</b> l'efface · la copie se pose à
-                côté, déjà choisie.
-              </p>
-            </div>
-          ) : null}
-
           {/* Les pièces ensuite : c'est ce qu'on vient chercher en traçant. */}
           <div className="fl-bloc">
             <span className="eyebrow">
-              Pièces · {m.formes.length}
+              {pieceUnique ? 'Pièce unique' : `Pièces · ${m.formes.length}`}
             </span>
-            {m.formes.length ? (
+            {onPieceUnique ? (
+              <div className="murs-unique" role="radiogroup" aria-label="Ce que referment les murs">
+                <label
+                  className="coche murs-coche"
+                  title="Les murs referment ce lieu lui-même : la pièce, c’est le lieu"
+                >
+                  <input
+                    type="radio"
+                    name="piece-unique"
+                    checked={pieceUnique}
+                    onChange={() => onPieceUnique(true)}
+                  />
+                  <span>Pièce unique</span>
+                </label>
+                <label
+                  className="coche murs-coche"
+                  title="Chaque contour fermé devient un lieu à nommer, et ce lieu devient leur étage"
+                >
+                  <input
+                    type="radio"
+                    name="piece-unique"
+                    checked={!pieceUnique}
+                    onChange={() => onPieceUnique(false)}
+                  />
+                  <span>Plusieurs pièces</span>
+                </label>
+              </div>
+            ) : null}
+            {pieceUnique ? (
+              <p className="texte">
+                La pièce, c’est le lieu : ses murs le referment, ils ne proposent pas d’autres
+                lieux à nommer.
+              </p>
+            ) : m.formes.length ? (
               <div className="murs-pieces">
                 {m.formes.map((f, i) => {
                   const nom = nomDeForme?.(f) ?? null
@@ -3106,6 +4050,13 @@ export function VoletMurs({
                           valeur={nom ?? ''}
                           onNommer={onNommer}
                           onFini={() => setRenomme(null)}
+                          /* On nomme ce qu'on voit : la pièce se colorie sur
+                             le plan tant que le champ a la main. */
+                          onVise={(oui) =>
+                            oui
+                              ? m.setFormeVisee(i)
+                              : m.setFormeVisee(m.formeVisee === i ? null : m.formeVisee)
+                          }
                         />
                         </>
                       ) : (
@@ -3147,17 +4098,22 @@ export function VoletMurs({
             </p>
             <GardeEclairee m={m} />
             <PorteeDuRegard m={m} />
-            <div className="murs-cle">
-              <span className="cl piece-nommee">
-                <i />
-                une pièce : un lieu de cet étage, avec sa fiche
-              </span>
-              <span className="cl piece-anonyme">
-                <i />
-                un contour que tes murs referment — nomme-le et il devient une pièce
-              </span>
-            </div>
-            <p className="texte">Clique une ligne : la pièce se colorie sur le plan.</p>
+            <LumiereDuDehorsReglage m={m} />
+            {pieceUnique ? null : (
+              <div className="murs-cle">
+                <span className="cl piece-nommee">
+                  <i />
+                  une pièce : un lieu de cet étage, avec sa fiche
+                </span>
+                <span className="cl piece-anonyme">
+                  <i />
+                  un contour que tes murs referment — nomme-le et il devient une pièce
+                </span>
+              </div>
+            )}
+            {pieceUnique ? null : (
+              <p className="texte">Clique une ligne : la pièce se colorie sur le plan.</p>
+            )}
           </div>
 
           <div className="fl-bloc">
@@ -3201,129 +4157,6 @@ export function VoletMurs({
               </div>
             </div>
           ) : null}
-
-          {ouv ? (
-            <div className="fl-bloc">
-              <span className="eyebrow">{OUVERTURE_NATURES[ouv.nature].label}</span>
-              <p className="texte">
-                Posée sur un mur : elle en prend la direction, tu n'as pas à l'aligner.
-              </p>
-              <label className="murs-reglage">
-                <span>Largeur</span>
-                <input
-                  type="range"
-                  min={1}
-                  max={30}
-                  step={0.5}
-                  value={Math.round(ouv.largeur * 1000) / 10}
-                  onChange={(e) =>
-                    void m.reglerOuverture(ouv.id, { largeur: Number(e.target.value) / 100 })
-                  }
-                />
-                <b className="num">{(ouv.largeur * 100).toFixed(1)} %</b>
-              </label>
-              <LargeurDefaut m={m} largeur={ouv.largeur} />
-              <label className="murs-reglage">
-                <span>Place sur le mur</span>
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  step={0.5}
-                  value={Math.round(ouv.d * 1000) / 10}
-                  onChange={(e) =>
-                    void m.reglerOuverture(ouv.id, { d: Number(e.target.value) / 100 })
-                  }
-                />
-                <b className="num">{Math.round(ouv.d * 100)} %</b>
-              </label>
-              {ouv.nature === 'porte' ? (
-                <div className="murs-rangee">
-                  <button
-                    className="btn btn-sm"
-                    aria-pressed={ouv.ouverte}
-                    disabled={ouv.verrouillee}
-                    title={
-                      ouv.verrouillee
-                        ? 'Déverrouille-la d’abord : une porte à clé ne s’ouvre pas'
-                        : 'Ouvrir ou refermer cette porte'
-                    }
-                    onClick={() => void m.basculerPorte(ouv.id)}
-                  >
-                    {ouv.ouverte ? 'Ouverte' : 'Fermée'}
-                  </button>
-                  <button
-                    className="btn btn-sm"
-                    aria-pressed={ouv.verrouillee}
-                    title="Les joueurs ne l’ouvrent pas ; toi seul l’accordes"
-                    onClick={() => void m.verrouiller(ouv.id, !ouv.verrouillee)}
-                  >
-                    <IconVerrou />
-                    Verrouillée
-                  </button>
-                </div>
-              ) : null}
-              <div className="murs-rangee">
-                <button
-                  className="btn btn-sm btn-danger"
-                  onClick={() => void m.oterOuverture(ouv.id)}
-                >
-                  <IconTrash />
-                  Ôter cette ouverture
-                </button>
-              </div>
-            </div>
-          ) : (
-            <div className="fl-bloc">
-              <span className="eyebrow">Le trait choisi</span>
-              {trait ? (
-                <>
-                  <p className="texte">
-                    {MUR_NATURES[trait.nature].label} — {trait.pts.length} points,{' '}
-                    {trait.pts.length - 1} segment{trait.pts.length > 2 ? 's' : ''},{' '}
-                    {m.ouvertures.filter((o) => o.murId === trait.id).length} ouverture(s) dessus.
-                  </p>
-                  <div className="murs-rangee">
-                    {(Object.keys(MUR_NATURES) as NatureMur[]).map((n) => (
-                      <button
-                        key={n}
-                        className={`murs-nat n-${n}`}
-                        aria-pressed={trait.nature === n}
-                        onClick={() => void m.changerNature(trait.id, n)}
-                      >
-                        <i />
-                        {MUR_NATURES[n].label}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="murs-rangee">
-                    <button
-                      className={`btn btn-sm${m.joindre ? ' btn-on' : ''}`}
-                      title="Puis clique un second mur : les deux se prolongent jusqu’à se rejoindre en un coin (raccourci : Maj + clic)"
-                      onClick={() => m.setJoindre(!m.joindre)}
-                    >
-                      ⌐ {m.joindre ? 'Clique le second mur…' : 'Joindre en coin'}
-                    </button>
-                    <button
-                      className="btn btn-sm btn-danger"
-                      onClick={() => void m.effacer(trait.id)}
-                    >
-                      <IconTrash />
-                      Effacer ce trait
-                    </button>
-                  </div>
-                </>
-              ) : (
-                <p className="vide">
-                  {m.outil === 'selection'
-                    ? 'Clique un trait ou une ouverture sur la carte. Glisser un trait déplace le côté visé, double-clic ajoute un sommet, Alt + clic le coupe en deux, Maj + clic sur un second trait les joint en coin ; Suppr l’efface en entier.'
-                    : m.liste.length
-                      ? 'Passe en « Sélection » et clique un trait sur la carte.'
-                      : 'Arme « + Mur » et clique sur la carte pour poser le premier point.'}
-                </p>
-              )}
-            </div>
-          )}
         </>
       )}
     </>
@@ -3337,14 +4170,197 @@ export function VoletMurs({
  * le pion porte. Ce n'est pas un réglage de bougie, c'est une façon de jouer :
  * la maison se dessine à mesure, ou elle se referme derrière soi.
  */
-function PorteeDuRegard({ m }: { m: ReturnType<typeof useMurs> }): JSX.Element {
-  const sans = m.regardPortee === null
+/**
+ * Le soleil ou la lune de la carte : aucun, l'un ou l'autre, et d'où vient sa
+ * lumière, comptée depuis le nord — et où pointe le nord sur ce plan.
+ *
+ * Quand l'espace règle le ciel pour tous ses lieux, le lieu ne le règle plus :
+ * on le dit, on montre ce qui tombe, et seul le nord reste à la main — c'est
+ * lui qui tourne le soleil commun sur ce plan-ci.
+ */
+function LumiereDuDehorsReglage({ m }: { m: ReturnType<typeof useMurs> }): JSX.Element {
+  const [apercu, setApercu] = useState(false)
+  /* Sur le plan d'un espace, le ciel commun se règle ici même : il n'y a rien
+     au-dessus pour le verrouiller. */
+  const general = m.espace ? null : m.cielGeneral
+  const a = astreReglable(m)
   return (
     <>
-      <label className="murs-reglage">
+      <span className="eyebrow">
+        {m.espace ? 'La lumière du dehors — pour tout l’espace' : 'La lumière du dehors'}
+      </span>
+      {general ? (
+        <span className="murs-cap">
+          Réglée pour tout l’espace « {general.nom} » :{' '}
+          {general.astre.nature === 'soleil' ? '☀ le soleil' : '☾ la lune'}, qui vient{' '}
+          {ventDe(general.astre.cap)} ({Math.round(general.astre.cap)}°). Elle se change sur
+          le plan de l’espace, ou en jeu depuis le tableau de scène.
+        </span>
+      ) : null}
+      <LumiereDuDehorsBoutons m={m} voir />
+      {m.espace ? (
+        <div className="murs-rangee">
+          <button
+            className="btn btn-sm"
+            title="Tous les plans de cet espace côte à côte, sous le soleil ou la lune"
+            onClick={() => setApercu(true)}
+          >
+            Voir l’ensemble des lieux
+          </button>
+        </div>
+      ) : null}
+      {apercu && m.espace ? (
+        <ApercuDuCiel
+          espace={m.espace}
+          ciel={a}
+          reglage={<LumiereDuDehorsBoutons m={m} />}
+          onClose={() => setApercu(false)}
+        />
+      ) : null}
+      <label className="murs-reglage" title="Où pointe le nord sur ce plan : 0° le haut de l’image, 90° la droite">
+        <span>Le nord</span>
+        <input
+          type="range"
+          min={0}
+          max={359}
+          step={1}
+          value={Math.round(m.nord)}
+          onChange={(e) => void m.reglerNord(Number(e.target.value))}
+        />
+        <Valeur
+          className="num"
+          value={Math.round(m.nord)}
+          min={0}
+          max={359}
+          unite="°"
+          label="Où pointe le nord"
+          onChange={(v) => void m.reglerNord(v)}
+        />
+      </label>
+    </>
+  )
+}
+
+/** Ce que ce plan règle : le ciel s'il est celui d'un espace, l'astre du lieu sinon. */
+function astreReglable(m: ReturnType<typeof useMurs>): Astre | null {
+  if (m.espace) return m.cielGeneral?.astre ?? null
+  return m.cielGeneral ? m.cielGeneral.astre : m.astreLieu
+}
+
+/**
+ * Aucune, soleil ou lune, et d'où vient la lumière — comptée depuis le nord.
+ * Rien à régler quand l'espace règle pour tous ; `voir` ajoute « Voir le
+ * soleil », qui n'a de sens que sur le plan lui-même.
+ */
+function LumiereDuDehorsBoutons({
+  m,
+  voir = false
+}: {
+  m: ReturnType<typeof useMurs>
+  voir?: boolean
+}): JSX.Element | null {
+  const verrou = !m.espace && !!m.cielGeneral
+  const a = astreReglable(m)
+  const poser = (nature: Astre['nature'] | null): void =>
+    void m.reglerAstre(nature ? { nature, cap: a?.cap ?? 135 } : null)
+  const cap = (v: number): void => {
+    if (a && !verrou) void m.reglerAstre({ ...a, cap: ((v % 360) + 360) % 360 })
+  }
+  if (verrou && !voir) return null
+  return (
+    <>
+      <div className="murs-rangee">
+        {verrou ? null : (
+          <>
+            <button className="btn btn-sm" aria-pressed={!a} onClick={() => poser(null)}>
+              Aucune
+            </button>
+            <button
+              className="btn btn-sm"
+              aria-pressed={a?.nature === 'soleil'}
+              title="Le jour : dehors éclairé, et la lumière qui entre par les fenêtres et les portes ouvertes"
+              onClick={() => poser('soleil')}
+            >
+              ☀ Soleil
+            </button>
+            <button
+              className="btn btn-sm"
+              aria-pressed={a?.nature === 'lune'}
+              title="La nuit : la même chose, à moitié"
+              onClick={() => poser('lune')}
+            >
+              ☾ Lune
+            </button>
+          </>
+        )}
+        {voir ? (
+          <>
+            {verrou ? null : <span className="murs-sep" />}
+            <button
+              className={`btn btn-sm${m.voirAstre && a ? ' btn-on' : ''}`}
+              aria-pressed={m.voirAstre && !!a}
+              disabled={!a}
+              title={
+                a
+                  ? 'Le plan au noir, avec la seule lumière du dehors — sans les lampes. Rappuie pour revenir.'
+                  : 'Choisis d’abord le soleil ou la lune'
+              }
+              onClick={() => m.setVoirAstre(!m.voirAstre)}
+            >
+              Voir {a?.nature === 'lune' ? 'la lune' : 'le soleil'}
+            </button>
+          </>
+        ) : null}
+      </div>
+      {a && !verrou ? (
+        <>
+          <label className="murs-reglage" title="D’où vient la lumière : 0° le nord, 90° l’est">
+            <span>Vient de</span>
+            <input
+              type="range"
+              min={0}
+              max={359}
+              step={1}
+              value={Math.round(a.cap)}
+              onChange={(e) => cap(Number(e.target.value))}
+            />
+            <Valeur
+              className="num"
+              value={Math.round(a.cap)}
+              min={0}
+              max={359}
+              unite="°"
+              label="D’où vient la lumière"
+              onChange={cap}
+            />
+          </label>
+          <span className="murs-cap">
+            La lumière vient {ventDe(a.cap)} · dehors, tout est éclairé ; dedans, ce qui passe
+            par les fenêtres et les portes ouvertes.
+            {m.espace
+              ? ' Elle tombe sur tous les lieux de l’espace, tournée selon le nord de chaque plan.'
+              : ''}
+          </span>
+        </>
+      ) : null}
+    </>
+  )
+}
+
+function PorteeDuRegard({ m }: { m: ReturnType<typeof useMurs> }): JSX.Element {
+  const sans = m.regardPortee === null
+  /* Le pion d'essai porte une lampe : c'est elle qui fixe la portée. */
+  const lampe = m.essai && m.essai.lampe > 0 ? m.essai.lampe : null
+  return (
+    <>
+      <label
+        className="murs-reglage"
+        title={lampe ? 'Le pion porte une lampe : il voit aussi loin qu’elle éclaire' : undefined}
+      >
         <span>Portée du regard</span>
         <input
           type="range"
+          disabled={lampe !== null}
           min={2}
           /* Au-delà de la largeur de la carte : un plan large reste plus haut
              que large en diagonale, et 100 % bornait encore le regard. On va
@@ -3355,10 +4371,24 @@ function PorteeDuRegard({ m }: { m: ReturnType<typeof useMurs> }): JSX.Element {
           value={Math.round((m.regardPortee ?? 1) * 100)}
           onChange={(e) => void m.reglerRegardPortee(Number(e.target.value) / 100)}
         />
-        <b className="num">{sans ? '∞' : `${Math.round((m.regardPortee ?? 0) * 100)} %`}</b>
+        <Valeur
+          className="num"
+          value={Math.round((m.regardPortee ?? 1) * 100)}
+          min={2}
+          max={150}
+          unite=" %"
+          disabled={lampe !== null}
+          affiche={(v) => (lampe ? `${Math.round(lampe * 100)} %` : sans ? '∞' : `${v} %`)}
+          label="Portée du regard"
+          onChange={(v) => void m.reglerRegardPortee(v / 100)}
+        />
       </label>
+      {lampe ? (
+        <span className="murs-cap">celle de sa lampe — retire-la pour régler le regard</span>
+      ) : null}
       <div className="murs-rangee">
         <button
+          disabled={lampe !== null}
           className={`btn btn-sm${sans ? ' btn-on' : ' btn-ghost'}`}
           title="Le regard ne s'arrête qu'aux murs, comme avant"
           onClick={() => void m.reglerRegardPortee(sans ? 0.35 : null)}
@@ -3370,7 +4400,7 @@ function PorteeDuRegard({ m }: { m: ReturnType<typeof useMurs> }): JSX.Element {
             ? 'on voit jusqu’au mur'
             : (m.regardPortee ?? 0) >= 1
               ? 'plus large que la carte — la portée ne borne presque plus rien'
-              : 'au-delà, c’est trop loin pour distinguer quoi que ce soit'}
+              : 'jusque-là, on voit même dans le noir ; au-delà, seulement ce qui est éclairé'}
         </span>
       </div>
     </>
@@ -3494,13 +4524,16 @@ function NommerForme({
   forme,
   valeur = '',
   onNommer,
-  onFini
+  onFini,
+  onVise
 }: {
   forme: Forme
   /** Le nom actuel, quand on renomme ; vide, quand on baptise. */
   valeur?: string
   onNommer?: (f: Forme, nom: string) => void
   onFini?: () => void
+  /** Le champ prend la main, ou la rend : la pièce se montre sur le plan. */
+  onVise?: (oui: boolean) => void
 }): JSX.Element {
   const [v, setV] = useState(valeur)
   const champ = useRef<HTMLInputElement>(null)
@@ -3528,7 +4561,11 @@ function NommerForme({
       value={v}
       placeholder="Nommer cette pièce…"
       onChange={(e) => setV(e.target.value)}
-      onBlur={() => onFini?.()}
+      onFocus={() => onVise?.(true)}
+      onBlur={() => {
+        onVise?.(false)
+        onFini?.()
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Enter') valider()
         else if (e.key === 'Escape') {
@@ -3598,4 +4635,18 @@ export function AideMurs({ m }: { m: ReturnType<typeof useMurs> }): JSX.Element 
       pour finir le trait. Un contour qui se referme devient une pièce.
     </span>
   )
+}
+
+/**
+ * Une part de gâteau : le faisceau d'une lampe directive, de son centre
+ * jusqu'au rayon donné. Cap et ouverture en degrés, 0 vers le haut.
+ */
+function secteur(c: Pt, r: number, cap: number, ouverture: number): string {
+  const a0 = ((cap - 90 - ouverture / 2) * Math.PI) / 180
+  const a1 = ((cap - 90 + ouverture / 2) * Math.PI) / 180
+  const x0 = c.x + r * Math.cos(a0)
+  const y0 = c.y + r * Math.sin(a0)
+  const x1 = c.x + r * Math.cos(a1)
+  const y1 = c.y + r * Math.sin(a1)
+  return `M${c.x} ${c.y}L${x0} ${y0}A${r} ${r} 0 ${ouverture > 180 ? 1 : 0} 1 ${x1} ${y1}Z`
 }

@@ -18,10 +18,20 @@
  * n'a pas de bouton « Rideaux » à ne jamais toucher, et un plan qui n'a qu'une
  * seule nature n'a pas de filtres du tout.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { Valeur } from './Valeur'
 import { dansForme, formesDesMurs, type Forme } from '@shared/pieces'
 import { bordsOuverture } from '@shared/ouvertures'
-import type { CalqueBrouillard, Lumiere, Mur, Ouverture, Place } from '@shared/types'
+import {
+  ventDe,
+  type Astre,
+  type CalqueBrouillard,
+  type CielDuLieu,
+  type Lumiere,
+  type Mur,
+  type Ouverture,
+  type Place
+} from '@shared/types'
 import {
   IconCheck,
   IconClose,
@@ -119,13 +129,126 @@ function milieuEtNormaleDuMur(trait: Mur): { m: [number, number]; n: [number, nu
   return { m: [a[0] + dx * t, a[1] + dy * t], n: [-dy / len, dx / len] }
 }
 
+/**
+ * La lumière du dehors, réglée en partie : le jour qui tourne, la lune qui se
+ * lève. Le curseur suit la main à l'écran et n'écrit qu'au relâchement — sans
+ * quoi chaque pixel du geste repartirait vers les joueurs.
+ *
+ * Le cap se compte depuis le nord. Quand l'espace règle le ciel pour tous ses
+ * lieux, c'est lui qu'on change d'ici : le soleil se couche sur tout le
+ * domaine à la fois, pas pièce par pièce.
+ */
+function Dehors({ placeId, vu }: { placeId: number; vu: Astre | null }): JSX.Element {
+  const [lieu, setLieu] = useState<Astre | null>(null)
+  const [ciel, setCiel] = useState<CielDuLieu['general']>(null)
+  /* Le calque à l'écran a bougé (`vu`) : on relit ce qui l'a fait bouger. */
+  useEffect(() => {
+    let vivant = true
+    void Promise.all([window.jdr.places.get(placeId), window.jdr.places.ciel(placeId)]).then(
+      ([p, c]) => {
+        if (!vivant) return
+        setLieu(p?.astre ?? null)
+        setCiel(c.general)
+      }
+    )
+    return () => {
+      vivant = false
+    }
+  }, [placeId, vu?.nature, vu?.cap])
+  const astre = ciel ? ciel.astre : lieu
+  const [cap, setCap] = useState(astre?.cap ?? 135)
+  useEffect(() => setCap(astre?.cap ?? 135), [astre?.cap])
+  const poser = (a: Astre | null): void => {
+    if (ciel) {
+      setCiel(a ? { ...ciel, astre: a } : null)
+      void window.jdr.places.cielEspace(ciel.espaceId, a)
+    } else {
+      setLieu(a)
+      void window.jdr.places.astre(placeId, a)
+    }
+  }
+  const tourner = (v: number): void => {
+    if (astre) poser({ ...astre, cap: ((v % 360) + 360) % 360 })
+  }
+  return (
+    <section className="tb-dehors">
+      <div className="tb-salle-tete">
+        <b title={ciel ? `Réglé pour tout l’espace « ${ciel.nom} »` : undefined}>
+          Dehors{ciel ? <em className="tb-ciel"> · tout « {ciel.nom} »</em> : null}
+        </b>
+        <span className="tb-mini">
+          {/* Le ciel de l'espace ne s'éteint pas d'ici : « Aucune » rendrait
+              à chaque lieu le sien, ce qui se décide sur l'espace. */}
+          {ciel ? null : (
+            <button
+              className="tb-b"
+              disabled={!astre}
+              title="Ni soleil ni lune : seules les lampes éclairent"
+              onClick={() => poser(null)}
+            >
+              Aucune
+            </button>
+          )}
+          <button
+            className={`tb-b${astre?.nature === 'soleil' ? ' on' : ''}`}
+            disabled={astre?.nature === 'soleil'}
+            title="Le jour : dehors éclairé, et ce qui entre par les fenêtres et les portes ouvertes"
+            onClick={() => poser({ nature: 'soleil', cap })}
+          >
+            ☀ Soleil
+          </button>
+          <button
+            className={`tb-b${astre?.nature === 'lune' ? ' on' : ''}`}
+            disabled={astre?.nature === 'lune'}
+            title="La nuit : la même chose, à moitié"
+            onClick={() => poser({ nature: 'lune', cap })}
+          >
+            ☾ Lune
+          </button>
+        </span>
+      </div>
+      {astre ? (
+        <label className="tb-cap" title="D’où vient la lumière : 0° le nord, 90° l’est">
+          <span>Vient de</span>
+          <input
+            type="range"
+            min={0}
+            max={359}
+            step={1}
+            value={Math.round(cap)}
+            onChange={(e) => setCap(Number(e.target.value))}
+            onPointerUp={() => tourner(cap)}
+            onKeyUp={() => tourner(cap)}
+          />
+          <Valeur
+            className="num"
+            value={Math.round(cap)}
+            min={0}
+            max={359}
+            unite="°"
+            label="D’où vient la lumière"
+            onChange={(v) => {
+              setCap(v)
+              tourner(v)
+            }}
+          />
+          <em>{ventDe(cap)}</em>
+        </label>
+      ) : null}
+    </section>
+  )
+}
+
 export function TableauDeScene({
   calque,
+  placeId,
   lieux,
   onSurvol,
   survol
 }: {
   calque: CalqueBrouillard
+  /** Le lieu à l'écran : c'est lui qui porte le soleil ou la lune. */
+  placeId: number | null
   /** Les lieux de cet étage : ce sont eux qui donnent leur nom aux pièces. */
   lieux: Place[]
   onSurvol: (s: Surbrillance) => void
@@ -319,6 +442,8 @@ export function TableauDeScene({
           </>
         ) : null}
       </header>
+
+      {placeId != null ? <Dehors placeId={placeId} vu={calque.astre} /> : null}
 
       <div className="tb-salles">
         {salles.filter(montre).map((s) => {

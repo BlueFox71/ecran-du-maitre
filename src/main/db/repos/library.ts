@@ -1,5 +1,6 @@
 import { activeCampaignId, getDb } from '../index'
 import { moveEntry, renameEntry, renommerJumeauTxt, writeDoc, writeTexteBrut } from '../../library'
+import { DOSSIER_NOTES, dansLApp, dossierDeLApp } from '@shared/dossierDeLApp'
 import type { Folder, FolderNode, Item, ItemFilter, ItemKind } from '@shared/types'
 
 /* ---------------- lignes brutes ---------------- */
@@ -111,6 +112,9 @@ export function folderTree(): { tree: FolderNode[]; orphans: Item[] } {
 
   const roots: FolderNode[] = []
   for (const f of folders) {
+    /* Le dossier de l'app ne se montre pas dans la Bibliothèque : ses textes
+       se lisent depuis leurs modules, et dans l'explorateur. */
+    if (dansLApp(f.relPath)) continue
     const node = nodes.get(f.id)!
     if (f.parentId != null && nodes.has(f.parentId)) nodes.get(f.parentId)!.children.push(node)
     else roots.push(node)
@@ -189,7 +193,7 @@ export function updateItem(
     getDb().prepare(`UPDATE item SET body = ? WHERE id = ?`).run(patch.body ?? '', id)
     // Le texte d'un moment, et chaque note du Bloc-notes, ont aussi leur version .txt.
     if (
-      cur.relPath.startsWith('Bloc-notes/') ||
+      cur.relPath.startsWith(`${dossierDeLApp(null, DOSSIER_NOTES)}/`) ||
       getDb().prepare(`SELECT 1 FROM beat_item WHERE item_id = ?`).get(id)
     )
       writeTexteBrut(cur.relPath, patch.body ?? '')

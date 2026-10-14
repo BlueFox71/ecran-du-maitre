@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { IconPlus, IconSoleil, IconTrash, IconType } from './Icons'
 import { LAMPE_NEUVE } from './Murs'
+import { Valeur } from './Valeur'
 import type { OutilAnnotation } from './Annotations'
 import {
   COLLAGE_CELLS,
@@ -209,7 +210,17 @@ export function VoletTextes({ t, onLive }: { t: TextesEcran; onLive: boolean }):
           value={t.over?.size ?? TEXTE_NEUF.size}
           onChange={(e) => t.pose({ size: Number(e.target.value) })}
         />
-        <span className="val num">{(t.over?.size ?? TEXTE_NEUF.size).toFixed(2)} %</span>
+        <Valeur
+          className="val num"
+          value={t.over?.size ?? TEXTE_NEUF.size}
+          min={1.5}
+          max={14}
+          step={0.25}
+          decimales={2}
+          unite=" %"
+          label="Corps du texte"
+          onChange={(v) => t.pose({ size: v })}
+        />
       </label>
 
       <span className="sep" />

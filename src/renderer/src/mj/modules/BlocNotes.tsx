@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { EditorContent, useEditor } from '@tiptap/react'
-import type { UiFolder, UiItem } from '../../../../preload/index'
+import type { UiItem } from '../../../../preload/index'
+import { DOSSIER_NOTES, dossierDeLApp } from '@shared/dossierDeLApp'
 import { useStore } from '../store'
 import { EXTENSIONS_TEXTE } from '../components/extensionsTexte'
 import { MenuTagPersonnage, resynchroniserTags } from '../components/TagPersonnage'
@@ -15,11 +16,11 @@ import { IconPlus, IconTrash } from '../components/Icons'
 /**
  * Des notes en petit, comme sur un tableau de liège : chacune n'est haute que
  * de ce qu'elle contient et grandit avec son texte. Une note est un vrai
- * fichier — `Bloc-notes/<date>.html`, à la racine de la campagne, avec sa
+ * fichier — `.ecran-du-maitre/Bloc-notes/<date>.html`, dans le dossier de l'app, avec sa
  * version .txt — donc elle s'ouvre aussi dans l'explorateur. Un seul
  * Bloc-notes pour toute la campagne.
  */
-const DOSSIER = 'Bloc-notes'
+const DOSSIER = dossierDeLApp(null, DOSSIER_NOTES)
 
 /** « 2026-10-01 23h52 » : un nom qui se trie tout seul, du plus récent au plus ancien. */
 function horodatage(d = new Date()): string {
@@ -74,11 +75,7 @@ export function BlocNotes(): JSX.Element {
     if (occupe) return
     setOccupe(true)
     try {
-      const existe = (ns: UiFolder[]): boolean => ns.some((f) => f.relPath === DOSSIER)
-      if (!existe(useStore.getState().arbreComplet)) {
-        const rel = await window.jdr.folders.create('', DOSSIER)
-        await window.jdr.folders.decor(rel, 'notes', null)
-      }
+      await window.jdr.folders.assurer(DOSSIER, 'notes')
       const it = await window.jdr.items.createDoc(DOSSIER, horodatage())
       if (!it) return s.toast('La note n’a pas pu être créée.', true)
       // Écrite une première fois, elle a tout de suite sa version .txt.

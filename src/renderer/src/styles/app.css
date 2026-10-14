@@ -2220,6 +2220,14 @@ input[type='range']::-webkit-slider-thumb {
   background: var(--brass-wash);
   border-color: var(--brass);
 }
+/* La racine de l'arbre : une cible de lâcher, pas un dossier qu'on ouvre. */
+.libview .row.racine {
+  cursor: default;
+  color: var(--text-dim);
+}
+.libview .row.racine:hover:not(.drop) {
+  background: none;
+}
 .libview .crumbs button.drop {
   color: var(--text);
   box-shadow: inset 0 0 0 1px var(--brass-line);
@@ -2963,6 +2971,19 @@ input[type='range']::-webkit-slider-thumb {
   --brass-wash: color-mix(in srgb, #ece0c0 var(--papier), var(--fond-app));
   --brass-line: color-mix(in srgb, #c9ab68 var(--papier), var(--fond-app));
   --label: #6b5a2b;
+}
+/* La fiche d'un lieu au Paravent : un papier entre le blanc et le bleu,
+   pour la distinguer d'un coup d'œil du texte d'un moment. Mêmes jetons,
+   même dosage — seule la teinte du papier change. */
+.lect-body.lect-lieu {
+  background: color-mix(in srgb, #e9f0f7 var(--papier), var(--fond-app));
+  --line: color-mix(in srgb, #c7d3df var(--papier), var(--fond-app));
+  --line-soft: color-mix(in srgb, #d8e2ec var(--papier), var(--fond-app));
+  --surface: color-mix(in srgb, #e1e9f2 var(--papier), var(--fond-app));
+  --raised: color-mix(in srgb, #dbe4ee var(--papier), var(--fond-app));
+  --sunk: color-mix(in srgb, #cfdae6 var(--papier), var(--fond-app));
+  --tint: color-mix(in srgb, #dbe4ee var(--papier), var(--fond-app));
+  --tint-line: color-mix(in srgb, #c7d3df var(--papier), var(--fond-app));
 }
 /* La sélection suit la page : le bleu du système sur fond crème jure, et le
    laiton est déjà la couleur de ce qui est choisi partout ailleurs. */
@@ -4093,7 +4114,14 @@ input[type='range']::-webkit-slider-thumb {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: 238px minmax(0, 1fr) minmax(210px, 0.42fr);
+  /* La colonne de gauche se règle à la souris (poignée entre les deux
+     premières colonnes) ; --fiche-g porte sa largeur. */
+  grid-template-columns: var(--fiche-g, 238px) minmax(0, 1fr) minmax(210px, 0.42fr);
+  position: relative;
+}
+/* Un PNJ sans colonne de feuille (Paramètres › Table) : ses chiffres prennent la place. */
+.sheet-cols.sheet-sans-feuille {
+  grid-template-columns: var(--fiche-g, 238px) minmax(0, 1fr);
 }
 
 /* ------------------------------------------------------------
@@ -4119,7 +4147,10 @@ input[type='range']::-webkit-slider-thumb {
 .portrait {
   position: relative;
   display: grid;
-  width: 100%;
+  /* Toute la colonne, sauf quand on l'élargit à la poignée : le visage
+     s'arrête alors à 42 % de la hauteur, pour laisser voir les notes. */
+  width: min(100%, calc(42vh / 1.18));
+  margin-inline: auto;
   aspect-ratio: 1 / 1.18;
   flex: none;
   border-radius: 6px;
@@ -5004,14 +5035,6 @@ input[type='range']::-webkit-slider-thumb {
   font-size: 18px;
   letter-spacing: 0.01em;
 }
-.ligne .tx .sum {
-  font-size: 12px;
-  color: var(--text-faint);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  min-width: 0;
-}
 .ligne .tier {
   flex: none;
   opacity: 0.6;
@@ -5129,75 +5152,6 @@ input[type='range']::-webkit-slider-thumb {
 /* Dans le volet, la liste des étages et son champ libre s'empilent. */
 .volet-lieu .field select + input {
   margin-top: 5px;
-}
-
-/* ------------------------------------------------------------
-   L'aperçu au survol d'une vignette : le plan, en grand, à côté.
-   ------------------------------------------------------------ */
-.apercu {
-  position: fixed;
-  z-index: 90;
-  display: grid;
-  gap: 6px;
-  padding: 7px;
-  border-radius: 8px;
-  background: var(--panel);
-  border: 1px solid var(--line);
-  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.3);
-  pointer-events: none;
-  animation: apercu-vient 0.11s ease-out;
-}
-@keyframes apercu-vient {
-  from {
-    opacity: 0;
-    transform: translateY(3px);
-  }
-}
-.apercu-vue {
-  position: relative;
-  display: grid;
-  place-items: center;
-  border-radius: 5px;
-  overflow: hidden;
-  background: var(--sunk);
-  border: 1px solid var(--line-soft);
-}
-.apercu-vue img {
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-}
-/* Une pièce montre le morceau de plan qui est le sien, agrandi et décalé. */
-.apercu-vue img.cadree {
-  position: absolute;
-  object-fit: cover;
-  max-width: none;
-}
-.apercu-vue > svg {
-  width: 34px;
-  height: 34px;
-  stroke: var(--text-faint);
-  fill: none;
-  stroke-width: 1.2;
-}
-.apercu-tx {
-  display: grid;
-  gap: 2px;
-  padding: 0 2px 1px;
-}
-.apercu-tx b {
-  font-family: 'Fraunces Variable', Georgia, serif;
-  font-size: 14.5px;
-  font-weight: 600;
-}
-.apercu-tx span {
-  font-size: 11.5px;
-  line-height: 1.35;
-  color: var(--text-faint);
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
 }
 
 /* La corbeille d'une tuile : discrète, en face du rond de découverte, et elle
@@ -5480,13 +5434,31 @@ input[type='range']::-webkit-slider-thumb {
   overflow: auto;
   padding: 12px;
   display: grid;
+  /* Une colonne bornée : sans elle, le plus long nom (une carte « (tournée)
+     (rognée)… », une option de menu) élargit tout le volet hors de l'écran. */
+  grid-template-columns: minmax(0, 1fr);
   gap: 11px;
   align-content: start;
 }
+.volet-lieu .corps > *,
+.volet-lieu .field > * {
+  min-width: 0;
+}
+.volet-lieu .corps select,
+.volet-lieu .corps input,
+.volet-lieu .corps textarea {
+  max-width: 100%;
+}
 .volet-lieu .corps .deux {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
   gap: 9px;
+}
+/* Le ciel de tout un espace : ses boutons, d'où vient la lumière, et ce que
+   ça fait aux lieux. */
+.volet-lieu .ciel-espace .murs-cap {
+  font-family: inherit;
+  line-height: 1.4;
 }
 .volet-lieu .mot {
   margin: 0;
@@ -6492,6 +6464,65 @@ input[type='range']::-webkit-slider-thumb {
 .modal.large {
   width: min(880px, 100%);
 }
+/* Tous les plans d'un espace sous son ciel : le réglage en tête, les plans
+   en grille dessous, chacun à ses proportions. */
+.modal.apercu-ciel {
+  width: min(1180px, 100%);
+  height: 100%;
+}
+.apercu-ciel .ac-fermer {
+  margin-left: auto;
+}
+.apercu-ciel .ac-reglage {
+  padding: 10px 16px;
+  border-bottom: 1px solid var(--line);
+  display: grid;
+  gap: 7px;
+  background: var(--raised);
+}
+.apercu-ciel .ac-reglage .murs-reglage {
+  max-width: 460px;
+}
+.apercu-ciel .ac-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+.apercu-ciel .ac-plan {
+  margin: 0;
+  display: grid;
+  gap: 5px;
+}
+.apercu-ciel .ac-image {
+  position: relative;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--ground);
+}
+.apercu-ciel .ac-image img,
+.apercu-ciel .ac-image svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.apercu-ciel .ac-image svg {
+  position: absolute;
+  inset: 0;
+}
+.apercu-ciel figcaption {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.apercu-ciel figcaption b {
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-size: 13px;
+  color: var(--text);
+}
 /* Deux champs qui vont ensemble sur une ligne — « ce que c'est » et « rangé dans ». */
 .modal .body .deux {
   display: grid;
@@ -6657,6 +6688,11 @@ input[type='range']::-webkit-slider-thumb {
 .galerie .vign:hover .nm,
 .galerie .vign:focus-visible .nm {
   opacity: 1;
+  /* Le nom en entier, sur plusieurs lignes s'il le faut : coupé, il ne
+     servirait à rien. */
+  white-space: normal;
+  overflow-wrap: anywhere;
+  padding-top: 14px;
 }
 .galerie .vign.sans .nm {
   opacity: 1;
@@ -6731,22 +6767,85 @@ input[type='range']::-webkit-slider-thumb {
   padding-left: 4px;
   border-left: 1px solid var(--line-soft);
 }
-/* Les grilles et les listes sont ici imbriquées : le cadre, c'est l'arbre. */
-.arbre .galerie {
-  border: 0;
-  background: none;
-  max-height: none;
-  overflow: visible;
-  padding: 4px 2px 8px;
-}
-.arbre .galerie.sans-seul {
-  padding-bottom: 4px;
-}
 .arbre .lignes {
   display: flex;
   flex-direction: column;
   gap: 2px;
   padding: 2px 0 6px;
+}
+/* Les lignes à gauche, l'image qu'on regarde à droite : on ne charge qu'elle. */
+.cda {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 12px;
+}
+.cda .arbre {
+  height: 54vh;
+}
+.cda .doc-row.on {
+  background: var(--raised);
+  border-color: var(--line);
+}
+.cda-actuel {
+  margin-left: auto;
+  flex: none;
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+.cda-volet {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.cda-image {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 220px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--ground);
+  overflow: hidden;
+}
+.cda-image img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.cda-image .g svg {
+  width: 34px;
+  height: 34px;
+  stroke: var(--text-faint);
+  fill: none;
+  stroke-width: 1.3;
+}
+.cda-nom {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.cda-infos {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 4px 10px;
+  margin: 0;
+  font-size: 12px;
+}
+.cda-infos dt {
+  color: var(--text-faint);
+}
+.cda-infos dd {
+  margin: 0;
+  color: var(--text);
+  overflow-wrap: anywhere;
+}
+.cda-rien {
+  margin: auto 0;
+  text-align: center;
+  color: var(--text-faint);
+  font-size: 12.5px;
 }
 .arbre .rien {
   margin: 0;
@@ -6841,7 +6940,10 @@ input[type='range']::-webkit-slider-thumb {
     grid-template-columns: 260px minmax(0, 1fr);
   }
   .sheet-cols {
-    grid-template-columns: 212px minmax(0, 1fr) minmax(190px, 0.36fr);
+    grid-template-columns: var(--fiche-g, 212px) minmax(0, 1fr) minmax(190px, 0.36fr);
+  }
+  .sheet-cols.sheet-sans-feuille {
+    grid-template-columns: var(--fiche-g, 212px) minmax(0, 1fr);
   }
 }
 @media (max-width: 1120px) {
@@ -6885,7 +6987,10 @@ input[type='range']::-webkit-slider-thumb {
      lit en grand depuis son portrait de toute façon — et l'identité garde sa
      colonne, plus étroite. */
   .sheet-cols {
-    grid-template-columns: 196px minmax(0, 1fr);
+    grid-template-columns: var(--fiche-g, 196px) minmax(0, 1fr);
+  }
+  .sheet-cols.sheet-sans-feuille {
+    grid-template-columns: var(--fiche-g, 196px) minmax(0, 1fr);
   }
   .sheet-c {
     display: none;
@@ -6932,6 +7037,45 @@ input[type='range']::-webkit-slider-thumb {
 .vhead h2.fil-ariane .retour:hover {
   color: var(--brass);
   text-decoration: underline;
+}
+/* Le saut vers une autre fiche, à droite du nom : discret, à la taille du
+   chemin et non du titre. */
+/* Le sélecteur de lieu, entre ses deux flèches. */
+.vhead h2.fil-ariane .saut-lieu-hote {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.vhead h2.fil-ariane .saut-fleche {
+  padding: 2px 7px;
+  font-size: 13px;
+  line-height: 1;
+}
+/* Une teinte par sorte de lieu, sur chaque ligne et sur le choix affiché :
+   l'espace, le bâtiment, le niveau et la pièce ne se confondent plus. */
+.saut-lieu.sorte-espace,
+.saut-lieu option.sorte-espace {
+  background-color: #2a2140;
+}
+.saut-lieu.sorte-batiment,
+.saut-lieu option.sorte-batiment {
+  background-color: #3a2a16;
+}
+.saut-lieu.sorte-niveau,
+.saut-lieu option.sorte-niveau {
+  background-color: #16303a;
+}
+.saut-lieu.sorte-lieu,
+.saut-lieu option.sorte-lieu {
+  background-color: #1b1d1f;
+}
+.vhead h2.fil-ariane .saut-lieu {
+  margin-left: 6px;
+  max-width: 220px;
+  font-family: 'Archivo', system-ui, sans-serif;
+  font-size: 12.5px;
+  font-weight: 500;
+  padding: 3px 6px;
 }
 
 
@@ -8692,8 +8836,10 @@ input[type='range']::-webkit-slider-thumb {
   flex: 1;
   min-height: 0;
   display: grid;
-  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  /* --pu-g : la largeur de la lecture, réglée à la poignée. */
+  grid-template-columns: var(--pu-g, minmax(0, 1fr)) minmax(0, 1fr);
   gap: 14px;
+  position: relative;
 }
 .pu-chrono {
   min-height: 0;
@@ -9150,9 +9296,13 @@ input[type='range']::-webkit-slider-thumb {
 }
 /* La scène et, à sa gauche quand le lieu a des murs, le tableau de scène —
    comme en Régie. Sans tableau, la scène garde toute la largeur. */
+/* Fenêtre basse : la rangée de la scène cède sa hauteur, la source non. Jules
+   ne voyait plus ses lieux sur un petit écran — la scène, incompressible,
+   poussait la source sous le bord. Elle rapetisse alors en gardant la forme
+   de l'écran (voir `.big-stage` plus bas), avec des bandes sur les côtés. */
 .pupitre .pu-avec-tableau {
-  flex: 0 0 auto;
-  min-height: 0;
+  flex: 0 1 auto;
+  min-height: 120px;
 }
 .pupitre .pu-avec-tableau > .big-frame {
   flex: 1;
@@ -9205,10 +9355,13 @@ input[type='range']::-webkit-slider-thumb {
 .pupitre .big-inner {
   padding: 0;
 }
+/* À pleine hauteur, le cadre a déjà la forme de l'écran et la scène le
+   remplit. Comprimé, il est plus large que haut : la scène se borne alors
+   par la hauteur, aux mêmes proportions. */
 .pupitre .big-stage {
-  width: 100%;
-  height: 100%;
-  aspect-ratio: auto;
+  aspect-ratio: var(--ecran, 16 / 9);
+  width: min(100%, calc(100cqh * var(--ecran, 16 / 9)));
+  height: auto;
   max-height: 100%;
 }
 /* La hauteur rendue par le cadrage va à l'étagère : elle tient sur une ligne
@@ -9265,8 +9418,9 @@ input[type='range']::-webkit-slider-thumb {
 /* Jules l'a voulue plus basse : depuis que la liste ne montre plus que les
    espaces et leurs niveaux, quelques lignes suffisent. Elle peut encore se
    comprimer si la fenêtre est basse. */
+/* Elle ne se comprime plus sous 150 px : c'est la scène qui rend la place. */
 .pu-source {
-  flex: 1 1 190px;
+  flex: 1 0 150px;
   min-height: 96px;
   display: flex;
   flex-direction: column;
@@ -10329,6 +10483,11 @@ input[type='range']::-webkit-slider-thumb {
 
 .murs-barre {
   flex-wrap: wrap;
+  /* Murs, lampe, ouverture, trait : quatre barres qui se relaient au même
+     endroit. Une hauteur commune, pour que la carte ne saute pas d'un pixel
+     quand on passe de l'une à l'autre. */
+  min-height: 76px;
+  align-content: center;
 }
 .murs-barre .note {
   font-size: 11.5px;
@@ -10562,6 +10721,34 @@ input[type='range']::-webkit-slider-thumb {
   display: grid;
   gap: 4px;
 }
+/* Le soleil ou la lune, en tête de colonne : un réglage de la carte entière. */
+.tb-dehors {
+  display: grid;
+  gap: 5px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.tb-b.on {
+  border-color: var(--brass);
+  color: var(--brass-ink);
+  opacity: 1;
+}
+.tb-cap {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.tb-cap input[type='range'] {
+  width: 100%;
+}
+.tb-cap em {
+  grid-column: 1 / -1;
+  font-style: normal;
+  font-size: 10.5px;
+}
 .tb-salle-tete {
   display: flex;
   align-items: baseline;
@@ -10571,6 +10758,13 @@ input[type='range']::-webkit-slider-thumb {
 .tb-salle-tete b {
   font-family: 'Fraunces Variable', Georgia, serif;
   font-size: 13.5px;
+}
+.tb-salle-tete b .tb-ciel {
+  font-family: inherit;
+  font-style: normal;
+  font-weight: 400;
+  font-size: 11px;
+  color: var(--text-faint);
 }
 .tb-mini {
   display: inline-flex;
@@ -10783,6 +10977,13 @@ input[type='range']::-webkit-slider-thumb {
   stroke-linecap: round;
   fill: none;
 }
+/* Le nez d'une lampe directive : où pointe son faisceau. */
+.lum .faisceau {
+  stroke: var(--lum);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  fill: none;
+}
 /* Les deux rayons : le clair se lit, la pénombre se devine. */
 .lum .clair {
   fill: color-mix(in oklab, var(--lum) 9%, transparent);
@@ -10795,6 +10996,49 @@ input[type='range']::-webkit-slider-thumb {
   stroke: color-mix(in oklab, var(--lum) 30%, transparent);
   stroke-width: 1;
   stroke-dasharray: 2 7;
+}
+/* Le soleil ou la lune au bord du plan, et la flèche d'où vient sa lumière. */
+.astre-repere .fleche {
+  stroke: var(--astre);
+  stroke-width: 2.5;
+  stroke-linecap: round;
+  fill: none;
+}
+.astre-repere .pointe {
+  fill: var(--astre);
+}
+.astre-repere .disque {
+  fill: rgba(12, 10, 6, 0.75);
+  stroke: var(--astre);
+  stroke-width: 1.6;
+}
+.astre-repere .signe {
+  fill: var(--astre);
+  font-size: 15px;
+  text-anchor: middle;
+  dominant-baseline: central;
+}
+.astre-repere.soleil {
+  --astre: #f0c15a;
+}
+.astre-repere.lune {
+  --astre: #b9c7e6;
+}
+/* Le nord du plan, au bord, en sourdine : un repère, pas une lumière. */
+.nord-repere .pointe {
+  fill: rgba(236, 226, 205, 0.85);
+}
+.nord-repere .disque {
+  fill: rgba(12, 10, 6, 0.75);
+  stroke: rgba(236, 226, 205, 0.6);
+  stroke-width: 1.2;
+}
+.nord-repere .signe {
+  fill: rgba(236, 226, 205, 0.9);
+  font-size: 10px;
+  font-weight: 700;
+  text-anchor: middle;
+  dominant-baseline: central;
 }
 .lum.eteinte .clair,
 .lum.eteinte .penombre {
@@ -10833,6 +11077,11 @@ input[type='range']::-webkit-slider-thumb {
    on ne cherche pas l'ambiance, on cherche à voir ce qui reste noir. */
 .ombre-seule {
   fill: rgba(0, 0, 0, 0.82);
+}
+/* « Test lumière », tenu : le noir des joueurs, sans transparence. */
+.murs-ombre.ombre-test {
+  fill: #000;
+  opacity: 1;
 }
 /* La couleur d'une lampe, posée sur ce qu'elle touche. Elle éclaircit sans
    repeindre : c'est une lueur, pas un filtre. */
@@ -10998,8 +11247,9 @@ input[type='range']::-webkit-slider-thumb {
   fill: #04080a;
   opacity: 0.86;
 }
+/* Le regard d'un humain : un voile blanc, pas la couleur des murs. */
 .murs-vu {
-  fill: var(--mur-plein);
+  fill: #fff;
   opacity: 0.08;
 }
 .pion-essai .jeton {
@@ -11027,6 +11277,107 @@ input[type='range']::-webkit-slider-thumb {
   border: 1px solid var(--brass-line);
   border-radius: 6px;
   background: var(--brass-wash);
+}
+/* L'échelle d'un plan : le trait qu'on tire, la règle posée sur le plan, et
+   le volet qui dit d'où on la tient. */
+.calque-trait .trait {
+  stroke: var(--brass, #c9a227);
+  stroke-width: 3;
+  stroke-dasharray: 10 6;
+  vector-effect: non-scaling-stroke;
+}
+.calque-trait .bout {
+  stroke: var(--brass, #c9a227);
+  stroke-width: 12;
+  stroke-linecap: round;
+  vector-effect: non-scaling-stroke;
+}
+.annot-barre .etal-champ {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.annot-barre .etal-champ input {
+  width: 72px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+}
+.regle-echelle {
+  position: absolute;
+  z-index: 3;
+  height: 0.7em;
+  border: 2px solid #e7e2d6;
+  border-top: 0;
+  pointer-events: none;
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.9));
+}
+.regle-echelle span {
+  position: absolute;
+  left: 100%;
+  bottom: -0.2em;
+  margin-left: 0.4em;
+  font-family: 'IBM Plex Mono', monospace;
+  color: #e7e2d6;
+  white-space: nowrap;
+}
+.echelle-bloc {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--brass-line);
+  border-radius: 6px;
+}
+.etat-echelle {
+  width: fit-content;
+  padding: 2px 8px;
+  border-radius: 99px;
+  font-size: 12px;
+}
+.etat-echelle.portes {
+  background: var(--brass-wash);
+  color: var(--brass-ink, var(--brass));
+}
+.etat-echelle.trait {
+  background: color-mix(in oklab, #6fa36a 18%, transparent);
+  color: #8cc387;
+}
+.etat-echelle.inconnue {
+  background: color-mix(in oklab, var(--blood) 16%, transparent);
+  color: var(--blood);
+}
+.ech-ligne {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+  color: var(--text-dim);
+}
+.ech-ligne b {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-weight: 500;
+  color: var(--text);
+}
+
+/* Ce que les murs ne savent pas trancher : deux fiches dans une pièce, une
+   fiche hors de toute pièce. Couleur de sang, sans crier. */
+.murs-conflit {
+  display: grid;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 1px solid color-mix(in oklab, var(--blood) 45%, transparent);
+  border-radius: 6px;
+  background: color-mix(in oklab, var(--blood) 10%, transparent);
+}
+.murs-conflit .eyebrow {
+  color: var(--blood);
+}
+.placer-dans {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
 }
 .murs-garde p {
   color: var(--brass-ink);
@@ -11247,6 +11598,26 @@ input[type='range']::-webkit-slider-thumb {
 }
 .murs-reglage input[type='range'] {
   width: 100%;
+}
+/* Dans la barre lumière : en ligne, chaque curseur à sa largeur. */
+.murs-reglage.lb-reglage {
+  width: 170px;
+}
+/* Les teintes en pastilles seules : le texte reste pour l'info-bulle et les
+   lecteurs d'écran, mais ne prend pas de place. */
+.lb-teintes .lteinte {
+  font-size: 0;
+  gap: 0;
+  padding: 4px;
+}
+/* L'aide passe toujours à la ligne, comme celle de la barre des murs. */
+.murs-barre .lb-note {
+  flex-basis: 100%;
+}
+.lb-groupe {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
 }
 .murs-reglage b {
   color: var(--text-dim);
@@ -11667,6 +12038,24 @@ input[type='range']::-webkit-slider-thumb {
   border-color: var(--text-faint);
   box-shadow: var(--shadow);
 }
+/* L'image de l'objet en grand, au survol de sa vignette. */
+.obj-survol {
+  position: fixed;
+  z-index: 900;
+  transform: translateY(-50%);
+  pointer-events: none;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  box-shadow: var(--shadow-lift);
+}
+.obj-survol img {
+  display: block;
+  max-width: 340px;
+  max-height: 340px;
+  border-radius: 3px;
+}
 .obj-carte.on {
   border-color: var(--brass);
   box-shadow: 0 0 0 1px var(--brass-line);
@@ -11675,6 +12064,9 @@ input[type='range']::-webkit-slider-thumb {
    une réserve se lit par rayons, à un mètre, avant qu'on lise les noms. */
 .obj-carte .vignette {
   position: relative;
+  /* Sans image, rien ne lui donne de largeur : le ratio seul la laissait
+     replier en petit carré. */
+  width: 100%;
   aspect-ratio: 4 / 3;
   display: grid;
   place-items: center;
@@ -11688,12 +12080,38 @@ input[type='range']::-webkit-slider-thumb {
   object-fit: cover;
   display: block;
 }
+/* Sans image, le dessin de la catégorie tient la place : un halo de sa
+   teinte derrière, un disque cerclé, le trait au milieu. */
+.obj-carte .vignette:not(:has(img)) {
+  background:
+    radial-gradient(
+      circle at 50% 50%,
+      color-mix(in srgb, var(--pion-ring, var(--text-faint)) 22%, transparent) 0,
+      transparent 62%
+    ),
+    var(--pion-fill, var(--sunk));
+}
+.obj-carte .vignette:not(:has(img))::before {
+  content: '';
+  position: absolute;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--pion-fill, var(--sunk)) 70%, black);
+  border: 1px solid color-mix(in srgb, var(--pion-ring, var(--text-faint)) 55%, transparent);
+  box-shadow: 0 2px 10px rgba(0, 0, 0, 0.35);
+}
 .obj-carte .vignette .glyphe {
-  width: 34px;
-  height: 34px;
+  position: relative;
+  width: 30px;
+  height: 30px;
   stroke: var(--pion-ring, var(--text-faint));
   fill: none;
-  stroke-width: 1.1;
+  stroke-width: 1.4;
+}
+.obj-carte:hover .vignette .glyphe,
+.obj-carte.on .vignette .glyphe {
+  stroke-width: 1.6;
 }
 .obj-carte .posee,
 .obj-carte .qte {
@@ -11738,6 +12156,53 @@ input[type='range']::-webkit-slider-thumb {
 .obj-carte .sous .pt {
   opacity: 0.5;
 }
+/* Où il est : une étiquette par endroit, calée au pied de la carte — d'une
+   carte à l'autre de la rangée, elles s'alignent quelle que soit la longueur
+   du nom. */
+.obj-ou {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 3px;
+  padding: 2px 8px 8px;
+  margin-top: auto;
+  min-width: 0;
+}
+.obj-ou-tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  min-width: 0;
+  padding: 1px 6px 1px 5px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  background: var(--sunk);
+  font-size: 10px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.obj-ou-tag .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.obj-ou-tag svg {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.7;
+  opacity: 0.8;
+}
+.obj-ou-tag.lieu {
+  border-color: var(--brass-line);
+  color: var(--brass-ink);
+}
+.obj-ou-tag.plus {
+  padding: 1px 6px;
+  color: var(--text-faint);
+}
 
 /* ---- l'étagère en liste ---- */
 .liste-objets {
@@ -11781,6 +12246,12 @@ input[type='range']::-webkit-slider-thumb {
 }
 .liste-objets .nm {
   font-size: 12.5px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.liste-objets .nm-tx {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -12228,6 +12699,18 @@ button.ou-etat:hover {
 .objview .pop.large {
   width: 292px;
 }
+/* La recherche en tête d'un panneau : elle reste là quand la liste défile. */
+.objview .pop .pop-cherche {
+  position: sticky;
+  top: -6px;
+  z-index: 1;
+  width: calc(100% + 12px);
+  margin: -6px -6px 6px;
+  padding: 7px 9px;
+  border-width: 0 0 1px;
+  border-radius: 6px 6px 0 0;
+  background: var(--raised);
+}
 .objview .pop > .eyebrow {
   display: block;
   padding: 4px 7px 5px;
@@ -12311,6 +12794,86 @@ button.ou-etat:hover {
   gap: 8px;
   padding: 4px 8px 8px;
 }
+/* « Éclaire » : le rayon au curseur, et un plan d'exemple. */
+.effet-rayon {
+  display: grid;
+  gap: 6px;
+}
+.effet-rayon .ligne {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.effet-rayon .ligne input[type='range'] {
+  flex: 1;
+}
+/* Le cône : tout autour, ou un faisceau — les mêmes choix qu'une lampe du plan. */
+.effet-cone {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.effet-cone .btn[aria-pressed='true'] {
+  border-color: var(--brass, #c9a227);
+  color: var(--brass, #c9a227);
+}
+.effet-rayon .note {
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.45;
+}
+.lueur-demo {
+  display: block;
+  width: 100%;
+  max-width: 320px;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+}
+.lueur-demo .fond {
+  fill: #07080a;
+}
+.lueur-demo .sol {
+  fill: #2a2418;
+}
+.lueur-demo .latte {
+  stroke: #3a3122;
+  stroke-width: 0.8;
+}
+.lueur-demo .meuble {
+  fill: #4a3b24;
+  stroke: #6b5533;
+  stroke-width: 1;
+}
+.lueur-demo .mur {
+  stroke: #d8cfbd;
+  stroke-width: 3;
+  stroke-linecap: square;
+}
+/* Le plan deviné dans le noir, comme le MJ le voit hors de la lueur. */
+.lueur-demo .ombre {
+  opacity: 0.22;
+}
+.lueur-demo .portee {
+  fill: none;
+  stroke: var(--brass, #c9a227);
+  stroke-width: 0.8;
+  stroke-dasharray: 3 3;
+  opacity: 0.7;
+}
+.lueur-demo .pion {
+  fill: #1d1708;
+  stroke: var(--brass, #c9a227);
+  stroke-width: 1.5;
+}
+.lueur-demo .echelle {
+  stroke: var(--text-faint);
+  stroke-width: 1.5;
+}
+.lueur-demo .echelle-txt {
+  fill: var(--text-faint);
+  font-size: 7px;
+  font-family: 'IBM Plex Mono', monospace;
+}
 .effet-tetes {
   display: flex;
   flex-wrap: wrap;
@@ -12392,6 +12955,91 @@ button.ou-etat:hover {
   height: auto;
   aspect-ratio: 1;
   border-radius: 99px;
+}
+
+/* ---- les familles en grand : la liste à gauche, la fiche à droite ---- */
+.fam-modale {
+  width: min(640px, 100%);
+}
+.fam-modale-corps {
+  display: grid;
+  grid-template-columns: 200px 1fr;
+  min-height: 0;
+  overflow: hidden;
+}
+.fam-rangs {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 8px;
+  border-right: 1px solid var(--line);
+  background: var(--sunk);
+  overflow: auto;
+}
+.objview .fam-btn.neuve {
+  color: var(--text-faint);
+  margin-top: 4px;
+}
+.fam-rangs .fam-btn svg,
+.objview .pop .opt.masquee svg,
+.fam-btn.neuve svg {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+}
+.fam-modale .fam-editeur {
+  padding: 14px 16px;
+  align-content: start;
+  overflow: auto;
+}
+.fam-modale .rien-objet {
+  padding: 16px;
+}
+/* Masquée : encore là pour qu'on la réaffiche, mais en retrait. */
+.objview .fam-btn.masquee .lib,
+.objview .pop .opt.masquee .lib {
+  color: var(--text-faint);
+  text-decoration: line-through;
+  text-decoration-color: var(--line);
+}
+.fam-rangs .fam-btn svg {
+  width: 11px;
+  height: 11px;
+  opacity: 0.7;
+}
+/* Verrouillée : elle a servi ailleurs, on la regarde sans la toucher. */
+.fam-verrou {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+  margin: 0;
+  padding: 8px 10px;
+  border: 1px solid var(--brass-line);
+  border-radius: 5px;
+  background: var(--brass-wash);
+  font-size: 11.5px;
+  line-height: 1.45;
+  color: var(--text-dim);
+}
+.fam-verrou svg {
+  width: 13px;
+  height: 13px;
+  flex: none;
+  margin-top: 1px;
+  stroke: var(--brass-ink);
+  fill: none;
+  stroke-width: 1.6;
+}
+.fam-editeur.fige .grid-glyphes .gl:not(.on),
+.fam-editeur.fige .teintes-grille .sw:not(.on) {
+  opacity: 0.3;
+  cursor: default;
+}
+.fam-editeur.fige .champ input {
+  opacity: 0.7;
 }
 
 /* ============================================================
@@ -12878,7 +13526,8 @@ button.ou-etat:hover {
 }
 .ol-ligne {
   display: grid;
-  grid-template-columns: 20px minmax(0, 1fr) auto auto 22px 20px;
+  /* glyphe, nom, alerte, quantité, état, donner, reprendre */
+  grid-template-columns: 20px minmax(0, 1fr) auto auto auto 22px 20px;
   align-items: center;
   gap: 7px;
   padding: 3px 5px;
@@ -13025,6 +13674,32 @@ button.ou-etat:hover {
   display: block;
   padding: 4px 8px 5px;
 }
+/* La croix du menu : la liste des lieux peut le remplir, et il faut toujours
+   un moyen visible d'en sortir sans rien donner. */
+.pop.menu-donner > .md-fermer {
+  position: sticky;
+  top: 0;
+  float: right;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: var(--text-faint);
+  background: var(--raised);
+}
+.pop.menu-donner > .md-fermer:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+.pop.menu-donner > .md-fermer svg {
+  width: 11px;
+  height: 11px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
 .pop.menu-donner hr {
   border: 0;
   border-top: 1px solid var(--line-soft);
@@ -13081,7 +13756,8 @@ button.ou-etat:hover {
 /* Le voile qui ferme au premier clic ailleurs — le panneau s'ouvrant hors des
    modules qui ont déjà le leur, il lui en faut un partout. */
 .volet-lieu .pop-fond,
-.fl-cote .pop-fond {
+.fl-cote .pop-fond,
+.objets-scene .pop-fond {
   position: fixed;
   inset: 0;
   z-index: 59;
@@ -14332,6 +15008,57 @@ ul[data-type='taskList'] li[data-checked='true'] > div {
   touch-action: none;
   z-index: 5;
 }
+/* Caler l'image sous les murs : le cadre des murs reste dessiné, l'image
+   glisse dessous. */
+.calque-calage {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  cursor: grab;
+  touch-action: none;
+  outline: 2px dashed var(--brass, #c9a227);
+  outline-offset: -1px;
+}
+.calque-calage:active {
+  cursor: grabbing;
+}
+/* La barre du calage passe à la ligne sous la rotation : la grille, puis l'aide. */
+.annot-barre:has(.cal-saut) {
+  flex-wrap: wrap;
+}
+.annot-barre .cal-saut {
+  flex-basis: 100%;
+  height: 0;
+}
+/* Des curseurs courts : on y règle au plus juste, la valeur se tape à côté. */
+.cal-barre {
+  gap: 6px 8px;
+  padding: 5px 8px;
+}
+.cal-barre input[type='range'] {
+  flex: none;
+  width: 90px;
+}
+.cal-barre label + input[type='range'] {
+  margin-left: -2px;
+}
+.cal-barre > label:not(.coche) {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+/* Une grille droite, fixe : c'est l'image qui tourne dessous. */
+.cal-grille {
+  position: absolute;
+  inset: 0;
+  z-index: 4;
+  pointer-events: none;
+  background-image:
+    linear-gradient(to right, rgba(255, 255, 255, 0.35) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.35) 1px, transparent 1px);
+  background-size: 40px 40px;
+  background-position: center;
+  mix-blend-mode: difference;
+}
 .calque-rect svg {
   position: absolute;
   inset: 0;
@@ -14512,6 +15239,23 @@ ul[data-type='taskList'] li[data-checked='true'] > div {
 .modal footer .rc-centre {
   margin-right: auto;
 }
+/* Le bandeau d'une carte de l'arborescence : un cadre large, l'aperçu dessous. */
+.modal.rc-fenetre.rc-bandeau {
+  width: min(560px, 100%);
+}
+.rc-bandeau .rc-corps {
+  grid-template-columns: minmax(0, 1fr);
+}
+.rc-bandeau .rc-scene {
+  width: 100%;
+}
+.rc-cadre {
+  position: absolute;
+  inset: 0;
+  outline: 1px dashed rgba(240, 209, 147, 0.7);
+  outline-offset: -1px;
+  pointer-events: none;
+}
 
 /* L'angle droit d'un lieu : un petit carré dans le coin. */
 .contours-lieux .contour .angle-droit {
@@ -14551,4 +15295,3752 @@ ul[data-type='taskList'] li[data-checked='true'] > div {
   text-align: center;
   pointer-events: none;
   box-shadow: 0 3px 12px rgba(0, 0, 0, 0.4);
+}
+
+/* ============================================================
+   Les tours — à qui de jouer (Paravent et Régie)
+   ============================================================ */
+
+/*
+ * La zone sous la barre de la scène. Elle ne prend que la hauteur de la frise ;
+ * l'initiative s'ouvre par-dessus la scène, sans pousser l'image ni faire
+ * défiler la page.
+ */
+.tr-zone {
+  position: relative;
+  flex: none;
+  z-index: 40;
+}
+.tr-zone:not(:has(.tr-frise)) {
+  height: 0;
+}
+
+.tr-frise {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border: 1px solid var(--brass-line);
+  border-radius: 7px;
+  background: linear-gradient(90deg, var(--brass-wash), var(--surface) 70%);
+}
+.tr-round {
+  flex: none;
+  display: grid;
+  justify-items: center;
+  line-height: 1;
+  min-width: 42px;
+}
+.tr-round .eyebrow {
+  font-size: 9px;
+}
+.tr-round b {
+  font: 600 20px 'Fraunces Variable', Georgia, serif;
+  color: var(--brass-ink);
+}
+.tr-ordre {
+  list-style: none;
+  margin: 0;
+  padding: 3px 2px;
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.tr-jeton {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px 3px 3px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  background: var(--surface);
+  cursor: pointer;
+  white-space: nowrap;
+  user-select: none;
+  font-size: 12px;
+}
+.tr-jeton:hover {
+  border-color: var(--text-faint);
+}
+.tr-jeton.fait {
+  opacity: 0.45;
+}
+.tr-jeton.actif {
+  opacity: 1;
+  padding: 4px 11px 4px 4px;
+  border-color: var(--brass);
+  background: var(--brass-wash);
+  box-shadow: 0 0 0 3px rgba(216, 169, 74, 0.16);
+}
+.tr-jeton.actif .tr-nom {
+  font-weight: 600;
+  color: var(--brass-ink);
+}
+.tr-jeton.actif .tr-rond {
+  width: 28px;
+  height: 28px;
+}
+.tr-jeton.glisse {
+  opacity: 0.3;
+}
+.tr-ini {
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+/* Caché aux joueurs : un œil barré, en pointillé comme les pions embusqués. */
+.tr-jeton.cache {
+  border-style: dashed;
+}
+.tr-cache {
+  width: 7px;
+  height: 7px;
+  border-radius: 99px;
+  border: 1px dashed var(--text-faint);
+}
+
+.tr-rond {
+  position: relative;
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border-radius: 99px;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  border: 2px solid var(--pion-ring, var(--brass));
+  background: var(--pion-fill, var(--sunk));
+  color: var(--pion-ink, var(--brass-ink));
+  font: 500 9px 'IBM Plex Mono', monospace;
+}
+.tr-rond img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.tr-gestes {
+  flex: none;
+  display: flex;
+  gap: 5px;
+}
+.tr-gestes kbd {
+  font: 500 9.5px 'IBM Plex Mono', monospace;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0 3px;
+  opacity: 0.7;
+}
+
+/* ---------- l'initiative ---------- */
+.tr-init {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  max-width: 720px;
+  margin-inline: auto;
+  max-height: min(70vh, 520px);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--raised);
+  box-shadow: var(--shadow-lift);
+}
+.tr-zone:not(:has(.tr-frise)) .tr-init {
+  top: 0;
+}
+.tr-init-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  padding: 12px 14px 8px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.tr-init-tete h3 {
+  margin: 0;
+  font: 600 16px 'Fraunces Variable', Georgia, serif;
+}
+.tr-init-tete p {
+  margin: 0;
+  flex: 1 1 260px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.tr-carac {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.tr-init-liste {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  padding: 4px 8px;
+}
+.tr-init-liste table {
+  width: 100%;
+  border-collapse: collapse;
+  font-variant-numeric: tabular-nums;
+}
+.tr-init-liste th {
+  text-align: left;
+  font: 500 10px 'IBM Plex Mono', monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.07em;
+  color: var(--label);
+  padding: 4px 6px;
+  border-bottom: 1px solid var(--line);
+}
+.tr-init-liste td {
+  padding: 5px 6px;
+  border-bottom: 1px solid var(--line-soft);
+  vertical-align: middle;
+}
+.tr-qui {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.tr-qui small {
+  display: block;
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+.tr-init-liste input[type='number'] {
+  width: 56px;
+}
+.tr-bonus {
+  color: var(--text-dim);
+}
+.tr-total {
+  font-size: 15px;
+  color: var(--brass-ink);
+}
+.tr-total.vide {
+  color: var(--text-faint);
+}
+.tr-toujours {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.btn.tr-cache-btn {
+  border-style: dashed;
+  color: var(--text-faint);
+}
+.tr-vide {
+  padding: 14px 6px;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+.tr-init-pied {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* Chronologie, onglet Lieux : la description du lieu, écrite sur place. */
+.lieu-desc .field {
+  margin-bottom: 14px;
+}
+/* La page est claire : le champ prend son papier, pas le fond sombre de
+   l'application, sans quoi l'encre de la page s'y perd. */
+.lieu-desc .field textarea {
+  background: var(--surface);
+  color: var(--text);
+  border-color: var(--line);
+  font-size: 14px;
+  line-height: 1.5;
+  padding: 8px 10px;
+}
+
+/* Paravent, onglet Lieux : l'arbre des lieux se lit à son retrait, et le
+   texte garde les retours à la ligne de son fichier. */
+.pupitre .moment.pu-lieu {
+  padding-left: calc(8px + var(--prof, 0) * 14px);
+}
+.pu-lieu-lecture .read-body p {
+  white-space: pre-line;
+}
+
+/* ---- l'horloge de séance, au pied du rail ----
+   Juste au-dessus de la plaque : on la touche en début de soirée, à la pause
+   du repas, à la fin. Le temps affiché est le temps joué, pauses déduites. */
+.horloge-seance {
+  flex: none;
+  display: grid;
+  gap: 5px;
+  padding: 8px 12px 9px;
+  border-top: 1px solid var(--line-soft);
+}
+.hs-tete {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 6px;
+}
+.hs-etat {
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+.hs-en-cours .hs-etat {
+  color: var(--brass);
+}
+.hs-temps {
+  font-size: 20px;
+  line-height: 1.1;
+  color: var(--text);
+}
+.hs-pause .hs-temps,
+.hs-finie .hs-temps {
+  color: var(--text-dim);
+}
+.hs-detail {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.hs-gestes {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.hs-large {
+  width: 100%;
+  justify-content: center;
+}
+
+/* ------------------------------------------------------------
+   L'objet croisé en plusieurs lieux
+   ------------------------------------------------------------ */
+
+/* Un triangle couleur de sang : on le voit sans qu'il crie. Le détail — quels
+   lieux — est dans l'infobulle, au survol. */
+.alerte-lieux {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-left: 5px;
+  padding: 0 4px;
+  height: 17px;
+  border-radius: 9px;
+  vertical-align: middle;
+  color: var(--blood);
+  background: color-mix(in oklab, var(--blood) 14%, transparent);
+  font-size: 10.5px;
+  line-height: 1;
+  cursor: help;
+}
+.alerte-lieux svg {
+  width: 12px;
+  height: 12px;
+  stroke-width: 1.8;
+}
+.ol-ligne .alerte-lieux,
+.ou-ligne .alerte-lieux,
+.liste-objets .alerte-lieux {
+  margin-left: 0;
+}
+
+/* ------------------------------------------------------------
+   Les objets de la scène — Paravent et Régie
+   ------------------------------------------------------------ */
+
+/* Le chiffre du bouton « Objets » : combien sont posés dans le lieu affiché. */
+.os-badge {
+  display: inline-grid;
+  place-items: center;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 4px;
+  margin-left: 2px;
+  border-radius: 8px;
+  background: var(--brass);
+  color: #101314;
+  font-size: 10px;
+  font-weight: 600;
+  line-height: 1;
+}
+.objets-scene .os-vide {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-faint);
+  line-height: 1.45;
+}
+.os-g {
+  flex: none;
+  display: grid;
+  place-items: center;
+  color: var(--pion-ring, var(--text-faint));
+}
+.os-g .glyphe {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.2;
+}
+.os-ligne .tb-nom {
+  align-items: center;
+}
+.os-nm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.os-ligne .alerte-lieux {
+  margin-left: 0;
+}
+.os-ligne .tb-oeil:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.os-ligne .tb-oeil:disabled:hover {
+  background: none;
+  color: var(--text-faint);
+}
+
+/* ------------------------------------------------------------
+   La valeur d'un curseur, qu'on peut aussi taper (Valeur.tsx)
+   ------------------------------------------------------------ */
+
+/* Elle se lit comme l'ancien chiffre — même police, même couleur, apportées
+   par la classe voisine (.num, .val…) — et un pointillé dessous dit qu'on
+   peut la saisir. */
+input.valeur-saisie {
+  flex: none;
+  min-width: 0;
+  padding: 0 1px;
+  margin: 0;
+  border: 0;
+  border-bottom: 1px dashed color-mix(in oklab, currentColor 35%, transparent);
+  border-radius: 0;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  text-align: right;
+  box-shadow: none;
+  cursor: text;
+}
+input.valeur-saisie:hover:not(:disabled) {
+  border-bottom-color: currentColor;
+}
+input.valeur-saisie:focus {
+  outline: none;
+  border-bottom: 1px solid var(--brass);
+  background: color-mix(in oklab, var(--brass) 10%, transparent);
+  text-align: left;
+}
+input.valeur-saisie:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+/* ============================================================
+   Les inventaires partagés — page Objets
+   ============================================================ */
+
+.objview .inv-titre {
+  display: block;
+  padding: 4px 8px 5px;
+}
+.objview .inv-btn svg,
+.objview .inv-neuf svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  stroke: var(--brass);
+  fill: none;
+  stroke-width: 1.4;
+}
+.objview .inv-neuf {
+  color: var(--text-faint);
+}
+.objview .inv-neuf svg {
+  stroke: currentColor;
+}
+.objview .inv-neuf:hover {
+  color: var(--brass-ink);
+}
+/* On y lâche une carte : la cible se signale avant qu'on ouvre la main. */
+.objview .inv-btn.vise {
+  border-color: var(--brass);
+  border-style: dashed;
+  background: var(--brass-wash);
+}
+.inv-ouvert {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--moss);
+  border: 1px solid color-mix(in srgb, var(--moss) 45%, transparent);
+  background: var(--moss-wash);
+  border-radius: 99px;
+  padding: 0 6px;
+}
+
+.objview .inv-tete {
+  gap: 8px;
+}
+.objview .inv-tete > svg {
+  width: 17px;
+  height: 17px;
+  flex: none;
+  stroke: var(--brass);
+  fill: none;
+  stroke-width: 1.4;
+}
+.inv-nom {
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-size: 17px;
+  color: var(--text);
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 2px 6px;
+  min-width: 0;
+  width: min(260px, 100%);
+}
+.inv-nom:hover {
+  border-color: var(--line);
+}
+.inv-nom:focus {
+  outline: none;
+  border-color: var(--brass-line);
+  background: var(--sunk);
+}
+/* L'interrupteur ouvert / fermé : vert quand les téléphones le voient. */
+.inv-bascule {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  font-size: 12px;
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 3px 11px 3px 4px;
+  background: var(--raised);
+}
+.inv-bascule .rail {
+  position: relative;
+  width: 28px;
+  height: 16px;
+  border-radius: 99px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+}
+.inv-bascule .rail::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  transition: transform 0.15s, background 0.15s;
+}
+.inv-bascule[aria-pressed='true'] {
+  color: var(--text);
+  border-color: color-mix(in srgb, var(--moss) 55%, transparent);
+  background: var(--moss-wash);
+}
+.inv-bascule[aria-pressed='true'] .rail::after {
+  transform: translateX(12px);
+  background: var(--moss);
+}
+
+.objview .inv-corps {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.inv-aide {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.inv-outils {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.inv-vue .obj-carte {
+  position: relative;
+  cursor: pointer;
+}
+.inv-retirer {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  display: none;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-dim);
+}
+.inv-retirer svg {
+  width: 9px;
+  height: 9px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+.inv-vue .obj-carte:hover .inv-retirer,
+.inv-retirer:focus-visible {
+  display: grid;
+}
+.inv-retirer:hover {
+  color: var(--text);
+  border-color: var(--text-faint);
+}
+/* Combien il en reste dans l'inventaire, réglable de la carte même. */
+.inv-qte {
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+  gap: 2px;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  font-size: 12px;
+}
+.inv-qte button {
+  width: 20px;
+  height: 18px;
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.inv-qte button:hover:not(:disabled) {
+  color: var(--text);
+}
+.inv-qte button:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.inv-qte .num {
+  min-width: 14px;
+  text-align: center;
+  color: var(--text);
+}
+.inv-journal {
+  border-top: 1px solid var(--line-soft);
+  padding-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.inv-journal ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+.inv-journal li {
+  display: flex;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.inv-journal time {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.objview .inv-pied {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* Remplir : tout un rayon d'un coup, ou un par un. */
+.pop.inv-menu {
+  position: fixed;
+  z-index: 60;
+  width: 280px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 6px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow-lift);
+}
+.pop.inv-menu > .eyebrow {
+  display: block;
+  padding: 4px 8px 5px;
+}
+.pop.inv-menu hr {
+  border: 0;
+  border-top: 1px solid var(--line-soft);
+  margin: 5px 2px;
+}
+.pop.inv-menu .opt {
+  width: 100%;
+  min-height: 0;
+  padding: 6px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  font-size: 12.5px;
+  text-align: left;
+}
+.pop.inv-menu .opt:hover {
+  background: var(--surface);
+}
+.pop.inv-menu .opt .t {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.pop.inv-menu .opt .n {
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+.pop.inv-menu .pastille {
+  width: 10px;
+  height: 10px;
+  flex: none;
+  border-radius: 2px;
+  border: 1px solid var(--line);
+  background: var(--pion-ring, var(--text-faint));
+}
+
+.inv-modale {
+  width: min(460px, 100%);
+}
+.inv-modale > .filtre-inline {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 12px 16px 0;
+  padding: 5px 9px;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+.inv-modale > .filtre-inline input {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 0;
+  outline: none;
+  color: var(--text);
+  font: inherit;
+}
+.inv-modale > .filtre-inline svg {
+  width: 13px;
+  height: 13px;
+  stroke: var(--text-faint);
+  fill: none;
+  stroke-width: 1.6;
+}
+.inv-cases {
+  padding: 10px 16px 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-height: 46vh;
+  overflow: auto;
+}
+.inv-cases .opt {
+  min-height: 30px;
+  font-size: 13px;
+}
+.inv-cases .opt.pris {
+  opacity: 0.5;
+  cursor: default;
+}
+.inv-cases .opt .t {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ============================================================
+   La trame de la séance (.tm-*) — Préparation, et Paravent par-dessus
+   ------------------------------------------------------------ */
+.tm-ouverture {
+  --k: var(--iris);
+}
+.tm-scene {
+  --k: var(--text-dim);
+}
+.tm-objectif {
+  --k: var(--brass);
+}
+.tm-fin {
+  --k: var(--blood);
+}
+
+.tm-outils {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.tm-pastille {
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  background: var(--k);
+}
+.tm-objectif.tm-pastille {
+  border-radius: 50%;
+}
+.tm-fin.tm-pastille {
+  transform: rotate(45deg) scale(0.85);
+}
+
+.tm-grille {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 300px;
+  gap: 14px;
+}
+.tm-cote {
+  overflow: auto;
+}
+
+/* ---- le plan ---- */
+.tm-plan {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background-color: var(--sunk);
+  background-image: radial-gradient(color-mix(in srgb, var(--text) 9%, transparent) 1.2px, transparent 1.3px);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.tm-plan:active {
+  cursor: grabbing;
+}
+.tm-monde {
+  position: absolute;
+  left: 0;
+  top: 0;
+  transform-origin: 0 0;
+}
+.tm-liens {
+  position: absolute;
+  left: 0;
+  top: 0;
+  overflow: visible;
+  pointer-events: none;
+}
+.tm-lien {
+  fill: none;
+  stroke: var(--line);
+  stroke-width: 2;
+}
+.tm-lien.franchi {
+  stroke: var(--moss);
+}
+.tm-lien.choisi {
+  stroke: var(--brass);
+  stroke-width: 3;
+}
+.tm-lien-prise {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 14;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+.tm-pointe {
+  fill: var(--line);
+}
+.tm-pointe.franchi {
+  fill: var(--moss);
+}
+.tm-pointe.choisi {
+  fill: var(--brass);
+}
+.tm-lien.voisin {
+  stroke: #e8b923;
+  stroke-width: 3;
+}
+.tm-pointe.voisin {
+  fill: #e8b923;
+}
+.tm-mot {
+  font: 10.5px 'IBM Plex Mono', monospace;
+  fill: var(--text-dim);
+  paint-order: stroke;
+  stroke: var(--sunk);
+  stroke-width: 4px;
+}
+.tm-brouillon {
+  fill: none;
+  stroke: var(--brass);
+  stroke-width: 2;
+  stroke-dasharray: 5 4;
+}
+
+/* ---- une carte ---- */
+.tm-carte {
+  position: absolute;
+  width: 210px;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  padding: 8px 10px 7px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--raised);
+  box-shadow: var(--shadow);
+  cursor: pointer;
+  transition: background 0.2s, border-color 0.2s, opacity 0.2s;
+}
+.tm-carte:hover {
+  border-color: var(--text-faint);
+}
+.tm-carte.choisie {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 1px var(--brass), var(--shadow);
+}
+.tm-carte.fait {
+  background: color-mix(in srgb, var(--moss) 28%, var(--raised));
+  border-color: var(--moss);
+}
+.tm-cadre-image {
+  position: relative;
+  overflow: hidden;
+  background: var(--sunk);
+}
+/* Sans cadre choisi, l'image au centre remplit le bandeau. */
+.tm-cadre-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.tm-vignette {
+  flex: none;
+  height: 82px;
+  margin: -8px -10px 3px;
+  border-radius: 6px 6px 0 0;
+  border-bottom: 1px solid var(--line);
+}
+.tm-carte.fait .tm-vignette {
+  filter: saturate(0.55);
+}
+.tm-type {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font: 500 9.5px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--k);
+}
+.tm-type i,
+.tm-types i,
+.tm-liste i {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 2px;
+  background: var(--k);
+}
+.tm-objectif .tm-type i,
+.tm-types .tm-objectif i,
+.tm-liste .tm-objectif i {
+  border-radius: 50%;
+}
+.tm-fin .tm-type i,
+.tm-types .tm-fin i,
+.tm-liste .tm-fin i {
+  transform: rotate(45deg) scale(0.9);
+}
+.tm-regle {
+  margin-left: auto;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  color: var(--text-faint);
+}
+.tm-carte h4 {
+  margin: 0;
+  font: 600 14px/1.2 'Fraunces Variable', Georgia, serif;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tm-carte p {
+  margin: 0;
+  font-size: 11.5px;
+  line-height: 1.35;
+  color: var(--text-dim);
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.tm-attaches {
+  margin-top: auto;
+  font: 10.5px 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.tm-coche {
+  position: absolute;
+  top: -9px;
+  right: -9px;
+  z-index: 1;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  background: var(--moss);
+  color: var(--ground);
+  font-size: 13px;
+  font-weight: 700;
+}
+.tm-port {
+  position: absolute;
+  right: -7px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid var(--brass);
+  background: var(--raised);
+  cursor: crosshair;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.tm-carte:hover .tm-port,
+.tm-carte.choisie .tm-port {
+  opacity: 1;
+}
+/* En jeu : ce qui est à portée se détache, le reste attend. */
+.tm-en-jeu .tm-carte.verrou:not(.fait) {
+  opacity: 0.4;
+}
+.tm-en-jeu .tm-carte.verrou:not(.fait) .tm-vignette {
+  filter: grayscale(1);
+}
+.tm-en-jeu .tm-carte.portee:not(.fait) {
+  border-color: var(--brass);
+  border-style: dashed;
+}
+
+.tm-vide {
+  position: absolute;
+  inset: 0;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 8px;
+  text-align: center;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.tm-vide svg {
+  width: 30px;
+  height: 30px;
+  opacity: 0.6;
+}
+.tm-vide b {
+  color: var(--text-dim);
+}
+.tm-vide .btn {
+  pointer-events: auto;
+  margin-top: 4px;
+}
+.tm-legende {
+  position: absolute;
+  left: 10px;
+  bottom: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  font: 10.5px 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.tm-legende span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.tm-legende i {
+  width: 10px;
+  height: 10px;
+  border-radius: 2px;
+  border: 1px solid var(--line);
+}
+.tm-legende .l-fait {
+  background: color-mix(in srgb, var(--moss) 28%, var(--raised));
+  border-color: var(--moss);
+}
+.tm-legende .l-portee {
+  border: 1px dashed var(--brass);
+}
+.tm-legende .l-verrou {
+  background: var(--raised);
+  opacity: 0.45;
+}
+.tm-selection {
+  position: absolute;
+  left: 10px;
+  top: 8px;
+  padding: 4px 9px;
+  border: 1px solid var(--brass-line);
+  border-radius: 5px;
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+  font: 11px 'IBM Plex Mono', monospace;
+  pointer-events: none;
+}
+.tm-zoom {
+  position: absolute;
+  right: 8px;
+  bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  cursor: default;
+}
+.tm-zoom .num {
+  min-width: 40px;
+  text-align: center;
+  font: 11px 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
+}
+
+/* ---- le volet ---- */
+.tm-volet {
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 12px 14px 18px;
+  min-width: 0;
+}
+.tm-volet h3 {
+  margin: 0;
+  font: 600 15px/1.25 'Fraunces Variable', Georgia, serif;
+  text-wrap: balance;
+}
+.tm-aide {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.tm-types,
+.tm-liste {
+  display: grid;
+  gap: 4px;
+}
+.tm-types span,
+.tm-liste button {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 9px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--raised);
+  font-size: 12.5px;
+  text-align: left;
+}
+.tm-liste button:hover {
+  border-color: var(--brass-line);
+}
+.tm-liste button.fait {
+  background: color-mix(in srgb, var(--moss) 22%, var(--raised));
+}
+.tm-liste span {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.tm-types small,
+.tm-liste small {
+  margin-left: auto;
+  font: 10.5px 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+.tm-seg {
+  display: flex;
+  width: 100%;
+}
+.tm-seg button {
+  flex: 1;
+  padding-inline: 4px;
+}
+.tm-image {
+  display: block;
+  width: 100%;
+  padding: 0;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--sunk);
+  cursor: pointer;
+}
+.tm-image:hover:not(:disabled) {
+  border-color: var(--brass);
+}
+/* Les proportions du bandeau de la carte : 208 × 82. */
+.tm-image .tm-cadre-image {
+  aspect-ratio: 208 / 82;
+}
+.tm-chemin {
+  font: 10.5px 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+  overflow-wrap: anywhere;
+}
+.tm-actions,
+.tm-puces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+/* ---- au Paravent ---- */
+.modal.tm-jeu {
+  width: min(1500px, 100%);
+  height: 100%;
+}
+.tm-jeu .spacer {
+  flex: 1;
+}
+.tm-compte {
+  font: 11.5px 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+}
+.tm-jeu-corps {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 280px;
+}
+.tm-jeu-corps .tm-plan {
+  border: 0;
+  border-radius: 0;
+}
+.tm-jeu-corps .tm-volet {
+  border-left: 1px solid var(--line);
+  overflow: auto;
+}
+.tm-jauge {
+  height: 6px;
+  border-radius: 3px;
+  border: 1px solid var(--line);
+  background: var(--sunk);
+  overflow: hidden;
+}
+.tm-jauge div {
+  height: 100%;
+  background: var(--moss);
+  transition: width 0.3s;
+}
+
+/* ============================================================
+   La fiche d'un lieu — le lieu à gauche sur toute la hauteur ; en
+   haut, découvertes et déclencheurs puis scénarios ; en bas, PNJ
+   puis objets. Chaque panneau défile chez lui, jamais la page.
+   ============================================================ */
+/* Au bout de la barre, sur la même ligne que les modes : aligné en bas comme eux. */
+.fl-termine {
+  align-self: center;
+}
+
+/* ============================================================
+   L'éditeur de plan (v2) : des outils à gauche, une barre d'options
+   au-dessus du plan, ce qui est choisi à droite, l'état en bas.
+   ============================================================ */
+.pe-tete {
+  gap: 8px;
+  align-items: center;
+}
+.pe-menu-hote {
+  position: relative;
+}
+.pop.menu-donner.pe-menu {
+  width: 290px;
+}
+.pop.menu-donner.pe-menu .opt {
+  align-items: flex-start;
+  white-space: normal;
+}
+.pop.menu-donner.pe-menu .opt > svg {
+  margin-top: 2px;
+  flex: none;
+}
+.pe-det {
+  display: block;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.fiche-lieu.pe-corps {
+  grid-template-columns: 48px minmax(0, 1fr) minmax(270px, 320px);
+  gap: 12px;
+}
+.fiche-lieu.pe-corps:not(:has(.pe-outils)) {
+  grid-template-columns: minmax(0, 1fr) minmax(270px, 320px);
+}
+.pe-outils {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 6px 4px;
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+  background: var(--surface);
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.pe-groupe {
+  font: 500 8.5px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--label);
+  margin: 8px 0 1px;
+}
+.pe-outil {
+  position: relative;
+  flex: none;
+  width: 38px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: none;
+  color: var(--text-dim);
+}
+.pe-outil .ico,
+.pe-outil > svg {
+  width: 17px;
+  height: 17px;
+}
+.pe-outil:hover:not(:disabled) {
+  background: var(--raised);
+  color: var(--text);
+}
+.pe-outil.on {
+  background: var(--brass-wash);
+  border-color: var(--brass-line);
+  color: var(--brass-ink);
+}
+.pe-outil.mj {
+  color: var(--iris);
+}
+.pe-outil.mj.on {
+  background: var(--iris-wash);
+  border-color: color-mix(in srgb, var(--iris) 45%, transparent);
+  color: color-mix(in srgb, var(--iris) 60%, white);
+}
+.pe-outil:disabled {
+  opacity: 0.3;
+  cursor: default;
+}
+.pe-touche {
+  position: absolute;
+  right: 2px;
+  bottom: 1px;
+  font: 8.5px 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+}
+.pe-outil.on .pe-touche {
+  color: var(--brass);
+}
+
+/* La barre au-dessus du plan : neutre pour un outil, dorée pour un geste en
+   cours (caler, rogner, étalonner), verte pour l'essai. Une hauteur commune :
+   le plan ne saute pas quand on passe de l'une à l'autre. */
+.annot-barre.pe-barre {
+  flex-wrap: wrap;
+  min-height: 46px;
+  align-content: center;
+  border-color: var(--line-soft);
+  background: var(--surface);
+}
+.annot-barre.pe-barre.pe-geste {
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+.annot-barre.pe-barre.pe-essai {
+  border-color: color-mix(in srgb, var(--moss) 45%, transparent);
+  background: var(--moss-wash);
+}
+.annot-barre.pe-barre.pe-mj {
+  border-color: color-mix(in srgb, var(--iris) 35%, transparent);
+}
+.pe-nom {
+  font-weight: 600;
+  font-size: 13px;
+  flex: none;
+}
+.pe-essai .pe-nom {
+  color: var(--moss);
+}
+.pe-mj .pe-nom {
+  color: var(--iris);
+}
+.pe-barre label {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.pe-barre input[type='range'] {
+  width: 110px;
+}
+.pe-barre .v {
+  font: 11px 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+  min-width: 42px;
+}
+.pe-barre .note {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.pe-barre .btn .ico {
+  width: 13px;
+  height: 13px;
+}
+.pe-barre kbd,
+.pe-etat kbd {
+  font: 500 9.5px 'IBM Plex Mono', monospace;
+  border: 1px solid currentColor;
+  border-radius: 3px;
+  padding: 0 3px;
+  opacity: 0.65;
+}
+
+/* Les calques et la vue, posés sur le plan, dans ses coins du bas. */
+.pe-calques,
+.pe-vue {
+  position: absolute;
+  bottom: 10px;
+  z-index: 6;
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: color-mix(in srgb, var(--ground) 88%, transparent);
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.pe-calques {
+  left: 10px;
+}
+.pe-vue {
+  right: 10px;
+  gap: 6px;
+  padding-inline: 8px;
+}
+.pe-calques button,
+.pe-vue button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: none;
+  border-radius: 4px;
+  padding: 3px 7px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.pe-calques button[aria-pressed='true'],
+.pe-vue button[aria-pressed='true'] {
+  color: var(--text);
+}
+.pe-calques button:hover,
+.pe-vue button:hover:not(:disabled) {
+  background: var(--raised);
+}
+.pe-vue button[aria-pressed='true'] {
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
+.pe-vue button:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.pe-calques i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1px solid currentColor;
+}
+.pe-calques button[aria-pressed='true'] i {
+  background: currentColor;
+}
+.pe-vue svg {
+  width: 14px;
+  height: 14px;
+  color: var(--text-faint);
+  display: block;
+}
+.pe-vue input[type='range'] {
+  width: 80px;
+}
+.pe-vue .v {
+  font: 11px 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+  min-width: 38px;
+}
+.pe-sep {
+  width: 1px;
+  height: 16px;
+  background: var(--line);
+}
+
+/* L'état du plan, toujours lisible. */
+.pe-etat {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  flex-wrap: wrap;
+  padding: 2px 4px;
+  font: 11px 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+}
+.pe-etat b {
+  color: var(--text-dim);
+  font-weight: 500;
+}
+.pe-enreg {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+}
+.pe-enreg::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--moss);
+}
+
+/* Le volet : ce qui est choisi, sinon l'état du plan. */
+.pe-volet-titre {
+  margin: 0;
+  font: 600 15px 'Fraunces Variable', Georgia, serif;
+}
+.pe-vers-fiche {
+  margin: 0;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.pe-vers-fiche button {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--brass-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+/* Les réglages d'un mur, d'une porte ou d'une lampe : faits pour une barre,
+   rangés ici en colonne. */
+.pe-choix {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+}
+.pe-choix > .eyebrow {
+  flex-basis: 100%;
+  font-size: 11px;
+}
+.pe-choix > .murs-sep {
+  flex-basis: 100%;
+  width: auto;
+  height: 1px;
+  align-self: auto;
+  margin: 2px 0;
+  background: var(--line-soft);
+  opacity: 1;
+}
+.pe-choix > .spacer {
+  display: none;
+}
+.pe-choix .murs-reglage.lb-reglage {
+  width: 100%;
+}
+.pe-choix > .lb-note,
+.pe-choix > .note {
+  flex-basis: 100%;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+.pe-choix .lb-groupe {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+
+/* Les repères pris avec « Choisir » : le calque laisse passer le vide. */
+.annot-layer.edit.traversant {
+  pointer-events: none;
+}
+.annot-layer.edit.traversant .annot {
+  pointer-events: auto;
+}
+/* Trois colonnes : le lieu (étroit), ce qui peut arriver (large), qui et quoi. */
+.fdl-grille {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(250px, 0.72fr) minmax(0, 1.45fr) minmax(0, 1fr);
+  grid-template-rows: minmax(0, 1fr);
+  gap: 12px;
+}
+.fdl-pane {
+  min-height: 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.fdl-tete {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 11px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.fdl-tete h3 {
+  margin: 0;
+  font: 600 14.5px 'Fraunces Variable', Georgia, serif;
+}
+.fdl-compte {
+  font: 11px 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+}
+.fdl-corps {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 10px 11px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  scrollbar-width: thin;
+}
+.fdl-vide {
+  margin: 2px;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+.fdl-ajout,
+.fdl-lier {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 1px dashed var(--line);
+  background: none;
+  border-radius: 5px;
+  padding: 2px 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.fdl-ajout .ico {
+  width: 12px;
+  height: 12px;
+}
+.fdl-ajout:hover,
+.fdl-lier:hover,
+.fdl-lier[aria-expanded='true'] {
+  border-color: var(--brass);
+  border-style: solid;
+  color: var(--brass-ink);
+}
+.fdl-lier {
+  border-radius: 999px;
+}
+.fdl-masquer {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border: 1px solid var(--line);
+  background: none;
+  border-radius: 4px;
+  padding: 2px 8px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.fdl-masquer::before {
+  content: '';
+  width: 9px;
+  height: 9px;
+  border-radius: 2px;
+  border: 1px solid var(--text-faint);
+}
+.fdl-masquer[aria-pressed='true'] {
+  color: var(--brass-ink);
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+.fdl-masquer[aria-pressed='true']::before {
+  background: var(--brass);
+  border-color: var(--brass);
+}
+.fdl-masquer:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.fdl-icone {
+  border: 0;
+  background: none;
+  padding: 3px;
+  border-radius: 4px;
+  color: var(--text-faint);
+  display: inline-grid;
+  place-items: center;
+}
+.fdl-icone:hover {
+  color: var(--brass-ink);
+  background: var(--raised);
+}
+.fdl-icone .ico {
+  width: 13px;
+  height: 13px;
+}
+
+/* ---- le lieu ---- */
+.fdl-plan {
+  position: relative;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--sunk);
+}
+.fdl-plan img {
+  display: block;
+  width: 100%;
+  height: auto;
+}
+.fdl-plan svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.fdl-plan.sans {
+  aspect-ratio: 16 / 10;
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  font: 11px 'IBM Plex Mono', monospace;
+  background: repeating-linear-gradient(45deg, var(--raised) 0 8px, var(--surface) 8px 16px);
+}
+.fdl-zone {
+  fill: transparent;
+  stroke: var(--text-faint);
+  stroke-width: 1;
+  stroke-dasharray: 4 3;
+  vector-effect: non-scaling-stroke;
+}
+.fdl-zone.ici {
+  fill: color-mix(in srgb, var(--brass) 24%, transparent);
+  stroke: var(--brass);
+  stroke-width: 2;
+  stroke-dasharray: none;
+}
+.fdl-plan-pied {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fdl-plan-pied .fdl-compte {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fdl-lieu .eyebrow {
+  margin-top: 4px;
+}
+.fdl-texte {
+  flex: none;
+  min-height: 90px;
+  resize: vertical;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  padding: 4px 6px;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.fdl-texte.mj {
+  color: var(--text-dim);
+  font-size: 12.5px;
+  min-height: 140px;
+}
+.fdl-texte:hover {
+  border-color: var(--line-soft);
+}
+.fdl-texte:focus {
+  outline: none;
+  border-color: var(--brass-line);
+  background: var(--sunk);
+}
+
+/* ---- découvertes et déclencheurs ---- */
+.fdl-cartes-ligne {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.fdl-carte {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  padding: 8px 10px;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  gap: 4px 9px;
+  align-items: start;
+}
+.fdl-carte.fait {
+  opacity: 0.62;
+  padding-block: 6px;
+}
+.fdl-carte.fait:hover,
+.fdl-carte.fait.deplie {
+  opacity: 0.9;
+}
+.fdl-sorte {
+  width: 22px;
+  height: 22px;
+  border-radius: 5px;
+  display: grid;
+  place-items: center;
+}
+.fdl-sorte .ico {
+  width: 13px;
+  height: 13px;
+}
+.fdl-sorte.decouverte {
+  background: var(--azur-wash);
+  color: var(--azur);
+}
+.fdl-sorte.declencheur {
+  background: var(--brass-wash);
+  color: var(--brass);
+}
+.fdl-titre {
+  font-weight: 600;
+  font-size: 13px;
+  padding-top: 2px;
+  min-width: 0;
+}
+.fdl-carte.fait .fdl-titre {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-faint);
+}
+.fdl-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.fdl-coche {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font: 10.5px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.fdl-coche input {
+  accent-color: var(--brass);
+  margin: 0;
+}
+.fdl-si {
+  grid-column: 2 / 4;
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 2px 8px;
+  font-size: 12.5px;
+}
+.fdl-si dt {
+  font: 500 10.5px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  color: var(--label);
+  padding-top: 2px;
+}
+.fdl-si dd {
+  margin: 0;
+  color: var(--text-dim);
+  white-space: pre-line;
+}
+.fdl-liens {
+  grid-column: 2 / 4;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-top: 2px;
+}
+.fdl-puce {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  border-radius: 999px;
+  padding: 1px 8px 1px 2px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  max-width: 100%;
+}
+.fdl-puce:hover {
+  border-color: var(--brass-line);
+  color: var(--text);
+}
+.fdl-puce img,
+.fdl-puce .rond {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  object-fit: cover;
+  flex: none;
+}
+.fdl-puce .rond {
+  display: grid;
+  place-items: center;
+  background: var(--raised);
+  font-size: 9.5px;
+}
+.fdl-puce .rond .glyphe {
+  width: 11px;
+  height: 11px;
+}
+.fdl-puce.moment {
+  padding-left: 8px;
+  border-color: var(--brass-line);
+  color: var(--brass-ink);
+}
+.fdl-puce .x {
+  color: var(--text-faint);
+  margin-left: 2px;
+  font-size: 13px;
+  line-height: 1;
+}
+.fdl-puce:hover .x {
+  color: var(--blood);
+}
+.fdl-voir {
+  grid-column: 2 / 4;
+  justify-self: start;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: 11px 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+}
+.fdl-voir:hover {
+  color: var(--text);
+}
+.fdl-groupe {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+}
+.fdl-groupe::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line-soft);
+}
+
+/* une carte en édition */
+.fdl-carte.edition {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 7px;
+  border-color: var(--brass-line);
+  padding: 10px;
+  opacity: 1;
+}
+.fdl-carte.edition .fdl-liens {
+  grid-column: auto;
+}
+.fdl-bascule {
+  display: inline-flex;
+  justify-self: start;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.fdl-bascule button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 0;
+  background: none;
+  padding: 3px 10px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.fdl-bascule button + button {
+  border-left: 1px solid var(--line);
+}
+.fdl-bascule button.on {
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
+.fdl-bascule button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.fdl-bascule .ico {
+  width: 12px;
+  height: 12px;
+}
+.fdl-bascule.petite button {
+  padding: 1px 7px;
+  font-size: 11px;
+}
+.fdl-saisie {
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  color: var(--text);
+  padding: 4px 7px;
+  font: inherit;
+  font-size: 12.5px;
+  width: 100%;
+  min-width: 0;
+}
+textarea.fdl-saisie {
+  resize: vertical;
+  min-height: 46px;
+  line-height: 1.4;
+}
+.fdl-saisie:focus {
+  outline: none;
+  border-color: var(--brass-line);
+}
+.fdl-champ {
+  display: grid;
+  gap: 3px;
+}
+.fdl-choix {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  padding: 6px;
+  display: grid;
+  gap: 4px;
+}
+.fdl-choix-liste {
+  max-height: 220px;
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.fdl-choix-groupe {
+  font: 500 9.5px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--label);
+  padding: 6px 6px 2px;
+}
+.fdl-choix-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  border: 0;
+  background: none;
+  padding: 4px 6px;
+  border-radius: 4px;
+  text-align: left;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.fdl-choix-item:hover:not(:disabled) {
+  background: var(--raised);
+}
+.fdl-choix-item:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.fdl-choix-item img,
+.fdl-choix-item .rond {
+  width: 26px;
+  height: 26px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex: none;
+  background: var(--raised);
+  display: grid;
+  place-items: center;
+  font-size: 10px;
+  color: var(--text-faint);
+}
+.fdl-choix-item.pnj img,
+.fdl-choix-item.pnj .rond {
+  border-radius: 50%;
+}
+.fdl-choix-item .ou {
+  margin-left: auto;
+  font: 10.5px 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 45%;
+}
+.fdl-pied {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ---- scénarios ---- */
+.fdl-scen {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  padding: 6px 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.fdl-scen-tete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fdl-num {
+  font: 600 18px 'Fraunces Variable', Georgia, serif;
+  color: var(--brass);
+  min-width: 22px;
+  text-align: center;
+}
+.fdl-scen-titre {
+  flex: 1;
+  min-width: 0;
+  background: transparent;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  padding: 3px 5px;
+  color: var(--text);
+  font: inherit;
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.fdl-scen-titre:hover {
+  border-color: var(--line-soft);
+}
+.fdl-scen-titre:focus {
+  outline: none;
+  border-color: var(--brass-line);
+  background: var(--sunk);
+}
+.fdl-scen-info {
+  margin-left: 30px;
+  min-height: 80px;
+  resize: vertical;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 5px 7px;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.fdl-scen-info:focus {
+  outline: none;
+  border-color: var(--brass-line);
+}
+.fdl-scen .fdl-pied {
+  margin-left: 30px;
+}
+.fdl-scen-apercu {
+  margin-left: 30px;
+  border: 0;
+  background: none;
+  padding: 0;
+  text-align: left;
+  font-size: 12px;
+  color: var(--text-faint);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+/* ---- PNJ et objets ---- */
+.fdl-fiche {
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  padding: 8px;
+  display: grid;
+  grid-template-columns: 54px minmax(0, 1fr);
+  gap: 4px 10px;
+  transition:
+    box-shadow 0.2s,
+    border-color 0.2s;
+}
+.fdl-fiche.eclaire {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 2px var(--brass-wash);
+}
+.fdl-fiche > :not(.fdl-vig) {
+  grid-column: 2;
+  min-width: 0;
+}
+.fdl-vig {
+  grid-row: 1 / span 4;
+  width: 54px;
+  height: 54px;
+  border-radius: 5px;
+  object-fit: cover;
+  background: var(--sunk);
+}
+.fdl-vig.vide {
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  font: 12px 'IBM Plex Mono', monospace;
+}
+.fdl-vig .glyphe {
+  width: 24px;
+  height: 24px;
+}
+.fdl-fiche.pnj .fdl-vig {
+  border-radius: 50%;
+}
+.fdl-nom {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+}
+.fdl-ou {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.fdl-ou select.fdl-saisie {
+  width: auto;
+}
+.fdl-info {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  white-space: pre-line;
+}
+.fdl-info-saisie {
+  min-height: 38px;
+}
+.fdl-etat {
+  font: 500 10px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border: 0;
+  border-radius: 3px;
+  padding: 1px 5px;
+}
+.fdl-etat.cache {
+  background: var(--iris-wash);
+  color: var(--iris);
+}
+.fdl-etat.trouve {
+  background: var(--moss-wash);
+  color: var(--moss);
+}
+.fdl-etat.porte {
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
+
+/* ---- monter au niveau, descendre dans ses lieux ---- */
+.fdl-voisins {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin-top: 4px;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+}
+.fdl-voisins-liste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  margin-bottom: 4px;
+}
+/* Les pièces d'un niveau : une ligne chacune, ses PNJ et ses objets comptés. */
+.fdl-pieces {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 4px;
+}
+.fdl-piece {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  border: 1px solid var(--line-soft);
+  background: var(--raised);
+  border-radius: 5px;
+  padding: 4px 9px;
+  text-align: left;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.fdl-piece:hover {
+  border-color: var(--brass-line);
+}
+.fdl-piece-nom {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fdl-piece-compte {
+  font: 500 11px 'IBM Plex Mono', monospace;
+  color: var(--brass-ink);
+  white-space: nowrap;
+}
+.fdl-piece-compte.zero {
+  color: var(--text-faint);
+}
+.fdl-voisin {
+  border: 1px solid var(--line);
+  background: var(--raised);
+  border-radius: 5px;
+  padding: 3px 9px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.fdl-voisin:hover {
+  border-color: var(--brass-line);
+  color: var(--text);
+}
+.fdl-voisin.haut {
+  color: var(--brass-ink);
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+
+/* ---- v2 : la barre de la fiche — voisins nommés, état, plan ---- */
+.fdl-barre {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.fdl-voisins-noms {
+  display: flex;
+  gap: 6px;
+  min-width: 0;
+}
+.fdl-voisins-noms button {
+  border: 1px solid var(--line-soft);
+  background: var(--surface);
+  border-radius: 5px;
+  padding: 3px 9px;
+  font-size: 12px;
+  color: var(--text-dim);
+  max-width: 260px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fdl-voisins-noms button:hover {
+  color: var(--text);
+  border-color: var(--line);
+}
+.fdl-pastille {
+  font: 11px 'IBM Plex Mono', monospace;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.fdl-pastille b {
+  color: var(--text);
+  font-weight: 500;
+}
+
+/* ---- v2 : le lieu ---- */
+.fdl-tete-lieu {
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+}
+.fdl-tete-lieu h3 {
+  font-size: 17px;
+}
+.fdl-sorte-lieu {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+button.fdl-plan {
+  padding: 0;
+  cursor: zoom-in;
+  text-align: left;
+}
+button.fdl-plan:hover {
+  border-color: var(--brass-line);
+}
+.fdl-agrandir {
+  position: absolute;
+  right: 6px;
+  bottom: 6px;
+  background: color-mix(in srgb, var(--sunk) 82%, transparent);
+  color: var(--text-dim);
+  border-radius: 4px;
+  padding: 2px 7px;
+  font-size: 11px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+button.fdl-plan:hover .fdl-agrandir,
+button.fdl-plan:focus-visible .fdl-agrandir {
+  opacity: 1;
+}
+.fdl-plan.sans {
+  gap: 8px;
+  align-content: center;
+}
+.fdl-alire,
+.fdl-secret {
+  flex: none;
+  resize: vertical;
+  border-radius: 6px;
+  color: var(--text);
+  font: inherit;
+  line-height: 1.55;
+  padding: 9px 11px;
+}
+/* Le texte qu'on lit à voix haute : un encadré, comme dans un livre de scénario. */
+.fdl-alire {
+  min-height: 110px;
+  background: var(--raised);
+  border: 1px solid transparent;
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-style: italic;
+  font-size: 14px;
+}
+/* Ce que les joueurs ne doivent pas savoir : à part, en rouge sourd. */
+.fdl-secret {
+  min-height: 130px;
+  background: var(--blood-wash);
+  border: 1px dashed color-mix(in srgb, var(--blood) 45%, transparent);
+  font-size: 12.5px;
+}
+.fdl-alire:focus,
+.fdl-secret:focus {
+  outline: none;
+  border-color: var(--brass-line);
+}
+.fdl-alire::placeholder,
+.fdl-secret::placeholder {
+  color: var(--text-faint);
+}
+.fdl-voile {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  background: rgba(5, 8, 10, 0.86);
+  display: grid;
+  place-items: center;
+  padding: 0;
+  cursor: zoom-out;
+}
+/* La largeur et la proportion viennent du plan lui-même (style en ligne). */
+.fdl-plan.grand {
+  max-width: none;
+}
+.fdl-plan.grand img {
+  width: 100%;
+  height: 100%;
+}
+.fdl-voile-fermer {
+  position: absolute;
+  top: 16px;
+  right: 20px;
+}
+
+/* ---- v2 : ce qui peut arriver ici ---- */
+.fdl-filtres {
+  display: flex;
+  gap: 3px;
+  flex-wrap: wrap;
+}
+.fdl-filtres button {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid transparent;
+  background: none;
+  border-radius: 999px;
+  padding: 2px 9px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.fdl-filtres button:hover {
+  color: var(--text);
+}
+.fdl-filtres button[aria-pressed='true'] {
+  border-color: var(--line);
+  background: var(--raised);
+  color: var(--text);
+}
+.fdl-nouveau {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: var(--sunk);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  padding: 4px 6px;
+  color: var(--text-faint);
+}
+.fdl-nouveau:focus-within {
+  border-color: var(--brass-line);
+}
+.fdl-nouveau > .ico {
+  width: 14px;
+  height: 14px;
+  margin-left: 2px;
+}
+.fdl-nouveau input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  padding: 4px 2px;
+}
+.fdl-nouveau input:focus {
+  outline: none;
+}
+.fdl-genre {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.fdl-genre button {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  background: none;
+  padding: 3px 8px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.fdl-genre button + button {
+  border-left: 1px solid var(--line-soft);
+}
+.fdl-genre button.on {
+  background: var(--raised);
+  color: var(--text);
+}
+.fdl-genre .ico {
+  width: 12px;
+  height: 12px;
+}
+.fdl-genre .num {
+  font: 500 10.5px 'IBM Plex Mono', monospace;
+}
+.fdl-sorte.scenario {
+  background: var(--iris-wash);
+  color: var(--iris);
+  font: 500 11px 'IBM Plex Mono', monospace;
+}
+.fdl-amorces {
+  display: grid;
+  gap: 7px;
+  border: 1px dashed var(--line);
+  border-radius: 8px;
+  padding: 14px;
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+.fdl-amorces > b {
+  font: 500 14px 'Fraunces Variable', Georgia, serif;
+  color: var(--text);
+}
+.fdl-amorce {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  border: 1px solid var(--line-soft);
+  background: var(--ground);
+  border-radius: 6px;
+  padding: 6px 8px;
+  text-align: left;
+  color: var(--text-dim);
+  font-size: 12.5px;
+}
+.fdl-amorce:hover {
+  border-color: var(--line);
+  color: var(--text);
+}
+.fdl-art {
+  flex: none;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: var(--ground);
+  padding: 7px 9px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  cursor: pointer;
+}
+.fdl-art:hover {
+  border-color: var(--line);
+}
+.fdl-art.ouvert {
+  cursor: default;
+  border-color: var(--brass-line);
+  background: var(--raised);
+}
+.fdl-art-ligne {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+}
+.fdl-art.ouvert .fdl-art-ligne {
+  grid-template-columns: 22px minmax(0, 1fr);
+}
+.fdl-art-titre {
+  font-weight: 600;
+  font-size: 13px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.fdl-art:hover .fdl-art-titre {
+  color: var(--brass-ink);
+}
+input.fdl-art-titre {
+  font-size: 13px;
+}
+.fdl-art.ouvert:hover .fdl-art-titre {
+  color: var(--text);
+}
+.fdl-art.fait {
+  opacity: 0.62;
+}
+.fdl-art.fait:hover {
+  opacity: 0.9;
+}
+.fdl-art.fait .fdl-art-titre {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-faint);
+}
+.fdl-art-resume {
+  margin: 0 0 0 31px;
+  font-size: 12px;
+  color: var(--text-dim);
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  white-space: pre-line;
+}
+.fdl-art-resume em {
+  font: normal 500 10px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  color: var(--label);
+}
+.fdl-art > .fdl-liens {
+  margin-left: 31px;
+}
+/* Lu : tout le texte, sans coupe ; le crayon passe à l'écriture. */
+.fdl-art.lu {
+  border-color: var(--line);
+  background: var(--raised);
+}
+.fdl-art.lu .fdl-art-resume {
+  -webkit-line-clamp: unset;
+  display: block;
+}
+.fdl-art.fait.lu {
+  opacity: 0.9;
+}
+.fdl-art-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.fdl-art-tout {
+  margin-left: 31px;
+}
+.fdl-art-edition {
+  display: grid;
+  gap: 8px;
+  margin-left: 31px;
+  padding-top: 4px;
+}
+.fdl-art-edition .fdl-champ {
+  display: grid;
+  grid-template-columns: 48px minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+.fdl-art-edition .fdl-champ > .eyebrow {
+  padding-top: 6px;
+}
+.fdl-art-genre {
+  width: auto;
+  padding: 2px 6px;
+}
+.fdl-astuce {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.fdl-liens-edition {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
+}
+.fdl-liens-edition .fdl-liens {
+  margin: 0;
+}
+.fdl-coche.fait {
+  color: var(--moss);
+}
+.fdl-faits {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  background: none;
+  padding: 6px 2px 2px;
+  text-align: left;
+}
+.fdl-faits .eyebrow {
+  color: var(--moss);
+}
+.fdl-faits::after {
+  content: '';
+  flex: 1;
+  height: 1px;
+  background: var(--line-soft);
+}
+
+/* ---- v2 : qui et quoi ---- */
+.fdl-qq-chercher {
+  position: relative;
+  flex: none;
+}
+.fdl-qq-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 20;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 5px;
+  max-height: 340px;
+  overflow-y: auto;
+  box-shadow: var(--shadow-lift);
+}
+.fdl-choix-item.creer {
+  color: var(--brass-ink);
+}
+.fdl-choix-item.creer .rond {
+  display: grid;
+  place-items: center;
+  color: var(--brass);
+}
+.fdl-qq-groupe {
+  margin: 6px 2px 0;
+}
+.fdl-rangee {
+  flex: none;
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 11px;
+  padding: 7px 8px;
+  border-radius: 6px;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition:
+    box-shadow 0.2s,
+    border-color 0.2s,
+    background 0.15s;
+}
+.fdl-rangee:hover {
+  background: var(--ground);
+}
+.fdl-rangee.ouvert {
+  background: var(--raised);
+  border-color: var(--brass-line);
+}
+.fdl-rangee.eclaire {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 2px var(--brass-wash);
+}
+.fdl-rangee.enfant {
+  margin-left: 24px;
+  grid-template-columns: 48px minmax(0, 1fr) auto;
+}
+.fdl-rvig {
+  width: 64px;
+  height: 64px;
+  border-radius: 8px;
+  object-fit: cover;
+  background: var(--sunk);
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  font: 11px 'IBM Plex Mono', monospace;
+}
+.fdl-rvig.pnj {
+  border-radius: 50%;
+}
+.fdl-rvig .glyphe {
+  width: 28px;
+  height: 28px;
+}
+span.fdl-rvig {
+  font-size: 16px;
+}
+.fdl-rangee.enfant .fdl-rvig {
+  width: 48px;
+  height: 48px;
+}
+/* Déplié : l'image en grand, en tête du détail. */
+.fdl-detail-image {
+  display: block;
+  width: 100%;
+  max-height: 260px;
+  object-fit: contain;
+  border-radius: 8px;
+  background: var(--sunk);
+}
+.fdl-rnom {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.fdl-rnom b {
+  font-weight: 600;
+  font-size: 14px;
+}
+.fdl-rnom > span {
+  font-size: 12px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.fdl-detail {
+  flex: none;
+  display: grid;
+  gap: 7px;
+  margin: -2px 0 4px 8px;
+  padding-bottom: 6px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.fdl-detail.enfant {
+  margin-left: 32px;
+}
+.fdl-partage {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.fdl-revele {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--azur);
+}
+.fdl-revele .ico {
+  width: 12px;
+  height: 12px;
+}
+
+/* ---- le chemin du lieu, dans la barre du haut ---- */
+.ariane-suite {
+  display: contents;
+}
+.ariane-suite h1 {
+  font-size: 15px;
+  font-weight: 600;
+}
+.ariane-suite .saut-lieu-hote {
+  display: inline-flex;
+  align-items: center;
+}
+.ariane-suite .saut-lieu {
+  max-width: 260px;
+  font-size: 14px;
+  font-weight: 600;
+  padding: 2px 6px;
+  border-radius: 5px;
+  border: 1px solid var(--line-soft);
+  color: var(--text);
+}
+
+@media (max-width: 1200px) {
+  .fdl-grille {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+  }
+  .fdl-lieu {
+    grid-column: 1 / 3;
+  }
+}
+
+/* ---- au Paravent : la fiche du lieu, simplifiée ----
+   Une colonne de rubriques qui se replient ; le corps de la lecture
+   défile, la page jamais. */
+.fdc {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.fdc-voisins {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.fdc-rubrique {
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--surface);
+}
+.fdc-tete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+}
+.fdc-rubrique:not(.replie) .fdc-tete {
+  border-bottom: 1px solid var(--line-soft);
+}
+.fdc-titre {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  border: 0;
+  background: none;
+  padding: 0;
+  font: 600 14px 'Fraunces Variable', Georgia, serif;
+  color: var(--text);
+}
+.fdc-fleche {
+  display: inline-block;
+  font-size: 10px;
+  color: var(--text-faint);
+  transform: rotate(90deg);
+  transition: transform 0.15s;
+}
+.fdc-rubrique.replie .fdc-fleche {
+  transform: none;
+}
+.fdc-corps {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  padding: 8px 10px 10px;
+}
+.fdc-scen {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  padding: 6px 9px;
+  text-align: left;
+  color: var(--text);
+}
+.fdc-scen:hover {
+  border-color: var(--brass-line);
+}
+.fdc-scen-t {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.fdc-scen-info {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  white-space: pre-line;
+  display: -webkit-box;
+  -webkit-line-clamp: 1;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.fdc-scen.ouvert .fdc-scen-info {
+  display: block;
+}
+.fdc-ligne {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  padding: 6px 8px;
+  transition:
+    box-shadow 0.2s,
+    border-color 0.2s;
+}
+.fdc-ligne.eclaire {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 2px var(--brass-wash);
+}
+.fdc-vig {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--sunk);
+}
+button.fdc-vig:hover {
+  border-color: var(--brass);
+}
+.fdc-vig img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.fdc-vig.pnj {
+  border-radius: 50%;
+}
+.fdc-vig.vide {
+  display: grid;
+  place-items: center;
+  color: var(--text-faint);
+  font: 11px 'IBM Plex Mono', monospace;
+}
+.fdc-vig .glyphe {
+  width: 20px;
+  height: 20px;
+}
+.fdc-t {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.fdc-sous {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.fdc-info {
+  font-size: 12px;
+  color: var(--text-faint);
+  white-space: pre-line;
+}
+.fdc .fdl-liens {
+  margin-top: 3px;
+}
+.fdc .pu-lieu-lecture {
+  margin: 0;
+}
+
+/* ============================================================
+   La ligne des pions : les PNJ qu'on y ajoute, et qu'on en retire
+   ============================================================ */
+
+.tray-tok {
+  position: relative;
+  display: inline-grid;
+}
+/* La croix ne paraît qu'au survol : la ligne reste une rangée de visages. */
+.tray-retirer {
+  position: absolute;
+  top: -5px;
+  right: -5px;
+  width: 15px;
+  height: 15px;
+  padding: 0;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-dim);
+  display: none;
+  place-items: center;
+  cursor: pointer;
+  z-index: 1;
+}
+.tray-tok:hover .tray-retirer,
+.tray-retirer:focus-visible {
+  display: grid;
+}
+.tray-retirer:hover {
+  color: var(--blood);
+  border-color: var(--blood);
+}
+.tray-retirer svg {
+  width: 9px;
+  height: 9px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2.2;
+}
+
+.modal.choix-pnj {
+  width: min(720px, 100%);
+}
+.choix-pnj-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
+}
+.choix-pnj-carte {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 4px;
+  padding: 10px 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text);
+  cursor: pointer;
+  text-align: center;
+}
+.choix-pnj-carte:hover {
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+.choix-pnj-carte.on {
+  border-color: var(--brass);
+  background: var(--brass-wash);
+}
+.choix-pnj-visage {
+  width: 64px;
+  height: 64px;
+  border-radius: 99px;
+  border: 2px solid var(--pion-ring, var(--brass));
+  background: var(--pion-fill, var(--brass-wash));
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 15px;
+  text-transform: uppercase;
+}
+.choix-pnj-visage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.choix-pnj-nom {
+  font-size: 12.5px;
+  font-weight: 500;
+  line-height: 1.2;
+}
+.choix-pnj-sous {
+  font-size: 11px;
+  color: var(--text-faint);
+  line-height: 1.2;
+  min-height: 1.2em;
+}
+.choix-pnj-coche {
+  position: absolute;
+  top: 6px;
+  right: 7px;
+  color: var(--brass);
+  font-weight: 700;
+}
+
+/* Un texte coupé à quelques lignes, et son « voir plus » (TexteCourt.tsx). Le
+   nombre de lignes est posé par le composant ; la coupe garde les retours à
+   la ligne du texte. */
+.texte-court {
+  display: block;
+}
+.texte-court-corps {
+  display: block;
+}
+.texte-court-corps.replie {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.texte-court-corps.replie > :last-child {
+  margin-bottom: 0;
+}
+.texte-court-voir {
+  display: inline-block;
+  margin-top: 2px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 11.5px;
+  color: var(--brass);
+  cursor: pointer;
+}
+.texte-court-voir:hover {
+  color: var(--brass-ink);
+  text-decoration: underline;
+}
+
+/* Fiche du lieu au Paravent : mettre un objet dans le sac de quelqu'un. */
+.fdc-donner {
+  flex: none;
+  align-self: center;
+  width: 26px;
+  height: 26px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--raised);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.fdc-donner:hover {
+  color: var(--brass-ink);
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+.fdc-donner svg {
+  width: 14px;
+  height: 14px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+}
+/* Un objet trouvé ici puis donné : il reste sur la fiche, en retrait. */
+.fdc-ligne.parti {
+  opacity: 0.62;
+}
+.fdc-ligne.parti:hover {
+  opacity: 1;
+}
+/* Le menu « Dans les mains de… » ouvert depuis une page claire (fiche du lieu
+   au Paravent) : il hériterait du papier tamisé et sortirait plus sombre que
+   la page. On lui donne un papier franc, qui se détache par-dessus. */
+.lect-body .pop.menu-donner {
+  background: #f4f7fb;
+  border-color: #c3cfdb;
+  --line-soft: #d8e1ea;
+  color: #191f22;
+}
+.lect-body .pop.menu-donner .opt {
+  /* La règle générale .opt pose le fond sombre de l'app : ici, rien. */
+  background: transparent;
+  border-color: transparent;
+  color: #2c383d;
+}
+.lect-body .pop.menu-donner .opt:hover,
+.lect-body .pop.menu-donner > .md-fermer:hover {
+  background: #e1e9f2;
+  color: #191f22;
+}
+
+/* Fiche du lieu au Paravent : mettre un PNJ sur la ligne des pions. */
+.fdc-pion {
+  flex: none;
+  align-self: center;
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--raised);
+  color: var(--text-dim);
+  font-size: 12px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.fdc-pion:hover {
+  color: var(--brass-ink);
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+.fdc-pion.on {
+  color: var(--brass-ink);
+  border-color: var(--brass);
+  background: var(--brass-wash);
+}
+
+/* La poignée entre « qui il est » et « ses chiffres » : on tire pour élargir
+   l'une ou l'autre. Double-clic : la largeur d'origine. */
+.poignee-col {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  width: 9px;
+  margin-left: -5px;
+  cursor: col-resize;
+  z-index: 2;
+  touch-action: none;
+}
+.poignee-col::after {
+  content: '';
+  position: absolute;
+  left: 4px;
+  top: 0;
+  bottom: 0;
+  width: 1px;
+  background: transparent;
+  transition: background 0.12s;
+}
+.poignee-col:hover::after,
+.poignee-col.tire::after {
+  background: var(--brass);
+  width: 2px;
+}
+
+/* ============================================================
+   Le cache du MJ : l'œil de la barre du haut, et le voile
+   ============================================================ */
+
+.cache-mj-oeil {
+  flex: none;
+  /* Il pousse la recherche avec lui, tout à droite. */
+  margin-left: auto;
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text-dim);
+  transition: color 0.12s, border-color 0.12s, background 0.12s;
+}
+.cache-mj-oeil + .search {
+  margin-left: 0;
+}
+.cache-mj-oeil:hover {
+  color: var(--brass-ink);
+  border-color: var(--brass);
+  background: var(--brass-wash);
+}
+.cache-mj-oeil svg {
+  width: 16px;
+  height: 16px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+}
+
+/* 70 % d'encre, et un flou : sous le voile on devine la forme de l'écran,
+   on n'en lit plus un mot. */
+.cache-mj-voile {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  display: grid;
+  place-items: center;
+  background: rgba(9, 13, 15, 0.7);
+  backdrop-filter: blur(16px) saturate(0.6);
+  cursor: pointer;
+  animation: cache-mj-entree 0.25s ease-out;
+}
+@keyframes cache-mj-entree {
+  from {
+    opacity: 0;
+  }
+}
+.cache-mj-carte {
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 34px 48px 28px;
+  border: 1px solid rgba(201, 171, 104, 0.35);
+  border-radius: 14px;
+  background: rgba(18, 25, 28, 0.82);
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.5);
+  text-align: center;
+  color: #e9e4d6;
+}
+.cache-mj-icone {
+  width: 132px;
+  height: 88px;
+  fill: none;
+  stroke: #d6b25e;
+  stroke-width: 3.2;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cache-mj-icone .cil {
+  stroke-width: 2.6;
+}
+.cache-mj-icone .z {
+  stroke-width: 2.4;
+  opacity: 0.8;
+  animation: cache-mj-z 2.6s ease-in-out infinite;
+}
+.cache-mj-icone .z.petit {
+  stroke-width: 2;
+  animation-delay: 0.6s;
+}
+@keyframes cache-mj-z {
+  0%,
+  100% {
+    transform: translateY(0);
+    opacity: 0.35;
+  }
+  50% {
+    transform: translateY(-5px);
+    opacity: 0.95;
+  }
+}
+.cache-mj-carte h2 {
+  margin: 4px 0 0;
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-size: 30px;
+  font-weight: 600;
+  color: #f1e7cc;
+}
+.cache-mj-carte p {
+  margin: 0;
+  font-size: 16px;
+  color: #c9c2b0;
+  font-style: italic;
+}
+.cache-mj-aide {
+  margin-top: 10px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: #8d877a;
+}
+
+/* « Pièce unique » ou « Plusieurs pièces », en tête du bloc des pièces du
+   mode murs. */
+.murs-unique {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 14px;
+  margin: 2px 0 4px;
+}
+
+/* ---- présenter le joueur à l'écran ---- */
+.fiche-qui .presenter {
+  margin-top: 10px;
+  gap: 6px;
+}
+.fiche-qui .presenter svg {
+  width: 13px;
+  height: 13px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+}
+.presenter-emo {
+  margin-left: 2px;
+  letter-spacing: 0.08em;
+}
+.nc-emojis {
+  font-size: 18px;
+  letter-spacing: 0.15em;
+}
+/* Un émoji ignore la couleur du texte : seule l'opacité l'efface. */
+.nc-emojis::placeholder {
+  opacity: 0.3;
+}
+.emo-choix {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.emo-choix button {
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+  line-height: 1;
+  border-radius: 4px;
+  border: 1px solid var(--line-soft);
+  background: var(--sunk);
+  cursor: pointer;
+}
+.emo-choix button[aria-pressed='true'] {
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+.emo-choix button:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.emo-saisie {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.emo-saisie .nc-emojis {
+  flex: 1;
+  min-width: 0;
+}
+
+/* ---- ça commence bientôt : la fenêtre de réglages ---- */
+.att-minutes {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.att-minutes .avec-unite {
+  width: 96px;
+}
+.att-coche {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  cursor: pointer;
+}
+.att-coche .aide {
+  flex-basis: 100%;
+  margin: 0 0 0 24px;
+}
+.att-mj {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 2px 0 0 24px;
+}
+.att-mj-nom {
+  font-size: 13px;
+}
+/* Le profil vit dans les paramètres : un lien, pas un champ. */
+.att-mj-lien {
+  margin-left: auto;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--brass);
+  font-size: 12px;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.att-mj-lien:hover {
+  color: var(--text);
+}
+.att-mj-face {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 0;
+  border-radius: 50%;
+  overflow: hidden;
+  border: 2px solid var(--brass);
+  background: var(--sunk);
+  display: grid;
+  place-items: center;
+  font-size: 18px;
+}
+.att-mj-face img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* ---------------- Paramètres · le maître du jeu ---------------- */
+
+.pmj-apercu {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin: 4px 0 10px;
+}
+.pmj-face,
+.pmj-rond {
+  flex: none;
+  border-radius: 50%;
+  overflow: hidden;
+  background: var(--sunk);
+  display: grid;
+  place-items: center;
+}
+.pmj-face {
+  width: 64px;
+  height: 64px;
+  border: 2px solid var(--brass);
+  font-size: 26px;
+}
+.pmj-face img,
+.pmj-rond img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pmj-nom {
+  font-weight: 600;
+  font-size: 18px;
+}
+/* La ligne range ses commandes en flex : sans largeur, la grille s'y
+   tasserait sur une seule colonne. */
+.pmj-avatars {
+  flex: 1;
+  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(112px, 1fr));
+  gap: 10px;
+}
+.pmj-avatar {
+  display: grid;
+  justify-items: center;
+  align-content: start;
+  gap: 8px;
+  padding: 12px 6px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  background: none;
+  color: var(--text-dim, var(--text));
+  cursor: pointer;
+}
+.pmj-avatar:hover {
+  background: var(--sunk);
+}
+.pmj-avatar.on {
+  border-color: var(--brass);
+  background: var(--sunk);
+  color: var(--text);
+}
+.pmj-rond {
+  width: 76px;
+  height: 76px;
+  border: 2px solid var(--line);
+  font-size: 22px;
+}
+.pmj-avatar.on .pmj-rond {
+  border-color: var(--brass);
+}
+.pmj-rond.parcourir svg {
+  width: 22px;
+  height: 22px;
+}
+.pmj-univers {
+  font-size: 11.5px;
+  line-height: 1.2;
+  text-align: center;
+}
+.att-lueurs {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.att-lueurs input[type='color'] {
+  width: 34px;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--sunk);
+  cursor: pointer;
+}
+.att-lueurs .sep {
+  width: 1px;
+  height: 20px;
+  background: var(--line-soft);
+  margin: 0 4px;
+}
+.att-ambiance {
+  padding: 4px 9px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  font-size: 11.5px;
+  color: #f2ece0;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.7);
+  cursor: pointer;
+}
+.att-ambiance.on {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 1px var(--brass);
+}
+
+/* ---- régie : taire les pièces dans la liste des lieux ---- */
+.lieux-filtre {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 8px;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+  user-select: none;
+}
+.lieux-filtre.pu-filtre {
+  margin: 4px 10px 8px;
 }

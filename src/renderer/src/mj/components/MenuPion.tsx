@@ -93,13 +93,40 @@ export function MenuPion({
       {/* Le seul geste de ce menu qui engage l'écran des joueurs : on dit ce
           qu'il fait, pas ce qu'il coche. */}
       {p.cache ? (
-        <button onClick={geste(() => window.jdr.pions.hide(p.id, false))}>
-          Montrer aux joueurs
-        </button>
+        <>
+          <button
+            onClick={geste(async () => {
+              if (p.anonyme) await window.jdr.pions.anonyme(p.id, false)
+              await window.jdr.pions.hide(p.id, false)
+            })}
+          >
+            Montrer aux joueurs
+          </button>
+          {/* Le jeton sans son nom : ils voient quelqu'un, pas qui. */}
+          <button
+            onClick={geste(async () => {
+              if (!p.anonyme) await window.jdr.pions.anonyme(p.id, true)
+              await window.jdr.pions.hide(p.id, false)
+            })}
+          >
+            Montrer aux joueurs (sans nom)
+          </button>
+        </>
       ) : (
-        <button onClick={geste(() => window.jdr.pions.hide(p.id, true))}>
-          Cacher aux joueurs
-        </button>
+        <>
+          {p.anonyme ? (
+            <button onClick={geste(() => window.jdr.pions.anonyme(p.id, false))}>
+              Leur révéler son nom
+            </button>
+          ) : (
+            <button onClick={geste(() => window.jdr.pions.anonyme(p.id, true))}>
+              Leur taire son nom
+            </button>
+          )}
+          <button onClick={geste(() => window.jdr.pions.hide(p.id, true))}>
+            Cacher aux joueurs
+          </button>
+        </>
       )}
 
       {/* Un pion nommé — un PNJ sans fiche — peut en recevoir une. Un pion qui

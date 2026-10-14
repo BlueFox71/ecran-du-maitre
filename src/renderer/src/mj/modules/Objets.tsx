@@ -14,27 +14,46 @@
  * canal de diffusion, exactement comme les annotations et les murs.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { currentObjet, itemById, useStore } from '../store'
 import {
   IconClose,
   IconCoffre,
   IconDonner,
+  IconEye,
+  IconEyeOff,
   IconImage,
+  IconPeople,
+  IconPlace,
+  IconPochette,
   IconPlus,
   IconPoser,
+  IconRouage,
   IconSearch,
   IconSliders,
   IconTrash,
+  IconVerrou,
   glypheObjet
 } from '../components/Icons'
 import { ChoixDansArbre } from '../components/ChoixDansArbre'
 import { Pop } from '../components/Pop'
+import { Valeur } from '../components/Valeur'
+import { CLAIR_DE_TORCHE, TEINTE_TORCHE } from '../../shared/Lueur'
+import { champDeVision, polygone, type Barriere } from '@shared/murs'
 import { MenuDonner } from '../components/MenuDonner'
-import { BandeJoueurs, TYPE_OBJET } from '../components/BandeJoueurs'
-import { EMPLACEMENTS_OBJET, GLYPHES_OBJET, PION_COULEURS, emplacementsDe } from '@shared/types'
+import { BandeJoueurs, TYPE_EXEMPLAIRE, TYPE_OBJET } from '../components/BandeJoueurs'
+import { AlerteLieux, lieuxDe } from '../components/ObjetsDuLieu'
+import {
+  EMPLACEMENTS_OBJET,
+  FAISCEAUX_LUMIERE,
+  GLYPHES_OBJET,
+  PION_COULEURS,
+  emplacementsDe
+} from '@shared/types'
 import type {
   EffetObjet,
   GlypheObjet,
+  Inventaire,
   Objet,
   ObjetFamille,
   ObjetPlacement,
@@ -56,15 +75,24 @@ export function Objets(): JSX.Element {
   const [filtre, setFiltre] = useState('')
   const [enListe, setEnListe] = useState(false)
   const [reglages, setReglages] = useState<{ x: number; y: number } | null>(null)
+  const [familles, setFamilles] = useState(false)
   const rafale = useRef<HTMLInputElement>(null)
+  /* Un inventaire ouvert au centre prend la place de l'étagère. */
+  const [inventaireVu, setInventaireVu] = useState<number | null>(null)
+  const inv = s.inventaires.find((i) => i.id === inventaireVu) ?? null
+  const choisirRayon = (r: number | 'tout'): void => {
+    setRayon(r)
+    setInventaireVu(null)
+  }
 
   /* Le rayon suit l'objet qu'on ouvre depuis « Tout » ? Non : on trie
      l'étagère, on ne la fait pas sauter sous la main. Seul un rayon devenu
      vide — sa famille retirée — ramène à « Tout ». */
+  const rayons = useMemo(() => s.objetFamilles.filter((f) => !f.masquee), [s.objetFamilles])
   useEffect(() => {
     if (rayon === 'tout' || rayon === SANS_FAMILLE) return
-    if (!s.objetFamilles.some((f) => f.id === rayon)) setRayon('tout')
-  }, [s.objetFamilles, rayon])
+    if (!rayons.some((f) => f.id === rayon)) setRayon('tout')
+  }, [rayons, rayon])
 
   const mot = filtre.trim().toLowerCase()
   const visibles = useMemo(
@@ -104,7 +132,7 @@ export function Objets(): JSX.Element {
             const r = e.currentTarget.getBoundingClientRect()
             setReglages({ x: r.left, y: r.bottom + 6 })
           }}
-          title="Les rayons de la réserve, et l’unité de valeur de la campagne"
+          title="Les catégories de la réserve, et l’unité de valeur de la campagne"
         >
           <IconSliders />
           Réglages
@@ -119,23 +147,32 @@ export function Objets(): JSX.Element {
         {/* ---------------- les rayons ---------------- */}
         <div className="pane">
           <div className="pane-head">
-            <span className="eyebrow">Familles</span>
+            <span className="eyebrow">Catégories</span>
+            <div className="spacer" />
+            <button
+              className="btn btn-ghost btn-sm btn-ico"
+              onClick={() => setFamilles(true)}
+              title="Régler les catégories : leur nom, leur couleur"
+              aria-label="Régler les catégories"
+            >
+              <IconRouage />
+            </button>
           </div>
           <div className="pane-body">
             <button
-              className={`fam-btn${rayon === 'tout' ? ' on' : ''}`}
-              onClick={() => setRayon('tout')}
+              className={`fam-btn${!inv && rayon === 'tout' ? ' on' : ''}`}
+              onClick={() => choisirRayon('tout')}
             >
               <span className="pastille tout" />
               <span className="lib">Tout</span>
               <span className="n">{s.objets.length}</span>
             </button>
             <div className="fam-sep" />
-            {s.objetFamilles.map((f) => (
+            {rayons.map((f) => (
               <button
                 key={f.id}
-                className={`fam-btn${rayon === f.id ? ' on' : ''}`}
-                onClick={() => setRayon(f.id)}
+                className={`fam-btn${!inv && rayon === f.id ? ' on' : ''}`}
+                onClick={() => choisirRayon(f.id)}
               >
                 <span className={`pastille c-${f.teinte}`} />
                 <span className="lib">{f.nom}</span>
@@ -148,89 +185,118 @@ export function Objets(): JSX.Element {
               <>
                 <div className="fam-sep" />
                 <button
-                  className={`fam-btn${rayon === SANS_FAMILLE ? ' on' : ''}`}
-                  onClick={() => setRayon(SANS_FAMILLE)}
-                  title="Les objets qui n’ont pas de famille"
+                  className={`fam-btn${!inv && rayon === SANS_FAMILLE ? ' on' : ''}`}
+                  onClick={() => choisirRayon(SANS_FAMILLE)}
+                  title="Les objets qui n’ont pas de catégorie"
                 >
                   <span className="pastille" />
-                  <span className="lib">Sans famille</span>
+                  <span className="lib">Sans catégorie</span>
                   <span className="n">{s.objets.filter((x) => x.familleId == null).length}</span>
                 </button>
               </>
             ) : null}
-          </div>
-        </div>
 
-        {/* ---------------- l'étagère ---------------- */}
-        <div className="pane">
-          <div className="pane-head">
-            <label className="filtre-inline">
-              <IconSearch />
-              <input
-                type="text"
-                value={filtre}
-                onChange={(e) => setFiltre(e.target.value)}
-                placeholder="Filtrer les objets"
-                aria-label="Filtrer les objets"
+            {/* Les inventaires partagés : le camion, la malle. On y lâche une
+                carte de l'étagère pour l'y ranger. */}
+            <div className="fam-sep" />
+            <span className="eyebrow inv-titre">Inventaires</span>
+            {s.inventaires.map((i) => (
+              <BoutonInventaire
+                key={i.id}
+                inv={i}
+                on={inv?.id === i.id}
+                onChoisir={() => setInventaireVu(i.id)}
               />
-            </label>
-            <span className="compte num">
-              {visibles.length === 0
-                ? 'aucun objet'
-                : `${visibles.length} objet${visibles.length > 1 ? 's' : ''}`}
-            </span>
-            <div className="spacer" />
-            <div className="seg" role="group" aria-label="Grille ou liste">
-              <button className={enListe ? '' : 'on'} onClick={() => setEnListe(false)}>
-                Grille
-              </button>
-              <button className={enListe ? 'on' : ''} onClick={() => setEnListe(true)}>
-                Liste
-              </button>
-            </div>
-          </div>
-
-          <div className="pane-body">
-            {s.objets.length === 0 ? (
-              <div className="empty">
-                <IconCoffre />
-                <b>La réserve est vide</b>
-                Tape un nom en bas de l’étagère&nbsp;: l’objet existe aussitôt, sa fiche s’ouvre à
-                droite pour le décrire.
-              </div>
-            ) : visibles.length === 0 ? (
-              <p className="rien-objet">
-                Rien sous ce filtre. Tape un nom en bas pour en créer un ici.
-              </p>
-            ) : enListe ? (
-              <ListeObjets objets={visibles} familles={s.objetFamilles} unite={s.uniteValeur} />
-            ) : (
-              <GrilleObjets objets={visibles} familles={s.objetFamilles} />
-            )}
-          </div>
-
-          <div className="pane-foot">
-            {/* Créer en rafale, comme les lieux : un nom, Entrée, et le champ
-                reste sous la main pour le suivant. */}
-            <div className="rafale">
+            ))}
+            <button
+              className="fam-btn inv-neuf"
+              onClick={async () => {
+                const neuf = await window.jdr.objets.inventaireAdd('Nouvel inventaire')
+                await s.refreshObjets()
+                setInventaireVu(neuf.id)
+              }}
+              title="Un inventaire que les joueurs pourront ouvrir sur leur portable"
+            >
               <IconPlus />
-              <input
-                ref={rafale}
-                type="text"
-                placeholder="Un objet de plus — tape son nom"
-                aria-label="Créer un objet"
-                onKeyDown={(e) => {
-                  if (e.key !== 'Enter') return
-                  const nom = e.currentTarget.value.trim()
-                  if (!nom) return
-                  e.currentTarget.value = ''
-                  void creer(nom)
-                }}
-              />
-              <span className="aide">Entrée</span>
-            </div>
+              <span className="lib">Nouvel inventaire</span>
+            </button>
           </div>
         </div>
+
+        {/* ---------------- l'étagère, ou l'inventaire choisi ---------------- */}
+        {inv ? (
+          <VueInventaire key={inv.id} inv={inv} onSupprime={() => setInventaireVu(null)} />
+        ) : (
+          <div className="pane">
+            <div className="pane-head">
+              <label className="filtre-inline">
+                <IconSearch />
+                <input
+                  type="text"
+                  value={filtre}
+                  onChange={(e) => setFiltre(e.target.value)}
+                  placeholder="Filtrer les objets"
+                  aria-label="Filtrer les objets"
+                />
+              </label>
+              <span className="compte num">
+                {visibles.length === 0
+                  ? 'aucun objet'
+                  : `${visibles.length} objet${visibles.length > 1 ? 's' : ''}`}
+              </span>
+              <div className="spacer" />
+              <div className="seg" role="group" aria-label="Grille ou liste">
+                <button className={enListe ? '' : 'on'} onClick={() => setEnListe(false)}>
+                  Grille
+                </button>
+                <button className={enListe ? 'on' : ''} onClick={() => setEnListe(true)}>
+                  Liste
+                </button>
+              </div>
+            </div>
+
+            <div className="pane-body">
+              {s.objets.length === 0 ? (
+                <div className="empty">
+                  <IconCoffre />
+                  <b>La réserve est vide</b>
+                  Tape un nom en bas de l’étagère&nbsp;: l’objet existe aussitôt, sa fiche s’ouvre à
+                  droite pour le décrire.
+                </div>
+              ) : visibles.length === 0 ? (
+                <p className="rien-objet">
+                  Rien sous ce filtre. Tape un nom en bas pour en créer un ici.
+                </p>
+              ) : enListe ? (
+                <ListeObjets objets={visibles} familles={s.objetFamilles} unite={s.uniteValeur} />
+              ) : (
+                <GrilleObjets objets={visibles} familles={s.objetFamilles} />
+              )}
+            </div>
+
+            <div className="pane-foot">
+              {/* Créer en rafale, comme les lieux : un nom, Entrée, et le champ
+                  reste sous la main pour le suivant. */}
+              <div className="rafale">
+                <IconPlus />
+                <input
+                  ref={rafale}
+                  type="text"
+                  placeholder="Un objet de plus — tape son nom"
+                  aria-label="Créer un objet"
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return
+                    const nom = e.currentTarget.value.trim()
+                    if (!nom) return
+                    e.currentTarget.value = ''
+                    void creer(nom)
+                  }}
+                />
+                <span className="aide">Entrée</span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* ---------------- la fiche ---------------- */}
         {o ? (
@@ -253,6 +319,12 @@ export function Objets(): JSX.Element {
 
       {reglages ? (
         <PanneauReglages x={reglages.x} y={reglages.y} onClose={() => setReglages(null)} />
+      ) : null}
+      {familles ? (
+        <ModaleFamilles
+          depart={rayon === 'tout' || rayon === SANS_FAMILLE ? null : rayon}
+          onClose={() => setFamilles(false)}
+        />
       ) : null}
     </section>
   )
@@ -279,11 +351,24 @@ function GrilleObjets({
   familles: ObjetFamille[]
 }): JSX.Element {
   const s = useStore()
+  /* L'image en grand au survol de la vignette : la carte la rogne, l'aperçu
+     la montre entière. Un temps d'arrêt avant, pour qu'un curseur qui ne
+     fait que passer sur l'étagère n'allume rien. */
+  const [apercu, setApercu] = useState<{ url: string; rect: DOMRect } | null>(null)
+  const attente = useRef<number | null>(null)
+  const oublier = (): void => {
+    if (attente.current) clearTimeout(attente.current)
+    attente.current = null
+    setApercu(null)
+  }
+  useEffect(() => oublier, [])
   return (
     <div className="etagere">
       {objets.map((o) => {
         const f = familles.find((x) => x.id === o.familleId) ?? null
         const n = o.placements.reduce((t, p) => t + p.qte, 0)
+        const img = itemById(s.allItems, o.imageItemId)
+        const url = img?.poster ?? img?.url ?? null
         return (
           <button
             key={o.id}
@@ -292,6 +377,7 @@ function GrilleObjets({
             /* On l'attrape pour le lâcher sur un joueur, en bas. */
             draggable
             onDragStart={(e) => {
+              oublier()
               e.dataTransfer.setData(TYPE_OBJET, String(o.id))
               /* Le même en texte : si le type maison ne survit pas au voyage,
                  la cible sait quand même ce qu'elle reçoit. */
@@ -299,21 +385,490 @@ function GrilleObjets({
               e.dataTransfer.effectAllowed = 'copy'
             }}
           >
-            <span className={`vignette c-${f?.teinte ?? 'neutral'}`}>
+            <span
+              className={`vignette c-${f?.teinte ?? 'neutral'}`}
+              onMouseEnter={(e) => {
+                if (!url) return
+                const rect = e.currentTarget.getBoundingClientRect()
+                if (attente.current) clearTimeout(attente.current)
+                attente.current = window.setTimeout(() => setApercu({ url, rect }), 250)
+              }}
+              onMouseLeave={oublier}
+            >
               {vignetteObjet(o, familles)}
               {n > 0 ? <span className="posee num">posé {n}×</span> : null}
               {!o.unique ? <span className="qte num">×{o.qte}</span> : null}
             </span>
-            <span className="nom">{o.nom}</span>
+            <span className="nom">
+              {o.nom}
+              {lieuxDe(o).length > 1 ? <AlerteLieux lieux={lieuxDe(o)} /> : null}
+            </span>
             <span className="sous">
-              {f?.nom ?? 'sans famille'}
+              {f?.nom ?? 'sans catégorie'}
               {o.equipable ? <span className="pt">·</span> : null}
               {o.equipable ? 'se porte' : null}
             </span>
+            <OuIlEst o={o} />
           </button>
         )
       })}
+      {apercu ? <ApercuObjet {...apercu} /> : null}
     </div>
+  )
+}
+
+/** Taille maximale de l'aperçu, et l'écart qu'il garde avec la carte. */
+const APERCU = 350
+const ECART = 12
+
+/**
+ * L'image entière, à côté de la vignette : à droite s'il y a la place, à
+ * gauche sinon, centrée sur elle sans sortir de la fenêtre. Elle ne prend
+ * jamais le curseur — elle ne doit rien masquer de ce qu'on vise.
+ */
+function ApercuObjet({ url, rect }: { url: string; rect: DOMRect }): JSX.Element {
+  const aDroite = rect.right + ECART + APERCU <= window.innerWidth
+  const milieu = rect.top + rect.height / 2
+  const haut = Math.max(ECART + APERCU / 2, Math.min(window.innerHeight - ECART - APERCU / 2, milieu))
+  return createPortal(
+    <div
+      className="obj-survol"
+      style={
+        aDroite
+          ? { left: rect.right + ECART, top: haut }
+          : { right: window.innerWidth - rect.left + ECART, top: haut }
+      }
+    >
+      <img src={url} alt="" />
+    </div>,
+    document.body
+  )
+}
+
+/* ============================================================
+   Les inventaires partagés
+   ============================================================ */
+
+/** Ce qu'on lâche sur un inventaire : une carte de la réserve, ou un exemplaire. */
+function lireLacher(dt: DataTransfer): { objetId: number; placementId: number } {
+  const secours = /^jdr:(objet|exemplaire):(\d+)$/.exec(dt.getData('text/plain'))
+  return {
+    objetId: Number(dt.getData(TYPE_OBJET)) || (secours?.[1] === 'objet' ? Number(secours[2]) : 0),
+    placementId:
+      Number(dt.getData(TYPE_EXEMPLAIRE)) || (secours?.[1] === 'exemplaire' ? Number(secours[2]) : 0)
+  }
+}
+
+/**
+ * Un inventaire dans la colonne de gauche. On y lâche une carte de l'étagère
+ * pour l'y ranger, ou une affaire d'un joueur, depuis la bande du bas, pour
+ * la lui reprendre.
+ */
+function BoutonInventaire({
+  inv,
+  on,
+  onChoisir
+}: {
+  inv: Inventaire
+  on: boolean
+  onChoisir: () => void
+}): JSX.Element {
+  const s = useStore()
+  const [vise, setVise] = useState(false)
+  const n = s.objets.reduce(
+    (t, o) => t + o.placements.filter((p) => p.inventaireId === inv.id).reduce((u, p) => u + p.qte, 0),
+    0
+  )
+  return (
+    <button
+      className={`fam-btn inv-btn${on ? ' on' : ''}${vise ? ' vise' : ''}`}
+      onClick={onChoisir}
+      onDragOver={(e) => {
+        const types = Array.from(e.dataTransfer.types)
+        if (!types.includes(TYPE_OBJET) && !types.includes(TYPE_EXEMPLAIRE) && !types.includes('text/plain'))
+          return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = types.includes(TYPE_EXEMPLAIRE) ? 'move' : 'copy'
+        if (!vise) setVise(true)
+      }}
+      onDragLeave={() => setVise(false)}
+      onDrop={async (e) => {
+        e.preventDefault()
+        setVise(false)
+        const { objetId, placementId } = lireLacher(e.dataTransfer)
+        try {
+          if (placementId) await window.jdr.objets.remettre(placementId, inv.id)
+          else if (objetId) {
+            const ajoutes = await window.jdr.objets.remplir(inv.id, [objetId])
+            if (!ajoutes) s.toast('Cette pièce unique est déjà posée ailleurs.', true)
+          } else return
+          await s.refreshObjets()
+        } catch (err) {
+          s.toast('L’objet n’a pas été rangé.', true)
+          console.error('[inventaire]', err)
+        }
+      }}
+      title={inv.ouvert ? 'Ouvert : les joueurs le voient sur leur portable' : 'Fermé aux joueurs'}
+    >
+      <IconCoffre />
+      <span className="lib">{inv.nom}</span>
+      {inv.ouvert ? <span className="inv-ouvert">ouvert</span> : null}
+      <span className="n">{n}</span>
+    </button>
+  )
+}
+
+/**
+ * L'inventaire ouvert au centre, à la place de l'étagère : son nom, s'il est
+ * ouvert aux joueurs, ce qu'il contient et ce qui est passé par là.
+ */
+function VueInventaire({ inv, onSupprime }: { inv: Inventaire; onSupprime: () => void }): JSX.Element {
+  const s = useStore()
+  const [menu, setMenu] = useState<{ x: number; y: number } | null>(null)
+  const [choix, setChoix] = useState(false)
+  const [suppr, setSuppr] = useState(false)
+  const contenu = s.objets.flatMap((o) =>
+    o.placements.filter((p) => p.inventaireId === inv.id).map((p) => ({ o, p }))
+  )
+  contenu.sort((a, b) => a.o.nom.localeCompare(b.o.nom, 'fr'))
+  const rayons = s.objetFamilles.filter((f) => !f.masquee)
+
+  const maj = async (patch: { nom?: string; ouvert?: boolean }): Promise<void> => {
+    await window.jdr.objets.inventaireUpdate(inv.id, patch)
+    await s.refreshObjets()
+  }
+  const remplir = async (ids: number[]): Promise<void> => {
+    const n = await window.jdr.objets.remplir(inv.id, ids)
+    await s.refreshObjets()
+    s.toast(
+      n === 0
+        ? 'Rien à ranger : tout est déjà posé quelque part.'
+        : `${n} objet${n > 1 ? 's' : ''} rangé${n > 1 ? 's' : ''} dans « ${inv.nom} »`
+    )
+  }
+
+  return (
+    <div className="pane inv-vue">
+      <div className="pane-head inv-tete">
+        <IconCoffre />
+        <input
+          className="inv-nom"
+          defaultValue={inv.nom}
+          aria-label="Nom de l’inventaire"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter') e.currentTarget.blur()
+          }}
+          onBlur={(e) => {
+            const nom = e.target.value.trim()
+            if (!nom) e.target.value = inv.nom
+            else if (nom !== inv.nom) void maj({ nom })
+          }}
+        />
+        <div className="spacer" />
+        <button
+          className="inv-bascule"
+          aria-pressed={inv.ouvert}
+          onClick={() => void maj({ ouvert: !inv.ouvert })}
+          title={inv.ouvert ? 'Le fermer : il disparaît des portables' : 'L’ouvrir : chacun y pioche depuis son portable'}
+        >
+          <span className="rail" />
+          {inv.ouvert ? 'Ouvert aux joueurs' : 'Fermé aux joueurs'}
+        </button>
+      </div>
+
+      <div className="pane-body inv-corps">
+        <p className="inv-aide">
+          {inv.ouvert
+            ? 'Visible sur tous les portables, dans la page Sac. Chacun pioche : l’objet tombe dans son sac. Il peut aussi y remettre ce qu’il a.'
+            : 'Personne ne le voit sur son portable. Remplis-le tranquillement avant de l’ouvrir.'}
+        </p>
+        <div className="inv-outils">
+          <button
+            className="btn btn-sm"
+            onClick={(e) => {
+              const r = e.currentTarget.getBoundingClientRect()
+              setMenu({ x: r.left, y: r.bottom + 4 })
+            }}
+          >
+            <IconPlus />
+            Remplir depuis la réserve
+          </button>
+          <span className="inv-aide">ou glisse une carte de l’étagère sur « {inv.nom} », à gauche</span>
+        </div>
+
+        {contenu.length === 0 ? (
+          <p className="rien-objet">Inventaire vide. Remplis-le depuis la réserve.</p>
+        ) : (
+          <div className="etagere">
+            {contenu.map(({ o, p }) => {
+              const f = s.objetFamilles.find((x) => x.id === o.familleId) ?? null
+              return (
+                <div
+                  key={p.id}
+                  className={`obj-carte${o.id === s.currentObjetId ? ' on' : ''}`}
+                  role="button"
+                  tabIndex={0}
+                  onClick={() => s.setCurrentObjet(o.id)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') s.setCurrentObjet(o.id)
+                  }}
+                  /* On l'attrape pour le donner à un joueur, en bas. */
+                  draggable
+                  onDragStart={(e) => {
+                    e.dataTransfer.setData(TYPE_EXEMPLAIRE, String(p.id))
+                    e.dataTransfer.setData('text/plain', `jdr:exemplaire:${p.id}`)
+                    e.dataTransfer.effectAllowed = 'move'
+                  }}
+                >
+                  <span className={`vignette c-${f?.teinte ?? 'neutral'}`}>
+                    {vignetteObjet(o, s.objetFamilles)}
+                    {p.qte > 1 ? <span className="qte num">×{p.qte}</span> : null}
+                  </span>
+                  <span className="nom">{o.nom}</span>
+                  {/* Combien il en reste dedans : chaque pioche en ôte un. Le
+                      nombre du modèle ne compte qu'au moment où on range. */}
+                  {o.unique ? null : (
+                    <span className="inv-qte" onClick={(e) => e.stopPropagation()}>
+                      <button
+                        disabled={p.qte <= 1}
+                        onClick={async () => {
+                          await window.jdr.objets.placement(p.id, { qte: p.qte - 1 })
+                          await s.refreshObjets()
+                        }}
+                        title="Un de moins"
+                        aria-label={`Un ${o.nom} de moins`}
+                      >
+                        −
+                      </button>
+                      <span className="num">{p.qte}</span>
+                      <button
+                        onClick={async () => {
+                          await window.jdr.objets.placement(p.id, { qte: p.qte + 1 })
+                          await s.refreshObjets()
+                        }}
+                        title="Un de plus"
+                        aria-label={`Un ${o.nom} de plus`}
+                      >
+                        +
+                      </button>
+                    </span>
+                  )}
+                  <button
+                    className="inv-retirer"
+                    onClick={async (e) => {
+                      e.stopPropagation()
+                      await window.jdr.objets.reprendre(p.id)
+                      await s.refreshObjets()
+                    }}
+                    title="Le retirer de l’inventaire — il reste dans la réserve"
+                    aria-label={`Retirer ${o.nom}`}
+                  >
+                    <IconClose />
+                  </button>
+                </div>
+              )
+            })}
+          </div>
+        )}
+
+        <div className="inv-journal">
+          <span className="eyebrow">Ce qui est passé par là</span>
+          {inv.journal.length === 0 ? (
+            <p className="inv-aide">Rien encore depuis le lancement.</p>
+          ) : (
+            <ul>
+              {[...inv.journal].reverse().slice(0, 8).map((l, i) => (
+                <li key={i}>
+                  <time className="num">{l.heure}</time>
+                  {l.texte}
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+
+      <div className="pane-foot inv-pied">
+        {suppr ? (
+          <>
+            <span className="inv-aide">Supprimer « {inv.nom} » ? Son contenu retourne dans la réserve.</span>
+            <div className="spacer" />
+            <button className="btn btn-sm" onClick={() => setSuppr(false)}>
+              Garder
+            </button>
+            <button
+              className="btn btn-sm btn-danger"
+              onClick={async () => {
+                await window.jdr.objets.inventaireRemove(inv.id)
+                await s.refreshObjets()
+                onSupprime()
+              }}
+            >
+              Supprimer
+            </button>
+          </>
+        ) : (
+          <>
+            <div className="spacer" />
+            <button className="btn btn-ghost btn-sm" onClick={() => setSuppr(true)}>
+              <IconTrash />
+              Supprimer l’inventaire
+            </button>
+          </>
+        )}
+      </div>
+
+      {menu ? (
+        <Pop x={menu.x} y={menu.y} className="inv-menu" onClose={() => setMenu(null)}>
+          <span className="eyebrow">Tout un rayon</span>
+          {rayons.map((f) => (
+            <button
+              key={f.id}
+              className="opt"
+              onClick={() => {
+                setMenu(null)
+                void remplir(s.objets.filter((o) => o.familleId === f.id).map((o) => o.id))
+              }}
+            >
+              <span className={`pastille c-${f.teinte}`} />
+              <span className="t">{f.nom}</span>
+              <span className="n num">{s.objets.filter((o) => o.familleId === f.id).length}</span>
+            </button>
+          ))}
+          <hr />
+          <button
+            className="opt"
+            onClick={() => {
+              setMenu(null)
+              setChoix(true)
+            }}
+          >
+            <span className="t">Choisir des objets un par un…</span>
+          </button>
+        </Pop>
+      ) : null}
+      {choix ? (
+        <ModaleRemplir
+          inv={inv}
+          onClose={() => setChoix(false)}
+          onRanger={async (ids) => {
+            setChoix(false)
+            await remplir(ids)
+          }}
+        />
+      ) : null}
+    </div>
+  )
+}
+
+/** Choisir, case par case, ce qu'on range dans un inventaire. */
+function ModaleRemplir({
+  inv,
+  onClose,
+  onRanger
+}: {
+  inv: Inventaire
+  onClose: () => void
+  onRanger: (ids: number[]) => void | Promise<void>
+}): JSX.Element {
+  const s = useStore()
+  const [mot, setMot] = useState('')
+  const [pris, setPris] = useState<Set<number>>(new Set())
+  useEffect(() => {
+    const touche = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', touche)
+    return () => window.removeEventListener('keydown', touche)
+  }, [onClose])
+  const m = mot.trim().toLowerCase()
+  const liste = s.objets.filter((o) => !m || o.nom.toLowerCase().includes(m))
+  return (
+    <div className="scrim" onClick={onClose}>
+      <div className="modal inv-modale" onClick={(e) => e.stopPropagation()}>
+        <header>
+          <IconCoffre />
+          <h3>Ranger dans « {inv.nom} »</h3>
+        </header>
+        <label className="filtre-inline">
+          <IconSearch />
+          <input
+            autoFocus
+            value={mot}
+            onChange={(e) => setMot(e.target.value)}
+            placeholder="Chercher un objet"
+            aria-label="Chercher un objet"
+          />
+        </label>
+        <div className="inv-cases">
+          {liste.map((o) => {
+            const ailleurs = o.unique && o.placements.length > 0
+            return (
+              <label key={o.id} className={`opt${ailleurs ? ' pris' : ''}`} title={ailleurs ? 'Pièce unique déjà posée ailleurs' : undefined}>
+                <input
+                  type="checkbox"
+                  disabled={ailleurs}
+                  checked={pris.has(o.id)}
+                  onChange={(e) => {
+                    const n = new Set(pris)
+                    if (e.target.checked) n.add(o.id)
+                    else n.delete(o.id)
+                    setPris(n)
+                  }}
+                />
+                <span className="t">{o.nom}</span>
+                {ailleurs ? <span className="v">{o.placements[0]?.cible}</span> : null}
+              </label>
+            )
+          })}
+        </div>
+        <footer>
+          <button className="btn btn-sm" onClick={onClose}>
+            Annuler
+          </button>
+          <button
+            className="btn btn-brass btn-sm"
+            disabled={pris.size === 0}
+            onClick={() => void onRanger([...pris])}
+          >
+            Ranger {pris.size || ''} objet{pris.size > 1 ? 's' : ''}
+          </button>
+        </footer>
+      </div>
+    </div>
+  )
+}
+
+/** Ce que dit l'étiquette, selon où l'exemplaire attend. */
+const PORT_OU: Record<PortObjet, { mot: string; icone: () => JSX.Element }> = {
+  lieu: { mot: 'Lieu', icone: () => <IconPlace /> },
+  pnj: { mot: 'Butin de', icone: () => <IconCoffre /> },
+  pj: { mot: 'Sac de', icone: () => <IconPeople /> },
+  inventaire: { mot: 'Dans', icone: () => <IconCoffre /> }
+}
+
+/**
+ * Où il est, sous sa catégorie : une étiquette par endroit — le lieu, le PNJ
+ * qui le garde en butin, le joueur qui l'a dans son sac. Deux se lisent, le
+ * reste se compte ; le survol les dit toutes.
+ */
+function OuIlEst({ o }: { o: Objet }): JSX.Element | null {
+  const vus = new Map<string, { port: PortObjet; cible: string }>()
+  for (const p of o.placements)
+    vus.set(`${p.port}:${p.placeId ?? p.characterId ?? p.inventaireId}`, { port: p.port, cible: p.cible })
+  const ou = [...vus.values()]
+  if (ou.length === 0) return null
+  const dit = ou.map((x) => `${PORT_OU[x.port].mot} ${x.cible}`).join(' · ')
+  return (
+    <span className="obj-ou" title={dit}>
+      {ou.slice(0, 2).map((x, i) => (
+        <span key={i} className={`obj-ou-tag ${x.port}`}>
+          {PORT_OU[x.port].icone()}
+          <span className="t">{x.cible}</span>
+        </span>
+      ))}
+      {ou.length > 2 ? <span className="obj-ou-tag plus num">+{ou.length - 2}</span> : null}
+    </span>
   )
 }
 
@@ -332,7 +887,7 @@ function ListeObjets({
       <div className="liste-tete">
         <span />
         <span className="nm">Objet</span>
-        <span className="col">Famille</span>
+        <span className="col">Catégorie</span>
         <span className="col">Poids</span>
         <span className="col">Valeur · {unite}</span>
         <span className="col">Posé</span>
@@ -357,7 +912,10 @@ function ListeObjets({
             <span className={`g c-${f?.teinte ?? 'neutral'}`}>
               {glypheObjet(f?.glyphe ?? 'outils', 'glyphe')}
             </span>
-            <span className="nm">{o.nom}</span>
+            <span className="nm">
+              <span className="nm-tx">{o.nom}</span>
+              {lieuxDe(o).length > 1 ? <AlerteLieux lieux={lieuxDe(o)} /> : null}
+            </span>
             <span className="col">{f?.nom ?? '—'}</span>
             <span className="col">{o.poids || '—'}</span>
             <span className="col">{o.valeur ?? '—'}</span>
@@ -425,6 +983,35 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
   const img = itemById(s.allItems, o.imageItemId)
   const urlImage = img?.poster ?? img?.url ?? null
   const totalPose = o.placements.reduce((t, p) => t + p.qte, 0)
+  /* Son image dans la Pochette, pour toute la table. */
+  const enPoche = img
+    ? (s.pochette.find((d) => d.itemId === img.id && d.playerId == null) ?? null)
+    : null
+
+  /**
+   * Mettre son image dans la Pochette, **cachée** — on la montre quand ils le
+   * trouvent —, et rangée dans l'onglet « Objets », créé s'il manque. Le
+   * premier onglet d'une pochette ramasse toute la pile : s'il y traîne déjà
+   * des documents, on leur ouvre d'abord un onglet « Documents », pour qu'ils
+   * ne se retrouvent pas rangés parmi les objets.
+   */
+  const mettreEnPoche = async (): Promise<void> => {
+    if (!img) return
+    const estObjets = (n: string): boolean => n.trim().toLowerCase() === 'objets'
+    try {
+      let p = await window.jdr.pochette.list()
+      if (!p.onglets.some((x) => estObjets(x.name))) {
+        if (p.onglets.length === 0 && p.docs.length > 0)
+          p = await window.jdr.pochette.createOnglet('Documents')
+        p = await window.jdr.pochette.createOnglet('Objets')
+      }
+      const onglet = p.onglets.find((x) => estObjets(x.name)) ?? null
+      s.setPochette(await window.jdr.pochette.add(img.id, null, onglet?.id ?? null))
+    } catch (e) {
+      s.toast('L’image n’est pas entrée dans la Pochette.', true)
+      console.error('[pochette]', e)
+    }
+  }
 
   return (
     <div className="pane fiche-objet">
@@ -460,7 +1047,7 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
           />
           <div className="champs">
             <label className="champ">
-              <span>Famille</span>
+              <span>Catégorie</span>
               <select
                 value={o.familleId ?? ''}
                 onChange={(e) =>
@@ -469,12 +1056,14 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
                   })
                 }
               >
-                <option value="">Sans famille</option>
-                {s.objetFamilles.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.nom}
-                  </option>
-                ))}
+                <option value="">Sans catégorie</option>
+                {s.objetFamilles
+                  .filter((f) => !f.masquee || f.id === o.familleId)
+                  .map((f) => (
+                    <option key={f.id} value={f.id}>
+                      {f.masquee ? `${f.nom} (masquée)` : f.nom}
+                    </option>
+                  ))}
               </select>
             </label>
 
@@ -684,7 +1273,7 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
               className="effet effet-neuf"
               onClick={(ev) => {
                 const r = ev.currentTarget.getBoundingClientRect()
-                setEffetOuvert({ x: r.left, y: r.bottom + 6 })
+                setEffetOuvert({ x: r.left, y: r.top - 6 })
               }}
             >
               + un effet
@@ -729,6 +1318,27 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
           <IconPoser />
           Poser…
         </button>
+        <button
+          className={`btn btn-sm${enPoche ? ' btn-on' : ''}`}
+          disabled={!img}
+          aria-pressed={!!enPoche}
+          title={
+            !img
+              ? 'Pas d’image — choisis-en une pour la mettre dans la Pochette'
+              : enPoche
+                ? `Dans la Pochette, onglet « ${enPoche.ongletName ?? 'pile'} » — ${
+                    enPoche.visible ? 'montrée aux joueurs' : 'masquée'
+                  }. Clic pour l’en retirer.`
+                : 'Mettre son image dans la Pochette, onglet « Objets » — masquée, tu la montreras quand ils le trouvent'
+          }
+          onClick={async () => {
+            if (!enPoche) return void mettreEnPoche()
+            s.setPochette(await window.jdr.pochette.remove(enPoche.id))
+          }}
+        >
+          <IconPochette />
+          {enPoche ? (enPoche.visible ? 'Pochette · montrée' : 'Pochette · masquée') : 'Pochette'}
+        </button>
         <div className="spacer" />
         <button
           className="btn btn-ghost btn-sm"
@@ -761,7 +1371,7 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
           kinds={['image']}
           rendu="vignettes"
           courant={o.imageItemId}
-          sansLibelle="Le glyphe de sa famille"
+          sansLibelle="Le glyphe de sa catégorie"
           onPick={async (id) => {
             setImage(false)
             await enregistre({ imageItemId: id })
@@ -860,6 +1470,8 @@ function LignePlacement({ o, p }: { o: Objet; p: ObjetPlacement }): JSX.Element 
         />
       </span>
 
+      {p.port === 'lieu' ? <AlerteLieux lieux={lieuxDe(o, p.placeId)} /> : null}
+
       {!o.unique ? (
         <input
           className="ou-qte num"
@@ -948,8 +1560,18 @@ function PanneauPoser({
   onClose: () => void
 }): JSX.Element {
   const s = useStore()
-  const pnjs = s.characters.filter((c) => c.kind === 'pnj')
-  const pjs = s.characters.filter((c) => c.kind !== 'pnj' && c.present)
+  const [q, setQ] = useState('')
+
+  /* On cherche comme on parle : sans les accents ni les majuscules —
+     « cave » trouve « Cave à vin », « Caveau ». */
+  const plat = (t: string): string =>
+    t.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('fr-FR')
+  const mot = plat(q.trim())
+  const garde = (nom: string): boolean => mot === '' || plat(nom).includes(mot)
+
+  const lieux = s.places.filter((l) => garde(l.name))
+  const pnjs = s.characters.filter((c) => c.kind === 'pnj' && garde(c.name))
+  const pjs = s.characters.filter((c) => c.kind !== 'pnj' && c.present && garde(c.name))
 
   const poser = async (
     port: PortObjet,
@@ -961,11 +1583,35 @@ function PanneauPoser({
     await s.refreshObjets()
   }
 
+  /* Entrée pose dans le premier qui répond : un mot, Entrée, c'est posé. */
+  const premier = (): void => {
+    if (lieux[0]) void poser('lieu', lieux[0].id, null)
+    else if (pnjs[0]) void poser('pnj', null, pnjs[0].id)
+    else if (pjs[0]) void poser('pj', null, pjs[0].id)
+  }
+
+  const rien = (quoi: string): JSX.Element => (
+    <p className="pop-rien">{mot ? 'Aucun nom ne correspond.' : quoi}</p>
+  )
+
   return (
     <Pop x={x} y={y} onClose={onClose}>
+      <label className="filtre-inline pop-cherche">
+        <IconSearch />
+        <input
+          type="text"
+          autoFocus
+          value={q}
+          placeholder="Chercher un lieu, un PNJ, un joueur"
+          aria-label="Chercher où poser"
+          onChange={(e) => setQ(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && premier()}
+        />
+      </label>
+
       <span className="eyebrow">Dans un lieu</span>
-      {s.places.length === 0 ? <p className="pop-rien">Aucun lieu dans la campagne.</p> : null}
-      {s.places.map((l) => (
+      {lieux.length === 0 ? rien('Aucun lieu dans la campagne.') : null}
+      {lieux.map((l) => (
         <button key={l.id} className="opt" onClick={() => void poser('lieu', l.id, null)}>
           {l.name}
         </button>
@@ -973,7 +1619,7 @@ function PanneauPoser({
 
       <hr />
       <span className="eyebrow">Dans le butin d’un PNJ</span>
-      {pnjs.length === 0 ? <p className="pop-rien">Aucun PNJ.</p> : null}
+      {pnjs.length === 0 ? rien('Aucun PNJ.') : null}
       {pnjs.map((c) => (
         <button key={c.id} className="opt" onClick={() => void poser('pnj', null, c.id)}>
           {c.name}
@@ -982,7 +1628,7 @@ function PanneauPoser({
 
       <hr />
       <span className="eyebrow">Dans le sac d’un joueur</span>
-      {pjs.length === 0 ? <p className="pop-rien">Aucun personnage joueur.</p> : null}
+      {pjs.length === 0 ? rien('Aucun personnage joueur.') : null}
       {pjs.map((c) => (
         <button key={c.id} className="opt" onClick={() => void poser('pj', null, c.id)}>
           {c.name}
@@ -1022,18 +1668,31 @@ function PanneauEffet({
     ...(s.sheet?.spec.skills ?? []).map((x) => x.label)
   ]
 
+  /* « Éclaire », « Lumière » : la tête que lit la régie pour faire une torche
+     de l'objet porté (voir porteursDeLumiere). Le détail n'est alors qu'une
+     portée en mètres — on la règle au curseur plutôt que de taper « 9 m » ;
+     l'échelle de chaque plan la change en part de la carte. */
+  const sansAccents = tete.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+  const eclaire = sansAccents.startsWith('eclair') || sansAccents.startsWith('lumi')
+  const [rayon, setRayon] = useState(9)
+  /* Le faisceau, en degrés : 360, tout autour ; moins, une lampe de poche
+     tournée comme le pion. La régie le relit dans « cône 30° ». */
+  const [ouverture, setOuverture] = useState(360)
+
   const poser = (): void => {
     const t = tete.trim()
     if (!t) return
     onPose({
       id: `e${Date.now().toString(36)}`,
       tete: t,
-      detail: detail.trim()
+      detail: eclaire
+        ? `${String(rayon).replace('.', ',')} m${ouverture < 360 ? ` · cône ${ouverture}°` : ''}`
+        : detail.trim()
     })
   }
 
   return (
-    <Pop x={x} y={y} className="large" onClose={onClose}>
+    <Pop x={x} y={y} haut className="large" onClose={onClose}>
       <span className="eyebrow">Un effet de plus</span>
       <div className="effet-form">
         <div className="effet-tetes">
@@ -1059,26 +1718,192 @@ function PanneauEffet({
             onKeyDown={(e) => e.key === 'Enter' && poser()}
           />
         </label>
-        <label className="champ">
-          <span>Et ce qui suit</span>
-          <input
-            value={detail}
-            list="objet-cibles"
-            placeholder="1d6 + Vigueur"
-            onChange={(e) => setDetail(e.target.value)}
-            onKeyDown={(e) => e.key === 'Enter' && poser()}
-          />
-          <datalist id="objet-cibles">
-            {cibles.map((c) => (
-              <option key={c} value={c} />
-            ))}
-          </datalist>
-        </label>
+        {eclaire ? (
+          <div className="effet-rayon">
+            <span className="eyebrow">Portée de la lumière</span>
+            <div className="ligne">
+              <input
+                type="range"
+                min={1}
+                max={40}
+                step={0.5}
+                value={rayon}
+                aria-label="Portée de la lumière"
+                onChange={(e) => setRayon(Number(e.target.value))}
+              />
+              <Valeur
+                className="v"
+                value={rayon}
+                min={0.5}
+                max={300}
+                step={0.5}
+                decimales={1}
+                unite=" m"
+                label="Portée de la lumière"
+                onChange={setRayon}
+              />
+            </div>
+            <span className="eyebrow">Cône de la lumière</span>
+            <div className="effet-cone">
+              <button
+                className="btn btn-sm"
+                aria-pressed={ouverture >= 360}
+                title="Une torche, une lanterne : elle éclaire dans toutes les directions"
+                onClick={() => setOuverture(360)}
+              >
+                Tout autour
+              </button>
+              {FAISCEAUX_LUMIERE.map((o) => (
+                <button
+                  key={o}
+                  className="btn btn-sm"
+                  aria-pressed={ouverture === o}
+                  title={`Une lampe de poche — un faisceau de ${o}°, là où le pion regarde`}
+                  onClick={() => setOuverture(o)}
+                >
+                  {o}°
+                </button>
+              ))}
+            </div>
+            <DemoLueur rayon={rayon} ouverture={ouverture} />
+            <span className="note">
+              {ouverture < 360
+                ? 'Porté en main par un personnage, l’objet éclaire droit devant lui, dans le sens où son pion regarde ; les murs arrêtent le faisceau. Une lampe de poche : 10 m, 30°.'
+                : 'Porté en main par un personnage, l’objet l’éclaire tout autour, à l’échelle du plan ; les murs arrêtent la lueur. Une torche ordinaire : 9 m.'}
+            </span>
+          </div>
+        ) : (
+          <label className="champ">
+            <span>Et ce qui suit</span>
+            <input
+              value={detail}
+              list="objet-cibles"
+              placeholder="1d6 + Vigueur"
+              onChange={(e) => setDetail(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && poser()}
+            />
+            <datalist id="objet-cibles">
+              {cibles.map((c) => (
+                <option key={c} value={c} />
+              ))}
+            </datalist>
+          </label>
+        )}
         <button className="btn btn-sm btn-brass btn-c" onClick={poser} disabled={!tete.trim()}>
           Poser l’effet
         </button>
       </div>
     </Pop>
+  )
+}
+
+/**
+ * L'exemple d'une lueur portée, calculé comme sur la carte.
+ *
+ * Un petit plan — trois pièces, un couloir, des portes — de 20 m de large, un
+ * personnage dans la première pièce, à 9 m environ de large. La lueur part de lui, s'arrête aux murs
+ * (`champDeVision`, le calcul de la carte) et passe par les portes : plein
+ * jour sur `CLAIR_DE_TORCHE` du rayon, puis la pénombre jusqu'au noir. Le plan
+ * reste deviné dans l'ombre, comme le MJ le voit ; le cercle en tirets dit
+ * jusqu'où la lueur irait sans mur. Une barre donne l'échelle : 2 m.
+ */
+const DEMO_W = 240
+/** Le plan d'exemple fait 20 m de large : 12 unités par mètre. */
+const DEMO_PAR_M = DEMO_W / 20
+const DEMO_H = 150
+const DEMO_PION = { x: 62, y: 92 }
+const DEMO_MURS: Barriere[] = [
+  [10, 10, 230, 10],
+  [230, 10, 230, 140],
+  [230, 140, 10, 140],
+  [10, 140, 10, 10],
+  /* Entre la pièce du personnage et le couloir, une porte. */
+  [120, 10, 120, 60],
+  [120, 84, 120, 140],
+  /* Le couloir, et une porte vers chaque pièce de droite. */
+  [150, 10, 150, 28],
+  [150, 48, 150, 98],
+  [150, 118, 150, 140],
+  [150, 75, 230, 75]
+].map(([ax, ay, bx, by]) => ({ a: { x: ax, y: ay }, b: { x: bx, y: by } }))
+
+function PlanDemo(): JSX.Element {
+  return (
+    <>
+      <rect x={10} y={10} width={220} height={130} className="sol" />
+      {[24, 38, 52, 66, 80, 94, 108, 122].map((y) => (
+        <line key={y} x1={10} x2={120} y1={y} y2={y} className="latte" />
+      ))}
+      {[24, 38, 52, 66, 80, 94, 108, 122].map((x) => (
+        <line key={x} x1={150 + x * 0.6} x2={150 + x * 0.6} y1={75} y2={140} className="latte" />
+      ))}
+      <rect x={24} y={22} width={40} height={24} rx={2} className="meuble" />
+      <rect x={86} y={110} width={24} height={20} rx={2} className="meuble" />
+      <rect x={196} y={18} width={26} height={40} rx={2} className="meuble" />
+      <circle cx={190} cy={108} r={10} className="meuble" />
+      {DEMO_MURS.map((m, i) => (
+        <line key={i} x1={m.a.x} y1={m.a.y} x2={m.b.x} y2={m.b.y} className="mur" />
+      ))}
+    </>
+  )
+}
+
+/** Le personnage de l'exemple regarde vers la porte, à droite. */
+const DEMO_CAP = 90
+
+function DemoLueur({ rayon, ouverture }: { rayon: number; ouverture: number }): JSX.Element {
+  const r = Math.max(1, rayon * DEMO_PAR_M)
+  const rond = useMemo(
+    () => champDeVision(DEMO_MURS, DEMO_PION, DEMO_CAP, ouverture, r),
+    [r, ouverture]
+  )
+  /* Jusqu'où irait la lueur sans mur : un cercle, ou le secteur du faisceau. */
+  const sansMur = useMemo((): string | null => {
+    if (ouverture >= 360) return null
+    const point = (deg: number): string => {
+      const a = ((deg - 90) * Math.PI) / 180
+      return `${DEMO_PION.x + r * Math.cos(a)} ${DEMO_PION.y + r * Math.sin(a)}`
+    }
+    const grand = ouverture > 180 ? 1 : 0
+    return `M ${DEMO_PION.x} ${DEMO_PION.y} L ${point(DEMO_CAP - ouverture / 2)} A ${r} ${r} 0 ${grand} 1 ${point(DEMO_CAP + ouverture / 2)} Z`
+  }, [r, ouverture])
+  return (
+    <svg className="lueur-demo" viewBox={`0 0 ${DEMO_W} ${DEMO_H}`} aria-hidden="true">
+      <defs>
+        <radialGradient
+          id="lueur-demo-g"
+          gradientUnits="userSpaceOnUse"
+          cx={DEMO_PION.x}
+          cy={DEMO_PION.y}
+          r={r}
+        >
+          <stop offset={0} stopColor="#fff" />
+          <stop offset={CLAIR_DE_TORCHE} stopColor="#fff" />
+          <stop offset={1} stopColor="#000" />
+        </radialGradient>
+        <mask id="lueur-demo-m" maskUnits="userSpaceOnUse" x={0} y={0} width={DEMO_W} height={DEMO_H}>
+          <polygon points={polygone(rond)} fill="url(#lueur-demo-g)" />
+        </mask>
+      </defs>
+      <rect x={0} y={0} width={DEMO_W} height={DEMO_H} className="fond" />
+      <g className="ombre">
+        <PlanDemo />
+      </g>
+      <g mask="url(#lueur-demo-m)">
+        <PlanDemo />
+        <rect x={0} y={0} width={DEMO_W} height={DEMO_H} fill={TEINTE_TORCHE} opacity={0.16} />
+      </g>
+      {sansMur ? (
+        <path d={sansMur} className="portee" />
+      ) : (
+        <circle cx={DEMO_PION.x} cy={DEMO_PION.y} r={r} className="portee" />
+      )}
+      <circle cx={DEMO_PION.x} cy={DEMO_PION.y} r={5} className="pion" />
+      <line x1={14} x2={14 + 2 * DEMO_PAR_M} y1={146} y2={146} className="echelle" />
+      <text x={18 + 2 * DEMO_PAR_M} y={148.5} className="echelle-txt">
+        2 m
+      </text>
+    </svg>
   )
 }
 
@@ -1113,11 +1938,16 @@ function PanneauReglages({
 
   return (
     <Pop x={x} y={y} className="large" onClose={onClose}>
-      <span className="eyebrow">Les familles</span>
+      <span className="eyebrow">Les catégories</span>
       {s.objetFamilles.map((f) => (
-        <button key={f.id} className="opt" onClick={() => setEditee(f.id)}>
+        <button
+          key={f.id}
+          className={`opt${f.masquee ? ' masquee' : ''}`}
+          onClick={() => setEditee(f.id)}
+        >
           <span className={`pastille c-${f.teinte}`} />
           <span className="lib">{f.nom}</span>
+          {f.masquee ? <IconEyeOff /> : f.verrouillee ? <IconVerrou /> : null}
           <span className="n num">{s.objets.filter((o) => o.familleId === f.id).length}</span>
         </button>
       ))}
@@ -1129,7 +1959,7 @@ function PanneauReglages({
           const prises = new Set(s.objetFamilles.map((f) => f.teinte))
           const libre = PION_COULEURS.find((c) => !prises.has(c.key))?.key ?? 'neutral'
           const neuve = await window.jdr.objets.familleAdd({
-            nom: 'Nouvelle famille',
+            nom: 'Nouvelle catégorie',
             teinte: libre,
             glyphe: 'outils'
           })
@@ -1138,7 +1968,7 @@ function PanneauReglages({
         }}
       >
         <IconPlus />
-        Une famille de plus
+        Une catégorie de plus
       </button>
 
       <p className="reglage-ailleurs">
@@ -1149,8 +1979,103 @@ function PanneauReglages({
   )
 }
 
+/**
+ * Les familles en grand : la liste à gauche, celle qu'on règle à droite. On
+ * ouvre sur le rayon où l'on se trouve, sinon sur le premier.
+ */
+function ModaleFamilles({
+  depart,
+  onClose
+}: {
+  depart: number | null
+  onClose: () => void
+}): JSX.Element {
+  const s = useStore()
+  const [choisie, setChoisie] = useState<number | null>(depart ?? s.objetFamilles[0]?.id ?? null)
+  const fam = s.objetFamilles.find((f) => f.id === choisie) ?? null
+
+  useEffect(() => {
+    const touche = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', touche)
+    return () => window.removeEventListener('keydown', touche)
+  }, [onClose])
+
+  return (
+    <div className="scrim" onClick={onClose}>
+      <div className="modal fam-modale" onClick={(e) => e.stopPropagation()}>
+        <header>
+          <IconRouage />
+          <h3>Les catégories d’objets</h3>
+        </header>
+        <div className="fam-modale-corps">
+          <div className="fam-rangs">
+            {s.objetFamilles.map((f) => (
+              <button
+                key={f.id}
+                className={`fam-btn${choisie === f.id ? ' on' : ''}${f.masquee ? ' masquee' : ''}`}
+                onClick={() => setChoisie(f.id)}
+                title={
+                  f.masquee
+                    ? 'Masquée à partir de cette séance'
+                    : f.verrouillee
+                      ? 'A servi dans une autre séance : elle ne se modifie plus'
+                      : undefined
+                }
+              >
+                <span className={`pastille c-${f.teinte}`} />
+                <span className="lib">{f.nom}</span>
+                {f.masquee ? <IconEyeOff /> : f.verrouillee ? <IconVerrou /> : null}
+                <span className="n">{s.objets.filter((o) => o.familleId === f.id).length}</span>
+              </button>
+            ))}
+            <button
+              className="fam-btn neuve"
+              onClick={async () => {
+                /* La teinte suivante qui n'est pas déjà prise : deux rayons de
+                   la même couleur ne se distinguent plus à un mètre. */
+                const prises = new Set(s.objetFamilles.map((f) => f.teinte))
+                const libre = PION_COULEURS.find((c) => !prises.has(c.key))?.key ?? 'neutral'
+                const neuve = await window.jdr.objets.familleAdd({
+                  nom: 'Nouvelle catégorie',
+                  teinte: libre,
+                  glyphe: 'outils'
+                })
+                await s.refreshObjets()
+                setChoisie(neuve.id)
+              }}
+            >
+              <IconPlus />
+              <span className="lib">Une catégorie de plus</span>
+            </button>
+          </div>
+          {fam ? (
+            <ReglageFamille key={fam.id} f={fam} onRetour={() => setChoisie(null)} enGrand />
+          ) : (
+            <p className="rien-objet">Choisis une catégorie à gauche, ou crées-en une.</p>
+          )}
+        </div>
+        <footer>
+          <button className="btn btn-ghost" onClick={onClose}>
+            Fermer
+          </button>
+        </footer>
+      </div>
+    </div>
+  )
+}
+
 /** Un rayon : son nom, sa teinte, son dessin. */
-function ReglageFamille({ f, onRetour }: { f: ObjetFamille; onRetour: () => void }): JSX.Element {
+function ReglageFamille({
+  f,
+  onRetour,
+  enGrand = false
+}: {
+  f: ObjetFamille
+  onRetour: () => void
+  enGrand?: boolean
+}): JSX.Element {
   const s = useStore()
   const [nom, setNom] = useState(f.nom)
   const frappe = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -1166,16 +2091,34 @@ function ReglageFamille({ f, onRetour }: { f: ObjetFamille; onRetour: () => void
   }
 
   const n = s.objets.filter((o) => o.familleId === f.id).length
+  const fige = f.verrouillee
+
+  const masquer = async (masquee: boolean): Promise<void> => {
+    await window.jdr.objets.familleMasquer(f.id, masquee)
+    await s.refreshObjets()
+  }
 
   return (
-    <div className="fam-editeur">
-      <button className="retour" onClick={onRetour}>
-        ← toutes les familles
-      </button>
+    <div className={`fam-editeur${fige ? ' fige' : ''}`}>
+      {enGrand ? null : (
+        <button className="retour" onClick={onRetour}>
+          ← toutes les catégories
+        </button>
+      )}
+
+      {fige ? (
+        <p className="fam-verrou">
+          <IconVerrou />
+          Elle a servi dans une autre séance&nbsp;: on ne la modifie plus. On peut la masquer
+          à partir de celle-ci — les séances d’avant la montrent toujours.
+        </p>
+      ) : null}
 
       <label className="champ">
-        <span>Nom du rayon</span>
+        <span>Nom de la catégorie</span>
         <input
+          autoFocus={enGrand && !fige}
+          disabled={fige}
           value={nom}
           onChange={(e) => {
             setNom(e.target.value)
@@ -1192,6 +2135,7 @@ function ReglageFamille({ f, onRetour }: { f: ObjetFamille; onRetour: () => void
             key={g}
             className={`gl c-${f.teinte}${f.glyphe === g ? ' on' : ''}`}
             title={g}
+            disabled={fige}
             onClick={() => void maj({ glyphe: g })}
           >
             {glypheObjet(g, '')}
@@ -1207,27 +2151,54 @@ function ReglageFamille({ f, onRetour }: { f: ObjetFamille; onRetour: () => void
             className={`teinte sw${f.teinte === c.key ? ' on' : ''}`}
             style={{ background: c.hex }}
             title={c.name}
+            disabled={fige}
             onClick={() => void maj({ teinte: c.key })}
           />
         ))}
       </div>
 
-      <button
-        className="btn btn-sm btn-danger btn-c"
-        onClick={async () => {
-          await window.jdr.objets.familleRemove(f.id)
-          await s.refreshObjets()
-          onRetour()
-        }}
-      >
-        <IconTrash />
-        Retirer ce rayon
-      </button>
-      <p className="note">
-        {n === 0
-          ? 'Ce rayon est vide.'
-          : `Ses ${n} objet${n > 1 ? 's' : ''} rest${n > 1 ? 'ent' : 'e'} en réserve, sans famille.`}
-      </p>
+      {f.masquee ? (
+        <>
+          <button className="btn btn-sm btn-c" onClick={() => void masquer(false)}>
+            <IconEye />
+            Réafficher cette catégorie
+          </button>
+          <p className="note">
+            Masquée&nbsp;: elle n’est plus dans la colonne ni dans le choix d’un objet. Ses objets
+            restent sous «&nbsp;Tout&nbsp;».
+          </p>
+        </>
+      ) : fige ? (
+        <>
+          <button className="btn btn-sm btn-c" onClick={() => void masquer(true)}>
+            <IconEyeOff />
+            Masquer à partir de cette séance
+          </button>
+          <p className="note">
+            Elle sort de la colonne et du choix d’un objet&nbsp;; ses objets restent sous
+            «&nbsp;Tout&nbsp;».
+          </p>
+        </>
+      ) : (
+        <>
+          <button
+            className="btn btn-sm btn-danger btn-c"
+            onClick={async () => {
+              await window.jdr.objets.familleRemove(f.id)
+              await s.refreshObjets()
+              onRetour()
+            }}
+          >
+            <IconTrash />
+            Retirer cette catégorie
+          </button>
+          <p className="note">
+            {n === 0
+              ? 'Cette catégorie est vide.'
+              : `Ses ${n} objet${n > 1 ? 's' : ''} rest${n > 1 ? 'ent' : 'e'} en réserve, sans catégorie.`}
+          </p>
+        </>
+      )}
     </div>
   )
 }

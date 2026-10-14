@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
+import { Valeur } from './Valeur'
 import { jaugeSanite } from '@shared/types'
 import type { Rubrique } from './Menubar'
+import { AVATARS_MJ, urlPortraitMj } from '../../shared/avatarsMj'
+import { nomDuMj } from '@shared/reglages'
 import {
   IconClavier,
   IconClose,
   IconDie,
   IconFolder,
   IconMurs,
+  IconPeople,
   IconPortable,
   IconRouage,
   IconScreen,
@@ -33,6 +37,7 @@ const RUBRIQUES: { id: Rubrique; nom: string; icone: JSX.Element; poste?: boolea
   { id: 'table', nom: 'Table et règles', icone: <IconDie /> },
   { id: 'murs', nom: 'Murs et lumière', icone: <IconMurs /> },
   { id: 'biblio', nom: 'Bibliothèque', icone: <IconFolder /> },
+  { id: 'mj', nom: 'Le maître du jeu', icone: <IconPeople />, poste: true },
   { id: 'portables', nom: 'Portables', icone: <IconPortable />, poste: true },
   { id: 'poste', nom: 'Le poste', icone: <IconSliders />, poste: true },
   { id: 'touches', nom: 'Raccourcis', icone: <IconClavier />, poste: true }
@@ -96,6 +101,7 @@ export function Parametres({
             {rub === 'table' && <Table />}
             {rub === 'murs' && <Murs />}
             {rub === 'biblio' && <Biblio />}
+            {rub === 'mj' && <ProfilMj />}
             {rub === 'portables' && <Portables />}
             {rub === 'poste' && <Poste />}
             {rub === 'touches' && <Touches />}
@@ -241,7 +247,21 @@ function Curseur({
         onPointerUp={() => onPoser(vu)}
         onKeyUp={() => onPoser(vu)}
       />
-      <b className="pm-val num">{texte(vu)}</b>
+      <Valeur
+        className="pm-val num"
+        value={vu}
+        min={min}
+        max={max}
+        step={pas ?? 1}
+        decimales={pas !== undefined && pas < 1 ? 1 : 0}
+        affiche={texte}
+        disabled={desactive}
+        label={label}
+        onChange={(v) => {
+          setVu(v)
+          onPoser(v)
+        }}
+      />
     </>
   )
 }
@@ -462,8 +482,20 @@ function Table(): JSX.Element {
       </Bloc>
 
       <Ligne
+        nom="Fiche de compétences des PNJ"
+        aide="Décochée, la fiche d’un PNJ n’a pas de colonne pour lier un PDF ou un scan : ses chiffres prennent la place."
+      >
+        <input
+          type="checkbox"
+          checked={s.reglages.pnjFiche}
+          aria-label="Fiche de compétences des PNJ"
+          onChange={(e) => void s.poserReglage('pnj.fiche', e.target.checked)}
+        />
+      </Ligne>
+
+      <Ligne
         nom="Unité de valeur"
-        aide="Nommée une fois ; chaque objet ne porte qu’un nombre. Les familles, elles, restent dans la réserve."
+        aide="Nommée une fois ; chaque objet ne porte qu’un nombre. Les catégories, elles, restent dans la réserve."
       >
         <input
           type="text"
@@ -498,7 +530,7 @@ function Murs(): JSX.Element {
 
       <Ligne
         nom="Portée du regard"
-        aide="Au-delà, c’est trop loin pour distinguer quoi que ce soit."
+        aide="Jusque-là, on voit même dans le noir ; au-delà, seulement ce qui est éclairé."
       >
         <Curseur
           label="Portée du regard"
@@ -853,6 +885,139 @@ function Poste(): JSX.Element {
         </div>
       </Ligne>
     </>
+  )
+}
+
+/* ============================================================
+   Le maître du jeu
+   ============================================================ */
+
+function ProfilMj(): JSX.Element {
+  const s = useStore()
+  const p = s.poste
+  const choisi = p.mjImage
+  const perso = choisi?.startsWith('jdr://') ? choisi : null
+  const parcourir = async (): Promise<void> => {
+    const url = await window.jdr.app.portraitMj()
+    if (url) await s.poserPoste('mj.image', url)
+  }
+
+  return (
+    <>
+      <Tete
+        titre="Le maître du jeu"
+        quoi="Ton profil, d’une campagne à l’autre. C’est lui qui s’assoit à la table sur l’écran « Ça commence bientôt »."
+      />
+
+      <div className="pmj-apercu">
+        <div className="pmj-face">
+          {urlPortraitMj(choisi) ? <img src={urlPortraitMj(choisi)!} alt="" /> : <b>🎲</b>}
+        </div>
+        <div>
+          <div className="pmj-nom">{nomDuMj(p)}</div>
+          <div className="aide">Maître du jeu</div>
+        </div>
+      </div>
+
+      <Ligne nom="Prénom">
+        <ChampTexte
+          valeur={p.mjPrenom}
+          label="Prénom du maître du jeu"
+          placeholder="Ton prénom"
+          onPoser={(v) => void s.poserPoste('mj.prenom', v || null)}
+        />
+      </Ligne>
+      <Ligne nom="Nom" aide="Facultatif. Sans prénom ni nom, l’écran dit « Le MJ ».">
+        <ChampTexte
+          valeur={p.mjNom}
+          label="Nom du maître du jeu"
+          placeholder="Ton nom"
+          onPoser={(v) => void s.poserPoste('mj.nom', v || null)}
+        />
+      </Ligne>
+
+      <Ligne
+        nom="Image"
+        aide="Une silhouette fournie avec l’application, ou une image de ton disque. Elle s’affiche dans un médaillon rond."
+        pleine
+      >
+        <div className="pmj-avatars" role="radiogroup" aria-label="Image du maître du jeu">
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!choisi}
+            className={`pmj-avatar${!choisi ? ' on' : ''}`}
+            onClick={() => void s.poserPoste('mj.image', null)}
+          >
+            <span className="pmj-rond">
+              <b>🎲</b>
+            </span>
+            <span className="pmj-univers">Aucune image</span>
+          </button>
+          {AVATARS_MJ.map((a) => {
+            const on = choisi === `avatar:${a.id}`
+            return (
+              <button
+                key={a.id}
+                type="button"
+                role="radio"
+                aria-checked={on}
+                className={`pmj-avatar${on ? ' on' : ''}`}
+                onClick={() => void s.poserPoste('mj.image', `avatar:${a.id}`)}
+              >
+                <span className="pmj-rond">
+                  <img src={a.url} alt="" />
+                </span>
+                <span className="pmj-univers">{a.nom}</span>
+              </button>
+            )
+          })}
+          <button
+            type="button"
+            role="radio"
+            aria-checked={!!perso}
+            className={`pmj-avatar${perso ? ' on' : ''}`}
+            onClick={() => void parcourir()}
+            title="Choisir une image dans l’explorateur de fichiers"
+          >
+            <span className="pmj-rond parcourir">
+              {perso ? <img src={perso} alt="" /> : <IconFolder />}
+            </span>
+            <span className="pmj-univers">{perso ? 'Mon image · changer' : 'Parcourir…'}</span>
+          </button>
+        </div>
+      </Ligne>
+    </>
+  )
+}
+
+/** Un champ de texte qui n'écrit qu'en sortant, ou sur Entrée. */
+function ChampTexte({
+  valeur,
+  label,
+  placeholder,
+  onPoser
+}: {
+  valeur: string
+  label: string
+  placeholder?: string
+  onPoser: (v: string) => void
+}): JSX.Element {
+  const [vu, setVu] = useState(valeur)
+  useEffect(() => setVu(valeur), [valeur])
+  const poser = (): void => {
+    if (vu.trim() !== valeur) onPoser(vu.trim())
+  }
+  return (
+    <input
+      type="text"
+      value={vu}
+      aria-label={label}
+      placeholder={placeholder}
+      onChange={(e) => setVu(e.target.value)}
+      onBlur={poser}
+      onKeyDown={(e) => e.key === 'Enter' && poser()}
+    />
   )
 }
 
