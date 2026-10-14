@@ -24,9 +24,9 @@ import { pathToFileURL } from 'node:url'
 import { BrowserWindow } from 'electron'
 import { activeCampaignId, getDb, isDbOpen } from './db'
 import { absOf } from './library'
-import { mediaUrl, vignettePath, vignettesDir } from './vault'
+import { copiePath, mediaUrl, vignettePath, vignettesDir } from './vault'
 import { cheminIcone } from './icone'
-import type { ExamenFait, ExamenJob } from '@shared/types'
+import type { ExamenFait, ExamenJob, SorteCopie } from '@shared/types'
 
 /* ============================================================
    La file d'attente
@@ -42,7 +42,13 @@ import type { ExamenFait, ExamenJob } from '@shared/types'
  * l'incrémente chaque fois que le graveur apprend à voir quelque chose de plus.
  */
 const VERSION = 2
-const SIG = `('v${VERSION}|' || COALESCE(i.bytes, 0) || '|' || i.updated_at)`
+/**
+ * Les images ont leur propre numéro depuis qu'elles reçoivent des copies
+ * réduites : le relever pour tout le monde aurait refait passer chaque vidéo
+ * et chaque son de la campagne, qui n'ont rien appris de neuf.
+ */
+const VERSION_IMAGE = 3
+const SIG = `('v' || CASE i.kind WHEN 'image' THEN ${VERSION_IMAGE} ELSE ${VERSION} END || '|' || COALESCE(i.bytes, 0) || '|' || i.updated_at)`
 
 interface Candidat {
   id: number
@@ -88,7 +94,8 @@ function prochain(): ExamenJob | null {
 
     const url = mediaUrl(r.rel_path)
     if (!url) return null
-    return { id: r.id, kind: r.kind, url, titre: r.title, sig: r.sig }
+    /* L'original, pas sa copie réduite : c'est lui qu'on mesure et qu'on réduit. */
+    return { id: r.id, kind: r.kind, url: `${url}?original`, titre: r.title, sig: r.sig }
   }
 }
 
@@ -132,6 +139,24 @@ function ranger(f: ExamenFait): void {
     }
   }
 
+  /* Les copies réduites : écrites quand l'image dépasse le plafond, effacées
+     quand elle n'en a plus besoin. Celles d'un fichier qui a changé sans être
+     relu restent, mais `copieReduite` ne sert jamais une copie plus vieille
+     que son original. */
+  if (f.copies) {
+    for (const sorte of Object.keys(f.copies) as SorteCopie[]) {
+      const donnees = f.copies[sorte]
+      const chemin = copiePath(f.id, sorte, !!donnees)
+      if (!chemin) continue
+      try {
+        if (donnees) writeFileSync(chemin, Buffer.from(donnees))
+        else if (existsSync(chemin)) rmSync(chemin)
+      } catch (e) {
+        console.error(`[examen] copie ${sorte} de ${f.id} non écrite :`, e)
+      }
+    }
+  }
+
   getDb()
     .prepare(
       `UPDATE item
@@ -164,9 +189,15 @@ function balayer(): void {
       (getDb().prepare(`SELECT id FROM item WHERE thumb_at IS NOT NULL`).all() as { id: number }[])
         .map((r) => String(r.id))
     )
+    const presents = new Set(
+      (getDb().prepare(`SELECT id FROM item`).all() as { id: number }[]).map((r) => String(r.id))
+    )
     for (const nom of readdirSync(dir)) {
       const m = /^(\d+)\.jpg$/.exec(nom)
       if (m && !vivants.has(m[1])) rmSync(join(dir, nom), { force: true })
+      /* Une copie réduite ne suit pas la vignette : elle part avec l'élément. */
+      const c = /^(\d+)\.(ecran|portable)\.webp$/.exec(nom)
+      if (c && !presents.has(c[1])) rmSync(join(dir, nom), { force: true })
     }
   } catch (e) {
     console.error('[examen] balayage impossible :', e)

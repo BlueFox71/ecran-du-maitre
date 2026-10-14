@@ -934,7 +934,7 @@ export function Pupitre(): JSX.Element {
                         onClick={() => void preparePlace(lieu.id)}
                         title={`Préparer ${lieu.name} — ses pions reviennent avec lui`}
                       >
-                        {carte?.url ? <img src={carte.url} alt="" /> : <span className="pu-rien" />}
+                        {carte?.url ? <img src={carte.poster ?? carte.url} alt="" /> : <span className="pu-rien" />}
                         <span className="pu-kind">lieu</span>
                         <span className="pu-nom">{lieu.name}</span>
                       </button>
@@ -1790,7 +1790,7 @@ export function Pupitre(): JSX.Element {
                           }\nClic : préparer · glisser sur la scène à l’antenne : envoyer tout de suite`}
                         >
                           <span className="mini">
-                            {map?.url ? <img src={map.url} alt="" draggable={false} /> : null}
+                            {map?.url ? <img src={map.poster ?? map.url} alt="" draggable={false} /> : null}
                           </span>
                           <span className="nm">{p.name}</span>
                           {p.seen ? null : (

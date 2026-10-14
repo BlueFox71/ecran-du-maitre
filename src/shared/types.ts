@@ -1808,7 +1808,36 @@ export interface ExamenFait {
   duration: number | null
   /** L'image saisie, en `data:image/jpeg;base64,…` — nulle pour un son. */
   vignette: string | null
+  /**
+   * Les copies réduites d'une grande image, en WebP — voir `PLAFONDS_COPIES`.
+   * Absentes pour ce qui n'est pas une image : on n'y touche pas. Une sorte
+   * nulle veut dire que l'image tient déjà sous son plafond.
+   */
+  copies?: Record<SorteCopie, Uint8Array | null>
   erreur: string | null
+}
+
+/**
+ * Les copies réduites d'une image trop grande pour être montrée telle quelle.
+ *
+ * Un plan peut faire 27 000 pixels de côté : décodé, il pèse deux gigaoctets,
+ * dépasse la plus grande texture qu'une carte graphique accepte, et fige
+ * l'application à chaque fois qu'on le montre. Un téléphone, lui, ne l'affiche
+ * pas du tout. L'examen grave donc, à côté de la vignette, une copie pour les
+ * écrans de l'application et une pour les portables ; l'original reste
+ * intact sur le disque.
+ *
+ * Tout ce qu'on pose sur une image (murs, pièces, pions, repères) est en
+ * fractions de sa taille : une copie aux mêmes proportions ne décale rien.
+ */
+export type SorteCopie = 'ecran' | 'portable'
+
+/** Le plus grand côté de chaque copie, en pixels. Une image plus petite n'en a pas. */
+export const PLAFONDS_COPIES: Record<SorteCopie, number> = {
+  /* Net même zoomé sur un écran 4K, et bien sous la texture maximale (16 384). */
+  ecran: 8192,
+  /* Lisible au doigt pour un document, et décodable par un iPhone. */
+  portable: 3072
 }
 
 /* ---------- Dossier de campagne ---------- */

@@ -20,12 +20,12 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { networkInterfaces } from 'node:os'
 import { randomBytes, randomUUID } from 'node:crypto'
-import { extname, join, normalize } from 'node:path'
+import { basename, extname, join, normalize } from 'node:path'
 import { BrowserWindow, app } from 'electron'
 import { toDataURL } from 'qrcode'
 import { activeCampaignId, getDb, isDbOpen } from './db'
 import { absOf, insideRoot } from './library'
-import { vignettesDir } from './vault'
+import { copieReduite, vignettesDir } from './vault'
 import { plageDemandee } from './plage'
 import * as chars from './db/repos/characters'
 import * as players from './db/repos/players'
@@ -839,13 +839,14 @@ const TYPES: Record<string, string> = {
  *    lecture ne démarre pas du tout. Le lecteur de PDF s'en sert aussi pour
  *    n'aller chercher que les pages qu'il affiche.
  */
-function envoyer(res: ServerResponse, abs: string, req?: IncomingMessage): void {
+function envoyer(res: ServerResponse, abs: string, req?: IncomingMessage, nomAffiche?: string): void {
   if (!existsSync(abs) || !statSync(abs).isFile()) return json(res, 404, { erreur: 'Introuvable.' })
 
   const taille = statSync(abs).size
   const ext = extname(abs).toLowerCase()
   const type = TYPES[ext] ?? 'application/octet-stream'
-  const nom = abs.split(/[/\\]/).pop() ?? 'fichier'
+  /* Une copie réduite porte un numéro pour nom : le joueur voit celui de l'original. */
+  const nom = nomAffiche ?? abs.split(/[/\\]/).pop() ?? 'fichier'
   const enTetes: Record<string, string | number> = {
     'content-type': type,
     /* Le nom en clair pour les navigateurs anciens, et encodé pour les accents. */
@@ -881,6 +882,10 @@ function media(res: ServerResponse, rel: string, req: IncomingMessage): void {
     return json(res, 404, { erreur: 'Aucune campagne ouverte.' })
   }
   if (!insideRoot(abs)) return json(res, 403, { erreur: 'Interdit.' })
+  /* Un grand plan part en copie réduite : l'original, c'est des dizaines de
+     mégaoctets par le Wi-Fi, et une image qu'un téléphone ne sait pas décoder. */
+  const copie = copieReduite(decodeURIComponent(rel), 'portable')
+  if (copie) return envoyer(res, copie, req, `${basename(abs, extname(abs))}.webp`)
   envoyer(res, abs, req)
 }
 

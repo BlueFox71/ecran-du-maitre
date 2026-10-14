@@ -1835,7 +1835,7 @@ Ici : ${ici.map((j) => j.name).join(', ')}` : ''
 Clic : préparer · glisser sur « À l’écran » : envoyer tout de suite`}
                       >
                         <span className="mini">
-                          {map?.url ? <img src={map.url} alt="" draggable={false} /> : null}
+                          {map?.url ? <img src={map.poster ?? map.url} alt="" draggable={false} /> : null}
                         </span>
                         <span className="nm">{p.name}</span>
                         {p.seen ? null : (

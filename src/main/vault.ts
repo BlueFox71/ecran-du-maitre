@@ -7,13 +7,17 @@
  *   `jdr://media/<chemin>` — un fichier de la bibliothèque ;
  *   `jdr://vignette/<id>.jpg` — une image gravée par l'examen (voir examen.ts),
  *   qui dort dans le dossier technique du projet et non dans la bibliothèque.
+ *
+ * Une image trop grande est servie, sous sa propre adresse, par sa copie
+ * réduite (voir `PLAFONDS_COPIES`) : les interfaces n'en savent rien.
  */
-import { existsSync, mkdirSync } from 'node:fs'
+import { existsSync, mkdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 import { pathToFileURL } from 'node:url'
 import { net, protocol } from 'electron'
 import { absOf, campaignRoot, insideRoot } from './library'
-import { dataRoot } from './db'
+import { activeCampaignId, dataRoot, getDb, isDbOpen } from './db'
+import type { SorteCopie } from '@shared/types'
 
 /** URL servie aux interfaces pour un chemin relatif au dossier de campagne. */
 export function mediaUrl(relPath: string | null): string | null {
@@ -49,6 +53,34 @@ export function vignettePath(id: number, creer = false): string | null {
 export function vignetteUrl(id: number, thumbAt: string | null): string | null {
   if (!thumbAt) return null
   return `jdr://vignette/${id}.jpg?v=${encodeURIComponent(thumbAt)}`
+}
+
+/* ---------------- les copies réduites ---------------- */
+
+/** Où dort une copie réduite : à côté de la vignette, `<id>.<sorte>.webp`. */
+export function copiePath(id: number, sorte: SorteCopie, creer = false): string | null {
+  const v = vignettesDir(creer)
+  return v ? join(v, `${id}.${sorte}.webp`) : null
+}
+
+/**
+ * La copie réduite à servir à la place d'une image de la bibliothèque, ou nul
+ * s'il faut l'original : l'image tient sous le plafond, l'examen n'est pas
+ * encore passé, ou le fichier a changé depuis — une copie plus ancienne que
+ * lui montrerait l'ancienne image.
+ */
+export function copieReduite(rel: string, sorte: SorteCopie): string | null {
+  if (!/\.(jpe?g|png|webp|bmp|avif)$/i.test(rel) || !isDbOpen()) return null
+  try {
+    const r = getDb()
+      .prepare(`SELECT id FROM item WHERE campaign_id = ? AND rel_path = ?`)
+      .get(activeCampaignId(), rel) as { id: number } | undefined
+    const copie = r ? copiePath(r.id, sorte) : null
+    if (!copie || !existsSync(copie)) return null
+    return statSync(copie).mtimeMs >= statSync(absOf(rel)).mtimeMs ? copie : null
+  } catch {
+    return null
+  }
 }
 
 /** Le portrait du MJ vit hors de toute campagne : il suit le poste. */
@@ -104,6 +136,12 @@ export function registerMediaProtocol(): void {
     }
 
     if (!insideRoot(abs) || !existsSync(abs)) return new Response('Interdit', { status: 403 })
+    /* Une grande image part en copie réduite. Seul le graveur, qui doit
+       mesurer l'original, demande `?original`. */
+    if (!url.searchParams.has('original')) {
+      const copie = copieReduite(nom, 'ecran')
+      if (copie) return servir(copie)
+    }
     return servir(abs)
   })
 }
