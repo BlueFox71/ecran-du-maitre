@@ -44,10 +44,15 @@ Release de ce dépôt, compare son tag à la version installée, et télécharge
 Publier une version tient donc en trois gestes :
 
 ```bash
-# 1. le numéro de version dans package.json, puis :
+# 1. le numéro de version dans package.json et le rapport dans RELEASE_NOTES.md, puis :
 git tag v1.0.0 && git push --tags     # le tag d'abord, la release s'y accroche
-npm run publier                       # construit et publie (demande GH_TOKEN)
+npm run publier                       # construit, publie et pose le rapport (demande GH_TOKEN)
 ```
+
+`RELEASE_NOTES.md` est le **rapport de mise à jour** : le Grenier l'affiche dans la section
+« Actualités » de la fiche. Il commence par `<!-- version: X.Y.Z -->`, qui doit égaler la version
+de package.json — sinon `scripts/publish-notes.mjs` refuse de le poser, plutôt que de republier
+le rapport de la version précédente.
 
 Deux contraintes viennent du Grenier, et **rien ne les signale** si on les enfreint :
 
