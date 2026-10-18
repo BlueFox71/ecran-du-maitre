@@ -14,6 +14,7 @@ import { emojisDe } from '@shared/emojis'
 import { nomDuMj } from '@shared/reglages'
 import { urlPortraitMj } from '../../shared/avatarsMj'
 import type { SlidePayload } from '@shared/types'
+import { useEchap } from '../echap'
 
 interface ReglagesAttente {
   titre: string
@@ -107,6 +108,7 @@ export function BoutonAttente(): JSX.Element {
 
 function FenetreAttente({ onClose }: { onClose: () => void }): JSX.Element {
   const s = useStore()
+  useEchap(onClose)
   const [r, setR] = useState<ReglagesAttente>(() => lire(s.reglagesBrut['attente']))
   const pose = (patch: Partial<ReglagesAttente>): void => setR((x) => ({ ...x, ...patch }))
   const portrait = urlPortraitMj(s.poste.mjImage)
@@ -169,7 +171,6 @@ function FenetreAttente({ onClose }: { onClose: () => void }): JSX.Element {
       <div
         className="modal"
         onClick={(e) => e.stopPropagation()}
-        onKeyDown={(e) => e.key === 'Escape' && onClose()}
       >
         <header>
           <IconSablier />

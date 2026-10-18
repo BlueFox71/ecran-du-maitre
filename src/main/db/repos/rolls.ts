@@ -1,6 +1,7 @@
 import { randomInt } from 'node:crypto'
 import { activeCampaignId, activeSessionId, getDb } from '../index'
 import type { Roll, RollLevel, RollRecord, RollRequest } from '@shared/types'
+import { horodatageLocal } from '@shared/heure'
 
 /** Dé équitable : tirage cryptographique, pas de Math.random. */
 export function die(faces: number): number {
@@ -228,7 +229,7 @@ export function rollsCsv(): string {
   const lines = [head.join(';')]
   for (const r of rows.slice().reverse()) {
     lines.push(
-      [r.at, r.characterName, r.playerName, r.label, r.formula, r.target, r.result, r.level]
+      [horodatageLocal(r.at), r.characterName, r.playerName, r.label, r.formula, r.target, r.result, r.level]
         .map(esc)
         .join(';')
     )

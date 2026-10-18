@@ -18,6 +18,8 @@ import * as carnet from './carnet'
 import * as mobile from './mobile'
 import * as display from './display'
 import * as tours from './tours'
+import * as prepa from './preparation'
+import * as regieSon from './sons'
 import * as fsLib from './library'
 import * as examen from './examen'
 import { listPlayers } from './db/repos/players'
@@ -126,6 +128,9 @@ export function switchTo(dir: string): ProjectInfo {
   const info = openProject(dir)
   /* Le combat de l'autre campagne s'arrête là. */
   tours.fin()
+  prepa.oublier()
+  /* Ses sons aussi : les nappes et les sons posés étaient les siens. */
+  regieSon.oublier()
   display.refreshJoueurs()
   /* Les fenêtres d'image montraient des images de l'autre campagne. */
   display.fermerFenetre()
@@ -223,6 +228,8 @@ export function closeProject(): void {
      suivante avec les identifiants de la précédente. */
   mobile.stop()
   tours.fin()
+  prepa.oublier()
+  regieSon.oublier()
   closeDb()
   courant = null
   carnet.setLastProject(null)

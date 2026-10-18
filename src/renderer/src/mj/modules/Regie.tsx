@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { ChoixPnj, RetirerDeLaReserve, usePnjEnReserve } from '../components/ReservePnj'
 import { MenuPion, type CiblePion } from '../components/MenuPion'
+import { TailleEchelle } from '../components/TailleEchelle'
 import { TableauDeScene, type Surbrillance } from '../components/Tableau'
 import { BoutonObjets, ObjetsDeScene, usePanneauScene } from '../components/ObjetsDeScene'
 import { MenuImage, type CibleImage } from '../components/MenuImage'
@@ -16,23 +17,19 @@ import { slideLabel } from '../components/Monitor'
 import { IconPhone, Portables } from '../components/Portables'
 import { BoutonPoserLumiere, usePoseLumiere } from '../components/OutilsDeScene'
 import { BoutonAttente } from '../components/Attente'
+import { ConsoleDirect } from '../components/ConsoleDirect'
 import { estPiece } from './Places'
 import {
-  IconAudio,
   IconChevron,
   IconCercle,
   IconEye,
-  IconEyeOff,
   IconExpand,
-  IconFade,
-  IconFreeze,
   IconPen,
   IconPlus,
   IconPorte,
   IconRetour,
   IconRotate,
   IconSearch,
-  IconStop,
   IconTrash,
   IconType,
   kindIcon
@@ -45,7 +42,6 @@ import {
   PION_COULEURS,
   TEXTE_COULEURS,
   TEXTE_NEUF,
-  TRANSITIONS,
   texteNeuf
 } from '@shared/types'
 import type {
@@ -61,6 +57,8 @@ import type {
   TextOverlay
 } from '@shared/types'
 import type { UiFolder, UiItem } from '../../../../preload/index'
+import { useTouchesSon } from '../components/PanneauSons'
+import { montreLaCarte } from '@shared/scene'
 
 /* ============================================================
    Régie : ce que voient les joueurs, le lieu où se tient la scène,
@@ -110,11 +108,12 @@ export function profondeur(p: Place, tous: Place[]): number {
 }
 
 /**
- * « Ne pas montrer les pièces » : les pièces encombrent une liste de lieux
- * quand on mène d'étage en étage. Une habitude du poste, retenue d'une
- * ouverture à l'autre — chaque liste a sa clé, et donc son propre choix.
+ * « Montrer les pièces » : les pièces encombrent une liste de lieux quand on
+ * mène d'étage en étage, elles sont donc tues tant qu'on ne les demande pas.
+ * Une habitude du poste, retenue d'une ouverture à l'autre — chaque liste a sa
+ * clé, et donc son propre choix.
  */
-export function useSansPieces(cle: string): [boolean, (on: boolean) => void] {
+export function useMontrerPieces(cle: string): [boolean, (on: boolean) => void] {
   const [on, setOn] = useState(() => {
     try {
       return localStorage.getItem(cle) === '1'
@@ -136,9 +135,12 @@ export function useSansPieces(cle: string): [boolean, (on: boolean) => void] {
 export function Regie(): JSX.Element {
   const s = useStore()
   const display = s.display
+  /* Les bruitages aux chiffres et le silence au point, comme au Paravent. */
+  useTouchesSon()
 
   const [tab, setTab] = useState<Tab>('lieux')
-  const [sansPieces, basculerPieces] = useSansPieces('regie.sansPieces')
+  const [montrerPieces, basculerPieces] = useMontrerPieces('regie.montrerPieces')
+  const sansPieces = !montrerPieces
   /* Une pièce à l'écran ou en préparation reste visible : sa ligne allumée
      est le seul endroit où on la retrouve. */
   const lieuxVus = sansPieces
@@ -181,9 +183,6 @@ export function Regie(): JSX.Element {
   const [outilAnnot, setOutilAnnot] = useState<OutilAnnotation>(null)
   const [annotChoisie, setAnnotChoisie] = useState<number | null>(null)
   const [edit, setEdit] = useState<{ pions: Pion[]; size: number }>({ pions: [], size: 6 })
-  /* Le nom qu'on est en train de donner à un pion qui n'est à personne.
-     `null` : le champ est fermé et la réserve montre son bouton. */
-  const [pnj, setPnj] = useState<string | null>(null)
   const held = useRef(false) // Ctrl maintenu
   const lastSent = useRef(0)
   // Le champ de texte garde la main pendant la frappe : l'état de diffusion ne
@@ -258,7 +257,13 @@ export function Regie(): JSX.Element {
 
   /** Le lieu qu'on arrange : celui de l'écran qu'on regarde. */
   const editPlaceId =
-    !onLive && display?.pendingPlaceId != null ? display.pendingPlaceId : (display?.placeId ?? null)
+    !onLive && display?.pendingPlaceId != null
+      ? display.pendingPlaceId
+      : /* Le lieu en scène ne s'arrange que sur sa carte : une autre image
+           regardée ici, libre ou au direct, ne porte ni ses pions ni ses murs. */
+        montreLaCarte(slide, display?.carteDuLieu ?? null)
+        ? (display?.placeId ?? null)
+        : null
   const place = s.places.find((p) => p.id === editPlaceId) ?? null
   /* La carte du lieu donne ses proportions au calque d'annotations. */
   const carteDuLieu = s.allItems.find((i) => i.id === place?.mapItemId) ?? null
@@ -400,16 +405,6 @@ export function Regie(): JSX.Element {
   }
 
   const annotEnCours = annots.find((a) => a.id === annotChoisie) ?? null
-
-  /**
-   * Un coup encaissé se note depuis l'encart, sans quitter la régie. Le journal
-   * du personnage l'enregistre comme n'importe quel ajustement, et l'écran des
-   * joueurs suit — `characters:adjust` relit la liste des joueurs.
-   */
-  const ajusterJauge = async (characterId: number, key: string, delta: number): Promise<void> => {
-    await window.jdr.characters.adjust(characterId, key, delta)
-    await s.refreshCharacters()
-  }
 
   // On change de texte, ou d'emplacement : le champ suit.
   useEffect(() => {
@@ -605,15 +600,6 @@ export function Regie(): JSX.Element {
     )
   }
 
-  /** La manière vient du magasin : la Régie et le Pupitre basculent pareil. */
-  const swap = async (ms: number): Promise<void> => {
-    if (frozen) {
-      s.toast('Image figée — dégèle d’abord pour changer l’écran joueurs', true)
-      return
-    }
-    await window.jdr.display.swap(ms, s.transition)
-    await refreshPresence()
-  }
 
   /* ---------------- pions ---------------- */
 
@@ -706,39 +692,6 @@ export function Regie(): JSX.Element {
     s.toast(`Photo de ${c.name} mise à jour`)
   }
 
-  /**
-   * Poser un pion qui n'est à personne : un PNJ, une créature, une silhouette
-   * au fond du couloir.
-   *
-   * Il n'a qu'un nom — pas de fiche, pas encore — et c'est ce qui le met hors
-   * de portée des joueurs : le téléphone ne rend saisissable que le pion dont
-   * le personnage est celui du joueur, et celui-ci n'est à personne.
-   *
-   * Il naît **caché**. Le MJ prépare ses créatures avant la scène ; les voir
-   * apparaître sur la carte serait leur annoncer, et il n'y a pas de geste
-   * pour rattraper ce qu'ils ont déjà vu. On le montre quand il entre —
-   * « Montrer aux joueurs », dans le menu du pion.
-   */
-  const poserPnj = async (): Promise<void> => {
-    const nom = (pnj ?? '').trim()
-    if (editPlaceId == null || !nom) return setPnj(null)
-
-    /* Au milieu, mais décalé de ce qui s'y trouve déjà : trois PNJ posés coup
-       sur coup ne doivent pas se cacher l'un l'autre. Le MJ les range ensuite
-       à la main, comme les autres. */
-    const n = edit.pions.length
-    await window.jdr.pions.add({
-      placeId: editPlaceId,
-      label: nom,
-      cache: true,
-      x: 0.5 + ((n % 4) - 1.5) * 0.06,
-      y: 0.5 + (Math.floor(n / 4) % 3) * 0.07
-    })
-    /* On garde le champ ouvert : une scène en amène rarement un seul. */
-    setPnj('')
-    await refreshPresence()
-    await refreshEdit()
-  }
 
   const removePion = async (id: number): Promise<void> => {
     await window.jdr.pions.remove(id)
@@ -976,7 +929,7 @@ Clic : préparer`
                   : 'Rien à corriger sur ce visuel'
               }
             >
-              <span className="eyebrow">Lumière</span>
+              <span className="eyebrow">Luminosité</span>
               <input
                 type="range"
                 min={LUM_MIN * 100}
@@ -994,7 +947,7 @@ Clic : préparer`
                 step={5}
                 unite=" %"
                 disabled={!pivotable}
-                label="Lumière de l’image"
+                label="Luminosité de l’image"
                 onChange={poseLum}
               />
               {/* Éteint tant qu'on est déjà à 100 % : il n'aurait rien à faire,
@@ -1101,7 +1054,6 @@ Clic : préparer`
                     onSizeEncart={(largeur, hauteur) =>
                       void window.jdr.display.encart({ largeur, hauteur })
                     }
-                    onAjuster={(id, key, d) => void ajusterJauge(id, key, d)}
                     fenetres={onLive ? display?.fenetres : null}
                     onFenetre={(id, patch) => void window.jdr.display.reglerFenetre(id, patch)}
                     onFermerFenetre={(id) => void window.jdr.display.fermerFenetre(id)}
@@ -1243,14 +1195,6 @@ Clic : préparer`
           {choixPnj ? (
             <ChoixPnj
               enScene={enScene}
-              onSansFiche={
-                editPlaceId == null
-                  ? undefined
-                  : () => {
-                      setChoixPnj(false)
-                      setPnj('')
-                    }
-              }
               onClose={() => setChoixPnj(false)}
             />
           ) : null}
@@ -1304,36 +1248,19 @@ Clic : préparer`
                 )
               })}
 
-              {/* Le pion de personne : un PNJ, une créature. Il se nomme ici et
-                  se pose aussitôt, caché des joueurs — il n'a pas de fiche à
-                  attendre, et ils ne pourront ni le voir ni le pousser. */}
-              {pnj === null ? (
-                <button
-                  type="button"
-                  className="tok neuf"
-                  title="Ajouter des PNJ à la ligne des pions"
-                  onClick={() => setChoixPnj(true)}
-                >
-                  +
-                </button>
-              ) : (
-                <input
-                  className="tok-nom"
-                  autoFocus
-                  value={pnj}
-                  placeholder="Nom du PNJ"
-                  onChange={(e) => setPnj(e.target.value)}
-                  onBlur={() => setPnj(null)}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Escape') setPnj(null)
-                    if (e.key === 'Enter') void poserPnj()
-                  }}
-                />
-              )}
+              {/* Le + ouvre le choix des PNJ de la séance : chacun a sa fiche. */}
+              <button
+                type="button"
+                className="tok neuf"
+                title="Ajouter des PNJ à la ligne des pions"
+                onClick={() => setChoixPnj(true)}
+              >
+                +
+              </button>
             </div>
             <span className="note">
               {place
-                ? 'Glisse un pion, ou une image de l’arborescence, sur l’écran. Le + pose un PNJ, caché.'
+                ? 'Glisse un pion, ou une image de l’arborescence, sur l’écran. Le + ajoute des PNJ à la ligne.'
                 : 'Choisis un lieu pour poser des pions.'}
             </span>
 
@@ -1370,6 +1297,7 @@ Clic : préparer`
                 }}
               />
             </label>
+            <TailleEchelle placeId={editPlaceId} size={edit.size} onFait={refreshEdit} />
 
             <span className="sep" />
             {/* Le nom sous le pion vaut pour tout l'écran, pas pour un lieu :
@@ -1650,21 +1578,6 @@ Clic : préparer`
               <BoutonAttente />
               <span className="sep" />
 
-              {/* Les trois touchent l'écran des joueurs de trois façons proches :
-                  sans un mot d'explication, on ne sait pas lequel prendre. */}
-              <button
-                className="btn"
-                onClick={() => void window.jdr.display.blackout()}
-                disabled={frozen}
-                title={
-                  dark
-                    ? 'Remet aux joueurs l’image qu’ils voyaient avant le voile. Ctrl+B'
-                    : 'Coupe l’image des joueurs d’un coup — leur écran devient noir. Le même bouton la rétablit. Ctrl+B, ou Ctrl+Alt+B même quand l’application n’a pas le focus'
-                }
-              >
-                <IconEyeOff />
-                {dark ? 'Rétablir l’image' : 'Voile noir'}
-              </button>
               <button
                 className={`btn${voirAnnots ? ' btn-on' : ''}`}
                 onClick={() => setVoirAnnots((v) => !v)}
@@ -1697,18 +1610,6 @@ Clic : préparer`
                 Voir ce qu’ils voient
               </button>
               <BoutonPoserLumiere p={lampe} />
-              <button
-                className={`btn${frozen ? ' btn-on' : ''}`}
-                onClick={() => void window.jdr.display.freeze(!frozen)}
-                title={
-                  frozen
-                    ? 'L’écran des joueurs est gelé : rien n’en part. Clique pour le rendre au direct.'
-                    : 'Gèle l’écran des joueurs sur ce qu’il montre : plus rien ne part tant que c’est actif — ni bascule, ni voile, ni fondu. De quoi tout réarranger sans qu’ils s’en aperçoivent.'
-                }
-              >
-                <IconFreeze />
-                {frozen ? 'Figé' : 'Figer'}
-              </button>
               <span className="sep" />
               <button
                 className={`btn${pointing ? ' btn-on' : ''}`}
@@ -1721,47 +1622,8 @@ Clic : préparer`
               </button>
             </div>
 
-            <div className="deck-row">
-              <span className="amb-name">
-                <IconAudio />
-                {audio?.title ?? 'Aucune ambiance'}
-              </span>
-              <button
-                className="btn btn-sm"
-                disabled={!audio?.itemId}
-                onClick={() => void window.jdr.display.audio({ playing: !audio?.playing })}
-              >
-                {audio?.playing ? 'Pause' : 'Reprendre'}
-              </button>
-              <button
-                className="btn btn-sm"
-                disabled={!audio?.itemId}
-                onClick={() =>
-                  void window.jdr.display.audio({ itemId: null, url: null, title: null, playing: false })
-                }
-              >
-                <IconStop />
-                Stop
-              </button>
-              <span className="eyebrow">Volume</span>
-              <input
-                type="range"
-                min={0}
-                max={1}
-                step={0.01}
-                value={audio?.volume ?? 0.35}
-                onChange={(e) => void window.jdr.display.audio({ volume: Number(e.target.value) })}
-              />
-              <Valeur
-                className="val num"
-                value={Math.round((audio?.volume ?? 0.35) * 100)}
-                min={0}
-                max={100}
-                unite=" %"
-                label="Volume de l’ambiance"
-                onChange={(v) => void window.jdr.display.audio({ volume: v / 100 })}
-              />
-            </div>
+            {/* Voile, Figer, ambiance et bascule : la même console qu'au Paravent. */}
+            <ConsoleDirect apres={() => void refreshPresence()} />
           </div>
         </div>
 
@@ -1807,10 +1669,10 @@ Clic : préparer`
                 <label className="lieux-filtre">
                   <input
                     type="checkbox"
-                    checked={sansPieces}
+                    checked={montrerPieces}
                     onChange={(e) => basculerPieces(e.target.checked)}
                   />
-                  Ne pas montrer les pièces
+                  Montrer les pièces
                 </label>
                 <div className="lieux-list">
                   {lieuxVus.map((p) => {
@@ -1943,7 +1805,11 @@ Clic : préparer · glisser sur « À l’écran » : envoyer tout de suite`}
                   <Slide
                     slide={payload}
                     animate={false}
-                    pions={live ? display?.pions : undefined}
+                    pions={
+                      live && montreLaCarte(payload, display?.carteDuLieu ?? null)
+                        ? display?.pions
+                        : undefined
+                    }
                     pionSize={display?.pionSize}
                     focusPionId={live ? display?.focusPionId : null}
                     pionEnJeuId={live ? (display?.tour?.pionEnJeuId ?? null) : null}
@@ -1963,34 +1829,6 @@ Clic : préparer · glisser sur « À l’écran » : envoyer tout de suite`}
             )
           })}
 
-          <div className="slot-acts">
-            {/* La manière de basculer, juste au-dessus du bouton qui
-                l'applique : on voit ce qui va se passer avant de le faire. */}
-            <div className="bascule-modes" role="group" aria-label="Manière de basculer">
-              {TRANSITIONS.map((t) => (
-                <button
-                  key={t.key}
-                  className={`bascule-mode${s.transition === t.key ? ' on' : ''}`}
-                  onClick={() => s.setTransition(t.key)}
-                  title={t.aide}
-                >
-                  {t.name}
-                </button>
-              ))}
-            </div>
-            <button className="btn btn-brass" onClick={() => void swap(s.reglages.basculeMs)} disabled={frozen}>
-              <IconFade />
-              Basculer
-            </button>
-            <button
-              className="btn btn-sm"
-              onClick={() => void swap(0)}
-              disabled={frozen}
-              title="Sans enchaînement — l’image change d’un coup"
-            >
-              Couper
-            </button>
-          </div>
         </div>
         </div>
       </div>

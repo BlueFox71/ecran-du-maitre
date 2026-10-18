@@ -66,6 +66,43 @@
   box-shadow: inset 0 0 26px rgba(0, 0, 0, 0.55);
   z-index: 1;
 }
+/* Le QR des portables, tel que l'écran des joueurs le pose : mêmes
+   proportions, en unités du moniteur (cqh) au lieu de celles de l'écran. */
+.mon-qr {
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  display: grid;
+  place-items: center;
+  background: rgba(10, 16, 19, 0.72);
+}
+.mon-qr-carte {
+  display: grid;
+  justify-items: center;
+  gap: 2.2cqh;
+  padding: 4cqh 5cqh;
+  border-radius: 1.6cqh;
+  background: #e7e2d4;
+  color: #141b1e;
+}
+.mon-qr-titre {
+  font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
+  font-size: 3.4cqh;
+  font-weight: 600;
+  line-height: 1;
+}
+.mon-qr-carte img {
+  width: 38cqh;
+  height: 38cqh;
+  display: block;
+  image-rendering: pixelated;
+}
+.mon-qr-url {
+  font-family: 'IBM Plex Mono', ui-monospace, monospace;
+  font-size: 2.4cqh;
+  line-height: 1;
+  color: #6b5526;
+}
 .mon-badge {
   position: absolute;
   top: 6px;
@@ -98,7 +135,7 @@
 }
 .mon-quick {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: 1fr 1fr auto;
   gap: 5px;
   margin-top: 7px;
 }
@@ -4885,9 +4922,9 @@ input[type='range']::-webkit-slider-thumb {
 .ligne {
   display: flex;
   align-items: center;
-  gap: 9px;
+  gap: 12px;
   width: 100%;
-  padding: 6px 8px 6px 4px;
+  padding: 8px 10px 8px 4px;
   border-radius: 6px;
   border: 1px solid transparent;
   text-align: left;
@@ -4977,8 +5014,8 @@ input[type='range']::-webkit-slider-thumb {
 
 .ligne .mini {
   flex: none;
-  width: 76px;
-  height: 51px;
+  width: 114px;
+  height: 76px;
   border-radius: 5px;
   overflow: hidden;
   background: var(--sunk);
@@ -5000,8 +5037,8 @@ input[type='range']::-webkit-slider-thumb {
   max-width: none;
 }
 .ligne-espace .mini {
-  width: 104px;
-  height: 69px;
+  width: 150px;
+  height: 100px;
   border-radius: 6px;
 }
 .ligne .mini svg {
@@ -5012,15 +5049,19 @@ input[type='range']::-webkit-slider-thumb {
   stroke-width: 1.4;
 }
 
+/* Le genre au-dessus du nom, et la ligne s'arrête là où s'arrête ce qu'elle dit :
+   étirer le nom laissait un grand vide entre lui et ses étiquettes. */
 .ligne .tx {
-  flex: 1;
+  flex: 0 1 auto;
   min-width: 0;
   display: flex;
-  align-items: baseline;
-  gap: 8px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
 }
 .ligne .tx b {
-  font-size: 14px;
+  max-width: 100%;
+  font-size: 17px;
   font-weight: 600;
   white-space: nowrap;
   overflow: hidden;
@@ -5028,11 +5069,11 @@ input[type='range']::-webkit-slider-thumb {
 }
 .ligne-niveau .tx b {
   font-family: 'Fraunces Variable', Georgia, serif;
-  font-size: 15.5px;
+  font-size: 19px;
 }
 .ligne-espace .tx b {
   font-family: 'Fraunces Variable', Georgia, serif;
-  font-size: 18px;
+  font-size: 23px;
   letter-spacing: 0.01em;
 }
 .ligne .tier {
@@ -5046,11 +5087,11 @@ input[type='range']::-webkit-slider-thumb {
 .tuiles {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  gap: 10px;
   padding: 5px 0 10px 18px;
 }
 .tuile {
-  width: 98px;
+  width: 150px;
   display: grid;
   gap: 3px;
   padding: 4px;
@@ -5108,7 +5149,7 @@ input[type='range']::-webkit-slider-thumb {
   stroke-width: 1.3;
 }
 .tuile .nom {
-  font-size: 11.5px;
+  font-size: 13.5px;
   font-weight: 500;
   line-height: 1.2;
   display: -webkit-box;
@@ -5128,7 +5169,7 @@ input[type='range']::-webkit-slider-thumb {
   align-items: center;
   gap: 3px;
   font-family: 'IBM Plex Mono', monospace;
-  font-size: 10px;
+  font-size: 11px;
 }
 .tuile .sig svg {
   width: 11px;
@@ -5147,6 +5188,133 @@ input[type='range']::-webkit-slider-thumb {
 }
 .tuile.pasvu .nom {
   color: var(--text-faint);
+}
+
+/* ------------------------------------------------------------
+   La page « Plans » : les lieux qui ont un plan, en grandes vignettes.
+   ------------------------------------------------------------ */
+.plans-grille {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  align-content: start;
+  gap: 12px;
+}
+.plan-vignette {
+  display: grid;
+  gap: 4px;
+  padding: 6px;
+  text-align: left;
+  border-radius: 7px;
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text);
+  cursor: pointer;
+  transition: background 0.1s, border-color 0.1s;
+}
+.plan-vignette:hover {
+  background: var(--brass-wash);
+  border-color: var(--brass-line);
+}
+.plan-vignette .vue {
+  display: grid;
+  place-items: center;
+  aspect-ratio: 3 / 2;
+  border-radius: 5px;
+  overflow: hidden;
+  background: var(--sunk);
+  border: 1px solid var(--line-soft);
+}
+.plan-vignette .vue img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.plan-vignette .vue > svg {
+  width: 24px;
+  height: 24px;
+  stroke: var(--text-faint);
+  fill: none;
+  stroke-width: 1.3;
+}
+.plan-vignette .nom {
+  font-size: 13px;
+  font-weight: 600;
+}
+.plan-vignette .chemin {
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.plan-vignette .contenu {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 10px;
+  margin-top: 2px;
+  color: var(--text-dim);
+}
+.plan-vignette .contenu .p {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+}
+.plan-vignette .contenu .p.amb {
+  font-family: inherit;
+  color: var(--brass-ink);
+}
+/* Chaque compteur a sa couleur d'icône, tant qu'il compte quelque chose :
+   un zéro reste pâle (la règle `.zero`, juste dessous, l'emporte). */
+.plan-vignette .contenu .k-lum svg {
+  color: var(--orange);
+}
+.plan-vignette .contenu .k-porte svg {
+  color: var(--argile);
+}
+.plan-vignette .contenu .k-obj svg {
+  color: var(--jade);
+}
+.plan-vignette .contenu .k-son svg {
+  color: var(--azur);
+}
+.plan-vignette .contenu .amb svg {
+  color: var(--iris);
+}
+.plan-vignette .contenu .p.zero svg {
+  color: inherit;
+}
+.plan-vignette .contenu .p.zero {
+  color: var(--text-faint);
+  opacity: 0.7;
+}
+.plan-vignette .contenu svg {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+  flex: none;
+}
+.plan-vignette .vue {
+  position: relative;
+}
+.plan-vignette .vue .pasvu {
+  position: absolute;
+  top: 5px;
+  left: 5px;
+  padding: 1px 6px;
+  border-radius: 4px;
+  font-size: 10.5px;
+  color: var(--text-dim);
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  opacity: 0.9;
 }
 
 /* Dans le volet, la liste des étages et son champ libre s'empilent. */
@@ -5229,10 +5397,10 @@ input[type='range']::-webkit-slider-thumb {
   fill: none;
   stroke-width: 1.7;
 }
-/* Sur une ligne, il reprend sa place dans le rang. */
-.ligne .jalon {
-  position: static;
-  flex: none;
+/* Sur une ligne, il se tient au coin du plan, un peu plus serré. */
+.ligne .mini .jalon {
+  top: 3px;
+  right: 3px;
 }
 
 /* ------------------------------------------------------------
@@ -8104,6 +8272,20 @@ input[type='range']::-webkit-slider-thumb {
   background: var(--sunk);
   outline: none;
 }
+/* La case « PNJ » d'une jauge : cochée, les PNJ la portent aussi. */
+.fc-ligne .fc-pnj {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font: 500 10px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  color: var(--text-faint);
+  cursor: pointer;
+}
+.fc-ligne .fc-pnj:has(input:checked) {
+  color: var(--text-dim);
+}
 .fc-ligne .plafond {
   width: 58px;
   flex: none;
@@ -8199,6 +8381,15 @@ input[type='range']::-webkit-slider-thumb {
 }
 
 /* --- La limite de compétences -------------------------------------------- */
+.fc-sans-comp {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-right: 14px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
 .fc-limite {
   display: inline-flex;
   align-items: center;
@@ -8842,9 +9033,11 @@ input[type='range']::-webkit-slider-thumb {
   position: relative;
 }
 .pu-chrono {
+  /* --pu-fil : la largeur du fil, que les onglets gardent en pleine colonne. */
+  --pu-fil: 208px;
   min-height: 0;
   display: grid;
-  grid-template-columns: 208px minmax(0, 1fr);
+  grid-template-columns: var(--pu-fil) minmax(0, 1fr);
   gap: 10px;
 }
 /* La colonne de droite est une pile fixe : seule la scène s'étire, pour que
@@ -8869,14 +9062,47 @@ input[type='range']::-webkit-slider-thumb {
   background: var(--line-soft);
 }
 
-/* Le sélecteur Chronologie | Annexes tient dans l'en-tête étroit du fil. */
+/* Les six onglets du fil : une rangée d'icônes de même largeur, et sous
+   elle le nom de celui qu'on lit, avec son décompte. */
+.pupitre .pu-cote-tete {
+  flex-direction: column;
+  align-items: stretch;
+  gap: 6px;
+  padding: 7px 8px 6px;
+}
 .pupitre .pu-cote {
-  width: 100%;
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
 }
 .pupitre .pu-cote button {
-  flex: 1;
-  padding: 4px 6px;
-  text-align: center;
+  display: grid;
+  place-items: center;
+  height: 26px;
+  padding: 0;
+}
+.pupitre .pu-cote button svg {
+  width: 15px;
+  height: 15px;
+}
+.pupitre .pu-cote button.on {
+  color: var(--brass-ink);
+}
+.pu-cote-nom {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  padding: 0 2px;
+}
+.pu-cote-nom .nm {
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--text);
+  white-space: nowrap;
+}
+.pu-cote-nom .eyebrow {
+  margin-left: auto;
+  white-space: nowrap;
 }
 
 /* ---- « À montrer » : l'étagère du moment, dans le fil, sous son titre ---- */
@@ -9051,7 +9277,8 @@ input[type='range']::-webkit-slider-thumb {
   align-items: stretch;
   gap: 8px;
   min-height: 118px;
-  max-height: 200px;
+  /* Plus de plafond : l'encart prend la hauteur de ce qu'il porte, sans
+     ascenseur. C'est le détail du pion, en dessous, qui rend la place. */
 }
 .pu-slots > .pu-slot {
   align-self: flex-start;
@@ -9101,11 +9328,10 @@ input[type='range']::-webkit-slider-thumb {
   border: 1px solid var(--line);
   border-radius: 5px;
   background: var(--tint);
-  /* Avec le sens de l'encart et « Recentrer », tout ne tient plus dans la
-     hauteur des vignettes : le cadre se déroule au lieu de rogner les jauges. */
-  overflow-x: hidden;
-  overflow-y: auto;
-  scrollbar-width: thin;
+  overflow: hidden;
+  /* Sa largeur range les joueurs : une colonne à l'étroit, deux ou trois
+     quand la place le permet — moins de rangs, moins de hauteur. */
+  container: encart / inline-size;
 }
 .pu-encart > * {
   flex-shrink: 0;
@@ -9120,12 +9346,25 @@ input[type='range']::-webkit-slider-thumb {
 
 /* ---- les joueurs et leurs jauges, dans l'encart ---- */
 .pu-jauges {
-  flex: 1;
-  min-height: 0;
-  overflow-y: auto;
-  display: flex;
-  flex-direction: column;
-  gap: 3px;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px 14px;
+}
+@container encart (min-width: 560px) {
+  .pu-jauges {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@container encart (min-width: 860px) {
+  .pu-jauges {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+/* L'en-tête serre ses écarts à l'étroit, pour passer moins souvent à la ligne. */
+@container encart (max-width: 620px) {
+  .pu-encart-tete {
+    gap: 6px 8px;
+  }
 }
 .pu-j {
   display: flex;
@@ -9147,6 +9386,21 @@ input[type='range']::-webkit-slider-thumb {
   font-family: 'IBM Plex Mono', monospace;
   font-size: 9px;
   color: var(--text);
+}
+/* Les visages des joueurs, en rang : un clic ouvre leur détail. */
+.pu-visages {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.pu-visages .pu-j-face {
+  width: 30px;
+  height: 30px;
+  cursor: pointer;
+}
+.pu-visages .pu-j-face.choisi {
+  outline: 2px solid var(--brass);
+  outline-offset: 2px;
 }
 .pu-j-face img {
   width: 100%;
@@ -9216,6 +9470,420 @@ input[type='range']::-webkit-slider-thumb {
   font-style: normal;
   color: var(--text-faint);
 }
+
+/* Les barres réglées au Paravent : fines, il ne reste qu'un trait par jauge. */
+.pu-barres {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-left: auto;
+}
+.pu-jauges[hidden] {
+  display: none;
+}
+.pu-jauges.fines .pu-jauge button,
+.pu-jauges.fines .pu-jauge .chiffres {
+  display: none;
+}
+.pu-jauges.fines .pu-jauge .barre {
+  height: 3px;
+}
+.pu-jauges.fines .pu-j-face {
+  width: 18px;
+  height: 18px;
+}
+
+/* ---- le détail du pion choisi, sous la réserve ----
+   Il prend ce qui reste de la colonne et défile en lui-même. */
+.pu-detail {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow-y: auto;
+}
+.dp {
+  border: 1px solid var(--brass-line);
+  border-radius: 5px;
+  background: var(--raised);
+}
+.dp-tete {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.dp-portrait.jeton {
+  width: 46px;
+  height: 46px;
+  border-width: 2px;
+  font-size: 14px;
+  overflow: hidden;
+}
+.dp-portrait.photo {
+  background: var(--sunk);
+}
+.dp-portrait img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.dp-qui {
+  display: grid;
+  min-width: 0;
+}
+.dp-qui h3 {
+  margin: 0;
+  font-size: 18px;
+  line-height: 1.15;
+}
+.dp-qui small {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.dp-etat {
+  font: 500 10px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  border-radius: 99px;
+  padding: 1px 8px;
+  border: 1px solid var(--line);
+}
+.dp-etat.ok {
+  color: var(--moss);
+  background: var(--moss-wash);
+}
+.dp-etat.blesse {
+  color: var(--blood);
+  background: var(--blood-wash);
+}
+.dp-etat.ko {
+  color: var(--text-faint);
+  background: var(--sunk);
+}
+.dp-etat.cache {
+  color: var(--iris);
+  background: var(--iris-wash);
+}
+.dp-corps {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+}
+.dp-corps > section {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  padding: 10px 12px;
+  min-width: 0;
+  border-left: 1px solid var(--line-soft);
+}
+.dp-corps > section:first-child {
+  border-left: 0;
+}
+.dp-vide {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.dp-note {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.dp-jauge {
+  display: grid;
+  gap: 4px;
+}
+.dp-jauge-ligne {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.dp-jauge-val {
+  font-size: 15px;
+  color: var(--text);
+}
+.dp-jauge-val i {
+  font-style: normal;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.dp-barre {
+  height: 8px;
+  border-radius: 99px;
+  background: var(--sunk);
+  overflow: hidden;
+}
+.dp-barre i {
+  display: block;
+  height: 100%;
+  border-radius: 99px;
+  background: var(--brass);
+  transition: width 0.25s;
+}
+.dp-barre.c-blood i {
+  background: var(--blood);
+}
+.dp-barre.c-iris i {
+  background: var(--iris);
+}
+.dp-barre.c-moss i {
+  background: var(--moss);
+}
+.dp-barre.c-neutral i {
+  background: var(--text-faint);
+}
+.dp-coups {
+  display: flex;
+  gap: 4px;
+}
+.dp-coups button {
+  min-width: 36px;
+  padding: 2px 6px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--surface);
+  font-size: 12px;
+}
+.dp-coups button:hover {
+  border-color: var(--text-faint);
+}
+.dp-coups button.moins {
+  color: var(--blood);
+}
+.dp-coups button.plus {
+  color: var(--moss);
+}
+.dp-caracs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(54px, 1fr));
+  gap: 5px;
+}
+.dp-carac {
+  display: grid;
+  padding: 3px 6px;
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  background: var(--surface);
+}
+.dp-carac span {
+  font: 500 9.5px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.06em;
+  color: var(--label);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dp-carac b {
+  font-size: 15px;
+  font-weight: 500;
+}
+.dp-carac b small {
+  margin-left: 4px;
+  font: 400 10.5px 'IBM Plex Mono', monospace;
+  color: var(--text-faint);
+}
+.dp-comps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.dp-comps span {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  border: 1px solid var(--line-soft);
+  border-radius: 99px;
+  padding: 1px 8px;
+}
+.dp-comps b {
+  margin-left: 4px;
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text);
+}
+.dp-objets,
+.dp-butin {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+}
+.dp-objets li {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-size: 12.5px;
+  min-width: 0;
+}
+.dp-objets .ou {
+  flex: none;
+  width: 92px;
+  font: 500 9.5px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+/* Le menu « où il le porte » : la colonne de l'emplacement, devenue choisissable. */
+.dp-objets .dp-ou {
+  flex: none;
+  width: 104px;
+  padding: 1px 2px;
+  font: 500 9.5px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--label);
+  background: transparent;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  cursor: pointer;
+}
+.dp-objets .dp-ou:hover {
+  border-color: var(--brass);
+}
+/* L'interrupteur d'une lampe portée : laiton allumée, éteinte en gris. */
+.dp-objets .dp-lampe {
+  flex: none;
+  margin-left: auto;
+  padding: 1px 7px;
+  font: 500 9.5px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  cursor: pointer;
+}
+.dp-objets .dp-lampe.on {
+  color: var(--brass-ink);
+  border-color: var(--brass);
+  background: var(--brass-wash);
+}
+.dp-objets .q,
+.dp-butin .q {
+  margin-left: auto;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.dp-butin label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.dp-butin .pris {
+  text-decoration: line-through;
+  color: var(--text-faint);
+}
+.dp-opt {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px 8px;
+  font-size: 12.5px;
+}
+.dp-case {
+  justify-content: flex-start;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.dp-btns {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.dp-gauche {
+  justify-self: start;
+}
+.dp-pied {
+  display: flex;
+  gap: 6px;
+  padding: 7px 12px;
+  border-top: 1px solid var(--line-soft);
+}
+.dp-retirer:hover {
+  border-color: var(--blood);
+  color: var(--blood);
+}
+
+/* ---- le détail s'ajuste à la place qu'il a, plutôt que de défiler ----
+   La jauge tient en deux rangs : son nom et ses chiffres, puis sa barre et
+   ses coups. Quand la hauteur manque, on serre, puis on tait ce qui sert le
+   moins en pleine partie — les ±5, la sous-ligne, les notes, les compétences.
+   La largeur, elle, range les rubriques côte à côte. */
+.pu-detail {
+  container: detail / size;
+}
+.dp-jauge {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 3px 8px;
+}
+.dp-jauge-ligne {
+  display: contents;
+}
+.dp-bloc {
+  display: grid;
+  gap: 5px;
+}
+.dp-jauge .dp-barre {
+  align-self: center;
+}
+@container detail (min-width: 760px) {
+  .dp-corps {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@container detail (max-height: 300px) {
+  .dp-tete {
+    padding: 6px 10px;
+    gap: 6px 10px;
+  }
+  .dp-portrait.jeton {
+    width: 34px;
+    height: 34px;
+  }
+  .dp-qui h3 {
+    font-size: 15px;
+  }
+  .dp-corps > section {
+    gap: 5px;
+    padding: 7px 10px;
+  }
+  .dp-barre {
+    height: 6px;
+  }
+  .dp-coups button {
+    min-width: 30px;
+    padding: 1px 4px;
+  }
+  .dp-pied {
+    padding: 5px 10px;
+  }
+}
+@container detail (max-height: 240px) {
+  .dp-qui small,
+  .dp-bloc-notes {
+    display: none;
+  }
+  .dp-carac b {
+    font-size: 13px;
+  }
+}
+@container detail (max-height: 190px) {
+  .dp-bloc-comps {
+    display: none;
+  }
+  .dp-corps > section {
+    padding: 5px 10px;
+  }
+}
 /* Les commandes gardent leur hauteur propre et se centrent : étirées sur toute
    celle des vignettes, elles faisaient de la bascule un pavé. */
 /* Les gestes en barre, sous les visuels et l'encart : une rangée à plat qui
@@ -9270,7 +9938,7 @@ input[type='range']::-webkit-slider-thumb {
 /* À l'étroit, le fil des moments se réduit avant la lecture. */
 @media (max-width: 1500px) {
   .pu-chrono {
-    grid-template-columns: 168px minmax(0, 1fr);
+    --pu-fil: 168px;
   }
   .pu-slots {
     height: 100px;
@@ -9335,19 +10003,45 @@ input[type='range']::-webkit-slider-thumb {
   align-items: center;
   gap: 2px 4px;
 }
-.pupitre .pu-avec-tableau .tb-salle-tete,
-.pupitre .pu-avec-tableau .tb-ligne {
+/* Les lampes et les portes en grille, deux tuiles par rang : la pastille et
+   le nom en haut, les boutons dessous. La croix qui retire une lampe se pose
+   dans le coin, au survol. */
+.pupitre .pu-avec-tableau .tb-salle {
+  gap: 4px;
+}
+.pupitre .pu-avec-tableau .tb-salle-tete {
   flex-basis: 100%;
 }
 .pupitre .pu-avec-tableau .tb-ligne {
-  padding: 1px 3px;
+  position: relative;
+  flex: 1 1 calc(50% - 2px);
+  min-width: 0;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 4px;
+  padding: 5px 6px;
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+  background: var(--surface);
+}
+.pupitre .pu-avec-tableau .tb-ligne .tb-nom {
+  flex: 1 1 calc(100% - 24px);
+  flex-wrap: wrap;
+  row-gap: 0;
+  padding-right: 14px;
+}
+.pupitre .pu-avec-tableau .tb-ligne .tb-oter {
+  position: absolute;
+  top: 3px;
+  right: 3px;
 }
 .pupitre .pu-avec-tableau .tb-ligne .btn:disabled {
   display: none;
 }
+/* Une fenêtre ne se manœuvre pas : une petite pastille, pas une tuile. */
 .pupitre .pu-avec-tableau .tb-ligne:has(.tb-pastille.fenetre) {
-  flex-basis: auto;
-  padding: 2px 3px;
+  flex: none;
+  padding: 3px;
 }
 .pupitre .pu-avec-tableau .tb-ligne:has(.tb-pastille.fenetre) .tb-nom {
   display: none;
@@ -9409,113 +10103,28 @@ input[type='range']::-webkit-slider-thumb {
   width: 74px;
 }
 
-/* ---- la source, en bas de colonne ----
-   Elle prend ce qui reste sous l'ambiance, et c'est elle qui se comprime en
-   premier quand la fenêtre est basse : mieux vaut faire défiler une liste que
-   rogner la scène. */
-/* Base zéro : la source se sert de ce qui reste et ne réclame jamais la
-   hauteur de ses dix-sept lieux — sans quoi elle pousse tout le reste. */
-/* Jules l'a voulue plus basse : depuis que la liste ne montre plus que les
-   espaces et leurs niveaux, quelques lignes suffisent. Elle peut encore se
-   comprimer si la fenêtre est basse. */
-/* Elle ne se comprime plus sous 150 px : c'est la scène qui rend la place. */
-.pu-source {
-  flex: 1 0 150px;
-  min-height: 96px;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
+/* ---- le dossier et les portables, à gauche ----
+   Plus de source sous l'ambiance : le dossier et les portables sont des
+   onglets du fil, et prennent toute la colonne puisqu'ils n'ont rien à lire
+   à côté. Les onglets gardent la largeur du fil pour ne pas sauter. */
+.pu-chrono.plein {
+  grid-template-columns: minmax(0, 1fr);
 }
-.pu-source .pane.side {
-  flex: 1;
-  min-height: 0;
+.pu-chrono.plein .pu-cote-tete > * {
+  width: calc(var(--pu-fil) - 18px);
 }
-/* Dans une demi-largeur, les vignettes du dossier tiennent en trois colonnes
-   au lieu de la grille large de la Régie. */
-/* Le tableau de scène, en onglet : il prend la largeur du panneau et laisse
-   le défilement au corps du panneau. */
-.pu-source .tableau {
-  width: auto;
-  border: 0;
-  background: transparent;
-  padding: 2px 0;
-  overflow: visible;
-}
-/* Dans la largeur du panneau, une colonne de vingt lignes devenait une longue
-   liste à dérouler : les pièces s'y rangent en cartes, côte à côte, et
-   l'en-tête (filtres, tout allumer) tient sur une ligne. */
-.pu-source .tb-tete {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
+/* Toute la colonne pour soi : les vignettes s'y font grandes, pour qu'on
+   reconnaisse une carte à son image d'un coup d'œil, et s'étirent jusqu'au
+   bord droit. */
+.pu-dossier .vigs {
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
   gap: 8px;
-  padding-bottom: 6px;
 }
-.pu-source .tb-salles {
-  overflow: visible;
-  grid-template-columns: repeat(auto-fill, minmax(230px, 1fr));
-  gap: 8px;
-  align-items: start;
-}
-.pu-source .tb-salle {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: center;
-  gap: 2px 4px;
-  padding: 6px 7px;
-  border: 1px solid var(--line-soft);
-  border-radius: 6px;
-  background: var(--tint);
-}
-.pu-source .tb-salle-tete {
-  flex-basis: 100%;
-}
-.pu-source .tb-ligne {
-  flex-basis: 100%;
-  padding: 1px 4px;
-}
-/* Une fenêtre ne se manœuvre pas : elle n'a pas à prendre une ligne. Les
-   fenêtres d'une pièce se suivent en petites pastilles, et le survol les
-   allume toujours sur la carte. */
-.pu-source .tb-ligne:has(.tb-pastille.fenetre) {
-  flex-basis: auto;
-  padding: 2px 3px;
-}
-.pu-source .tb-ligne:has(.tb-pastille.fenetre) .tb-nom {
-  display: none;
-}
-/* Portes, rideaux et lampes en petites étiquettes : la pastille dit ce que
-   c'est, le mot dit son état, et seul le geste possible reste — le bouton
-   éteint (« Ouvrir » sur une porte ouverte) n'apprenait rien. Deux par ligne
-   dans une carte, au lieu d'une ligne chacune. */
-.pu-source .tb-ligne {
-  flex-basis: auto;
-  flex-grow: 1;
-  gap: 3px;
-  padding: 1px 2px;
-}
-.pu-source .tb-ligne .btn {
-  padding: 1px 5px;
-}
-.pu-source .tb-salles {
-  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
-}
-.pu-source .tb-ligne .btn:disabled {
-  display: none;
-}
-.pu-source .tb-ligne .tb-nom {
-  flex: none;
-  font-size: 0;
-}
-.pu-source .tb-ligne .tb-nom em {
-  font-size: 10.5px;
-}
-/* Une lampe n'a pas de mot d'état : son bouton le porte déjà. */
-.pu-source .tb-ligne:not(:has(em)) .tb-nom {
-  display: none;
-}
-.pu-source .vigs {
-  grid-template-columns: repeat(auto-fill, minmax(84px, 1fr));
+/* À cette taille, le nom tient sous l'image : on le laisse affiché. */
+.pu-dossier .vig .nm {
+  opacity: 1;
+  font-size: 11px;
+  padding: 3px 7px;
 }
 
 /* Le point rouge du visuel à l'antenne : la Régie le porte sous sa propre
@@ -10888,15 +11497,12 @@ input[type='range']::-webkit-slider-thumb {
   border-color: color-mix(in oklab, #f0c15a 60%, transparent);
   background: color-mix(in oklab, #f0c15a 16%, transparent);
 }
-.tb-pastille.porte.close {
-  color: var(--blood);
-  border-color: color-mix(in oklab, var(--blood) 55%, transparent);
-}
-/* Un rideau tiré voile : il se marque comme une porte close. Ouvert, il n'est
-   plus qu'un trait sur le plan, et s'éteint. */
+/* Close ou tiré : marqué, mais sans rouge — le rouge ne dit plus que « en
+   direct ». Ouvert, le rideau n'est plus qu'un trait sur le plan, et s'éteint. */
+.tb-pastille.porte.close,
 .tb-pastille.rideau.close {
-  color: var(--blood);
-  border-color: color-mix(in oklab, var(--blood) 55%, transparent);
+  color: var(--text);
+  border-color: var(--text-dim);
 }
 .tb-pastille.fenetre {
   border-style: dashed;
@@ -11271,13 +11877,6 @@ input[type='range']::-webkit-slider-thumb {
 
 /* ---------- le volet ---------- */
 
-.murs-garde {
-  /* Un encart teinté sans marge colle son texte au bord : on lui en donne. */
-  padding: 10px 12px;
-  border: 1px solid var(--brass-line);
-  border-radius: 6px;
-  background: var(--brass-wash);
-}
 /* L'échelle d'un plan : le trait qu'on tire, la règle posée sur le plan, et
    le volet qui dit d'où on la tient. */
 .calque-trait .trait {
@@ -11378,9 +11977,6 @@ input[type='range']::-webkit-slider-thumb {
   align-items: center;
   gap: 4px;
   margin-top: 4px;
-}
-.murs-garde p {
-  color: var(--brass-ink);
 }
 /* Le bouton qui retient la largeur, et ce qu'il retient — sous le curseur. */
 .murs-defaut {
@@ -11618,6 +12214,39 @@ input[type='range']::-webkit-slider-thumb {
   display: inline-flex;
   flex-wrap: wrap;
   gap: 4px;
+}
+/* Le nom d'une porte ou d'une lampe : le « Porte » d'une porte est posé
+   devant le champ, et ne s'efface pas. */
+.lb-nom-champ {
+  display: flex;
+  align-items: center;
+  min-width: 0;
+  grid-column: 2 / -1;
+  background: var(--ground);
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+}
+.lb-nom-champ:focus-within {
+  border-color: var(--brass);
+}
+.lb-nom-pre {
+  padding-left: 7px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.lb-nom-champ input {
+  flex: 1;
+  min-width: 0;
+  background: none;
+  border: 0;
+  outline: 0;
+  padding: 3px 7px 3px 4px;
+  font-size: 12.5px;
+  color: var(--text);
+  user-select: text;
+}
+.lb-nom-champ input:first-child {
+  padding-left: 7px;
 }
 .murs-reglage b {
   color: var(--text-dim);
@@ -12323,10 +12952,14 @@ input[type='range']::-webkit-slider-thumb {
   border-bottom: 1px solid var(--line);
   overflow: hidden;
 }
+/* Posée sur tout le cadre : dans la grille, `height: 100%` ne tient pas et
+   l'image débordait, rognée par l'overflow. */
 .fiche-objet .fiche-vign img {
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
-  object-fit: cover;
+  object-fit: contain;
   display: block;
 }
 .fiche-objet .fiche-vign .grand {
@@ -12536,6 +13169,22 @@ input[type='range']::-webkit-slider-thumb {
 }
 .effet .x:hover {
   color: var(--blood);
+}
+/* La couleur de la lumière d'un effet « Éclaire ». */
+.effet .effet-teinte {
+  position: relative;
+  width: 11px;
+  height: 11px;
+  border-radius: 50%;
+  border: 1px solid rgba(0, 0, 0, 0.35);
+  cursor: pointer;
+}
+/* Le sélecteur du navigateur reste sous la pastille : on clique la pastille. */
+.effet .effet-teinte input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
 }
 .effet-neuf {
   border-style: dashed;
@@ -13047,6 +13696,11 @@ button.ou-etat:hover {
    La silhouette au milieu, les endroits du corps tout autour. Elle prend la
    place des chiffres et de la feuille ; « qui il est » reste à gauche.
    ============================================================ */
+.fiche-gestes {
+  display: flex;
+  align-items: stretch;
+  gap: 8px;
+}
 .seg-fiche {
   display: flex;
   gap: 2px;
@@ -15516,6 +16170,69 @@ ul[data-type='taskList'] li[data-checked='true'] > div {
 .tr-init-liste input[type='number'] {
   width: 56px;
 }
+/* La case du dé : un bouton qui ouvre la grille, de la largeur de l'ancien champ. */
+.tr-de-case {
+  width: 56px;
+  height: 28px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--sunk);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 500;
+  text-align: center;
+}
+.tr-de-case:hover,
+.tr-de-case.on {
+  border-color: var(--brass-line);
+}
+.tr-de-case.vide {
+  color: var(--text-faint);
+}
+/* La grille de 1 à 20, cinq par rang : un d20 se lit d'un coup d'œil. */
+.tr-de-grille {
+  position: fixed;
+  z-index: 80;
+  display: grid;
+  grid-template-columns: repeat(5, 34px);
+  gap: 4px;
+  padding: 7px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 10px 28px -8px rgba(0, 0, 0, 0.55);
+}
+.tr-de-grille button {
+  height: 32px;
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  background: var(--tint);
+  color: var(--text);
+  font-size: 13px;
+}
+.tr-de-grille button:hover {
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+.tr-de-grille button.on {
+  border-color: var(--brass);
+  background: var(--brass-wash);
+  box-shadow: inset 0 0 0 1px var(--brass);
+}
+/* Le 1 et le 20 se repèrent : l'échec et la réussite critiques. */
+.tr-de-grille button.echec {
+  color: var(--blood);
+}
+.tr-de-grille button.reussite {
+  color: var(--brass);
+  font-weight: 600;
+}
+.tr-de-grille .tr-de-effacer {
+  grid-column: 1 / -1;
+  height: 26px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
 .tr-bonus {
   color: var(--text-dim);
 }
@@ -15566,6 +16283,130 @@ ul[data-type='taskList'] li[data-checked='true'] > div {
    texte garde les retours à la ligne de son fichier. */
 .pupitre .moment.pu-lieu {
   padding-left: calc(8px + var(--prof, 0) * 14px);
+  align-items: center;
+}
+/* Chaque lieu porte ce que montrait la source de droite : qui s'y trouve, et
+   de quoi le mettre dans le visuel libre. */
+.pu-lieu-ligne {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+}
+.pu-lieu-ligne .moment.pu-lieu {
+  flex: 1;
+  min-width: 0;
+}
+.pu-lieu-ligne .moment.pu-lieu .t {
+  min-width: 0;
+}
+.pu-lieu-ligne .seats.ici {
+  margin-top: 3px;
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.pu-lieu-ligne .seats.ici .jeton {
+  overflow: hidden;
+  box-shadow: 0 0 0 1.5px var(--surface);
+}
+.pu-lieu-ligne .seats.ici .jeton:last-child {
+  margin-right: 0;
+}
+.pu-lieu-ligne .seats.ici .jeton.photo {
+  background: var(--sunk);
+}
+.pu-lieu-ligne .seats.ici .jeton img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+/* La bulle d'un lieu survolé, à gauche de sa ligne : qui s'y trouve. Elle
+   passe par-dessus le rail, qu'on ne touche pas pendant qu'on survole. */
+.pu-bulle {
+  position: fixed;
+  z-index: 60;
+  transform: translate(-100%, -50%);
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 10px 28px -8px rgba(0, 0, 0, 0.55);
+  pointer-events: none;
+}
+.pu-bulle-nom {
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+}
+.pu-bulle-groupe {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.pu-bulle-ligne {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  min-width: 0;
+}
+/* Les visages en grand : c'est à eux qu'on reconnaît qui est là. */
+.pu-bulle-ligne .jeton {
+  overflow: hidden;
+  width: 32px;
+  height: 32px;
+  border-width: 2px;
+  font-size: 11px;
+}
+.pu-bulle-ligne .jeton.photo {
+  background: var(--sunk);
+}
+.pu-bulle-ligne .jeton img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.pu-bulle-vide {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.pu-bulle-aide {
+  padding-top: 6px;
+  border-top: 1px solid var(--line-soft);
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+.pu-lieu-visuel {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  color: var(--text-faint);
+}
+.pu-lieu-visuel:hover {
+  background: var(--tint);
+  color: var(--text);
+}
+.pu-lieu-visuel svg {
+  width: 14px;
+  height: 14px;
+}
+/* Prêt dans le visuel libre, ou déjà à l'antenne : le bouton le dit. */
+.pu-lieu-ligne.pret .pu-lieu-visuel {
+  color: var(--brass);
+}
+.pu-lieu-ligne.direct .pu-lieu-visuel {
+  color: var(--blood);
 }
 .pu-lieu-lecture .read-body p {
   white-space: pre-line;
@@ -16866,6 +17707,190 @@ input.valeur-saisie:disabled {
   margin: 0;
   font: 600 15px 'Fraunces Variable', Georgia, serif;
 }
+/* Échelle, pièces, lumière, traits : un onglet chacun, collés en haut du
+   volet pendant qu'il défile. Même barre segmentée que la fiche de campagne. */
+.pe-onglets {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1px;
+  background: var(--line);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  overflow: hidden;
+}
+/* Cinq onglets dans un volet étroit : ils passent à la ligne plutôt que de
+   tronquer « Objets et PNJ ». */
+.pe-onglets > button {
+  flex: 1 0 auto;
+  border: 0;
+  background: var(--surface);
+  padding: 6px 4px;
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 5px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.pe-onglets > button:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+.pe-onglets > button[aria-selected='true'] {
+  background: var(--sunk);
+  color: var(--brass);
+  font-weight: 500;
+}
+.pe-onglets .n {
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 10.5px;
+  color: var(--text-faint);
+}
+.pe-onglets > button[aria-selected='true'] .n {
+  color: var(--brass-ink);
+}
+/* Les objets posés sur le plan : une puce ronde, du MJ seul. Le calque laisse
+   passer la souris ; les puces ne se prennent qu'onglet « Objets et PNJ » ouvert. */
+.pe-objets {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+.pe-objet {
+  position: absolute;
+  width: 26px;
+  height: 26px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid var(--brass);
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.55);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+}
+.pe-objet.cache {
+  border-style: dashed;
+}
+.pe-objet.trouve {
+  opacity: 0.6;
+}
+.pe-objets.actif .pe-objet {
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+.pe-objet.tire {
+  cursor: grabbing;
+  z-index: 1;
+  opacity: 1;
+}
+.pe-objet img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pe-objet > span {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+}
+.pe-objet .glyphe {
+  width: 14px;
+  height: 14px;
+}
+.fdl-rangee.glissable {
+  cursor: grab;
+}
+/* « Objets et PNJ » d'un étage découpé : la pièce où l'on range. */
+.pe-qq-pieces {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.pe-qq-pieces > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.pe-qq-pieces button {
+  border: 1px solid var(--line);
+  background: var(--surface);
+  color: var(--text-dim);
+  border-radius: 999px;
+  padding: 3px 10px;
+  font-size: 12.5px;
+}
+.pe-qq-pieces button:hover {
+  background: var(--raised);
+  color: var(--text);
+}
+.pe-qq-pieces button[aria-checked='true'] {
+  background: var(--sunk);
+  border-color: var(--brass);
+  color: var(--brass);
+  font-weight: 500;
+}
+/* Le pion de l'aperçu : un vrai jeton (slide.css), par-dessus les murs. Lui
+   seul prend la souris ; le calque, transparent, laisse tracer autour. */
+.pion-layer.apercu-pion {
+  z-index: 6;
+}
+.pion-layer.apercu-pion .pion {
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+.pion-layer.apercu-pion .pion:active {
+  cursor: grabbing;
+}
+/* Le pilote : le disque du téléphone, à la souris. */
+.pe-pilote-rangee {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+.pe-pilote-rangee .note {
+  flex: 1;
+  margin: 0;
+}
+.pe-pilote {
+  flex: none;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  background: radial-gradient(circle, var(--sunk) 55%, var(--raised));
+  border: 1px solid var(--line);
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.pe-pilote.pris {
+  cursor: grabbing;
+  border-color: var(--brass-line);
+}
+.pe-pilote .pouce {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--brass);
+  box-shadow: 0 2px 6px rgba(0, 0, 0, 0.5);
+  pointer-events: none;
+}
+.pe-pilote:not(.pris) .pouce {
+  transition: transform 0.15s ease-out;
+}
 .pe-vers-fiche {
   margin: 0;
   padding-top: 10px;
@@ -18122,6 +19147,25 @@ input.fdl-art-titre {
 .fdl-qq-groupe {
   margin: 6px 2px 0;
 }
+/* Dans le volet de l'éditeur de plan : pas de cadre, le volet défile pour lui. */
+.fdl-qq-nu {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.fdl-qq-nu > .fdl-corps {
+  overflow: visible;
+  padding: 0;
+}
+.fdl-qq-nu .fdl-rangee {
+  grid-template-columns: 40px minmax(0, 1fr) auto;
+  gap: 9px;
+  padding: 5px 6px;
+}
+.fdl-qq-nu .fdl-rvig {
+  width: 40px;
+  height: 40px;
+}
 .fdl-rangee {
   flex: none;
   display: grid;
@@ -19043,4 +20087,3079 @@ button.fdc-vig:hover {
 }
 .lieux-filtre.pu-filtre {
   margin: 4px 10px 8px;
+}
+
+/* ============================================================
+   Ranger et la corbeille (.rgm-*) — page Objets
+   ============================================================ */
+
+/* Combien d'objets ont quitté leur emplacement initial. */
+.rgm-badge {
+  min-width: 17px;
+  padding: 0 5px;
+  border-radius: 99px;
+  background: var(--brass-wash);
+  border: 1px solid var(--brass-line);
+  color: var(--brass-ink);
+  font-size: 10.5px;
+  line-height: 15px;
+  text-align: center;
+}
+.objview .rgm-btn svg {
+  width: 14px;
+  height: 14px;
+  flex: none;
+  stroke: var(--text-dim);
+  fill: none;
+  stroke-width: 1.4;
+}
+.objview .rgm-btn.vise {
+  border-color: var(--blood);
+  border-style: dashed;
+  background: var(--blood-wash);
+}
+.obj-ou-tag.corbeille {
+  border-color: var(--blood);
+  color: var(--blood);
+}
+.liste-ligne .nm .obj-ou-tag.corbeille {
+  margin-left: 6px;
+  flex: none;
+}
+.rgm-aide {
+  font-size: 12.5px;
+  color: var(--text-dim);
+  line-height: 1.5;
+}
+
+/* La modale « Ranger » : une ligne par exemplaire, d'où il est à où il va. */
+.rgm-modale {
+  width: min(720px, 100%);
+}
+.rgm-tete {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 16px 6px;
+}
+.rgm-tout {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.rgm-tete .rgm-aide {
+  margin-left: auto;
+}
+.rgm-lignes {
+  padding: 0 10px 12px;
+  display: grid;
+  gap: 1px;
+  max-height: 52vh;
+  overflow: auto;
+}
+.rgm-ligne {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1.2fr) minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 9px;
+  padding: 5px 6px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12.5px;
+}
+.rgm-ligne:hover {
+  background: var(--sunk);
+}
+.rgm-ligne.perdu {
+  opacity: 0.5;
+  cursor: default;
+}
+.rgm-nom {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rgm-nom b {
+  font-weight: 500;
+  color: var(--text-dim);
+}
+.rgm-ou {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.rgm-ou .t {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rgm-ou svg {
+  width: 12px;
+  height: 12px;
+  flex: none;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.6;
+}
+.rgm-ou.corbeille {
+  color: var(--blood);
+}
+.rgm-ou.init {
+  color: var(--brass-ink);
+}
+.rgm-fleche {
+  color: var(--text-faint);
+}
+.rgm-confirme {
+  width: min(440px, 100%);
+}
+.rgm-recap {
+  margin: 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 3px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.rgm-recap b {
+  font-weight: 500;
+  color: var(--brass-ink);
+}
+
+/* La corbeille, au centre à la place de l'étagère. */
+.rgm-vue .pane-head svg {
+  width: 14px;
+  height: 14px;
+  stroke: var(--text-dim);
+  fill: none;
+  stroke-width: 1.4;
+}
+.rgm-vue .pane-body {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.rgm-jetes {
+  display: grid;
+  gap: 2px;
+}
+.rgm-jete {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 8px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  cursor: pointer;
+  font-size: 13px;
+}
+.rgm-jete:hover {
+  background: var(--sunk);
+}
+.rgm-jete.on {
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+.rgm-pied {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+}
+
+/* Dans la fiche : où il était au départ, sous là où il est. */
+.ou-cible .rgm-initial {
+  display: block;
+}
+.rgm-initial {
+  font-size: 11px;
+  color: var(--brass-ink);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.rgm-fixer {
+  margin-left: 6px;
+  padding: 0 4px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 10.5px;
+  text-decoration: underline dotted;
+  cursor: pointer;
+  opacity: 0;
+}
+.ou-ligne:hover .rgm-fixer {
+  opacity: 1;
+}
+.rgm-fixer:hover {
+  color: var(--brass-ink);
+}
+.ou-ligne.jete .ou-port {
+  color: var(--blood);
+}
+.ou-ligne.jete .ou-port svg {
+  width: 14px;
+  height: 14px;
+}
+.rgm-fiche-jetes {
+  margin-top: 2px;
+}
+
+/* ---- « Affichage » : toutes les cases de ce qui se montre ---- */
+.aff {
+  position: relative;
+}
+.aff-pop {
+  position: fixed;
+  z-index: 70;
+  width: 270px;
+  display: grid;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.6);
+}
+.aff-pop section {
+  display: grid;
+  gap: 5px;
+}
+.aff-pop section + section {
+  padding-top: 9px;
+  border-top: 1px solid var(--line-soft);
+}
+.aff-pop .coche {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+}
+.aff-sous {
+  padding-left: 20px;
+}
+.aff-sous.eteint {
+  color: var(--text-faint);
+}
+/* La pastille rappelle la couleur du trait sur la carte. */
+.aff-pastille {
+  width: 14px;
+  height: 3px;
+  border-radius: 2px;
+  flex: none;
+  background: var(--text-faint);
+}
+.aff-pastille.lampes {
+  height: 8px;
+  width: 8px;
+  border-radius: 99px;
+  background: var(--brass);
+}
+.aff-pastille.pieces {
+  height: 9px;
+  width: 9px;
+  border-radius: 2px;
+  background: var(--text);
+}
+.aff-pastille.astre {
+  height: 8px;
+  width: 8px;
+  border-radius: 99px;
+  background: var(--brass-ink);
+}
+.aff-pastille.portes {
+  background: linear-gradient(90deg, var(--blood) 50%, var(--moss) 50%);
+}
+.aff-pastille.fenetres {
+  background: var(--azur);
+}
+.aff-pastille.murs {
+  background: var(--text-dim);
+}
+.aff-pastille.sons {
+  height: 9px;
+  width: 9px;
+  border-radius: 99px;
+  border: 1.5px dashed var(--brass);
+  background: transparent;
+}
+
+/* « départ : Bureau » sous un exemplaire : discret à sa place, en laiton
+   quand il a bougé, rouge quand son emplacement de départ a disparu. */
+.rgm-depart {
+  justify-self: start;
+  max-width: 100%;
+  padding: 0 3px;
+  margin-left: -3px;
+  border: 0;
+  border-radius: 3px;
+  background: none;
+  font: inherit;
+  font-size: 11px;
+  line-height: 1.5;
+  color: var(--brass-ink);
+  text-align: left;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.rgm-depart:hover {
+  background: var(--brass-wash);
+  text-decoration: underline dotted;
+}
+.rgm-depart.ici {
+  color: var(--text-faint);
+  opacity: 0;
+}
+.ou-ligne:hover .rgm-depart.ici,
+.rgm-depart.ici:focus-visible {
+  opacity: 1;
+}
+.rgm-depart.perdu {
+  color: var(--blood);
+}
+.rgm-jete .rgm-depart {
+  font-size: 12px;
+}
+.pop.rgm-menu {
+  max-height: 60vh;
+  overflow: auto;
+}
+.rgm-menu .opt.on {
+  background: var(--brass-wash);
+}
+.rgm-menu .opt .t {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.rgm-coche {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brass-ink);
+}
+/* Les rubriques du menu de départ, fermées à l'ouverture. */
+.rgm-section {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 8px;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  text-align: left;
+  cursor: pointer;
+}
+.rgm-section:hover {
+  background: var(--sunk);
+  color: var(--text);
+}
+.rgm-section svg {
+  width: 11px;
+  height: 11px;
+  flex: none;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.8;
+  transition: transform 0.12s;
+}
+.rgm-section.ouverte svg {
+  transform: rotate(90deg);
+}
+.rgm-section .t {
+  flex: 1;
+  min-width: 0;
+}
+.rgm-section .n {
+  color: var(--text-faint);
+  letter-spacing: 0;
+}
+
+/* ============================================================
+   La bourse d'un personnage — une case par monnaie de la campagne
+   ============================================================ */
+.bourse-sous {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(190px, 1fr));
+  gap: 8px;
+}
+.bourse-sou {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto auto;
+  align-items: center;
+  gap: 8px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  padding: 7px 10px;
+}
+.bourse-sou .nm {
+  font-size: 12px;
+  font-weight: 500;
+  color: var(--text-dim);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.bourse-sou input {
+  width: 64px;
+  text-align: right;
+  font-family: 'IBM Plex Mono', monospace;
+  font-variant-numeric: tabular-nums;
+  font-size: 16px;
+  font-weight: 600;
+}
+.bourse-geste {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 10px;
+}
+.bourse-geste input[type='number'] {
+  width: 72px;
+  text-align: right;
+}
+.bourse-geste .motif {
+  flex: 1 1 140px;
+  min-width: 0;
+}
+.bourse-geste .unite {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+
+/* ============================================================
+   Fiche de campagne — l'onglet des monnaies (.mc-*)
+   ============================================================ */
+.fc-colonnes.fc-une {
+  grid-template-columns: minmax(0, 1fr);
+}
+.mc-enr {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.mc-corps {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.mc-barre {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 9px 11px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+.mc-seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.mc-seg button {
+  padding: 5px 12px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  background: var(--surface);
+}
+.mc-seg button + button {
+  border-left: 1px solid var(--line);
+}
+.mc-seg button:hover {
+  color: var(--text);
+}
+.mc-seg button[aria-pressed='true'] {
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
+.mc-lignes {
+  display: grid;
+  gap: 6px;
+}
+.mc-ligne {
+  display: grid;
+  grid-template-columns: 16px 40px minmax(120px, 1.4fr) 64px auto minmax(150px, 1fr) 28px;
+  align-items: center;
+  gap: 10px;
+  padding: 6px 10px;
+  background: var(--raised);
+  border: 1px solid var(--line-soft);
+  border-radius: 7px;
+}
+.mc-ligne.tiree {
+  opacity: 0.5;
+}
+.mc-poignee {
+  cursor: grab;
+  color: var(--text-faint);
+  letter-spacing: -2px;
+  user-select: none;
+  text-align: center;
+}
+.mc-piece {
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  /* Le bouton garde sinon la marge du navigateur, et la pièce déborde à droite. */
+  padding: 0;
+  background: var(--sunk);
+  border: 1px dashed var(--line);
+  overflow: hidden;
+}
+.mc-piece:hover {
+  border-color: var(--brass);
+}
+.mc-ligne input[type='text'] {
+  min-width: 0;
+}
+.mc-teintes {
+  display: flex;
+  gap: 3px;
+}
+.mc-teintes button {
+  width: 16px;
+  height: 16px;
+  padding: 0;
+  border-radius: 50%;
+  background: var(--t);
+  border: 2px solid transparent;
+  box-shadow: inset 0 0 0 1px rgba(0, 0, 0, 0.3);
+}
+.mc-teintes button[aria-pressed='true'] {
+  border-color: var(--text);
+}
+.mc-change {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+}
+.mc-change input {
+  width: 64px;
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.mc-forte {
+  color: var(--text-faint);
+}
+.mc-pied {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px;
+}
+.mc-pied .note {
+  margin: 0;
+  flex: 1 1 260px;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+
+/* Le prix d'un objet : une case par monnaie de la campagne. */
+.prix-objet {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.objview .prix-objet .champ-suffixe {
+  flex: 1 1 96px;
+  padding-left: 5px;
+}
+/* Le filtre « Emplacement » à droite de la recherche de l'étagère. */
+.rgm-filtre {
+  flex: none;
+}
+.rgm-filtre svg {
+  width: 13px;
+  height: 13px;
+}
+.pop.rgm-filtre-menu {
+  width: 260px;
+}
+.rgm-filtre-menu label.opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.rgm-filtre-menu .opt .n {
+  color: var(--text-faint);
+  font-size: 11px;
+}
+.rgm-filtre-menu .rgm-effacer {
+  color: var(--brass-ink);
+}
+
+/* « Poser… » un objet qui se compte : après l'endroit, combien. */
+.pop.poser-combien {
+  width: 240px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.poser-combien .pc-ligne {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0 8px;
+  font-size: 13px;
+}
+.poser-combien .inv-qte input {
+  width: 42px;
+  border: 0;
+  background: none;
+  color: var(--text);
+  font: inherit;
+  text-align: center;
+  -moz-appearance: textfield;
+}
+.poser-combien .inv-qte input::-webkit-inner-spin-button,
+.poser-combien .inv-qte input::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+.poser-combien .inv-qte input:focus {
+  outline: none;
+}
+.poser-combien .pc-sur {
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.poser-combien .pc-pied {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* « Nouvel objet », la fenêtre. */
+.nobj-modale {
+  width: min(440px, 100%);
+}
+.nobj-modale .field input,
+.nobj-modale .field select {
+  font-size: 13px;
+  padding: 6px 8px;
+}
+.nobj-ligne {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 11px;
+}
+.nobj-aide {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.5;
+}
+
+/* Recadrer et changer l'image : côte à côte, en bas à droite du bandeau. */
+.fiche-objet .vign-actions {
+  position: absolute;
+  right: 8px;
+  bottom: 8px;
+  z-index: 1;
+  display: flex;
+  gap: 6px;
+}
+.fiche-objet .vign-actions .changer {
+  position: static;
+}
+
+/* ---- les gestes, dans le creux entre les deux visuels ---- */
+.pu-slots > .pu-acts {
+  flex: 1 1 0;
+  min-width: 0;
+  align-self: stretch;
+  align-content: flex-start;
+}
+
+/* ---- le menu de l'encart, au clic sur lui dans la scène ---- */
+.menu-encart {
+  position: fixed;
+  z-index: 80;
+  transform: translateX(-50%);
+  /* Sa largeur est celle de son contenu : posé près du bord droit, il se
+     rétrécissait et « Recentrer » débordait de sa boîte. */
+  width: max-content;
+  display: grid;
+  gap: 7px;
+  padding: 9px 11px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  box-shadow: 0 12px 30px -10px rgba(0, 0, 0, 0.6);
+}
+.menu-encart-ligne {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+}
+
+/* ---- la porte-bouton du tableau de scène : verte ouverte, neutre fermée ----
+   Le rouge est réservé au direct (17 oct.) : neuf portes fermées faisaient
+   neuf alarmes pour l'état le plus ordinaire. Verrouillée, c'est le cadenas
+   de la pastille qui le dit. */
+.tb-ligne.tb-porte {
+  width: 100%;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.tb-ligne.tb-porte.ouverte {
+  background: var(--moss-wash);
+  border-color: color-mix(in srgb, var(--moss) 55%, transparent);
+}
+.tb-ligne.tb-porte.ouverte .tb-pastille,
+.tb-ligne.tb-porte.ouverte em {
+  color: var(--moss);
+  border-color: var(--moss);
+}
+.tb-ligne.tb-porte.fermee em,
+.tb-ligne.tb-porte.verrou em {
+  color: var(--text-faint);
+}
+.tb-ligne.tb-porte.verrou .tb-pastille {
+  color: var(--text);
+  border-color: var(--text-dim);
+}
+.tb-ligne.tb-porte:hover,
+.tb-ligne.tb-porte.vise {
+  filter: brightness(1.18);
+}
+.tb-ligne.tb-porte:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 1px;
+}
+
+/* ---- la lampe-bouton : jaune allumée, sans couleur éteinte ---- */
+.tb-ligne.tb-lampe {
+  cursor: pointer;
+}
+.tb-ligne.tb-lampe.allumee {
+  background: var(--brass-wash);
+  border-color: var(--brass-line);
+}
+.tb-ligne.tb-lampe.allumee .tb-pastille,
+.tb-ligne.tb-lampe.allumee em {
+  color: var(--brass);
+  border-color: var(--brass);
+}
+.tb-ligne.tb-lampe.eteinte em {
+  color: var(--text-faint);
+}
+.tb-ligne.tb-lampe:hover,
+.tb-ligne.tb-lampe.vise {
+  filter: brightness(1.18);
+}
+.tb-ligne.tb-lampe:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 1px;
+}
+
+/* ---- piloter un pion depuis son détail : le pupitre du téléphone, en petit ---- */
+.dp-piloter {
+  justify-items: center;
+}
+.pp {
+  display: grid;
+  justify-items: center;
+  gap: 6px;
+}
+.pp-anneau {
+  position: relative;
+  width: 128px;
+  height: 128px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 50% 50%, transparent 0 39px, var(--surface) 39px 100%);
+  border: 1px solid var(--line);
+  touch-action: none;
+  cursor: grab;
+}
+.pp-anneau:focus-visible {
+  outline: 2px solid var(--brass);
+  outline-offset: 3px;
+}
+/* Le secteur du regard, redit sur l'anneau. */
+.pp-anneau::after {
+  content: '';
+  position: absolute;
+  inset: 4px;
+  border-radius: 50%;
+  background: conic-gradient(
+    from calc(var(--cap, 0deg) - 60deg),
+    rgba(216, 169, 74, 0.26) 0deg 120deg,
+    transparent 120deg 360deg
+  );
+  -webkit-mask: radial-gradient(circle at 50% 50%, transparent 0 42px, #000 42px);
+  mask: radial-gradient(circle at 50% 50%, transparent 0 42px, #000 42px);
+  pointer-events: none;
+}
+.pp-cran {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 0;
+  transform: rotate(var(--cap, 0deg));
+  pointer-events: none;
+}
+.pp-cran::after {
+  content: '';
+  position: absolute;
+  left: -6px;
+  top: -62px;
+  border: 6px solid transparent;
+  border-bottom-color: var(--brass);
+}
+.pp-rose {
+  position: absolute;
+  left: 50%;
+  top: 5px;
+  transform: translateX(-50%);
+  font-size: 9px;
+  color: var(--text-faint);
+  pointer-events: none;
+}
+.pp-manche {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 76px;
+  height: 76px;
+  border-radius: 50%;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  display: grid;
+  place-items: center;
+  touch-action: none;
+  cursor: move;
+}
+.pp-pouce {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  background: var(--raised);
+  border: 2px solid var(--brass);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.5);
+  display: grid;
+  place-items: center;
+  color: var(--brass-ink);
+  font-size: 13px;
+  transform: translate(var(--dx, 0px), var(--dy, 0px));
+  transition: transform 0.12s ease-out;
+}
+.pp-pouce.pris {
+  transition: none;
+}
+.pp-suivre {
+  font-size: 11.5px;
+}
+/* Leurs regards, ou plein jour : deux choix côte à côte, sous un trait. */
+.aff-vision {
+  display: flex;
+  gap: 14px;
+  padding-bottom: 5px;
+  margin-bottom: 2px;
+  border-bottom: 1px dashed var(--line-soft);
+}
+
+/* ============================================================
+   Les sons — sonothèque, sons posés sur le plan, onglet du Paravent
+   Trois natures, une couleur chacune partout : l'ambiance en iris, la nappe
+   en azur, le bruitage en laiton.
+   ============================================================ */
+
+.n-ambiance {
+  --snd: var(--iris);
+  --snd-wash: var(--iris-wash);
+}
+.n-nappe {
+  --snd: var(--azur);
+  --snd-wash: var(--azur-wash);
+}
+.n-bruitage {
+  --snd: var(--brass);
+  --snd-wash: var(--brass-wash);
+}
+
+.snd-pastille {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.07em;
+  text-transform: uppercase;
+  color: var(--snd, var(--label));
+}
+.snd-pastille::before {
+  content: '';
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--snd, var(--label));
+}
+.snd-aide {
+  font-size: 11.5px;
+  color: var(--text-faint);
+  line-height: 1.4;
+}
+.snd-manque {
+  color: var(--blood);
+  font-size: 11.5px;
+}
+
+/* Le sélecteur à boutons : Tout, Ambiances, Nappes, Bruitages. */
+.snd-seg {
+  display: inline-flex;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  overflow: hidden;
+  flex: none;
+}
+.snd-seg button {
+  font: inherit;
+  font-size: 12px;
+  background: transparent;
+  color: var(--text-dim);
+  border: 0;
+  padding: 3px 10px;
+  cursor: pointer;
+}
+.snd-seg button + button {
+  border-left: 1px solid var(--line);
+}
+.snd-seg button:hover {
+  color: var(--text);
+}
+.snd-seg button.on {
+  background: var(--snd-wash, var(--brass-wash));
+  color: var(--snd, var(--brass-ink));
+}
+
+/* ---- la sonothèque ---- */
+.snd-shell {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  /* La fiche d'un son a de la place : ses curseurs vont par deux, ses fichiers ont des noms longs. */
+  grid-template-columns: 200px minmax(0, 1fr) clamp(380px, 32vw, 460px);
+  gap: 10px;
+}
+.snd-vue .pane {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.snd-vue .pane-head {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 10px;
+  background: var(--tint);
+  border-bottom: 1px solid var(--tint-line);
+  border-radius: 4px 4px 0 0;
+  min-height: 38px;
+}
+.snd-vue .pane-head .spacer {
+  flex: 1;
+}
+.snd-vue .pane-body {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  padding: 7px;
+}
+.snd-planche {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  font-size: 12.5px;
+  text-align: left;
+  background: transparent;
+  border: 0;
+  border-radius: 4px;
+  padding: 5px 8px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.snd-planche:hover {
+  background: var(--tint);
+  color: var(--text);
+}
+.snd-planche.on {
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
+.snd-planche .lib {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.snd-planche .n {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.snd-planche-champ {
+  width: 100%;
+  margin: 2px 0;
+}
+.snd-sep {
+  height: 1px;
+  background: var(--line-soft);
+  margin: 6px 4px;
+}
+.snd-cherche {
+  width: 190px;
+}
+.snd-corps {
+  display: grid;
+  align-content: start;
+  gap: 14px;
+}
+.snd-groupe {
+  display: grid;
+  gap: 7px;
+}
+.snd-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(176px, 1fr));
+  gap: 7px;
+}
+.snd-carte {
+  display: grid;
+  gap: 6px;
+  padding: 8px 9px 7px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--snd);
+  border-radius: 6px;
+  cursor: pointer;
+  outline: none;
+}
+.snd-carte:hover,
+.snd-carte:focus-visible {
+  border-color: var(--brass-line);
+  border-top-color: var(--snd);
+}
+.snd-carte.on {
+  box-shadow: 0 0 0 2px var(--brass);
+}
+.snd-carte .l1 {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  min-width: 0;
+}
+.snd-carte .emo {
+  width: 24px;
+  text-align: center;
+  font-size: 17px;
+  flex: none;
+}
+.snd-carte .nm {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  font-size: 13px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.snd-carte .l2 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.snd-carte .meta {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.snd-carte .meta svg {
+  width: 13px;
+  height: 13px;
+}
+.snd-onde {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 16px;
+}
+.snd-onde i {
+  width: 3px;
+  border-radius: 1px;
+  background: var(--snd, var(--brass));
+  opacity: 0.5;
+}
+.snd-carte.joue .snd-onde i,
+.snd-pad.joue .snd-onde i {
+  opacity: 1;
+  animation: snd-pouls 0.7s ease-in-out infinite alternate;
+}
+@keyframes snd-pouls {
+  from {
+    transform: scaleY(0.4);
+  }
+  to {
+    transform: scaleY(1);
+  }
+}
+.snd-lire {
+  flex: none;
+  width: 24px;
+  height: 24px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  border-radius: 50%;
+  border: 1px solid var(--line);
+  background: var(--sunk);
+  color: var(--text);
+  cursor: pointer;
+}
+.snd-lire:hover:not(:disabled) {
+  border-color: var(--snd, var(--brass));
+  color: var(--snd, var(--brass));
+}
+.snd-lire:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.snd-lire svg {
+  width: 12px;
+  height: 12px;
+}
+
+/* ---- le réglage d'un son ---- */
+.snd-tete {
+  border-top: 3px solid var(--snd);
+}
+.snd-reglage {
+  display: grid;
+  align-content: start;
+  gap: 13px;
+  padding: 11px 12px !important;
+}
+.snd-reglage .field label,
+.snd-curseur > span {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.snd-nom {
+  display: flex;
+  gap: 6px;
+}
+.snd-emoji {
+  width: 40px;
+  text-align: center;
+  font-size: 18px !important;
+  padding: 2px !important;
+}
+.snd-nom-champ {
+  flex: 1;
+  min-width: 0;
+  font-family: 'Fraunces Variable', Georgia, serif !important;
+  font-size: 16px !important;
+  font-weight: 600;
+}
+.snd-fichiers {
+  display: grid;
+  gap: 4px;
+}
+.snd-fichier {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 3px 4px 3px 5px;
+  background: var(--sunk);
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+}
+.snd-fichier .t {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.snd-fichier .d {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.snd-ajout {
+  justify-self: start;
+  margin-top: 4px;
+}
+.snd-deux {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.snd-curseur {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 58px;
+  align-items: center;
+  gap: 3px 8px;
+}
+.snd-curseur > span {
+  grid-column: 1 / -1;
+}
+.snd-curseur input[type='range'] {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--snd, var(--brass));
+}
+.snd-ligne {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+}
+.snd-ligne select {
+  flex: 1;
+  min-width: 0;
+}
+.snd-usages {
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.snd-pied {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  padding-top: 8px;
+  border-top: 1px solid var(--line-soft);
+}
+.snd-pied .snd-aide {
+  flex: 1 1 100%;
+}
+
+/* ---- les sons posés sur le plan ---- */
+.snd-calque {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.snd-calque.arme {
+  pointer-events: auto;
+  touch-action: none;
+  cursor: crosshair;
+}
+.snd-calque svg {
+  display: block;
+}
+.snd-calque.arme .snd-zone {
+  pointer-events: all;
+  cursor: move;
+}
+.snd-calque:not(.arme) .snd-zone,
+.snd-calque:not(.arme) .snd-etiquette {
+  opacity: 0.55;
+}
+.snd-zone .disque {
+  fill: color-mix(in srgb, var(--snd) 13%, transparent);
+  stroke: var(--snd);
+  stroke-width: 1.5;
+  stroke-dasharray: 6 5;
+}
+.snd-zone.on .disque {
+  stroke-dasharray: none;
+  stroke-width: 2.5;
+  fill: color-mix(in srgb, var(--snd) 20%, transparent);
+}
+.snd-zone .coeur {
+  fill: color-mix(in srgb, var(--snd) 16%, transparent);
+  stroke: none;
+}
+.snd-zone.muette .disque {
+  stroke: var(--text-faint);
+  fill: color-mix(in srgb, var(--text-faint) 10%, transparent);
+}
+.snd-zone .poignee {
+  fill: var(--snd);
+  stroke: var(--surface);
+  stroke-width: 2;
+  cursor: ew-resize;
+}
+.snd-etiquette {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  pointer-events: none;
+  white-space: nowrap;
+  font-size: 11px;
+  line-height: 1.5;
+  padding: 0 8px 0 6px;
+  border-radius: 99px;
+  background: var(--surface);
+  color: var(--text);
+  border: 1px solid var(--snd);
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.35);
+}
+
+/* ---- le volet d'un son posé ---- */
+.snd-volet {
+  display: grid;
+  align-content: start;
+  gap: 13px;
+  padding: 12px;
+}
+.snd-volet header {
+  display: grid;
+  gap: 4px;
+}
+.snd-volet h3 {
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-size: 16px;
+  font-weight: 600;
+  margin: 0;
+}
+.snd-volet .field label,
+.snd-volet .snd-curseur > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 10px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.snd-volet .field label svg {
+  width: 13px;
+  height: 13px;
+}
+.snd-seg-plein {
+  display: flex;
+}
+.snd-seg-plein button {
+  flex: 1;
+  padding: 4px 6px;
+  font-size: 11.5px;
+}
+.snd-liste-zones {
+  display: grid;
+  gap: 10px;
+}
+/* Les sons d'une même pièce, sous son nom. */
+/* Les filtres de la liste des sons posés : trois listes, une par réglage. */
+.snd-filtres {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 6px;
+}
+.snd-filtres label {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.snd-filtres select {
+  min-width: 0;
+  font-size: 12px;
+}
+.snd-filtres-pied {
+  grid-column: 1 / -1;
+  display: flex;
+  justify-content: space-between;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+/* Sous la fiche d'un son posé : les autres, pour passer de l'un à l'autre. */
+.snd-autres {
+  display: grid;
+  gap: 8px;
+  padding-top: 12px;
+  border-top: 1px solid var(--line-soft);
+}
+.snd-par-piece {
+  display: grid;
+  gap: 4px;
+}
+.snd-par-piece-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding-left: 2px;
+}
+.snd-ligne-zone {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font: inherit;
+  text-align: left;
+  padding: 6px 8px;
+  background: var(--raised);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--snd);
+  border-radius: 5px;
+  cursor: pointer;
+}
+.snd-ligne-zone:hover {
+  border-color: var(--brass-line);
+  border-left-color: var(--snd);
+}
+.snd-ligne-zone .emo {
+  font-size: 16px;
+}
+.snd-ligne-zone .t {
+  display: grid;
+  min-width: 0;
+}
+.snd-ligne-zone .t b {
+  font-weight: 500;
+  font-size: 12.5px;
+}
+.snd-ligne-zone .t span {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+/* La ligne tient deux gestes : la choisir, et l'œil qui la masque sur le plan. */
+.snd-ligne-zone {
+  cursor: default;
+}
+.snd-ligne-zone .snd-choisir {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  font: inherit;
+  text-align: left;
+  color: inherit;
+  background: none;
+  border: 0;
+  cursor: pointer;
+}
+.snd-ligne-zone.cache .snd-choisir {
+  opacity: 0.5;
+}
+.snd-oeil {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border-radius: 5px;
+  border: 1px solid transparent;
+  background: none;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.snd-oeil:hover {
+  background: var(--tint);
+  border-color: var(--line);
+}
+.snd-ligne-zone.cache .snd-oeil {
+  color: var(--text-faint);
+}
+.snd-oeil svg,
+.snd-tout svg {
+  width: 15px;
+  height: 15px;
+}
+.snd-tout {
+  justify-self: start;
+}
+
+/* ---- l'onglet Sons du Paravent ---- */
+.snd-para {
+  display: grid;
+  align-content: start;
+  gap: 16px;
+  padding: 10px 12px 16px;
+}
+.snd-para .vide {
+  color: var(--text-faint);
+  font-size: 12.5px;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.snd-bloc {
+  display: grid;
+  gap: 7px;
+}
+.snd-bloc-tete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+.snd-bloc-tete .ligne {
+  flex: 1;
+  height: 1px;
+  background: var(--line);
+}
+.snd-bloc-tete select {
+  font-size: 11.5px;
+  padding: 2px 5px;
+}
+.snd-amb {
+  display: grid;
+  gap: 7px;
+  padding: 8px 10px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--snd);
+  border-radius: 6px;
+}
+.snd-amb .l1 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+.snd-amb .emo {
+  font-size: 17px;
+}
+.snd-amb .nm {
+  flex: 1;
+  min-width: 0;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.snd-mini {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 56px;
+  gap: 8px;
+  align-items: center;
+}
+.snd-mini input[type='range'],
+.snd-nappe input[type='range'],
+.snd-pied-para input[type='range'] {
+  width: 100%;
+  min-width: 0;
+  accent-color: var(--snd, var(--brass));
+}
+.snd-puces {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.snd-puce {
+  font: inherit;
+  font-size: 12px;
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  padding: 2px 10px;
+  cursor: pointer;
+}
+.snd-puce:hover {
+  color: var(--text);
+  border-color: var(--snd, var(--brass));
+}
+.snd-nappe {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) minmax(70px, 140px) 26px;
+  gap: 8px;
+  align-items: center;
+  font-size: 12.5px;
+}
+.snd-nappe .nm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.snd-nappe.off .nm,
+.snd-nappe.off input {
+  opacity: 0.45;
+}
+.snd-nappe.source .snd-lire {
+  border-style: dashed;
+  font-size: 12px;
+}
+.snd-vu {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  overflow: hidden;
+}
+.snd-vu i {
+  display: block;
+  height: 100%;
+  background: var(--snd);
+  transition: width 0.25s;
+}
+.snd-ajout-nappe {
+  max-width: 160px;
+}
+.snd-pads {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(92px, 1fr));
+  gap: 6px;
+}
+.snd-pad {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  align-content: center;
+  gap: 3px;
+  min-height: 66px;
+  padding: 10px 5px 7px;
+  font: inherit;
+  font-size: 11.5px;
+  line-height: 1.2;
+  text-align: center;
+  color: var(--text);
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.snd-pad:hover:not(:disabled) {
+  border-color: var(--brass-line);
+}
+.snd-pad:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.snd-pad:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.snd-pad.joue {
+  background: var(--brass-wash);
+  border-color: var(--brass);
+}
+.snd-pad .emo {
+  font-size: 19px;
+}
+.snd-pad kbd {
+  position: absolute;
+  top: 3px;
+  left: 4px;
+}
+.snd-pad > svg {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  width: 12px;
+  height: 12px;
+  color: var(--text-faint);
+}
+.snd-vibrer {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.snd-vibrer .snd-aide {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.snd-vibrer .snd-aide svg {
+  width: 13px;
+  height: 13px;
+}
+.snd-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.snd-auto input {
+  accent-color: var(--moss);
+}
+.snd-decl {
+  display: grid;
+  gap: 5px;
+}
+.snd-dl {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) auto auto;
+  gap: 8px;
+  align-items: center;
+  padding: 6px 8px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 12.5px;
+}
+.snd-dl.attente {
+  background: var(--brass-wash);
+  border-color: var(--brass);
+}
+.snd-dl.fait {
+  opacity: 0.7;
+}
+.snd-dl .emo {
+  font-size: 15px;
+  text-align: center;
+}
+.snd-dl .t {
+  display: grid;
+  min-width: 0;
+}
+.snd-dl .t b {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.snd-dl .t span {
+  font-size: 11px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.snd-dl .etat {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 9.5px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+.snd-dl .etat.arme {
+  color: var(--moss);
+}
+.snd-dl .etat.fait {
+  color: var(--text-faint);
+}
+.snd-dl .etat.attente {
+  color: var(--brass-ink);
+}
+.snd-dl .etat.ecoute {
+  color: var(--azur);
+}
+.snd-dl .actions {
+  display: flex;
+  gap: 4px;
+}
+.snd-rearmer {
+  justify-self: start;
+}
+.snd-journal {
+  display: grid;
+  gap: 3px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.snd-journal span {
+  border-left: 2px solid var(--snd);
+  padding-left: 7px;
+}
+.snd-journal i {
+  color: var(--text-faint);
+  font-style: normal;
+}
+.snd-pied-para {
+  flex: none;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) 56px auto;
+  gap: 8px;
+  align-items: center;
+  padding: 8px 12px;
+  border-top: 1px solid var(--line);
+  background: var(--rail);
+}
+.snd-confirme {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.snd-suivre {
+  justify-self: start;
+  margin-top: -6px;
+}
+
+/* Le volet d'un son tient dans sa colonne : une grille garde sinon la largeur
+   naturelle d'un champ ou d'une liste, et la fiche débordait à droite. */
+.snd-reglage,
+.snd-volet {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+.snd-reglage .field,
+.snd-volet .field {
+  grid-template-columns: minmax(0, 1fr);
+  min-width: 0;
+}
+.snd-reglage .field > select,
+.snd-reglage .field > input,
+.snd-volet .field > select,
+.snd-volet .field > input,
+.snd-volet header > input,
+.snd-ligne select {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
+}
+.snd-deux {
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.snd-deux > * {
+  min-width: 0;
+}
+.snd-reglage .snd-seg,
+.snd-volet .snd-seg {
+  display: flex;
+  max-width: 100%;
+}
+.snd-reglage .snd-seg button,
+.snd-volet .snd-seg button {
+  flex: 1 1 0;
+  min-width: 0;
+  white-space: normal;
+  line-height: 1.25;
+  padding-inline: 4px;
+}
+.snd-suivre {
+  max-width: 100%;
+  white-space: normal;
+  text-align: left;
+  height: auto;
+}
+.snd-pied .btn {
+  flex: none;
+}
+
+/* La barre d'un son : ses volumes en bâtons ; pendant l'écoute, la part jouée
+   prend la couleur de sa nature et la tête avance. Un clic y lance ou y saute. */
+.snd-barre {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  cursor: pointer;
+}
+.snd-barre .batons {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 1px;
+  padding: 0 1px;
+  background: var(--sunk);
+  border-radius: 4px;
+}
+.snd-barre .batons i {
+  flex: 1;
+  min-width: 1px;
+  border-radius: 1px;
+  background: var(--text-faint);
+  opacity: 0.55;
+}
+.snd-barre:hover .batons i {
+  opacity: 0.8;
+}
+.snd-barre .batons i.fait {
+  background: var(--snd, var(--brass));
+  opacity: 1;
+}
+.snd-barre.plate .batons i {
+  opacity: 0.3;
+}
+.snd-barre .tete {
+  position: absolute;
+  top: 2px;
+  bottom: 2px;
+  width: 2px;
+  margin-left: -1px;
+  background: var(--text);
+  border-radius: 1px;
+  pointer-events: none;
+}
+.snd-barre .temps {
+  flex: none;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.snd-barre.joue .temps {
+  color: var(--text-dim);
+}
+.snd-fichier {
+  flex-wrap: wrap;
+}
+.snd-fichier > .snd-barre {
+  flex-basis: 100%;
+}
+.snd-volet .field > .snd-barre {
+  margin-top: 6px;
+}
+
+/* Les lieux d'un son, dans sa fiche : des puces et une liste à cocher. */
+.snd-lieux {
+  position: relative;
+}
+.snd-lieux-puces {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 5px;
+}
+.snd-lieu-puce {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 9px;
+  border-radius: 999px;
+  background: var(--snd-wash, var(--sunk));
+  border: 1px solid var(--snd, var(--line));
+  font-size: 12px;
+  color: var(--text);
+}
+.snd-lieu-puce button {
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  padding: 0 4px;
+  font-size: 14px;
+  line-height: 1;
+}
+.snd-lieu-puce button:hover {
+  color: var(--text);
+}
+.snd-lieux-menu {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: calc(100% - 18px);
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  max-height: 300px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.45);
+}
+.snd-lieux-cherche {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.snd-lieux-cherche input {
+  flex: 1;
+  min-width: 0;
+  border: 0;
+  background: none;
+  color: var(--text);
+  outline: none;
+}
+.snd-lieux-liste {
+  overflow: auto;
+  padding: 4px 0;
+}
+.snd-lieux-ligne {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 8px;
+  font-size: 12.5px;
+  color: var(--text);
+  cursor: pointer;
+}
+.snd-lieux-ligne:hover {
+  background: var(--sunk);
+}
+.snd-lieux-ligne.sans {
+  color: var(--text-faint);
+  cursor: default;
+}
+
+/* Plusieurs sons pris ensemble : la case d'une carte paraît au survol, et
+   reste visible tant qu'une sélection multiple est en cours. */
+.snd-carte .snd-case {
+  flex: none;
+  margin: 0;
+  width: 14px;
+  height: 14px;
+  accent-color: var(--brass);
+  display: none;
+  cursor: pointer;
+}
+.snd-carte:hover .snd-case,
+.snd-carte.multi .snd-case {
+  display: block;
+}
+.snd-carte:hover .snd-case + .emo,
+.snd-carte.multi .snd-case + .emo {
+  display: none;
+}
+.snd-choisis {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.snd-choisis h3 {
+  margin: 0;
+}
+.snd-choisis-liste {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.snd-choisis-liste > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--snd, var(--line));
+  background: var(--snd-wash, var(--sunk));
+  font-size: 12px;
+}
+
+/* Importer des fichiers son : une ligne par fichier, son état à droite. */
+.snd-import .body {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+.snd-import-outils {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.snd-import-outils .cherche {
+  flex: 1;
+}
+.snd-import-liste {
+  display: grid;
+  align-content: start;
+  gap: 2px;
+  max-height: 56vh;
+  overflow: auto;
+}
+.snd-import-ligne {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto minmax(150px, auto);
+  align-items: center;
+  gap: 10px;
+  padding: 5px 8px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+.snd-import-ligne:hover {
+  background: var(--sunk);
+}
+.snd-import-ligne.deja {
+  cursor: default;
+  opacity: 0.6;
+}
+.snd-import-ligne .t {
+  display: grid;
+  min-width: 0;
+}
+.snd-import-ligne .t b,
+.snd-import-ligne .t span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.snd-import-ligne .t b {
+  font-weight: 500;
+  font-size: 13px;
+}
+.snd-import-ligne .t span {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.snd-import-ligne .d {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.snd-import-etat {
+  display: grid;
+  justify-items: end;
+  font-size: 11.5px;
+  font-weight: 500;
+}
+.snd-import-etat.nouveau {
+  color: var(--moss);
+}
+.snd-import-etat.double {
+  color: var(--brass);
+}
+.snd-import-etat.deja {
+  color: var(--text-dim);
+}
+.snd-import-etat > span {
+  font-weight: 400;
+  color: var(--snd, var(--text-dim));
+  max-width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.vhead .btn .n {
+  margin-left: 4px;
+  font-size: 10.5px;
+  opacity: 0.75;
+}
+/* Dans la liste des lieux d'une ambiance : celle que chaque lieu a déjà. */
+.snd-lieux-amb {
+  margin-left: auto;
+  padding-left: 10px;
+  font-size: 11px;
+  color: var(--text-faint);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 55%;
+}
+.snd-lieux-amb.a {
+  color: var(--iris);
+}
+
+/* ============================================================
+   L'onglet Sons du Paravent (17 oct., refait) : trois étages — ce qui
+   joue, ici, la séance. Seul le dernier défile ; le reste tient en place.
+   ============================================================ */
+.pane-body.spx-corps {
+  overflow: hidden;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+}
+.spx {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.spx-vide {
+  padding: 12px;
+  color: var(--text-faint);
+  font-size: 12.5px;
+  display: grid;
+  gap: 8px;
+  justify-items: start;
+}
+.spx-etage {
+  flex: none;
+  display: grid;
+  gap: 7px;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.spx-joue {
+  background: var(--raised);
+}
+.spx-tete {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 24px;
+}
+.spx-tete .spacer {
+  flex: 1;
+}
+.spx-lieu {
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-size: 14.5px;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
+}
+.spx-silence {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 9px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font-size: 12px;
+}
+.spx-silence:hover {
+  border-color: var(--blood);
+  color: var(--blood);
+}
+.spx-silence .ico {
+  width: 13px;
+  height: 13px;
+}
+.spx-menu-hote {
+  position: relative;
+}
+.spx-menu {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 4px);
+  z-index: 30;
+  display: grid;
+  gap: 2px;
+  min-width: 190px;
+  padding: 6px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  box-shadow: var(--shadow-lift);
+}
+.spx-menu .eyebrow {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  padding: 2px 6px 4px;
+}
+.spx-menu button {
+  text-align: left;
+  border: 0;
+  background: none;
+  color: var(--text);
+  padding: 5px 8px;
+  border-radius: 5px;
+  font-size: 12.5px;
+}
+.spx-menu button:hover {
+  background: var(--sunk);
+}
+.spx-pistes {
+  display: grid;
+  gap: 5px;
+}
+.spx-piste {
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr) 76px 22px;
+  align-items: center;
+  gap: 8px;
+}
+.spx-piste .emo {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border-radius: 5px;
+  background: var(--snd-wash, var(--sunk));
+  font-size: 13px;
+}
+.spx-piste .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 12.5px;
+}
+.spx-piste .nm small {
+  margin-left: 5px;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+.spx-piste input[type='range'] {
+  width: 76px;
+  accent-color: var(--snd, var(--brass));
+}
+.spx-x {
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 4px;
+  background: none;
+  color: var(--text-faint);
+}
+.spx-x:hover {
+  background: var(--sunk);
+  color: var(--text);
+}
+.spx-x .ico {
+  width: 12px;
+  height: 12px;
+}
+.spx-jauge {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--sunk);
+  overflow: hidden;
+}
+.spx-jauge i {
+  display: block;
+  height: 100%;
+  background: var(--snd, var(--brass));
+  transition: width 0.4s;
+}
+.spx-rien {
+  color: var(--text-faint);
+  font-style: italic;
+  font-size: 12px;
+}
+.spx-general {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.spx-general input[type='range'] {
+  flex: 1;
+  min-width: 0;
+  accent-color: var(--brass);
+}
+.spx-auto {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.spx-auto input {
+  accent-color: var(--brass);
+}
+.spx-attente {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 8px;
+  border: 1px solid var(--brass);
+  border-radius: 6px;
+  background: var(--brass-wash);
+}
+.spx-attente .t {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+.spx-attente .t b {
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.spx-attente .t small {
+  color: var(--text-dim);
+  font-size: 11px;
+}
+.spx-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+.spx-note:empty {
+  display: none;
+}
+.spx-tuiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(104px, 1fr));
+  gap: 6px;
+}
+.spx-tuile {
+  position: relative;
+  display: grid;
+  gap: 2px;
+  min-height: 58px;
+  padding: 7px 7px 6px;
+  text-align: left;
+  border: 1px solid var(--line);
+  border-top: 3px solid var(--snd, var(--brass));
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text);
+  min-width: 0;
+}
+.spx-tuile:hover:not(:disabled) {
+  border-color: var(--snd, var(--brass));
+}
+.spx-tuile:disabled {
+  cursor: default;
+}
+.spx-tuile .emo {
+  font-size: 17px;
+  line-height: 1;
+}
+.spx-tuile .nm {
+  font-size: 12px;
+  font-weight: 500;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.spx-tuile .ou {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10.5px;
+  color: var(--text-faint);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.spx-tuile .ou .ico {
+  width: 11px;
+  height: 11px;
+  flex: none;
+}
+.spx-tuile kbd {
+  position: absolute;
+  top: 5px;
+  right: 5px;
+}
+.spx-tuile.on {
+  background: var(--snd-wash, var(--sunk));
+  box-shadow: inset 0 0 0 1px var(--snd, var(--brass));
+}
+.spx-tuile.on .ou {
+  color: var(--snd, var(--brass));
+}
+.spx-tuile.fait {
+  opacity: 0.55;
+}
+.spx-tuile.attend {
+  box-shadow: inset 0 0 0 1px var(--brass);
+}
+.spx-tuile.part {
+  animation: spx-part 0.6s ease-out;
+}
+@keyframes spx-part {
+  from {
+    box-shadow: 0 0 0 0 var(--snd, var(--brass));
+  }
+  to {
+    box-shadow: 0 0 0 10px transparent;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .spx-tuile.part {
+    animation: none;
+  }
+}
+.spx-seance {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-bottom: 0;
+}
+.spx-puces {
+  flex: none;
+  display: flex;
+  gap: 4px;
+  overflow-x: auto;
+  scrollbar-width: none;
+}
+.spx-puces button {
+  flex: none;
+  padding: 2px 9px;
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  background: var(--raised);
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+.spx-puces button[aria-pressed='true'] {
+  border-color: var(--brass);
+  background: var(--brass-wash);
+  color: var(--brass);
+}
+.spx-cherche {
+  flex: none;
+  width: 100%;
+  padding: 4px 8px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--sunk);
+  color: var(--text);
+  font: inherit;
+  font-size: 12.5px;
+}
+.spx-defile {
+  flex: 1;
+  min-height: 0;
+  overflow: auto;
+  display: grid;
+  align-content: start;
+  gap: 6px;
+}
+
+/* ============================================================
+   La console du direct — commune au Paravent et à la Régie
+   (ConsoleDirect.tsx, 17 octobre 2026)
+   ============================================================ */
+.cd {
+  flex: none;
+  min-width: 0;
+  padding: 7px 10px;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  /* Elle se mesure elle-même : ce qui s'abrège dépend de sa largeur, pas
+     de celle de la fenêtre. */
+  container-type: inline-size;
+  container-name: cd;
+}
+.cd-in {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.cd-grp {
+  display: flex;
+  gap: 5px;
+  flex: none;
+}
+.cd-sep {
+  width: 1px;
+  align-self: stretch;
+  background: var(--line);
+  flex: none;
+}
+/* Le voile posé : le seul rouge de la console, parce que c'est l'écran des
+   joueurs qui est en jeu. */
+.cd .btn.cd-voile {
+  background: var(--blood-wash);
+  border-color: var(--blood);
+  color: var(--text);
+}
+.cd-amb {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-dim);
+  font-size: 11.5px;
+}
+.cd-amb > svg {
+  flex: none;
+}
+.cd-amb-nom {
+  min-width: 0;
+  max-width: 180px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cd-amb input[type='range'] {
+  width: 80px;
+  flex: none;
+}
+.cd-suite {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  /* Le texte peut s'abréger, la vignette non : sans ce plancher, elle
+     débordait sur la liste des transitions. */
+  min-width: 84px;
+}
+.cd-suite-txt {
+  display: grid;
+  text-align: right;
+  min-width: 0;
+  line-height: 1.25;
+}
+.cd-suite-nom {
+  font-size: 11.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 220px;
+}
+.cd-vig {
+  position: relative;
+  flex: none;
+  height: 42px;
+  aspect-ratio: 16 / 9;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--ground);
+}
+.cd-modes {
+  display: inline-flex;
+  flex: none;
+  gap: 2px;
+  padding: 2px;
+  background: var(--ground);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+}
+.cd-mode {
+  border: 0;
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 11.5px;
+  padding: 3px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.cd-mode.on {
+  background: var(--raised);
+  color: var(--text);
+}
+.cd-modes-liste {
+  display: none;
+  flex: none;
+}
+.cd .cd-bascule {
+  flex: none;
+  padding: 7px 16px;
+}
+/* Portable : les transitions passent en liste, « À suivre » perd ses mots. */
+@container cd (max-width: 860px) {
+  .cd-modes {
+    display: none;
+  }
+  .cd-modes-liste {
+    display: block;
+  }
+  .cd-suite-txt {
+    display: none;
+  }
+}
+/* Étroit (colonne de scène d'un portable) : deux lignes. En haut les gestes
+   d'urgence et l'ambiance, en bas « À suivre » et la bascule, calée à droite.
+   L'écarteur prend toute la ligne et force le passage. */
+@container cd (max-width: 760px) {
+  .cd-in {
+    flex-wrap: wrap;
+    row-gap: 7px;
+  }
+  .cd-in > .spacer {
+    flex: 0 0 100%;
+    height: 0;
+  }
+  .cd-sep {
+    display: none;
+  }
+  .cd-amb {
+    flex: 1 1 auto;
+  }
+  .cd-suite {
+    margin-left: auto;
+  }
+}
+/* Très étroit : l'ambiance ne garde que son curseur. */
+@container cd (max-width: 640px) {
+  .cd-amb-nom,
+  .cd-amb .val {
+    display: none;
+  }
+  .cd-amb input[type='range'] {
+    width: 56px;
+  }
+  .cd {
+    gap: 7px;
+  }
+}
+
+/* ---- les outils de la carte, posés sur la scène du Paravent ----
+   Une colonne nommée en haut à droite (17 octobre 2026). Elle passe au-dessus
+   du voile intérieur du cadre (`::after`) et défile en elle-même si la scène
+   est basse, plutôt que de déborder. */
+.pupitre .pu-outils {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  z-index: 3;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 4px;
+  max-height: calc(100% - 20px);
+  overflow-y: auto;
+  background: color-mix(in srgb, var(--sunk) 90%, transparent);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  box-shadow: 0 8px 24px -10px rgba(0, 0, 0, 0.8);
+}
+.pupitre .pu-outils .btn {
+  justify-content: flex-start;
+}
+.pupitre .pu-outils .btn:not(.btn-on) {
+  background: none;
+  border-color: transparent;
+}
+.pupitre .pu-outils .btn:not(.btn-on):not(:disabled):hover {
+  background: var(--raised);
+}
+.pupitre .pu-outils .kbd {
+  margin-left: auto;
+}
+.pu-outils-sep {
+  flex: none;
+  height: 1px;
+  margin: 2px 4px;
+  background: var(--line);
+}
+
+/* ---- les tiroirs de la scène du Paravent : portes et lumières, objets ----
+   Ils s'ouvrent par-dessus le bord gauche de la carte au lieu de la pousser
+   (17 octobre 2026) : la carte garde sa taille, ouvert ou fermé. */
+.pupitre .pu-avec-tableau {
+  position: relative;
+}
+.pupitre .pu-avec-tableau > .tableau {
+  position: absolute;
+  z-index: 4;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: min(300px, 55%);
+  contain: none;
+  background: color-mix(in srgb, var(--rail) 97%, transparent);
+  border-right: 1px solid var(--line);
+  border-radius: 7px 0 0 7px;
+  box-shadow: 12px 0 30px -14px rgba(0, 0, 0, 0.85);
+}
+
+/* ============================================================
+   Les formats d'écran (17 octobre 2026) — « bien responsive,
+   exemple écran PC portable ». Zéro scroll de page à tous les formats.
+   ============================================================ */
+
+/* Le rail rend de la largeur sur les écrans moyens ; le moniteur, qui en
+   prend toute la largeur, rapetisse avec lui mais reste en haut à gauche. */
+@media (max-width: 1700px) {
+  .app {
+    grid-template-columns: 236px minmax(0, 1fr);
+  }
+}
+@media (max-width: 1440px) {
+  .app {
+    grid-template-columns: 208px minmax(0, 1fr);
+  }
+  .nav-item {
+    gap: 7px;
+    font-size: 12.5px;
+  }
+}
+
+/* Les seuils du Paravent portent sur la fenêtre, pas sur la page : une
+   requête de conteneur sur la page entière en ferait le repère des menus en
+   `position: fixed` (menu du pion, menu d'image), qui se placent au curseur.
+   La console, elle, se mesure elle-même (`.cd`). */
+/* La console au pied de la colonne, quelle que soit la hauteur de la scène. */
+.pupitre .pu-regie > .cd {
+  margin-top: auto;
+}
+/* Préfixé : `.pupitre .seg` l'aurait affichée partout, et la grille lui
+   donnait sa première case (18 oct.). */
+.pupitre .pu-grid > .pu-vue {
+  display: none;
+}
+/* Écran moyen : la largeur tirée à la poignée sur un grand écran laissait
+   à la scène une vignette. La lecture ne dépasse plus la moitié de la page. */
+@media (max-width: 1700px) {
+  .pupitre .pu-grid[style] {
+    grid-template-columns: min(var(--pu-g), 50%) minmax(0, 1fr);
+  }
+}
+/* Portable 1536 : le fil se resserre. */
+@media (max-width: 1600px) {
+  .pu-chrono {
+    --pu-fil: 150px;
+  }
+  .pu-grid {
+    gap: 10px;
+  }
+}
+/* Petit portable (1280, fenêtre mini 1080) : on lit ou on joue. La bascule
+   « Lire | Scène » montre un côté à la fois ; en lisant, la console du direct
+   reste au pied. En 1366, les deux tiennent encore côte à côte. */
+@media (max-width: 1320px) {
+  .pupitre .pu-grid,
+  .pupitre .pu-grid[style] {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto minmax(0, 1fr);
+    gap: 8px;
+  }
+  .pu-grid > .poignee-col {
+    display: none;
+  }
+  .pupitre .pu-grid > .pu-vue {
+    display: inline-flex;
+    justify-self: start;
+  }
+  .pu-vue button {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding-inline: 12px;
+  }
+  /* Les icônes tirent leur trait de la feuille, comme dans un `.btn`. */
+  .pu-vue svg {
+    width: 13px;
+    height: 13px;
+    flex: none;
+    stroke: currentColor;
+    fill: none;
+    stroke-width: 1.5;
+  }
+  .pu-grid[data-vue='scene'] > .pu-chrono {
+    display: none;
+  }
+  .pupitre .pu-grid[data-vue='lire'] {
+    grid-template-rows: auto minmax(0, 1fr) auto;
+  }
+  .pu-grid[data-vue='lire'] > .pu-regie {
+    padding: 0;
+    border: 0;
+    background: none;
+    box-shadow: none;
+  }
+  .pu-grid[data-vue='lire'] > .pu-regie > :not(.cd) {
+    display: none;
+  }
+}
+
+/* ============================================================
+   Préparation des personnages (page Fiches)
+   La règle à gauche, le suivi à droite ; rien ne fait défiler la page,
+   le tableau des joueurs défile dans sa carte.
+   ============================================================ */
+.prp {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(300px, 380px) minmax(0, 1fr);
+  gap: 16px;
+}
+.prp h3 {
+  margin: 2px 0 0;
+  font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
+  font-weight: 600;
+  font-size: 19px;
+}
+.prp-regle,
+.prp-suivi {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px;
+}
+.prp-nombres {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 10px;
+}
+.prp-nombres label {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.prp-nombres .valeur-saisie {
+  width: 100% !important;
+  height: 38px;
+  box-sizing: border-box;
+  font-size: 16px;
+}
+.prp-bareme {
+  display: grid;
+  grid-template-columns: 58px repeat(var(--n, 8), minmax(0, 1fr));
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  overflow: hidden;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 12px;
+  text-align: center;
+}
+.prp-bareme span {
+  padding: 5px 0;
+  border-top: 1px solid var(--line-soft);
+}
+.prp-bareme .t {
+  padding-left: 8px;
+  text-align: left;
+  color: var(--label);
+}
+.prp-bareme .cher {
+  color: var(--brass);
+  font-weight: 600;
+}
+.prp-bareme .plus,
+.prp-val small.plus {
+  color: var(--moss);
+}
+.prp-bareme .moins,
+.prp-val small.moins {
+  color: var(--blood);
+}
+.prp-case {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  background: var(--raised);
+  cursor: pointer;
+}
+.prp-case input {
+  margin-top: 3px;
+}
+.prp-case span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.prp-case small {
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.prp-aide {
+  margin: 0;
+  font-size: 12px;
+  line-height: 1.55;
+  color: var(--text-dim);
+}
+.prp-vide {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  text-align: center;
+}
+.prp-vide p {
+  margin: 0;
+  max-width: 460px;
+  line-height: 1.6;
+  color: var(--text-dim);
+}
+.prp-barre {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.prp-direct {
+  border-color: var(--blood);
+  background: var(--blood);
+  color: #fbf3df;
+}
+.prp-table {
+  display: grid;
+  grid-template-columns: minmax(140px, 1.6fr) minmax(110px, 1fr) repeat(var(--n, 9), minmax(42px, 0.6fr));
+  align-items: center;
+  column-gap: 8px;
+  row-gap: 0;
+  font-size: 13px;
+}
+.prp-table > span {
+  min-width: 0;
+  padding: 9px 0;
+  border-bottom: 1px solid var(--line-soft);
+}
+.prp-tete {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  text-align: center;
+}
+.prp-tete b {
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  color: var(--label);
+}
+.prp-tete small {
+  max-width: 100%;
+  font-size: 9.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prp-nom {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-weight: 500;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.prp-etat {
+  font-size: 12px;
+  color: var(--brass);
+}
+.prp-etat.ok {
+  color: var(--moss);
+  font-weight: 600;
+}
+.prp-val {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.prp-val b {
+  font-size: 15px;
+  font-weight: 500;
+}
+.prp-val small {
+  font-size: 10.5px;
+  color: var(--text-dim);
 }

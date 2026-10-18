@@ -253,6 +253,14 @@ export function seedProject(db: Database.Database, nom: string): void {
       cid,
       'Séance 1'
     )
+
+    /* Les rangements d'une fois servent aux campagnes d'avant le dossier de
+       l'app. Une campagne neuve n'a rien d'ancien à ranger : sans ces marques,
+       un dossier « Lieux » ou « Moments » que le MJ avait déjà à la racine
+       partirait dans `.ecran-du-maitre/`, caché de la Bibliothèque. */
+    const fait = db.prepare(`INSERT OR IGNORE INTO setting (key, value) VALUES (?, '1')`)
+    fait.run('migration.dossier-de-l-app')
+    fait.run('migration.textes-des-moments')
   })()
   console.log(`[db] projet « ${nom} » installé`)
 }

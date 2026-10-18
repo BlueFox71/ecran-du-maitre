@@ -19,6 +19,7 @@ import { currentObjet, itemById, useStore } from '../store'
 import {
   IconClose,
   IconCoffre,
+  IconCrop,
   IconDonner,
   IconEye,
   IconEyeOff,
@@ -28,6 +29,7 @@ import {
   IconPochette,
   IconPlus,
   IconPoser,
+  IconRetour,
   IconRouage,
   IconSearch,
   IconSliders,
@@ -38,15 +40,32 @@ import {
 import { ChoixDansArbre } from '../components/ChoixDansArbre'
 import { Pop } from '../components/Pop'
 import { Valeur } from '../components/Valeur'
-import { CLAIR_DE_TORCHE, TEINTE_TORCHE } from '../../shared/Lueur'
+import { CLAIR_DE_TORCHE } from '../../shared/Lueur'
 import { champDeVision, polygone, type Barriere } from '@shared/murs'
 import { MenuDonner } from '../components/MenuDonner'
 import { BandeJoueurs, TYPE_EXEMPLAIRE, TYPE_OBJET } from '../components/BandeJoueurs'
 import { AlerteLieux, lieuxDe } from '../components/ObjetsDuLieu'
+import { ModaleNouvelObjet } from '../components/NouvelObjet'
+import { RognageCarre } from '../components/RognageCarre'
+import { Piece } from '../../shared/Piece'
+import { ditMontant, monnaiesActives, type Monnaie } from '@shared/monnaies'
+import {
+  BoutonCorbeille,
+  Confirmer,
+  Depart,
+  FiltreEmplacement,
+  clesOu,
+  ModaleRanger,
+  VueCorbeille,
+  deplaces,
+  ditInitial
+} from '../components/Rangement'
 import {
   EMPLACEMENTS_OBJET,
   FAISCEAUX_LUMIERE,
   GLYPHES_OBJET,
+  TEINTES_LUMIERE,
+  estLumiere,
   PION_COULEURS,
   emplacementsDe
 } from '@shared/types'
@@ -59,6 +78,7 @@ import type {
   ObjetPlacement,
   PortObjet
 } from '@shared/types'
+import { useEchap } from '../echap'
 
 /** Le rayon des objets qu'aucune famille ne réclame. */
 const SANS_FAMILLE = -1
@@ -80,9 +100,20 @@ export function Objets(): JSX.Element {
   /* Un inventaire ouvert au centre prend la place de l'étagère. */
   const [inventaireVu, setInventaireVu] = useState<number | null>(null)
   const inv = s.inventaires.find((i) => i.id === inventaireVu) ?? null
+  /* La corbeille aussi, tant qu'aucun inventaire n'est ouvert. */
+  const [corbeilleVue, setCorbeilleVue] = useState(false)
+  const corbeille = corbeilleVue && !inv
+  const [rangerOuvert, setRangerOuvert] = useState(false)
+  const [nouvelObjet, setNouvelObjet] = useState(false)
+  const nDeplaces = useMemo(() => deplaces(s.objets).length, [s.objets])
   const choisirRayon = (r: number | 'tout'): void => {
     setRayon(r)
     setInventaireVu(null)
+    setCorbeilleVue(false)
+  }
+  const voirInventaire = (id: number): void => {
+    setInventaireVu(id)
+    setCorbeilleVue(false)
   }
 
   /* Le rayon suit l'objet qu'on ouvre depuis « Tout » ? Non : on trie
@@ -95,15 +126,27 @@ export function Objets(): JSX.Element {
   }, [rayons, rayon])
 
   const mot = filtre.trim().toLowerCase()
+  /* Les endroits cochés dans « Emplacement » ; vide, tout passe. */
+  const [ou, setOu] = useState<Set<string>>(new Set())
+  /* Un endroit que le dernier objet vient de quitter ne filtre plus rien :
+     sans quoi l'étagère resterait vide derrière un filtre qui ne se voit plus. */
+  const ouActifs = useMemo(() => {
+    const presents = new Set(s.objets.flatMap(clesOu))
+    return new Set([...ou].filter((c) => presents.has(c)))
+  }, [s.objets, ou])
+  useEffect(() => {
+    if (ouActifs.size !== ou.size) setOu(ouActifs)
+  }, [ouActifs, ou])
   const visibles = useMemo(
     () =>
       s.objets.filter(
         (x) =>
           (rayon === 'tout' ||
             (rayon === SANS_FAMILLE ? x.familleId == null : x.familleId === rayon)) &&
-          (mot === '' || x.nom.toLowerCase().includes(mot))
+          (mot === '' || x.nom.toLowerCase().includes(mot)) &&
+          (ouActifs.size === 0 || clesOu(x).some((c) => ouActifs.has(c)))
       ),
-    [s.objets, rayon, mot]
+    [s.objets, rayon, mot, ouActifs]
   )
 
   const creer = async (nom: string): Promise<void> => {
@@ -128,6 +171,15 @@ export function Objets(): JSX.Element {
         <div className="spacer" />
         <button
           className="btn btn-sm"
+          onClick={() => setRangerOuvert(true)}
+          title="Remettre à leur emplacement initial les objets qui ont bougé pendant la partie"
+        >
+          <IconRetour />
+          Ranger
+          {nDeplaces > 0 ? <span className="rgm-badge num">{nDeplaces}</span> : null}
+        </button>
+        <button
+          className="btn btn-sm"
           onClick={(e) => {
             const r = e.currentTarget.getBoundingClientRect()
             setReglages({ x: r.left, y: r.bottom + 6 })
@@ -137,7 +189,7 @@ export function Objets(): JSX.Element {
           <IconSliders />
           Réglages
         </button>
-        <button className="btn btn-brass btn-sm" onClick={() => rafale.current?.focus()}>
+        <button className="btn btn-brass btn-sm" onClick={() => setNouvelObjet(true)}>
           <IconPlus />
           Nouvel objet
         </button>
@@ -160,7 +212,7 @@ export function Objets(): JSX.Element {
           </div>
           <div className="pane-body">
             <button
-              className={`fam-btn${!inv && rayon === 'tout' ? ' on' : ''}`}
+              className={`fam-btn${!inv && !corbeille && rayon === 'tout' ? ' on' : ''}`}
               onClick={() => choisirRayon('tout')}
             >
               <span className="pastille tout" />
@@ -171,7 +223,7 @@ export function Objets(): JSX.Element {
             {rayons.map((f) => (
               <button
                 key={f.id}
-                className={`fam-btn${!inv && rayon === f.id ? ' on' : ''}`}
+                className={`fam-btn${!inv && !corbeille && rayon === f.id ? ' on' : ''}`}
                 onClick={() => choisirRayon(f.id)}
               >
                 <span className={`pastille c-${f.teinte}`} />
@@ -185,7 +237,7 @@ export function Objets(): JSX.Element {
               <>
                 <div className="fam-sep" />
                 <button
-                  className={`fam-btn${!inv && rayon === SANS_FAMILLE ? ' on' : ''}`}
+                  className={`fam-btn${!inv && !corbeille && rayon === SANS_FAMILLE ? ' on' : ''}`}
                   onClick={() => choisirRayon(SANS_FAMILLE)}
                   title="Les objets qui n’ont pas de catégorie"
                 >
@@ -205,7 +257,7 @@ export function Objets(): JSX.Element {
                 key={i.id}
                 inv={i}
                 on={inv?.id === i.id}
-                onChoisir={() => setInventaireVu(i.id)}
+                onChoisir={() => voirInventaire(i.id)}
               />
             ))}
             <button
@@ -213,18 +265,30 @@ export function Objets(): JSX.Element {
               onClick={async () => {
                 const neuf = await window.jdr.objets.inventaireAdd('Nouvel inventaire')
                 await s.refreshObjets()
-                setInventaireVu(neuf.id)
+                voirInventaire(neuf.id)
               }}
               title="Un inventaire que les joueurs pourront ouvrir sur leur portable"
             >
               <IconPlus />
               <span className="lib">Nouvel inventaire</span>
             </button>
+
+            {/* Ce qu'on a retiré aux joueurs attend ici qu'on le range. */}
+            <div className="fam-sep" />
+            <BoutonCorbeille
+              on={corbeille}
+              onChoisir={() => {
+                setInventaireVu(null)
+                setCorbeilleVue(true)
+              }}
+            />
           </div>
         </div>
 
         {/* ---------------- l'étagère, ou l'inventaire choisi ---------------- */}
-        {inv ? (
+        {corbeille ? (
+          <VueCorbeille />
+        ) : inv ? (
           <VueInventaire key={inv.id} inv={inv} onSupprime={() => setInventaireVu(null)} />
         ) : (
           <div className="pane">
@@ -239,6 +303,7 @@ export function Objets(): JSX.Element {
                   aria-label="Filtrer les objets"
                 />
               </label>
+              <FiltreEmplacement choisis={ou} onChange={setOu} />
               <span className="compte num">
                 {visibles.length === 0
                   ? 'aucun objet'
@@ -268,7 +333,7 @@ export function Objets(): JSX.Element {
                   Rien sous ce filtre. Tape un nom en bas pour en créer un ici.
                 </p>
               ) : enListe ? (
-                <ListeObjets objets={visibles} familles={s.objetFamilles} unite={s.uniteValeur} />
+                <ListeObjets objets={visibles} familles={s.objetFamilles} monnaies={monnaiesActives(s.reglages.monnaies)} />
               ) : (
                 <GrilleObjets objets={visibles} familles={s.objetFamilles} />
               )}
@@ -319,6 +384,13 @@ export function Objets(): JSX.Element {
 
       {reglages ? (
         <PanneauReglages x={reglages.x} y={reglages.y} onClose={() => setReglages(null)} />
+      ) : null}
+      {rangerOuvert ? <ModaleRanger onClose={() => setRangerOuvert(false)} /> : null}
+      {nouvelObjet ? (
+        <ModaleNouvelObjet
+          familleDepart={rayon === 'tout' || rayon === SANS_FAMILLE ? null : rayon}
+          onClose={() => setNouvelObjet(false)}
+        />
       ) : null}
       {familles ? (
         <ModaleFamilles
@@ -500,7 +572,8 @@ function BoutonInventaire({
           if (placementId) await window.jdr.objets.remettre(placementId, inv.id)
           else if (objetId) {
             const ajoutes = await window.jdr.objets.remplir(inv.id, [objetId])
-            if (!ajoutes) s.toast('Cette pièce unique est déjà posée ailleurs.', true)
+            if (!ajoutes)
+              s.toast('Déjà au complet dans cet inventaire, ou pièce unique posée ailleurs.', true)
           } else return
           await s.refreshObjets()
         } catch (err) {
@@ -542,7 +615,7 @@ function VueInventaire({ inv, onSupprime }: { inv: Inventaire; onSupprime: () =>
     await s.refreshObjets()
     s.toast(
       n === 0
-        ? 'Rien à ranger : tout est déjà posé quelque part.'
+        ? 'Rien à ranger : déjà au complet ici, ou pièces uniques posées ailleurs.'
         : `${n} objet${n > 1 ? 's' : ''} rangé${n > 1 ? 's' : ''} dans « ${inv.nom} »`
     )
   }
@@ -625,8 +698,8 @@ function VueInventaire({ inv, onSupprime }: { inv: Inventaire; onSupprime: () =>
                     {p.qte > 1 ? <span className="qte num">×{p.qte}</span> : null}
                   </span>
                   <span className="nom">{o.nom}</span>
-                  {/* Combien il en reste dedans : chaque pioche en ôte un. Le
-                      nombre du modèle ne compte qu'au moment où on range. */}
+                  {/* Combien il en reste dedans : chaque pioche en ôte un. On
+                      n'en remet pas plus que la quantité de l'objet. */}
                   {o.unique ? null : (
                     <span className="inv-qte" onClick={(e) => e.stopPropagation()}>
                       <button
@@ -642,11 +715,16 @@ function VueInventaire({ inv, onSupprime }: { inv: Inventaire; onSupprime: () =>
                       </button>
                       <span className="num">{p.qte}</span>
                       <button
+                        disabled={p.qte >= o.qte}
                         onClick={async () => {
                           await window.jdr.objets.placement(p.id, { qte: p.qte + 1 })
                           await s.refreshObjets()
                         }}
-                        title="Un de plus"
+                        title={
+                          p.qte >= o.qte
+                            ? `Pas plus que sa quantité : ${o.qte} — à changer dans sa fiche`
+                            : 'Un de plus'
+                        }
                         aria-label={`Un ${o.nom} de plus`}
                       >
                         +
@@ -774,13 +852,7 @@ function ModaleRemplir({
   const s = useStore()
   const [mot, setMot] = useState('')
   const [pris, setPris] = useState<Set<number>>(new Set())
-  useEffect(() => {
-    const touche = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', touche)
-    return () => window.removeEventListener('keydown', touche)
-  }, [onClose])
+  useEchap(onClose)
   const m = mot.trim().toLowerCase()
   const liste = s.objets.filter((o) => !m || o.nom.toLowerCase().includes(m))
   return (
@@ -844,7 +916,8 @@ const PORT_OU: Record<PortObjet, { mot: string; icone: () => JSX.Element }> = {
   lieu: { mot: 'Lieu', icone: () => <IconPlace /> },
   pnj: { mot: 'Butin de', icone: () => <IconCoffre /> },
   pj: { mot: 'Sac de', icone: () => <IconPeople /> },
-  inventaire: { mot: 'Dans', icone: () => <IconCoffre /> }
+  inventaire: { mot: 'Dans', icone: () => <IconCoffre /> },
+  corbeille: { mot: '', icone: () => <IconTrash /> }
 }
 
 /**
@@ -857,10 +930,21 @@ function OuIlEst({ o }: { o: Objet }): JSX.Element | null {
   for (const p of o.placements)
     vus.set(`${p.port}:${p.placeId ?? p.characterId ?? p.inventaireId}`, { port: p.port, cible: p.cible })
   const ou = [...vus.values()]
-  if (ou.length === 0) return null
-  const dit = ou.map((x) => `${PORT_OU[x.port].mot} ${x.cible}`).join(' · ')
+  const jetes = o.corbeille.reduce((t, p) => t + p.qte, 0)
+  if (ou.length === 0 && jetes === 0) return null
+  const dit = [
+    ...ou.map((x) => `${PORT_OU[x.port].mot} ${x.cible}`),
+    ...(jetes ? [`${jetes} à la corbeille`] : [])
+  ].join(' · ')
   return (
     <span className="obj-ou" title={dit}>
+      {/* Jeté : il ne compte plus nulle part, mais on doit le voir. */}
+      {jetes ? (
+        <span className="obj-ou-tag corbeille">
+          <IconTrash />
+          <span className="t">Corbeille{jetes > 1 ? ` ×${jetes}` : ''}</span>
+        </span>
+      ) : null}
       {ou.slice(0, 2).map((x, i) => (
         <span key={i} className={`obj-ou-tag ${x.port}`}>
           {PORT_OU[x.port].icone()}
@@ -875,11 +959,11 @@ function OuIlEst({ o }: { o: Objet }): JSX.Element | null {
 function ListeObjets({
   objets,
   familles,
-  unite
+  monnaies
 }: {
   objets: Objet[]
   familles: ObjetFamille[]
-  unite: string
+  monnaies: Monnaie[]
 }): JSX.Element {
   const s = useStore()
   return (
@@ -889,7 +973,7 @@ function ListeObjets({
         <span className="nm">Objet</span>
         <span className="col">Catégorie</span>
         <span className="col">Poids</span>
-        <span className="col">Valeur · {unite}</span>
+        <span className="col">Valeur</span>
         <span className="col">Posé</span>
       </div>
       {objets.map((o) => {
@@ -915,10 +999,16 @@ function ListeObjets({
             <span className="nm">
               <span className="nm-tx">{o.nom}</span>
               {lieuxDe(o).length > 1 ? <AlerteLieux lieux={lieuxDe(o)} /> : null}
+              {o.corbeille.length > 0 ? (
+                <span className="obj-ou-tag corbeille" title="Des exemplaires à la corbeille">
+                  <IconTrash />
+                  <span className="t">Corbeille</span>
+                </span>
+              ) : null}
             </span>
             <span className="col">{f?.nom ?? '—'}</span>
             <span className="col">{o.poids || '—'}</span>
-            <span className="col">{o.valeur ?? '—'}</span>
+            <span className="col">{ditMontant(o.prix, monnaies) || '—'}</span>
             <span className="col">
               {n > 0
                 ? `${n} · ${o.placements.length} endroit${o.placements.length > 1 ? 's' : ''}`
@@ -945,10 +1035,15 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
   const s = useStore()
   const [nom, setNom] = useState(o.nom)
   const [poids, setPoids] = useState(o.poids ?? '')
-  const [valeur, setValeur] = useState(o.valeur == null ? '' : String(o.valeur))
+  /* Le prix se tape monnaie par monnaie ; chaque case garde sa frappe. */
+  const [prix, setPrix] = useState<Record<string, string>>(() =>
+    Object.fromEntries(Object.entries(o.prix ?? {}).map(([k, n]) => [k, String(n)]))
+  )
+  const monnaies = monnaiesActives(s.reglages.monnaies)
   const [vu, setVu] = useState(o.vu)
   const [su, setSu] = useState(o.su)
   const [image, setImage] = useState(false)
+  const [rogner, setRogner] = useState(false)
   const [effetOuvert, setEffetOuvert] = useState<{
     x: number
     y: number
@@ -957,9 +1052,13 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
     x: number
     y: number
   } | null>(null)
+  const [demande, setDemande] = useState<'supprimer' | 'ranger' | null>(null)
   const frappe = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => () => void (frappe.current && clearTimeout(frappe.current)), [])
+
+  /* Ses exemplaires qui ont quitté leur emplacement initial — corbeille comprise. */
+  const aRanger = [...o.placements, ...o.corbeille].filter((p) => p.deplace && p.initial)
 
   const famille = s.objetFamilles.find((f) => f.id === o.familleId) ?? null
 
@@ -983,6 +1082,9 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
   const img = itemById(s.allItems, o.imageItemId)
   const urlImage = img?.poster ?? img?.url ?? null
   const totalPose = o.placements.reduce((t, p) => t + p.qte, 0)
+  /* Ce qu'on tape dans la quantité, recalé sur l'objet dès qu'il change. */
+  const [qteTapee, setQteTapee] = useState(String(o.qte))
+  useEffect(() => setQteTapee(String(o.qte)), [o.qte])
   /* Son image dans la Pochette, pour toute la table. */
   const enPoche = img
     ? (s.pochette.find((d) => d.itemId === img.id && d.playerId == null) ?? null)
@@ -1024,14 +1126,24 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
       <div className="pane-body flush">
         <div className={`fiche-vign c-${famille?.teinte ?? 'neutral'}`}>
           {urlImage ? (
-            <img src={urlImage} alt={o.nom} />
+            /* L'image entière, ajustée au bandeau : le recadrage ne sert
+               qu'aux vignettes carrées de la réserve. */
+            <img src={urlImage} alt={o.nom} draggable={false} />
           ) : (
             glypheObjet(famille?.glyphe ?? 'outils', 'grand')
           )}
-          <button className="changer" onClick={() => setImage(true)}>
-            <IconImage />
-            {urlImage ? 'changer l’image' : 'une image de la bibliothèque'}
-          </button>
+          <span className="vign-actions">
+            {urlImage ? (
+              <button className="changer" onClick={() => setRogner(true)} title="Choisir la partie de l’image que montre la fiche">
+                <IconCrop />
+                recadrer
+              </button>
+            ) : null}
+            <button className="changer" onClick={() => setImage(true)}>
+              <IconImage />
+              {urlImage ? 'changer l’image' : 'une image de la bibliothèque'}
+            </button>
+          </span>
         </div>
 
         {/* ---- identité ---- */}
@@ -1068,7 +1180,7 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
             </label>
 
             <label className="champ">
-              <span>Quantité</span>
+              <span>Type</span>
               <select
                 value={o.unique ? 'unique' : 'pile'}
                 onChange={(e) => pose({ unique: e.target.value === 'unique' })}
@@ -1080,17 +1192,37 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
 
             {!o.unique ? (
               <label className="champ">
-                <span>Par défaut</span>
+                <span>Quantité</span>
                 <input
                   type="number"
-                  min={1}
-                  value={o.qte}
+                  min={Math.max(1, totalPose)}
+                  value={qteTapee}
                   onChange={(e) => {
                     const n = Number(e.target.value)
-                    if (Number.isNaN(n)) return
-                    tape({ qte: Math.max(1, Math.trunc(n)) })
+                    setQteTapee(e.target.value)
+                    if (Number.isNaN(n) || e.target.value === '') return
+                    /* Pas en dessous de ce qui est déjà posé : on retire
+                       d'abord un exemplaire de son emplacement. */
+                    const voulu = Math.max(1, Math.trunc(n))
+                    if (frappe.current) clearTimeout(frappe.current)
+                    frappe.current = setTimeout(() => {
+                      if (voulu < totalPose) {
+                        setQteTapee(String(o.qte))
+                        s.toast(
+                          `${totalPose} exemplaires sont posés : retire-en d’abord d’un emplacement pour descendre à ${voulu}.`,
+                          true
+                        )
+                        return
+                      }
+                      setQteTapee(String(voulu))
+                      void enregistre({ qte: voulu })
+                    }, 400)
                   }}
-                  title="Combien on en pose d’un coup"
+                  title={
+                    totalPose > 1
+                      ? `Combien on en pose d’un coup — pas moins que les ${totalPose} déjà posés`
+                      : 'Combien on en pose d’un coup — et le plus qu’un inventaire peut en tenir'
+                  }
                 />
               </label>
             ) : null}
@@ -1107,28 +1239,42 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
               />
             </label>
 
-            {/* La valeur est un nombre ; l'unité appartient à la campagne et se
-                lit en suffixe. On ne retape pas « francs » seize fois, et les
-                totaux restent calculables. */}
-            <label className="champ">
-              <span>Valeur</span>
-              <span className="champ-suffixe">
-                <input
-                  inputMode="decimal"
-                  value={valeur}
-                  placeholder="—"
-                  aria-label={`Valeur en ${s.uniteValeur}`}
-                  onChange={(e) => {
-                    setValeur(e.target.value)
-                    const n = Number(e.target.value.replace(',', '.'))
-                    tape({
-                      valeur: e.target.value.trim() && Number.isFinite(n) ? n : null
-                    })
-                  }}
-                />
-                <span className="unite">{s.uniteValeur}</span>
-              </span>
-            </label>
+            {/* La valeur se dit dans les monnaies de la campagne, réglées une
+                fois dans la fiche de campagne : un nombre par monnaie. Sans
+                monnaie, la campagne n'a pas de prix. */}
+            {monnaies.length > 0 ? (
+              <div className="champ">
+                <span>Valeur</span>
+                <div className="prix-objet">
+                  {monnaies.map((m) => {
+                    const img = itemById(s.allItems, m.imageItemId)
+                    return (
+                      <label className="champ-suffixe" key={m.key} title={m.nom}>
+                        <Piece teinte={m.teinte} url={img?.url ?? null} taille={18} />
+                        <input
+                          inputMode="decimal"
+                          value={prix[m.key] ?? ''}
+                          placeholder="0"
+                          aria-label={`Valeur en ${m.nom}`}
+                          onChange={(e) => {
+                            const suite = { ...prix, [m.key]: e.target.value }
+                            setPrix(suite)
+                            const p: Record<string, number> = { ...(o.prix ?? {}) }
+                            for (const [k, t] of Object.entries(suite)) {
+                              const n = Number(t.replace(',', '.'))
+                              if (t.trim() && Number.isFinite(n) && n !== 0) p[k] = n
+                              else delete p[k]
+                            }
+                            tape({ prix: Object.keys(p).length ? p : null })
+                          }}
+                        />
+                        <span className="unite">{m.abbr || m.nom}</span>
+                      </label>
+                    )
+                  })}
+                </div>
+              </div>
+            ) : null}
           </div>
         </div>
 
@@ -1258,6 +1404,28 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
             {o.effets.map((e) => (
               <span className="effet" key={e.id}>
                 <b>{e.tete}</b>
+                {/* Une lumière : sa couleur, qu'on change d'un clic sur la
+                    pastille — même un effet posé avant qu'on puisse la choisir. */}
+                {estLumiere(e.tete) ? (
+                  <label
+                    className="effet-teinte"
+                    style={{ background: e.teinte ?? '#ffffff' }}
+                    title="La couleur de sa lumière — clic pour la changer"
+                  >
+                    <input
+                      type="color"
+                      value={e.teinte ?? '#ffffff'}
+                      aria-label={`Couleur de la lumière de ${o.nom}`}
+                      onChange={(ev) =>
+                        tape({
+                          effets: o.effets.map((x) =>
+                            x.id === e.id ? { ...x, teinte: ev.target.value } : x
+                          )
+                        })
+                      }
+                    />
+                  </label>
+                ) : null}
                 {e.detail}
                 <button
                   className="x"
@@ -1304,6 +1472,23 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
               ))}
             </div>
           )}
+          {o.corbeille.length > 0 ? (
+            <div className="ou-liste rgm-fiche-jetes">
+              {o.corbeille.map((p) => (
+                <div key={p.id} className="ou-ligne jete">
+                  <span className="ou-port">
+                    <IconTrash />
+                  </span>
+                  <span className="ou-txt">
+                    <span className="ou-cible">
+                      Corbeille{p.qte > 1 ? <b className="num"> ×{p.qte}</b> : null}
+                    </span>
+                    <Depart p={p} />
+                  </span>
+                </div>
+              ))}
+            </div>
+          ) : null}
         </div>
       </div>
 
@@ -1339,30 +1524,84 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
           <IconPochette />
           {enPoche ? (enPoche.visible ? 'Pochette · montrée' : 'Pochette · masquée') : 'Pochette'}
         </button>
+        <button
+          className="btn btn-sm"
+          disabled={aRanger.length === 0}
+          onClick={() => setDemande('ranger')}
+          title={
+            aRanger.length === 0
+              ? 'Il est à son emplacement initial'
+              : 'Remettre ses exemplaires là où on les avait rangés au départ'
+          }
+        >
+          <IconRetour />
+          Ranger à sa place
+        </button>
         <div className="spacer" />
         <button
-          className="btn btn-ghost btn-sm"
-          title="Repartir de celui-ci — la description suit, pas les exemplaires posés"
-          onClick={async () => {
-            const copie = await window.jdr.objets.copy(o.id)
-            await s.refreshObjets()
-            if (copie) s.setCurrentObjet(copie.id)
-          }}
-        >
-          Dupliquer
-        </button>
-        <button
           className="btn btn-ghost btn-sm btn-danger"
-          title="Retirer de la réserve — avec tous ses exemplaires posés"
-          aria-label="Retirer de la réserve"
-          onClick={async () => {
-            await window.jdr.objets.remove(o.id)
-            await s.refreshObjets()
-          }}
+          title="Supprimer définitivement — avec tous ses exemplaires posés"
+          aria-label="Supprimer définitivement"
+          onClick={() => setDemande('supprimer')}
         >
           <IconTrash />
         </button>
       </div>
+
+      {demande === 'supprimer' ? (
+        <Confirmer
+          danger
+          titre={`Supprimer « ${o.nom} » définitivement ?`}
+          oui="Supprimer"
+          onNon={() => setDemande(null)}
+          onOui={async () => {
+            await window.jdr.objets.remove(o.id)
+            await s.refreshObjets()
+          }}
+        >
+          <p className="rgm-aide">
+            {o.placements.length + o.corbeille.length === 0
+              ? 'Il disparaît de la réserve. Cela ne se défait pas.'
+              : `Il disparaît de la réserve, et avec lui ses ${
+                  o.placements.length + o.corbeille.length
+                } exemplaire${o.placements.length + o.corbeille.length > 1 ? 's' : ''} — dans les lieux, les sacs, les inventaires, la corbeille. Cela ne se défait pas.`}
+          </p>
+        </Confirmer>
+      ) : demande === 'ranger' ? (
+        <Confirmer
+          titre={`Ranger « ${o.nom} » à sa place ?`}
+          oui="Ranger"
+          onNon={() => setDemande(null)}
+          onOui={async () => {
+            await window.jdr.objets.ranger(aRanger.map((p) => p.id))
+            await s.refreshObjets()
+            setDemande(null)
+          }}
+        >
+          <ul className="rgm-recap">
+            {aRanger.map((p) => (
+              <li key={p.id}>
+                {p.port === 'corbeille' ? 'Corbeille' : p.cible}
+                {p.qte > 1 ? ` ×${p.qte}` : ''} → <b>{ditInitial(p.initial)}</b>
+              </li>
+            ))}
+          </ul>
+        </Confirmer>
+      ) : null}
+
+      {rogner && urlImage ? (
+        <RognageCarre
+          titre={`Recadrer l’image — ${o.nom}`}
+          url={urlImage}
+          cadre={o.imageCadre}
+          rapport={16 / 7}
+          onClose={() => setRogner(false)}
+          onValider={async (cadre) => {
+            setRogner(false)
+            await enregistre({ imageCadre: cadre })
+          }}
+        />
+      ) : null}
 
       {image ? (
         <ChoixDansArbre
@@ -1412,6 +1651,9 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
 function LignePlacement({ o, p }: { o: Objet; p: ObjetPlacement }): JSX.Element {
   const s = useStore()
   const [precis, setPrecis] = useState(p.precision ?? '')
+  /* Ce qu'on tape dans le nombre, recalé sur l'exemplaire dès qu'il change. */
+  const [qteTapee, setQteTapee] = useState(String(p.qte))
+  useEffect(() => setQteTapee(String(p.qte)), [p.qte])
   const [donne, setDonne] = useState<{ x: number; y: number } | null>(null)
   const frappe = useRef<ReturnType<typeof setTimeout> | null>(null)
   useEffect(() => () => void (frappe.current && clearTimeout(frappe.current)), [])
@@ -1453,7 +1695,10 @@ function LignePlacement({ o, p }: { o: Objet; p: ObjetPlacement }): JSX.Element 
       </span>
 
       <span className="ou-txt">
-        <span className="ou-cible">{p.cible}</span>
+        <span className="ou-cible">
+          {p.cible}
+        </span>
+        <Depart p={p} />
         <input
           className="ou-precis"
           value={precis}
@@ -1477,13 +1722,22 @@ function LignePlacement({ o, p }: { o: Objet; p: ObjetPlacement }): JSX.Element 
           className="ou-qte num"
           type="number"
           min={1}
-          value={p.qte}
+          max={Math.max(p.qte, o.qte)}
+          value={qteTapee}
           aria-label={`Combien à ${p.cible}`}
+          title={`Pas plus que sa quantité : ${o.qte}`}
           onChange={(e) => {
             const n = Number(e.target.value)
-            if (Number.isNaN(n)) return
+            setQteTapee(e.target.value)
+            if (Number.isNaN(n) || e.target.value === '') return
+            /* Pas au-delà de la quantité de l'objet — ce qui la dépassait
+               déjà peut seulement descendre. */
+            const borne = Math.min(Math.max(1, Math.trunc(n)), Math.max(p.qte, o.qte))
             if (frappe.current) clearTimeout(frappe.current)
-            frappe.current = setTimeout(() => void maj({ qte: Math.max(1, Math.trunc(n)) }), 400)
+            frappe.current = setTimeout(() => {
+              setQteTapee(String(borne))
+              void maj({ qte: borne })
+            }, 400)
           }}
         />
       ) : null}
@@ -1518,12 +1772,19 @@ function LignePlacement({ o, p }: { o: Objet; p: ObjetPlacement }): JSX.Element 
         <IconDonner />
       </button>
 
+      {/* Ce qu'on retire à un joueur part à la corbeille ; ailleurs, on
+          défait seulement la pose. */}
       <button
         className="ou-retire"
-        title="Le reprendre d’ici — l’objet reste en réserve"
+        title={
+          p.port === 'pj'
+            ? 'Le lui retirer — il part à la corbeille'
+            : 'Le reprendre d’ici — l’objet reste en réserve'
+        }
         aria-label={`Reprendre de ${p.cible}`}
         onClick={async () => {
-          await window.jdr.objets.reprendre(p.id)
+          if (p.port === 'pj') await window.jdr.objets.jeter(p.id)
+          else await window.jdr.objets.reprendre(p.id)
           await s.refreshObjets()
         }}
       >
@@ -1561,6 +1822,16 @@ function PanneauPoser({
 }): JSX.Element {
   const s = useStore()
   const [q, setQ] = useState('')
+  const objet = s.objets.find((o) => o.id === objetId) ?? null
+  /* Un objet qui se compte : on choisit d'abord où, puis combien. */
+  const [cible, setCible] = useState<{
+    port: PortObjet
+    placeId: number | null
+    characterId: number | null
+    nom: string
+  } | null>(null)
+  const [combien, setCombien] = useState(objet?.qte ?? 1)
+  const max = Math.max(1, objet?.qte ?? 1)
 
   /* On cherche comme on parle : sans les accents ni les majuscules —
      « cave » trouve « Cave à vin », « Caveau ». */
@@ -1573,21 +1844,79 @@ function PanneauPoser({
   const pnjs = s.characters.filter((c) => c.kind === 'pnj' && garde(c.name))
   const pjs = s.characters.filter((c) => c.kind !== 'pnj' && c.present && garde(c.name))
 
-  const poser = async (
+  const poserVraiment = async (
     port: PortObjet,
     placeId: number | null,
-    characterId: number | null
+    characterId: number | null,
+    qte?: number
   ): Promise<void> => {
     onClose()
-    await window.jdr.objets.poser({ objetId, port, placeId, characterId })
+    await window.jdr.objets.poser({ objetId, port, placeId, characterId, qte })
     await s.refreshObjets()
+  }
+  const poser = (
+    port: PortObjet,
+    placeId: number | null,
+    characterId: number | null,
+    nom: string
+  ): void => {
+    if (objet && !objet.unique && max > 1) {
+      setCombien(max)
+      setCible({ port, placeId, characterId, nom })
+    } else void poserVraiment(port, placeId, characterId)
   }
 
   /* Entrée pose dans le premier qui répond : un mot, Entrée, c'est posé. */
   const premier = (): void => {
-    if (lieux[0]) void poser('lieu', lieux[0].id, null)
-    else if (pnjs[0]) void poser('pnj', null, pnjs[0].id)
-    else if (pjs[0]) void poser('pj', null, pjs[0].id)
+    if (lieux[0]) poser('lieu', lieux[0].id, null, lieux[0].name)
+    else if (pnjs[0]) poser('pnj', null, pnjs[0].id, pnjs[0].name)
+    else if (pjs[0]) poser('pj', null, pjs[0].id, pjs[0].name)
+  }
+
+  if (cible) {
+    const n = Math.min(max, Math.max(1, combien || 1))
+    const valider = (): void => void poserVraiment(cible.port, cible.placeId, cible.characterId, n)
+    return (
+      <Pop x={x} y={y} onClose={onClose} className="poser-combien">
+        <span className="eyebrow">
+          {cible.port === 'lieu' ? 'Dans' : cible.port === 'pnj' ? 'Butin de' : 'Sac de'} {cible.nom}
+        </span>
+        <label className="pc-ligne">
+          <span>Combien&nbsp;?</span>
+          <span className="inv-qte">
+            <button disabled={n <= 1} onClick={() => setCombien(n - 1)} aria-label="Un de moins">
+              −
+            </button>
+            <input
+              className="num"
+              type="number"
+              min={1}
+              max={max}
+              autoFocus
+              value={combien}
+              onFocus={(e) => e.currentTarget.select()}
+              onChange={(e) => setCombien(Math.trunc(Number(e.target.value)) || 0)}
+              onKeyDown={(e) => e.key === 'Enter' && valider()}
+              aria-label="Combien en poser"
+            />
+            <button disabled={n >= max} onClick={() => setCombien(n + 1)} aria-label="Un de plus">
+              +
+            </button>
+          </span>
+          <span className="pc-sur num">sur {max}</span>
+        </label>
+        <div className="pc-pied">
+          <button className="btn btn-sm btn-ghost" onClick={() => setCible(null)}>
+            Retour
+          </button>
+          <div className="spacer" />
+          <button className="btn btn-sm btn-brass" onClick={valider}>
+            <IconPoser />
+            Poser {n}
+          </button>
+        </div>
+      </Pop>
+    )
   }
 
   const rien = (quoi: string): JSX.Element => (
@@ -1612,7 +1941,7 @@ function PanneauPoser({
       <span className="eyebrow">Dans un lieu</span>
       {lieux.length === 0 ? rien('Aucun lieu dans la campagne.') : null}
       {lieux.map((l) => (
-        <button key={l.id} className="opt" onClick={() => void poser('lieu', l.id, null)}>
+        <button key={l.id} className="opt" onClick={() => poser('lieu', l.id, null, l.name)}>
           {l.name}
         </button>
       ))}
@@ -1621,7 +1950,7 @@ function PanneauPoser({
       <span className="eyebrow">Dans le butin d’un PNJ</span>
       {pnjs.length === 0 ? rien('Aucun PNJ.') : null}
       {pnjs.map((c) => (
-        <button key={c.id} className="opt" onClick={() => void poser('pnj', null, c.id)}>
+        <button key={c.id} className="opt" onClick={() => poser('pnj', null, c.id, c.name)}>
           {c.name}
         </button>
       ))}
@@ -1630,7 +1959,7 @@ function PanneauPoser({
       <span className="eyebrow">Dans le sac d’un joueur</span>
       {pjs.length === 0 ? rien('Aucun personnage joueur.') : null}
       {pjs.map((c) => (
-        <button key={c.id} className="opt" onClick={() => void poser('pj', null, c.id)}>
+        <button key={c.id} className="opt" onClick={() => poser('pj', null, c.id, c.name)}>
           {c.name}
         </button>
       ))}
@@ -1665,19 +1994,21 @@ function PanneauEffet({
 
   const cibles = [
     ...(s.sheet?.spec.stats ?? []).map((x) => x.label),
-    ...(s.sheet?.spec.skills ?? []).map((x) => x.label)
+    ...(s.sheet?.spec.sansCompetences ? [] : (s.sheet?.spec.skills ?? [])).map((x) => x.label)
   ]
 
   /* « Éclaire », « Lumière » : la tête que lit la régie pour faire une torche
      de l'objet porté (voir porteursDeLumiere). Le détail n'est alors qu'une
      portée en mètres — on la règle au curseur plutôt que de taper « 9 m » ;
      l'échelle de chaque plan la change en part de la carte. */
-  const sansAccents = tete.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
-  const eclaire = sansAccents.startsWith('eclair') || sansAccents.startsWith('lumi')
+  const eclaire = estLumiere(tete)
   const [rayon, setRayon] = useState(9)
   /* Le faisceau, en degrés : 360, tout autour ; moins, une lampe de poche
      tournée comme le pion. La régie le relit dans « cône 30° ». */
   const [ouverture, setOuverture] = useState(360)
+  /* La couleur de la lueur, les mêmes choix qu'une lampe du plan. Jaune
+     d'abord : c'est une flamme qu'on tient le plus souvent. */
+  const [teinte, setTeinte] = useState(TEINTES_LUMIERE[1].cle)
 
   const poser = (): void => {
     const t = tete.trim()
@@ -1687,7 +2018,8 @@ function PanneauEffet({
       tete: t,
       detail: eclaire
         ? `${String(rayon).replace('.', ',')} m${ouverture < 360 ? ` · cône ${ouverture}°` : ''}`
-        : detail.trim()
+        : detail.trim(),
+      ...(eclaire ? { teinte } : {})
     })
   }
 
@@ -1765,11 +2097,36 @@ function PanneauEffet({
                 </button>
               ))}
             </div>
-            <DemoLueur rayon={rayon} ouverture={ouverture} />
+            <span className="eyebrow">Couleur de la lumière</span>
+            <div className="murs-teintes">
+              {TEINTES_LUMIERE.map((t) => (
+                <button
+                  key={t.cle}
+                  className={`lteinte${teinte === t.cle ? ' on' : ''}`}
+                  style={{ ['--t' as string]: t.cle } as React.CSSProperties}
+                  aria-pressed={teinte === t.cle}
+                  title={`${t.label} — la couleur ne change rien à ce qui est vu`}
+                  onClick={() => setTeinte(t.cle)}
+                >
+                  <i />
+                  {t.label}
+                </button>
+              ))}
+              <label
+                className={`lteinte libre${TEINTES_LUMIERE.some((t) => t.cle === teinte) ? '' : ' on'}`}
+                style={{ ['--t' as string]: teinte } as React.CSSProperties}
+                title="Une couleur à toi"
+              >
+                <i />
+                La tienne
+                <input type="color" value={teinte} onChange={(e) => setTeinte(e.target.value)} />
+              </label>
+            </div>
+            <DemoLueur rayon={rayon} ouverture={ouverture} teinte={teinte} />
             <span className="note">
               {ouverture < 360
-                ? 'Porté en main par un personnage, l’objet éclaire droit devant lui, dans le sens où son pion regarde ; les murs arrêtent le faisceau. Une lampe de poche : 10 m, 30°.'
-                : 'Porté en main par un personnage, l’objet l’éclaire tout autour, à l’échelle du plan ; les murs arrêtent la lueur. Une torche ordinaire : 9 m.'}
+                ? 'Posé sur un emplacement d’un personnage — en main, à la ceinture —, l’objet éclaire droit devant lui, dans le sens où son pion regarde ; les murs arrêtent le faisceau. Dans le sac, il n’éclaire pas. Une lampe de poche : 10 m, 30°.'
+                : 'Posé sur un emplacement d’un personnage — en main, à la ceinture —, l’objet l’éclaire tout autour, à l’échelle du plan ; les murs arrêtent la lueur. Dans le sac, il n’éclaire pas. Une torche ordinaire : 9 m.'}
             </span>
           </div>
         ) : (
@@ -1851,7 +2208,15 @@ function PlanDemo(): JSX.Element {
 /** Le personnage de l'exemple regarde vers la porte, à droite. */
 const DEMO_CAP = 90
 
-function DemoLueur({ rayon, ouverture }: { rayon: number; ouverture: number }): JSX.Element {
+function DemoLueur({
+  rayon,
+  ouverture,
+  teinte
+}: {
+  rayon: number
+  ouverture: number
+  teinte: string
+}): JSX.Element {
   const r = Math.max(1, rayon * DEMO_PAR_M)
   const rond = useMemo(
     () => champDeVision(DEMO_MURS, DEMO_PION, DEMO_CAP, ouverture, r),
@@ -1891,7 +2256,10 @@ function DemoLueur({ rayon, ouverture }: { rayon: number; ouverture: number }): 
       </g>
       <g mask="url(#lueur-demo-m)">
         <PlanDemo />
-        <rect x={0} y={0} width={DEMO_W} height={DEMO_H} fill={TEINTE_TORCHE} opacity={0.16} />
+        {/* Le blanc ne teinte rien, comme sur la carte. */}
+        {teinte.toLowerCase() !== '#ffffff' ? (
+          <rect x={0} y={0} width={DEMO_W} height={DEMO_H} fill={teinte} opacity={0.16} />
+        ) : null}
       </g>
       {sansMur ? (
         <path d={sansMur} className="portee" />
@@ -1972,8 +2340,8 @@ function PanneauReglages({
       </button>
 
       <p className="reglage-ailleurs">
-        L’unité de valeur — francs, pièces d’or, crédits — se nomme une fois dans les
-        paramètres, sous « Table et règles ». Elle vaut pour toute la campagne.
+        Les monnaies — dollars, pièces d’or, crédits — se règlent une fois dans la fiche de
+        campagne, onglet « Monnaies ». Elles valent pour toute la campagne.
       </p>
     </Pop>
   )
@@ -1994,13 +2362,7 @@ function ModaleFamilles({
   const [choisie, setChoisie] = useState<number | null>(depart ?? s.objetFamilles[0]?.id ?? null)
   const fam = s.objetFamilles.find((f) => f.id === choisie) ?? null
 
-  useEffect(() => {
-    const touche = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', touche)
-    return () => window.removeEventListener('keydown', touche)
-  }, [onClose])
+  useEchap(onClose)
 
   return (
     <div className="scrim" onClick={onClose}>

@@ -200,10 +200,10 @@ function LigneAvoir({ a }: { a: Avoir }): JSX.Element {
       <span className="ou">{porte ? nomEmplacement(a.p.emplacement) : 'inventaire'}</span>
       <button
         className="bj-retire"
-        title="Le lui reprendre — il retourne en réserve"
+        title="Le lui retirer — il part à la corbeille"
         aria-label={`Reprendre ${a.o.nom}`}
         onClick={async () => {
-          await window.jdr.objets.reprendre(a.p.id)
+          await window.jdr.objets.jeter(a.p.id)
           await s.refreshObjets()
         }}
       >

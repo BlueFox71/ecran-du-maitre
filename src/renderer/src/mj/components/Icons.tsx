@@ -22,6 +22,17 @@ const box = (children: JSX.Element, p: P): JSX.Element => (
   </svg>
 )
 
+export const IconQr = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <rect x="3.5" y="3.5" width="6" height="6" rx="0.5" />
+      <rect x="14.5" y="3.5" width="6" height="6" rx="0.5" />
+      <rect x="3.5" y="14.5" width="6" height="6" rx="0.5" />
+      <path d="M14.5 14.5h2.5v2.5M20.5 14.5v0M14.5 20.5h2.5M20.5 18v2.5" />
+    </>,
+    p
+  )
+
 export const IconScreen = (p: P = {}): JSX.Element =>
   box(
     <>
@@ -430,6 +441,27 @@ export const IconRetour = (p: P = {}): JSX.Element =>
 
 export const IconStop = (p: P = {}): JSX.Element =>
   box(<rect x="6" y="6" width="12" height="12" rx="1.5" />, p)
+
+/* Le son : lire, suspendre, la note de la sonothèque, et le téléphone qui vibre. */
+export const IconLecture = (p: P = {}): JSX.Element => box(<path d="M8 5.5v13l10.5-6.5z" />, p)
+export const IconPause = (p: P = {}): JSX.Element => box(<path d="M8.5 6v12M15.5 6v12" />, p)
+export const IconNote = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M9 17.5V6l10-2v11.5" />
+      <circle cx="6.5" cy="17.5" r="2.5" />
+      <circle cx="16.5" cy="15.5" r="2.5" />
+    </>,
+    p
+  )
+export const IconVibre = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <rect x="8" y="4" width="8" height="16" rx="1.5" />
+      <path d="M4.5 9v6M19.5 9v6M2 10.5v3M22 10.5v3" />
+    </>,
+    p
+  )
 
 /** Icône correspondant au type d'un élément de bibliothèque. */
 export function kindIcon(kind: string, className = 'ico'): JSX.Element {

@@ -17,7 +17,7 @@
  * yeux et la taille de l'image, il rend du noir.
  */
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
-import { FORCE_ASTRE, type CalqueBrouillard } from '@shared/types'
+import { FORCE_ASTRE, lumiereCommande, nuitNoire, type CalqueBrouillard } from '@shared/types'
 import { formesDesMurs } from '@shared/pieces'
 import { bordsOuverture } from '@shared/ouvertures'
 import {
@@ -69,6 +69,83 @@ export interface Oeil {
 /** Ce qu'on a au bout des bras, même dans le noir : en part de la largeur. */
 const A_PORTEE = 0.018
 
+/** La couleur d'une lueur éclaircit sans repeindre — comme `.lueur-teinte`. */
+const TEINTE_LUEUR = { opacity: 0.22, mixBlendMode: 'soft-light', pointerEvents: 'none' } as const
+
+/** Une lueur qui a une couleur à dire : le blanc ne teinte rien. */
+const aUneTeinte = (l: Lueur): boolean =>
+  !!l.teinte && !['#fff', '#ffffff'].includes(l.teinte.toLowerCase())
+
+/**
+ * Une part de ce que voient les joueurs : un point y est s'il tombe dans
+ * **tous** ses polygones — un regard seul, ou un regard et la lueur d'une
+ * lampe à la fois, la nuit.
+ */
+export type ZoneVue = Pt[][]
+
+/**
+ * Les champs de vision des joueurs, en pixels de l'image : le même calcul que
+ * l'ombre ci-dessous (murs, portée, lampe portée), sans rien dessiner. Il sert
+ * à ne montrer un pion « au regard » que s'il tombe dans l'un d'eux — sur la
+ * table, le moniteur et les téléphones, qui doivent dire la même chose.
+ */
+export function regardsDes(calque: CalqueBrouillard, yeux: Oeil[], w: number, h: number): ZoneVue[] {
+  if (w <= 0 || h <= 0 || !yeux.length) return []
+  const enPx = (p: [number, number]): Pt => ({ x: p[0] * w, y: p[1] * h })
+  const murs = barrieres(calque.murs, 'vue', enPx, calque.ouvertures).concat(bords(w, h))
+  const nuit = nuitNoire(calque.astre)
+  /* Sous la lumière, pas de portée : c'est l'éclairage qui borne. */
+  const commande = lumiereCommande(calque)
+  /* Sans ciel qui éclaire le dehors, on ne voit un pion que s'il est à la
+     fois sous une lampe allumée et dans un regard. */
+  const lampesSeules = commande && (!calque.astre || nuit)
+  const lampes = lampesSeules
+    ? calque.lumieres
+        .filter((l) => l.allumee)
+        .map((l) => champDeVision(murs, enPx([l.x, l.y]), l.cap, l.ouverture, l.penombre * w))
+        .filter((pts) => pts.length > 2)
+    : []
+  /* Le regard garde la portée de la carte ; ce qu'il porte éclaire en plus,
+     mais seulement dans son faisceau — une lampe de poche ne fait pas voir
+     tout le cône du regard à sa portée. La nuit, le regard seul ne voit
+     rien : il lui faut une lampe. */
+  return yeux
+    .flatMap((o): ZoneVue[] => {
+      const c = { x: o.x * w, y: o.y * h }
+      const portee = commande ? null : calque.regardPortee
+      const regard = champDeVision(
+        murs,
+        c,
+        o.cap,
+        calque.regardOuverture,
+        portee ? portee * w : Infinity
+      )
+      const faisceaux = calque.porteurs
+        .filter((p) => p.characterId === o.characterId)
+        .map((p) => [champDeVision(murs, c, o.cap, p.ouverture ?? 360, p.rayon * w)])
+      return lampesSeules
+        ? [...faisceaux, ...lampes.map((l) => [regard, l])]
+        : [[regard], ...faisceaux]
+    })
+    .filter((z) => z.every((pts) => pts.length > 2))
+}
+
+/** Ce point est-il dans ce polygone (en pixels de l'image) ? */
+function dansPolygone(pts: Pt[], x: number, y: number): boolean {
+  let dedans = false
+  for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) {
+    const a = pts[i]
+    const b = pts[j]
+    if (a.y > y !== b.y > y && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) dedans = !dedans
+  }
+  return dedans
+}
+
+/** Ce point (en pixels de l'image) est-il sous le regard d'un joueur ? */
+export function sousUnRegard(regards: ZoneVue[], x: number, y: number): boolean {
+  return regards.some((z) => z.every((pts) => dansPolygone(pts, x, y)))
+}
+
 export function Brouillard({
   calque,
   yeux,
@@ -81,13 +158,20 @@ export function Brouillard({
   w: number
   h: number
 }): JSX.Element | null {
-  const { murs, ouvertures, lumieres, lumGarde, regardPortee } = calque
+  const { murs, ouvertures, lumieres, lumGarde } = calque
+  const nuit = nuitNoire(calque.astre)
   /* Ceux qui portent de la lumière, réduits à ceux qui sont sur cette carte :
      un personnage resté au campement n'éclaire pas le manoir. */
   const porteurs = useMemo(
     () => calque.porteurs.filter((p) => yeux.some((o) => o.characterId === p.characterId)),
     [calque.porteurs, yeux]
   )
+  /* Sous la lumière — une lampe, le soleil, la lune, la nuit noire —, on ne
+     distingue rien dans le noir : la portée du regard ne compte plus, seul
+     ce qui est éclairé se voit. Elle ne sert qu'aux cartes sans lumière. */
+  const regardPortee = lumiereCommande({ lumieres, porteurs, astre: calque.astre })
+    ? null
+    : calque.regardPortee
   const enPx = (p: [number, number]): Pt => ({ x: p[0] * w, y: p[1] * h })
 
   const barrieresVue = useMemo(
@@ -99,9 +183,11 @@ export function Brouillard({
   /**
    * Le regard de chaque joueur, arrêté par les murs.
    *
-   * Sa portée est celle de la carte — sauf s'il porte une lampe : il voit
-   * alors aussi loin qu'elle éclaire, et la lampe passe avant le réglage.
-   * `loin`, le même regard sans limite, pour ce qu'une lampe éclaire au-delà.
+   * Sa portée est celle de la carte — sur une carte sans lumière ; sous la
+   * lumière, il n'en a plus, et c'est l'éclairage qui borne ce qu'il voit. Une
+   * lampe portée ne lui fait pas distinguer tout son cône : elle n'éclaire
+   * que son faisceau. `loin`, le même regard sans limite, pour ce qu'une
+   * lampe éclaire au-delà de la portée.
    */
   const regardsY = useMemo(
     () =>
@@ -109,7 +195,9 @@ export function Brouillard({
         ? yeux
             .map((o) => {
               const c = { x: o.x * w, y: o.y * h }
-              const portee = porteurs.find((p) => p.characterId === o.characterId)?.rayon ?? regardPortee
+              /* La portée de la carte, lampe ou pas : ce que la lampe
+                 éclaire plus loin passe par `loin`, sous sa lueur. */
+              const portee = regardPortee
               const pts = champDeVision(barrieresVue, c, o.cap, calque.regardOuverture, portee ? portee * w : Infinity)
               return {
                 c,
@@ -179,20 +267,24 @@ export function Brouillard({
           pts: champDeVision(barrieresVue, c, l.cap, l.ouverture, l.penombre * w),
           c,
           r: l.penombre * w,
-          f: l.clair / l.penombre
+          f: l.clair / l.penombre,
+          teinte: l.teinte
         }
       })
+    /* Chacune de ses lampes : la lampe de poche et la lampe UV éclairent
+       toutes les deux, chacune de sa couleur. */
     for (const o of yeux) {
-      const porte = porteurs.find((p) => p.characterId === o.characterId)
-      if (!porte) continue
       const c = { x: o.x * w, y: o.y * h }
-      ronds.push({
-        /* Une lampe de poche éclaire où le pion regarde. */
-        pts: champDeVision(barrieresVue, c, o.cap, porte.ouverture ?? 360, porte.rayon * w),
-        c,
-        r: porte.rayon * w,
-        f: CLAIR_DE_TORCHE
-      })
+      for (const porte of porteurs.filter((p) => p.characterId === o.characterId)) {
+        ronds.push({
+          /* Une lampe de poche éclaire où le pion regarde. */
+          pts: champDeVision(barrieresVue, c, o.cap, porte.ouverture ?? 360, porte.rayon * w),
+          c,
+          r: porte.rayon * w,
+          f: CLAIR_DE_TORCHE,
+          teinte: porte.teinte
+        })
+      }
     }
     ronds.push(...halosDesLampes(lumieres, barrieresVue, w, h))
     return ronds.filter((l) => l.pts.length > 2)
@@ -208,16 +300,18 @@ export function Brouillard({
    */
   /* Le soleil ou la lune : dehors éclairé, et ce qui entre par les fenêtres. */
   const dehors = useMemo((): Dehors | null => {
-    if (!calque.astre || w <= 0 || h <= 0) return null
+    if (!calque.astre || nuit || w <= 0 || h <= 0) return null
     return {
       dedans: lueurDuDehors(murs, ouvertures, calque.astre.cap, w, h),
       pieces: formesDesMurs(murs).map((f) => f.pts.map(enPx)),
       force: FORCE_ASTRE[calque.astre.nature]
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [calque.astre?.nature, calque.astre?.cap, murs, ouvertures, w, h])
+  }, [calque.astre?.nature, calque.astre?.cap, nuit, murs, ouvertures, w, h])
 
-  const sousLaLampe = lumieres.length > 0 || porteurs.length > 0 || !!dehors
+  /* La nuit noire commande comme une lampe : sans lumière, on ne voit rien —
+     même sur une carte qui n'a encore aucune lampe. */
+  const sousLaLampe = lumiereCommande({ lumieres, porteurs, astre: calque.astre })
 
 
   /* La mémoire de la table : ce qui a été vu et qu'on ne regarde plus. Elle ne
@@ -434,6 +528,17 @@ export function Brouillard({
           </mask>
         ) : null}
       </defs>
+
+      {/* La couleur des lampes, seulement là où l'on voit : une lueur orange
+          dans le dos des joueurs ne les regarde pas. Le blanc ne teinte rien.
+          En styles posés sur l'élément : le téléphone ne charge pas app.css. */}
+      {sousLaLampe && lueurs.some(aUneTeinte) ? (
+        <g mask={`url(#${id}-champ)`} filter={`url(#${id}-flou)`}>
+          {lueurs.filter(aUneTeinte).map((l, i) => (
+            <polygon key={i} points={polygone(l.pts)} fill={l.teinte} style={TEINTE_LUEUR} />
+          ))}
+        </g>
+      ) : null}
 
       {/* Ce qu'on ne voit pas à cet instant : sombre si on l'a déjà vu, noir
           plein sinon. Sans mémoire, il n'y a qu'un seul noir. */}

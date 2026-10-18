@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { enCourt } from './Ident'
 import { IconCheck } from './Icons'
+import { useEchap } from '../echap'
 
 /**
  * La barre de menus, en haut à gauche — là où tous les logiciels la mettent.
@@ -43,16 +44,10 @@ export function Menubar({
     const dehors = (e: MouseEvent): void => {
       if (!barre.current?.contains(e.target as Node)) setOuvert(null)
     }
-    const touche = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setOuvert(null)
-    }
     document.addEventListener('mousedown', dehors)
-    document.addEventListener('keydown', touche)
-    return () => {
-      document.removeEventListener('mousedown', dehors)
-      document.removeEventListener('keydown', touche)
-    }
+    return () => document.removeEventListener('mousedown', dehors)
   }, [ouvert])
+  useEchap(() => setOuvert(null), !!ouvert)
 
   const cmd = (nom: string) => (): void => void window.jdr.app.commande(nom)
   /* Le champ où l'on écrivait avant d'ouvrir le menu : cliquer la barre lui

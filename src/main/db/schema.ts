@@ -1584,5 +1584,189 @@ export const MIGRATIONS: { id: number; sql: string }[] = [
        cinq au plus, tous différents, collés en un seul texte. NULL : aucun. */
     ALTER TABLE character ADD COLUMN emojis TEXT;
     `
+  },
+  {
+    id: 63,
+    sql: `
+    /* Un PNJ montre-t-il aux joueurs qu'il est blessé ou à terre, sur son
+       pion ? Choix du MJ, PNJ par PNJ ; 0 : il garde son état pour lui. */
+    ALTER TABLE character ADD COLUMN etat_visible INTEGER NOT NULL DEFAULT 0;
+    `
+  },
+  {
+    id: 64,
+    sql: `
+    /* Où un exemplaire a été rangé au départ — le lieu, le sac, l'inventaire
+       où on l'a posé — pour l'y remettre d'un geste après la partie. Posé à la
+       création de l'exemplaire, il ne suit pas les « Donner à… ». Une cible
+       supprimée efface la colonne : l'emplacement initial est alors perdu.
+
+       Et la corbeille : un exemplaire jeté a port = 'corbeille', plus aucune
+       cible, mais garde son emplacement initial — on peut l'y ranger, ou le
+       supprimer pour de bon.
+
+       Ce qui existe déjà part d'où il est, sauf ce qui a quitté un lieu : il
+       y retourne, pas encore découvert. */
+    ALTER TABLE objet_placement ADD COLUMN init_port TEXT;
+    ALTER TABLE objet_placement ADD COLUMN init_place_id INTEGER REFERENCES place(id) ON DELETE SET NULL;
+    ALTER TABLE objet_placement ADD COLUMN init_character_id INTEGER REFERENCES character(id) ON DELETE SET NULL;
+    ALTER TABLE objet_placement ADD COLUMN init_inventaire_id INTEGER REFERENCES inventaire(id) ON DELETE SET NULL;
+    ALTER TABLE objet_placement ADD COLUMN init_emplacement TEXT;
+    ALTER TABLE objet_placement ADD COLUMN init_etat TEXT;
+    UPDATE objet_placement
+       SET init_port = 'lieu', init_place_id = origine_place_id, init_etat = 'cache'
+     WHERE origine_place_id IS NOT NULL;
+    UPDATE objet_placement
+       SET init_port = port, init_place_id = place_id, init_character_id = character_id,
+           init_inventaire_id = inventaire_id, init_emplacement = emplacement, init_etat = etat
+     WHERE origine_place_id IS NULL;
+    `
+  },
+  {
+    id: 65,
+    sql: `
+    /* Le prix d'un objet se dit dans les monnaies de la campagne : un nombre
+       par clé de monnaie, en JSON — « {"po": 2, "pa": 5} ». L'ancienne valeur,
+       un nombre dans l'unité de la campagne, passe dans la monnaie par défaut
+       (clé 'piece'), qui prend le nom de cette unité tant que le MJ n'a pas
+       réglé ses monnaies. La colonne valeur reste, dormante. */
+    ALTER TABLE objet ADD COLUMN prix TEXT;
+    UPDATE objet SET prix = json_object('piece', valeur)
+     WHERE valeur IS NOT NULL AND valeur <> 0;
+    `
+  },
+  {
+    id: 66,
+    sql: `
+    /* Une campagne neuve n'a pas de monnaie : le réglage absent veut dire
+       « pas d'argent ». Celles qui existent déjà en avaient une — l'unité de
+       valeur des objets — et la gardent : on l'écrit, active, quand la base a
+       déjà des personnages ou des objets. Une base neuve passe ici vide. */
+    INSERT INTO setting (key, value)
+    SELECT 'monnaies', '{"actif":true}'
+     WHERE NOT EXISTS (SELECT 1 FROM setting WHERE key = 'monnaies')
+       AND (EXISTS (SELECT 1 FROM character) OR EXISTS (SELECT 1 FROM objet));
+    `
+  },
+  {
+    id: 67,
+    sql: `
+    /* Le cadre taillé dans l'image d'un objet pour le bandeau de sa fiche, en
+       fractions de l'image (comme le carré d'un portrait). NULL : l'image au
+       centre. */
+    ALTER TABLE objet ADD COLUMN image_cadre TEXT;
+    `
+  },
+  {
+    id: 68,
+    sql: `
+    /* Un pion montré aux joueurs seulement quand l'un d'eux le regarde : il
+       est sur la carte, mais n'apparaît que dans un champ de vision. 0 : il
+       se montre ou se cache comme avant. */
+    ALTER TABLE pion ADD COLUMN regard INTEGER NOT NULL DEFAULT 0;
+    `
+  },
+  {
+    id: 69,
+    sql: `
+    /* L'allure des pions sur ce plan : le pas le plus long qu'un pouce donne
+       en une seconde, en part de la largeur de l'image. Portée par le plan,
+       comme l'échelle : les pièces d'un étage la partagent. NULL : l'allure
+       d'usine (12 % par seconde). */
+    ALTER TABLE place ADD COLUMN allure REAL;
+    `
+  },
+  {
+    id: 70,
+    sql: `
+    /* Une lampe de poche s'allume et s'eteint.
+
+       Un objet qui eclaire (son effet « Eclaire ») n'eclaire que porte sur un
+       emplacement ; on peut en plus l'eteindre sans le ranger, depuis le
+       paravent ou le telephone. C'est l'exemplaire qui s'eteint, pas le
+       modele : deux lampes de poche ne sont pas liees. Allumee par defaut :
+       une lampe deja en main ne s'eteint pas du jour au lendemain. */
+    ALTER TABLE objet_placement ADD COLUMN eteinte INTEGER NOT NULL DEFAULT 0;
+    `
+  },
+  {
+    id: 71,
+    sql: `
+    /* La sonothèque : les sons de la campagne, rangés en planches.
+
+       Un son n'est pas un fichier : c'est un nom, une nature (ambiance, nappe,
+       bruitage), un volume, des fondus — et un ou plusieurs fichiers de la
+       bibliothèque, dont on tire un au hasard pour qu'une porte ne grince
+       jamais deux fois pareil. Le fichier qui disparaît du disque s'en va de
+       la liste ; le son reste. */
+    CREATE TABLE son (
+      id           INTEGER PRIMARY KEY AUTOINCREMENT,
+      nom          TEXT NOT NULL DEFAULT '',
+      emoji        TEXT,
+      nature       TEXT NOT NULL DEFAULT 'bruitage'
+                   CHECK (nature IN ('ambiance', 'nappe', 'bruitage')),
+      volume       REAL NOT NULL DEFAULT 0.7,
+      fondu_entree REAL NOT NULL DEFAULT 2,
+      fondu_sortie REAL NOT NULL DEFAULT 2,
+      touche       TEXT,
+      planche      TEXT NOT NULL DEFAULT '',
+      vibration    TEXT,
+      ord          INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE TABLE son_fichier (
+      id      INTEGER PRIMARY KEY AUTOINCREMENT,
+      son_id  INTEGER NOT NULL REFERENCES son(id) ON DELETE CASCADE,
+      item_id INTEGER NOT NULL REFERENCES item(id) ON DELETE CASCADE,
+      ord     INTEGER NOT NULL DEFAULT 0,
+      UNIQUE (son_id, item_id)
+    );
+    CREATE INDEX idx_son_fichier ON son_fichier(son_id, ord);
+
+    /* Les sons posés sur un plan : un cercle, et ce qui s'y passe quand un
+       pion y entre. Ils vivent sur le lieu qui porte la carte, comme les
+       lampes, et le suivent quand il est repris dans une autre séance. */
+    CREATE TABLE son_zone (
+      id         INTEGER PRIMARY KEY AUTOINCREMENT,
+      place_id   INTEGER NOT NULL REFERENCES place(id) ON DELETE CASCADE,
+      son_id     INTEGER REFERENCES son(id) ON DELETE SET NULL,
+      nom        TEXT NOT NULL DEFAULT '',
+      x          REAL NOT NULL,
+      y          REAL NOT NULL,
+      rayon      REAL NOT NULL DEFAULT 0.08,
+      quand      TEXT NOT NULL DEFAULT 'chaque' CHECK (quand IN ('une', 'chaque', 'proche')),
+      par        TEXT NOT NULL DEFAULT 'joueurs' CHECK (par IN ('joueurs', 'pnj', 'tous')),
+      temps_mort REAL NOT NULL DEFAULT 10,
+      confirmer  INTEGER NOT NULL DEFAULT 0,
+      vibrer     TEXT NOT NULL DEFAULT 'lui' CHECK (vibrer IN ('aucun', 'lui', 'tous'))
+    );
+    CREATE INDEX idx_son_zone_place ON son_zone(place_id, id);
+    `
+  },
+  {
+    id: 72,
+    sql: `
+    /* Un objet posé sur le plan : son point, en fractions de l'image, comme
+       les murs. Il ne vaut que pour le lieu où il est rangé — qu'il change de
+       lieu ou de mains, le point s'efface. NULL : rangé là, mais nulle part
+       de précis. */
+    ALTER TABLE objet_placement ADD COLUMN pos_x REAL;
+    ALTER TABLE objet_placement ADD COLUMN pos_y REAL;
+    CREATE TRIGGER objet_placement_pos_oubliee
+      AFTER UPDATE OF port, place_id ON objet_placement
+      WHEN NEW.port IS NOT OLD.port OR NEW.place_id IS NOT OLD.place_id
+    BEGIN
+      UPDATE objet_placement SET pos_x = NULL, pos_y = NULL WHERE id = NEW.id;
+    END;
+    `
+  },
+  {
+    id: 73,
+    sql: `
+    /* Un nom pour une porte ou une lampe : « Porte de la cave », « Lustre du
+       salon ». NULL : elle s'appelle comme sa nature. Le nom d'une porte
+       commence toujours par « Porte » — c'est le dépôt qui y veille. */
+    ALTER TABLE ouverture ADD COLUMN nom TEXT;
+    ALTER TABLE lumiere ADD COLUMN nom TEXT;
+    `
   }
 ]

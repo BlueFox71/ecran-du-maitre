@@ -628,7 +628,16 @@ export function usePoseLumiere(placeId: number | null, calque: CalqueBrouillard 
   }
 }
 
-export function BoutonPoserLumiere({ p, petit }: { p: PoseLumiere; petit?: boolean }): JSX.Element {
+export function BoutonPoserLumiere({
+  p,
+  petit,
+  court
+}: {
+  p: PoseLumiere
+  petit?: boolean
+  /** Le nom bref de la colonne d'outils du Paravent. */
+  court?: boolean
+}): JSX.Element {
   return (
     <button
       className={`btn${petit ? ' btn-sm' : ''}${p.arme ? ' btn-on' : ''}`}
@@ -638,7 +647,7 @@ export function BoutonPoserLumiere({ p, petit }: { p: PoseLumiere; petit?: boole
       title={p.raison}
     >
       <IconSoleil />
-      {p.arme ? 'Clique dans la pièce…' : 'Lumière'}
+      {p.arme ? (court ? 'Clique…' : 'Clique dans la pièce…') : court ? 'Lampe' : 'Poser une lampe'}
     </button>
   )
 }

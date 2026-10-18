@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { useEchap } from '../echap'
 
 /* ============================================================
    L'heure d'un moment, sans la taper : un bouton qui affiche « 21h30 »,
@@ -65,16 +66,10 @@ export function SelecteurHeure({
     const dehors = (e: PointerEvent): void => {
       if (!racine.current?.contains(e.target as Node)) setOuvert(false)
     }
-    const echap = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setOuvert(false)
-    }
     window.addEventListener('pointerdown', dehors)
-    window.addEventListener('keydown', echap)
-    return () => {
-      window.removeEventListener('pointerdown', dehors)
-      window.removeEventListener('keydown', echap)
-    }
+    return () => window.removeEventListener('pointerdown', dehors)
   }, [ouvert])
+  useEchap(() => setOuvert(false), ouvert)
 
   return (
     <div className="selheure" ref={racine}>

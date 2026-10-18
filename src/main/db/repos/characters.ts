@@ -1,7 +1,9 @@
 import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { copierLigne } from '../copie'
+import { fixerInitial } from './objets'
 import { couleurLibre, lisCadreCarre } from '@shared/types'
 import { emojisDe } from '@shared/emojis'
+import type { Monnaie } from '@shared/monnaies'
 import type {
   ButinLigne,
   CadreCarre,
@@ -157,7 +159,8 @@ function recadre(data: CharacterData, spec: TemplateSpec): CharacterData {
   for (const st of spec.stats) stats[st.key] = data.stats[st.key] ?? 10
   const skills: Record<string, number> = {}
   for (const sk of spec.skills) if (sk.key in data.skills) skills[sk.key] = data.skills[sk.key]
-  return { gauges, stats, skills, states: data.states, notes: data.notes }
+  /* La bourse ne dépend pas de la fiche : les monnaies sont à la campagne. */
+  return { gauges, stats, skills, states: data.states, notes: data.notes, bourse: data.bourse }
 }
 
 /**
@@ -230,6 +233,7 @@ function toCharacter(r: any): Character {
     sexe: r.sexe === 'femme' ? 'femme' : r.sexe === 'homme' ? 'homme' : null,
     notes: r.notes ?? null,
     butin: lisButin(r.butin),
+    etatVisible: !!r.etat_visible,
     horsJeu: !!r.hors_jeu,
     /* Hors-jeu, on n'est plus à la table — ni présent, ni absent : parti. */
     present: (r.present === undefined ? true : !!r.present) && !r.hors_jeu,
@@ -244,7 +248,7 @@ function toCharacter(r: any): Character {
  */
 const SELECT_PERSO = `
   SELECT c.id, c.template_id, c.name, c.player, c.occupation, c.portrait_item_id,
-         c.portrait_cadre, c.sheet_item_id, c.sheet_frame, c.age, c.biographie, c.lieu_naissance, c.ville, c.emojis, c.color, c.kind, c.sexe, c.notes, c.butin,
+         c.portrait_cadre, c.sheet_item_id, c.sheet_frame, c.age, c.biographie, c.lieu_naissance, c.ville, c.emojis, c.color, c.kind, c.sexe, c.notes, c.butin, c.etat_visible,
          CASE WHEN c.kind = 'pj'
               THEN COALESCE((SELECT cs.data FROM character_seance cs
                               WHERE cs.character_id = c.id AND cs.session_id = @sid), c.data)
@@ -402,7 +406,7 @@ export function preparerSeance(sessionId: number): void {
         for (const o of db
           .prepare(`SELECT id FROM objet_placement WHERE character_id = ? AND session_id = ?`)
           .all(j.id, avant.sid) as { id: number }[])
-          copierLigne('objet_placement', o.id, { session_id: sessionId })
+          fixerInitial(copierLigne('objet_placement', o.id, { session_id: sessionId }))
     }
   })()
 }
@@ -443,7 +447,7 @@ export function copierPnj(id: number, sid: number, jumeaux: Map<number, number> 
   for (const o of db.prepare(`SELECT id FROM objet_placement WHERE character_id = ?`).all(id) as {
     id: number
   }[])
-    copierLigne('objet_placement', o.id, { character_id: neuf, session_id: sid })
+    fixerInitial(copierLigne('objet_placement', o.id, { character_id: neuf, session_id: sid }))
   return neuf
 }
 
@@ -592,6 +596,14 @@ export function setButin(characterId: number, lignes: ButinLigne[]): Character {
   return getCharacter(characterId)!
 }
 
+/** Montrer ou taire l'état d'un PNJ sur son pion. */
+export function setEtatVisible(characterId: number, on: boolean): Character {
+  getDb()
+    .prepare(`UPDATE character SET etat_visible = ?, updated_at = datetime('now') WHERE id = ? AND kind = 'pnj'`)
+    .run(on ? 1 : 0, characterId)
+  return getCharacter(characterId)!
+}
+
 export function removeCharacter(id: number): void {
   getDb().prepare(`DELETE FROM character WHERE id = ?`).run(id)
 }
@@ -631,6 +643,45 @@ export function adjustGauge(
     }
   })()
 
+  return { character: getCharacter(characterId)!, log: characterLog(characterId) }
+}
+
+/**
+ * Faire bouger sa bourse, et le noter au journal — une ligne par monnaie qui
+ * change, à l'heure exacte, comme les jauges. Le champ vaut `bourse:<clé>` :
+ * c'est ce qui la distingue d'une jauge à la lecture. Une bourse ne descend
+ * pas sous zéro.
+ */
+export function bougerBourse(
+  characterId: number,
+  ecarts: Record<string, number>,
+  monnaies: Monnaie[],
+  reason?: string | null
+): { character: Character; log: CharacterLogEntry[] } {
+  const db = getDb()
+  const ch = getCharacter(characterId)
+  if (!ch) throw new Error('Personnage introuvable')
+  const bourse = { ...(ch.data.bourse ?? {}) }
+  const notes: { key: string; label: string; delta: number; value: number }[] = []
+  for (const m of monnaies) {
+    const d = Math.round(ecarts[m.key] ?? 0)
+    if (!d) continue
+    const avant = bourse[m.key] ?? 0
+    const apres = Math.max(0, avant + d)
+    if (apres === avant) continue
+    bourse[m.key] = apres
+    notes.push({ key: m.key, label: m.nom, delta: apres - avant, value: apres })
+  }
+  if (notes.length) {
+    db.transaction(() => {
+      ecrisDonnees(characterId, { ...ch.data, bourse })
+      const ins = db.prepare(
+        `INSERT INTO character_log (character_id, field, label, delta, value, max, reason)
+         VALUES (?, ?, ?, ?, ?, 0, ?)`
+      )
+      for (const n of notes) ins.run(characterId, `bourse:${n.key}`, n.label, n.delta, n.value, reason ?? null)
+    })()
+  }
   return { character: getCharacter(characterId)!, log: characterLog(characterId) }
 }
 

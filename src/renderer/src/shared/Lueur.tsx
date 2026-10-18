@@ -22,6 +22,8 @@ export interface Lueur {
   r: number
   /** La part du rayon où il fait plein jour : clair / pénombre. */
   f: number
+  /** Sa couleur, posée sur ce qu'elle touche ; blanc ou rien, aucune. */
+  teinte?: string
 }
 
 /** Ce qu'il reste de lumière au bord de la pénombre. */
@@ -44,7 +46,14 @@ export const TEINTE_TORCHE = '#ffc23d'
  * autour n'en ont pas besoin.
  */
 export function halosDesLampes(
-  lumieres: { x: number; y: number; ouverture: number; clair: number; allumee: boolean }[],
+  lumieres: {
+    x: number
+    y: number
+    ouverture: number
+    clair: number
+    allumee: boolean
+    teinte?: string
+  }[],
   barrieres: Barriere[],
   w: number,
   h: number
@@ -53,7 +62,13 @@ export function halosDesLampes(
     .filter((l) => l.allumee && l.ouverture < 360 && l.clair > 0)
     .map((l) => {
       const c = { x: l.x * w, y: l.y * h }
-      return { pts: champDeVision(barrieres, c, 0, 360, l.clair * w), c, r: l.clair * w, f: 0 }
+      return {
+        pts: champDeVision(barrieres, c, 0, 360, l.clair * w),
+        c,
+        r: l.clair * w,
+        f: 0,
+        teinte: l.teinte
+      }
     })
 }
 

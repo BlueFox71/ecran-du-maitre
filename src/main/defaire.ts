@@ -55,6 +55,7 @@ const MODULES: Record<string, string> = {
   murs: 'Murs',
   ouvertures: 'Portes et fenêtres',
   lumieres: 'Lumières',
+  sons: 'Sons',
   annotations: 'Repères',
   objets: 'Objets',
   characters: 'Fiches',

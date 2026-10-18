@@ -15,7 +15,7 @@ import type { Lumiere } from '@shared/types'
 
 const SELECT = `
   SELECT l.id, l.place_id AS placeId, l.x, l.y, l.clair, l.penombre, l.allumee, l.teinte,
-         l.icone, l.ouverture, l.cap
+         l.icone, l.ouverture, l.cap, l.nom
     FROM lumiere l`
 
 /** Une couleur qu'on accepte d'écrire : #rgb ou #rrggbb, et rien d'autre. */
@@ -56,7 +56,8 @@ function toLumiere(r: any): Lumiere {
     teinte: teinteSure(r.teinte),
     icone: !!r.icone,
     ouverture: faisceau(r.ouverture),
-    cap: capSur(r.cap)
+    cap: capSur(r.cap),
+    nom: typeof r.nom === 'string' && r.nom.trim() ? r.nom : null
   }
 }
 
@@ -115,6 +116,8 @@ export function updateLumiere(
     icone?: boolean
     ouverture?: number
     cap?: number
+    /** null ou vide : elle redevient « Lumière ». */
+    nom?: string | null
   }
 ): Lumiere | null {
   const av = getLumiere(id)
@@ -127,7 +130,7 @@ export function updateLumiere(
       `UPDATE lumiere
           SET x = @x, y = @y, clair = @clair, penombre = @penombre,
               allumee = @allumee, teinte = @teinte, icone = @icone,
-              ouverture = @ouverture, cap = @cap
+              ouverture = @ouverture, cap = @cap, nom = @nom
         WHERE id = @id`
     )
     .run({
@@ -140,7 +143,9 @@ export function updateLumiere(
       teinte: patch.teinte === undefined ? av.teinte : teinteSure(patch.teinte, av.teinte),
       icone: (patch.icone === undefined ? av.icone : patch.icone) ? 1 : 0,
       ouverture: patch.ouverture === undefined ? av.ouverture : faisceau(patch.ouverture),
-      cap: patch.cap === undefined ? av.cap : capSur(patch.cap)
+      cap: patch.cap === undefined ? av.cap : capSur(patch.cap),
+      nom:
+        patch.nom === undefined ? av.nom : (patch.nom ?? '').trim().slice(0, 80) || null
     })
   return getLumiere(id)
 }
@@ -164,15 +169,19 @@ const LARGEUR_SANS_ECHELLE_M = 60
  * en part de la carte ; les effets d'avant la donnaient en pour-cent
  * (« 20 % »), on les lit encore. Sans portée, c'est une torche ordinaire.
  * Un angle (« cône 30° ») en fait une lampe directive, tournée comme le
- * pion ; sans angle, elle éclaire tout autour.
+ * pion ; sans angle, elle éclaire tout autour. Sa couleur, choisie dans
+ * l'effet, est à part (`teinte`) : ce n'est pas du texte qu'on lit.
  *
  * Seul ce qui est **porté** compte : une lanterne au fond d'un sac n'éclaire
- * personne, et un objet posé dans un lieu n'est pas encore une lampe — celles
+ * personne : il faut qu'il occupe **un emplacement** de la poupée — en main,
+ * à la ceinture. Rangé dans le sac, il reste « porté » mais n'éclaire pas ;
+ * un objet qui ne s'équipe pas n'éclaire donc jamais. Éteinte, une lampe en
+ * main n'éclaire pas non plus —, et un objet posé dans un lieu n'est pas encore une lampe — celles
  * du décor se posent sur le plan, dans la fiche du lieu.
  */
 export function porteursDeLumiere(
   metres: number | null
-): { characterId: number; rayon: number; ouverture: number; objet: string }[] {
+): { characterId: number; rayon: number; ouverture: number; objet: string; teinte: string }[] {
   const sansAccents = (v: string): string =>
     v.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim()
 
@@ -182,13 +191,15 @@ export function porteursDeLumiere(
          FROM objet_placement p
          JOIN objet o ON o.id = p.objet_id
         WHERE p.port = 'pj' AND p.character_id IS NOT NULL AND p.etat = 'porte'
+          AND p.emplacement IS NOT NULL AND p.eteinte = 0
           AND (p.session_id = ? OR p.session_id IS NULL)`
     )
     .all(activeSessionId()) as { characterId: number; nom: string; effets: string | null }[]
 
-  const out: { characterId: number; rayon: number; ouverture: number; objet: string }[] = []
+  const out: { characterId: number; rayon: number; ouverture: number; objet: string; teinte: string }[] =
+    []
   for (const l of lignes) {
-    let effets: { tete?: string; detail?: string }[] = []
+    let effets: { tete?: string; detail?: string; teinte?: string }[] = []
     try {
       const v = JSON.parse(l.effets ?? '[]')
       if (Array.isArray(v)) effets = v
@@ -211,7 +222,10 @@ export function porteursDeLumiere(
       const rayon = Math.min(1.5, Math.max(0.01, part))
       const enDeg = /(\d+)\s*°/.exec(detail)
       const ouverture = enDeg ? faisceau(enDeg[1]) : 360
-      out.push({ characterId: l.characterId, rayon, ouverture, objet: l.nom })
+      /* La couleur choisie dans l'effet ; un effet d'avant n'en a pas : blanc,
+         il garde l'allure qu'il avait. */
+      const teinte = teinteSure(e?.teinte)
+      out.push({ characterId: l.characterId, rayon, ouverture, objet: l.nom, teinte })
       break
     }
   }

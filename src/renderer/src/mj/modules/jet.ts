@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import { templateOf, useStore } from '../store'
 import type { SkillSpec } from '@shared/types'
+import { modificateur } from '@shared/jet'
 
 /**
  * Les faces du dé que la table utilise. La saisie est écrite pour le système
- * maison — d20 + caractéristique — et n'en propose pas d'autre : on recopie le
+ * d20 + modificateur de la caractéristique, et n'en propose pas d'autre : on recopie le
  * dé du joueur, il n'y a rien à choisir.
  */
 export const FACES = 20
@@ -28,6 +29,8 @@ export function useSaisieJet(): {
   setCaracKey: (k: string) => void
   carac: SkillSpec | null
   valeurDe: (key: string) => number
+  /** Ce que la carac ajoute au dé : son modificateur, pas sa valeur. */
+  bonusDe: (key: string) => number
   bonus: number
   valeur: number | null
   setValeur: (v: number | null) => void
@@ -64,6 +67,7 @@ export function useSaisieJet(): {
   )
 
   const valeurDe = (key: string): number => perso?.data.stats[key] ?? 0
+  const bonusDe = (key: string): number => modificateur(perso?.data.stats[key] ?? 10)
 
   /** Un changement de joueur peut changer de gabarit : la carac suit. */
   useEffect(() => {
@@ -75,7 +79,7 @@ export function useSaisieJet(): {
   }, [caracs, caracKey])
 
   const carac = caracs.find((x) => x.key === caracKey) ?? null
-  const bonus = carac ? valeurDe(carac.key) : 0
+  const bonus = carac ? bonusDe(carac.key) : 0
   const pret = !!perso && !!carac && valeur !== null
 
   /**
@@ -105,6 +109,7 @@ export function useSaisieJet(): {
     setCaracKey,
     carac,
     valeurDe,
+    bonusDe,
     bonus,
     valeur,
     setValeur,

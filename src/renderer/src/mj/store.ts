@@ -43,7 +43,9 @@ export type ViewId =
   | 'lib'
   | 'editor'
   | 'places'
+  | 'plans'
   | 'objets'
+  | 'sons'
   | 'timeline'
   | 'trame'
   | 'annexes'
@@ -426,6 +428,12 @@ export const useStore = create<State>((set, get) => ({
     })
     /* Un PNJ réécrit dans son fichier texte, ou né d'un fichier neuf. */
     api.characters.onRelus?.(() => void get().refreshCharacters())
+    /* Un joueur a validé sa préparation : sa fiche vient d'être écrite. */
+    api.prepa.onEcrit((id) => {
+      void get().refreshCharacters()
+      const c = get().characters.find((x) => x.id === id)
+      if (c) get().toast(`${c.name} a validé son personnage`)
+    })
     /* Un joueur vient d'ouvrir un document sur son téléphone. */
     api.pochette.onChanged(() => void get().refreshPochette())
     /* Un joueur vient de ranger une de ses affaires depuis son téléphone : la

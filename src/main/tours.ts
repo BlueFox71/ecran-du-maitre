@@ -12,6 +12,7 @@ import { colorFor, getPion, initialsOf, listPions } from './db/repos/pions'
 import { getItem } from './db/repos/library'
 import { mediaUrl } from './vault'
 import { totalTour } from '@shared/types'
+import { modificateur } from '@shared/jet'
 import type { Character, EntrantTour, EntrantVu, Pion, ToursMj, TourVu } from '@shared/types'
 
 let tours: ToursMj | null = null
@@ -35,7 +36,8 @@ function depuisPerso(c: Character, caracKey: string | null): EntrantTour {
     cadre: portrait ? c.portraitCadre : null,
     initials: initialsOf(c.name),
     de: null,
-    carac: caracKey ? (c.data.stats[caracKey] ?? 0) : 0,
+    /* L'initiative suit la règle des jets : le dé plus le modificateur. */
+    carac: caracKey ? modificateur(c.data.stats[caracKey] ?? 10) : 0,
     montre: true
   }
 }
@@ -131,7 +133,7 @@ export function choisirCarac(key: string | null): ToursMj | null {
   for (const e of tours.entrants) {
     if (e.characterId == null) continue
     const c = chars.getCharacter(e.characterId)
-    if (c) e.carac = key ? (c.data.stats[key] ?? 0) : 0
+    if (c) e.carac = key ? modificateur(c.data.stats[key] ?? 10) : 0
   }
   return publier()
 }

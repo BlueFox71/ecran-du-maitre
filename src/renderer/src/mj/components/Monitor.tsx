@@ -1,9 +1,11 @@
-import { useEffect } from 'react'
+import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { Slide } from '../../shared/Slide'
 import { Pings, usePings } from '../../shared/Pings'
-import { IconEyeOff, IconExpand } from './Icons'
-import type { CollageCell } from '@shared/types'
+import { BandeauTour } from '../../shared/BandeauTour'
+import { montreLaCarte } from '@shared/scene'
+import { IconEyeOff, IconExpand, IconQr } from './Icons'
+import type { CalqueBrouillard, CollageCell } from '@shared/types'
 
 /**
  * Moniteur de l'écran joueurs, en haut à gauche et visible depuis tous les modules.
@@ -14,6 +16,8 @@ export function Monitor(): JSX.Element {
   const screens = useStore((s) => s.screens)
   const setView = useStore((s) => s.setView)
   const toast = useStore((s) => s.toast)
+  const mobile = useStore((s) => s.mobile)
+  const setMobile = useStore((s) => s.setMobile)
 
   /*
    * Les ondes des joueurs se voient ici, et pas seulement en Régie : le
@@ -35,9 +39,34 @@ export function Monitor(): JSX.Element {
   const slide = vue?.slide ?? display?.slide ?? { type: 'black' as const }
   const dark = slide.type === 'black'
   const open = display?.playerOpen ?? false
+  /* La même garde que la fenêtre des joueurs : pas de jetons sur une lettre. */
+  const surCarte = montreLaCarte(slide, display?.carteDuLieu ?? null)
 
   const pillClass = frozen ? 'frozen' : dark ? 'off' : 'on'
   const pillText = frozen ? 'Figé' : dark ? 'Voile noir' : 'Direct'
+
+  /*
+   * Le brouillard et les murs du lieu à l'antenne, que l'écran des joueurs va
+   * chercher de son côté : sans eux, le moniteur montrerait toute la carte là
+   * où la table ne voit que ce qu'elle a découvert. Même relecture que lui.
+   * Pendant un gel, la scène est celle d'avant : on ne sait plus sur quel
+   * calque, on n'en pose pas plutôt que d'en poser un faux.
+   */
+  const [calque, setCalque] = useState<CalqueBrouillard | null>(null)
+  const placeId = frozen ? null : (display?.placeId ?? null)
+  useEffect(() => {
+    let vivant = true
+    if (placeId == null) {
+      setCalque(null)
+      return
+    }
+    void window.jdr.murs.calque(placeId).then((c) => {
+      if (vivant) setCalque(c)
+    })
+    return () => {
+      vivant = false
+    }
+  }, [placeId, display?.calqueRev, display?.slide, display?.pions])
 
   const out = screens.find((x) => x.id === display?.outputDisplayId)
   const fallback = screens.find((x) => !x.primary) ?? screens[0]
@@ -53,7 +82,10 @@ export function Monitor(): JSX.Element {
         <span className="mon-frame">
           <Slide
             slide={slide}
-            pions={vue?.pions ?? display?.pions}
+            brouillard={surCarte ? calque : null}
+            ombre={display?.vision !== 'jour'}
+            jour={display?.vision === 'jour'}
+            pions={surCarte ? (vue?.pions ?? display?.pions) : undefined}
             pionSize={vue?.pionSize ?? display?.pionSize}
             /* Pendant le gel, la caméra est celle du gel : elle a été mise de
                côté avec la scène, et le moniteur montre la scène d'alors. */
@@ -69,13 +101,28 @@ export function Monitor(): JSX.Element {
           {/* Pendant un gel, rien ne part vers les joueurs : une onde n'aurait
               pas lieu d'apparaître sur ce qu'ils voient encore. */}
           {!frozen ? <Pings pings={ondes.pings} /> : null}
+          {/* « Au tour de … », comme en haut de leur écran. */}
+          {!frozen && display?.tour ? <BandeauTour tour={display.tour} /> : null}
+          {/* Le QR des portables, comme les joueurs le voient : par-dessus la
+              scène, qu'il voile sans la remplacer. Le gel ne le retient pas. */}
+          {display?.qr ? (
+            <span className="mon-qr">
+              <span className="mon-qr-carte">
+                <span className="mon-qr-titre">Vos portables</span>
+                <img src={display.qr.dataUrl} alt="" />
+                <span className="mon-qr-url">{display.qr.url}</span>
+              </span>
+            </span>
+          ) : null}
           <span className={`mon-badge live-pill ${pillClass}`}>
             <span className="dot" />
             {pillText}
           </span>
         </span>
         <span className="mon-foot">
-          <span className="mon-name">{slideLabel(slide)}</span>
+          <span className="mon-name">
+            {display?.qr ? `QR des portables · ${slideLabel(slide)}` : slideLabel(slide)}
+          </span>
           <span className="mon-open">Régie ›</span>
         </span>
       </button>
@@ -101,6 +148,25 @@ export function Monitor(): JSX.Element {
           <IconExpand />
           {open ? 'Fermer' : 'Projeter'}
         </button>
+        {/* Le raccourci du QR des portables : tendu à la table d'un clic, accès
+            ouvert au passage s'il ne l'était pas. Le reste vit en Régie. */}
+        <button
+          className={`btn btn-sm btn-c${display?.qr ? ' btn-on' : ''}`}
+          disabled={frozen}
+          aria-pressed={!!display?.qr}
+          aria-label={display?.qr ? 'Retirer le QR code de l’écran' : 'Montrer le QR code des portables'}
+          title={display?.qr ? 'Retirer le QR code de l’écran' : 'Montrer le QR code des portables à la table'}
+          onClick={async () => {
+            try {
+              if (!display?.qr && !mobile?.inviteOpen) setMobile((await window.jdr.mobile.open()).info)
+              setMobile(await window.jdr.mobile.show(!display?.qr))
+            } catch (e) {
+              toast(String(e instanceof Error ? e.message : e).replace(/^Error invoking remote method '[^']+': (Error: )?/, ''), true)
+            }
+          }}
+        >
+          <IconQr />
+        </button>
       </div>
 
       <div className="mon-out">
@@ -125,6 +191,7 @@ export function slideLabel(slide: {
   if (slide.type === 'black') return 'Voile noir'
   if (slide.type === 'presentation') return `Présentation · ${slide.name ?? ''}`
   if (slide.type === 'attente') return slide.titre ?? 'Ça commence bientôt'
+  if (slide.type === 'preparation') return 'Préparation des personnages'
   if (slide.type === 'collage') {
     const pleines = (slide.cells ?? []).filter(Boolean) as CollageCell[]
     if (!pleines.length) return 'Collage vide'

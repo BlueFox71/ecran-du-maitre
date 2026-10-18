@@ -177,6 +177,10 @@ function buildMenu(): void {
    pendant qu'on prépare une séance qu'on a envie de voir une retouche. */
 if (!app.isPackaged) app.setPath('userData', `${app.getPath('userData')} (dev)`)
 
+/* Un son posé sur le plan part quand un téléphone pousse un pion : personne
+   n'a cliqué dans la fenêtre du MJ, et Chromium refuserait de le jouer. */
+app.commandLine.appendSwitch('autoplay-policy', 'no-user-gesture-required')
+
 // Une seule instance : deux processus sur la même base SQLite finiraient mal.
 if (!app.requestSingleInstanceLock()) {
   app.quit()

@@ -4,6 +4,7 @@ import { cheminIcone } from './icone'
 import { getPion, initialsOf, listPionsVus, pionSize } from './db/repos/pions'
 import { listJoueurs, listTemplates } from './db/repos/characters'
 import { getItem } from './db/repos/library'
+import { getPlace } from './db/repos/places'
 import { mediaUrl } from './vault'
 import { COLLAGE_CELLS, ENCART_NEUF, jaugeSanite } from '@shared/types'
 import type {
@@ -38,15 +39,26 @@ const state: DisplayState = {
   frozenView: null,
   calqueRev: 0,
   pionLabels: true,
+  vision: 'regards',
   pionPv: false,
   encart: ENCART_NEUF,
   fenetres: [],
   joueurs: [],
-  audio: { itemId: null, url: null, title: null, playing: false, loop: true, volume: 0.35 },
+  audio: {
+    itemId: null,
+    url: null,
+    title: null,
+    playing: false,
+    loop: true,
+    volume: 0.35,
+    sonId: null,
+    fondu: 2
+  },
   outputDisplayId: null,
   playerOpen: false,
   qr: null,
   placeId: null,
+  carteDuLieu: null,
   pions: [],
   pionSize: 6,
   focusPionId: null,
@@ -208,7 +220,7 @@ export function show(slide: SlidePayload): DisplayState {
  * présentation d'un joueur, l'attente d'avant séance. Les arrêter rend ce
  * qui était là avant le premier d'entre eux.
  */
-const ECRANS_A_PART = new Set<SlidePayload['type']>(['presentation', 'attente'])
+const ECRANS_A_PART = new Set<SlidePayload['type']>(['presentation', 'attente', 'preparation'])
 
 /** Retire la présentation d'un joueur ou l'attente : l'écran revient à ce qu'il montrait avant. */
 export function arreterPresentation(): DisplayState {
@@ -448,6 +460,13 @@ export function setFrozen(on: boolean): DisplayState {
   return state
 }
 
+/** Ombre des regards, ou plein jour : ce que la table voit d'une carte à murs. */
+export function setVision(v: 'regards' | 'jour'): DisplayState {
+  state.vision = v === 'jour' ? 'jour' : 'regards'
+  broadcast()
+  return state
+}
+
 /** Le nom du joueur sous son pion : à la table, tout le monde ne le connaît pas. */
 export function setPionLabels(on: boolean): DisplayState {
   state.pionLabels = on
@@ -582,6 +601,24 @@ export function setPlace(placeId: number | null): DisplayState {
   return state
 }
 
+/**
+ * La carte d'un lieu vient de changer d'image (rognée, redressée, remplacée).
+ *
+ * Ses pions ont été recalés sur la nouvelle : un emplacement qui montrait
+ * l'ancienne la reçoit à son tour, sans quoi les jetons tomberaient à côté —
+ * et, la carte n'étant plus la même, ils ne s'y poseraient plus du tout.
+ */
+export function carteRemplacee(placeId: number, ancienne: number, neuve: SlidePayload): void {
+  if (state.placeId !== placeId && state.pendingPlaceId !== placeId) return
+  for (const i of [0, 1] as const) {
+    const s = state.slots[i]
+    if ((s.type === 'image' || s.type === 'video') && s.itemId === ancienne)
+      state.slots[i] = garderTextes(neuve, s)
+  }
+  if (!state.frozen) sync()
+  refreshPions()
+}
+
 /** Prépare un lieu : il ne prendra effet qu'à la bascule. */
 export function preparePlace(placeId: number | null): DisplayState {
   state.pendingPlaceId = placeId
@@ -601,6 +638,16 @@ export function setFocusPion(id: number | null): DisplayState {
   return state
 }
 
+/**
+ * Qui veut savoir qu'un pion a bougé, ou que le lieu a changé : la régie du
+ * son, qui fait partir les sons posés. Un rappel plutôt qu'un import — elle
+ * dépend de l'écran, pas l'inverse.
+ */
+let apresPions: ((placeId: number | null) => void) | null = null
+export function ecouterPions(f: (placeId: number | null) => void): void {
+  apresPions = f
+}
+
 /** À rappeler après toute modification de pions : l'état vit ici, pas ailleurs. */
 export function refreshPions(): DisplayState {
   /* Les pions vus, et eux seuls. Un pion caché n'entre pas dans l'état de
@@ -609,6 +656,9 @@ export function refreshPions(): DisplayState {
      Pupitre, eux, travaillent sur `pions:of`, qui les rend tous. */
   state.pions = listPionsVus(state.placeId)
   state.pionSize = pionSize(state.placeId)
+  /* Relue ici, là où passe tout changement de lieu : c'est sur elle seule
+     que les écrans posent les pions et l'ombre. */
+  state.carteDuLieu = state.placeId != null ? (getPlace(state.placeId)?.mapItemId ?? null) : null
   /*
    * On ne suit que ce qui est encore là. Le pion retiré, ou resté dans le lieu
    * d'avant, lâche la caméra : mieux vaut un plan large qu'un écran zoomé sur
@@ -620,6 +670,7 @@ export function refreshPions(): DisplayState {
     const suivi = getPion(state.focusPionId)
     if (!suivi || suivi.placeId !== state.placeId) state.focusPionId = null
   }
+  apresPions?.(state.placeId)
   broadcast()
   return state
 }

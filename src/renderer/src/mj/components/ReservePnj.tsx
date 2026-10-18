@@ -11,6 +11,7 @@ import { useEffect, useMemo } from 'react'
 import { useStore } from '../store'
 import { IconClose, IconPeople } from './Icons'
 import type { Character } from '@shared/types'
+import { useEchap } from '../echap'
 
 const cle = (sessionId: number): string => `pions.pnj.${sessionId}`
 
@@ -62,16 +63,13 @@ export function RetirerDeLaReserve({ c, onRetirer }: { c: Character; onRetirer: 
 /**
  * Le choix des PNJ : leurs visages, ceux du moment en cours d'abord. Un clic
  * ajoute, un second retire ; la fenêtre reste ouverte pour en prendre
- * plusieurs. En bas, l'ancien geste du + : un pion sans fiche, nommé à la volée.
+ * plusieurs. Plus de pion sans fiche : un PNJ a toujours la sienne.
  */
 export function ChoixPnj({
   enScene,
-  onSansFiche,
   onClose
 }: {
   enScene: Set<number>
-  /** Absent : pas de lieu choisi, on ne peut pas encore poser de pion sans fiche. */
-  onSansFiche?: () => void
   onClose: () => void
 }): JSX.Element {
   const s = useStore()
@@ -84,13 +82,7 @@ export function ChoixPnj({
     [s.characters, enScene]
   )
 
-  useEffect(() => {
-    const touche = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', touche)
-    return () => document.removeEventListener('keydown', touche)
-  }, [onClose])
+  useEchap(onClose)
 
   return (
     <div className="scrim" onClick={onClose}>
@@ -135,14 +127,6 @@ export function ChoixPnj({
           )}
         </div>
         <footer className="choix-pnj-pied">
-          <button
-            className="btn btn-sm btn-ghost"
-            disabled={!onSansFiche}
-            title={onSansFiche ? 'Un pion nommé à la volée, sans fiche, caché des joueurs' : 'Choisis d’abord un lieu'}
-            onClick={onSansFiche}
-          >
-            + Pion sans fiche…
-          </button>
           <div className="spacer" />
           <button className="btn btn-sm" onClick={onClose}>
             Terminé

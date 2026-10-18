@@ -251,10 +251,10 @@ function LigneSac({ x }: { x: SurLui }): JSX.Element {
       </button>
       <button
         className="x"
-        title="Le lui reprendre — il retourne en réserve"
+        title="Le lui retirer — il part à la corbeille"
         aria-label={`Reprendre ${x.o.nom}`}
         onClick={async () => {
-          await window.jdr.objets.reprendre(x.p.id)
+          await window.jdr.objets.jeter(x.p.id)
           await s.refreshObjets()
         }}
       >

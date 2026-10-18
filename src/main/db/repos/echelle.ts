@@ -12,7 +12,7 @@
  * l'image de l'étage, donc son échelle.
  */
 import { getDb } from '../index'
-import type { EchellePlan } from '@shared/types'
+import { ALLURE_DEFAUT, ALLURE_MAX, ALLURE_MIN, type EchellePlan } from '@shared/types'
 
 /** La largeur d'une porte, dans la réalité. */
 export const PORTE_M = 0.9
@@ -62,6 +62,9 @@ export function echelleDe(placeId: number): EchellePlan {
     .prepare(`SELECT pion_size AS taille, pion_main AS main FROM place WHERE id = ?`)
     .get(placeId) as { taille: number; main: number } | undefined
   const main = !!r?.main
+  const a = getDb().prepare(`SELECT allure FROM place WHERE id = ?`).get(plan) as
+    | { allure: number | null }
+    | undefined
   const aLEchelle =
     metres !== null ? Math.min(PION_MAX, Math.max(PION_MIN, (PION_M / metres) * 100)) : null
   return {
@@ -70,8 +73,18 @@ export function echelleDe(placeId: number): EchellePlan {
     source,
     portes,
     pionMain: main,
-    pionPourcent: !main && aLEchelle !== null ? aLEchelle : (r?.taille ?? 6)
+    pionPourcent: !main && aLEchelle !== null ? aLEchelle : (r?.taille ?? 6),
+    allure: a?.allure ?? ALLURE_DEFAUT,
+    allureReglee: a?.allure != null
   }
+}
+
+/** Régler l'allure des pions de ce plan — ou `null`, revenir à celle d'usine. */
+export function poserAllure(placeId: number, allure: number | null): EchellePlan {
+  const ok =
+    allure !== null && Number.isFinite(allure) ? Math.min(ALLURE_MAX, Math.max(ALLURE_MIN, allure)) : null
+  getDb().prepare(`UPDATE place SET allure = ? WHERE id = ?`).run(ok, planDe(placeId))
+  return echelleDe(placeId)
 }
 
 /** Fixer l'échelle au trait — ou `null`, revenir à l'estimation par les portes. */

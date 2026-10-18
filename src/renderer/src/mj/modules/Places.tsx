@@ -13,13 +13,18 @@
  */
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Valeur } from '../components/Valeur'
+import { urlPortraitMj } from '../../shared/avatarsMj'
+import { nomDuMj } from '@shared/reglages'
 import { createPortal } from 'react-dom'
 import { useStore } from '../store'
 import {
   IconAudio,
   IconCadrage,
+  IconCoffre,
+  IconPorte,
   IconRegle,
   IconCercle,
+  IconNote,
   IconCheck,
   IconChevron,
   IconDoc,
@@ -30,6 +35,7 @@ import {
   IconMurs,
   IconPen,
   IconPlace,
+  glypheObjet,
   IconPlus,
   IconSoleil,
   IconSouris,
@@ -50,7 +56,8 @@ import {
   BarreTrait,
   CalqueMurs,
   VoletMurs,
-  useMurs
+  useMurs,
+  type OngletMurs
 } from '../components/Murs'
 import {
   PARENT_TIERS,
@@ -61,17 +68,21 @@ import {
   type Astre,
   type EchellePlan,
   type Item,
+  type Objet,
+  type ObjetPlacement,
   type Place,
   type PlaceTier,
   type PointMur,
   type Zone
 } from '@shared/types'
+import { ALLURE_DEFAUT, ALLURE_MAX, ALLURE_MIN } from '@shared/types'
 import { boiteDe, centreDe, dansForme, pointInterieur, type Forme } from '@shared/pieces'
-import { carreDAngle, mettreDEquerre, type Pt } from '@shared/murs'
+import { barrieres, carreDAngle, mettreDEquerre, pasContraint, type Pt } from '@shared/murs'
 import { BoutonEquerre } from '../components/BoutonEquerre'
-import { FicheDuLieu } from '../components/FicheDuLieu'
+import { FicheDuLieu, GLISSE_OBJET, QuiQuoiDuLieu } from '../components/FicheDuLieu'
 import { ApercuDuCiel } from '../components/ApercuDuCiel'
 import { SuiteAriane } from '../components/SuiteAriane'
+import { CalqueSons, VoletSons, useSonsDEssai, useZonesSon } from '../components/CalqueSons'
 
 /** Ce qu'on est en train de créer à la chaîne, et sous quel contenant. */
 type Rafale = { parentId: number | null; tier: PlaceTier }
@@ -124,7 +135,12 @@ const NOMS_DE_NIVEAU = [
 /** La sortie de secours de la liste : un nom à soi. */
 const NOM_LIBRE = '__autre'
 
-export function Places(): JSX.Element {
+export function Places({
+  plans = false
+}: {
+  /** La page « Plans » : seulement les lieux qui ont un plan, en vignettes. */
+  plans?: boolean
+} = {}): JSX.Element {
   const s = useStore()
   const [choisi, setChoisi] = useState<number | null>(null)
   /** Le lieu dont l'éditeur de plan est ouvert ; la liste disparaît tant qu'il l'est. */
@@ -327,9 +343,33 @@ export function Places(): JSX.Element {
     setFiche(id)
   }
 
+  /* « Éditer le plan » depuis le volet : le même geste que celui de la fiche,
+     qui reste derrière pour que « Retour » y ramène. */
+  const editerPlan = (q: Place): void => {
+    setFiche(q.id)
+    if (q.tier === 'niveau') void ouvrirLesMurs(q)
+    else {
+      setChoisi(q.id)
+      setOuvert(q.id)
+    }
+  }
+
+  /* Passer d'un plan à l'autre, sans repasser par la liste : un niveau
+     s'ouvre sur ses murs, comme depuis sa fiche ; le reste sur son plan. */
+  const allerAuPlan = (q: Place): void => {
+    if (fiche != null) setFiche(q.id)
+    if (q.tier === 'niveau') void ouvrirLesMurs(q)
+    else {
+      setChoisi(q.id)
+      setOuvert(q.id)
+      setMurs(null)
+    }
+  }
+
   const lieuOuvert = place(ouvert)
   const ficheOuverte = place(fiche)
-  if (lieuOuvert)
+  if (lieuOuvert) {
+    const { avant, apres } = plansVoisins(s.places, lieuOuvert.id)
     return (
       <>
       <SuiteAriane
@@ -361,6 +401,26 @@ export function Places(): JSX.Element {
               </button>
               <span className="ariane-sep">›</span>
               <h1 aria-current="page">Plan</h1>
+              <span className="saut-lieu-hote">
+                <button
+                  className="btn btn-sm btn-ghost saut-fleche"
+                  disabled={!avant}
+                  title={avant ? `Plan précédent : ${avant.name}` : 'Premier plan'}
+                  aria-label="Plan précédent"
+                  onClick={() => avant && allerAuPlan(avant)}
+                >
+                  ←
+                </button>
+                <button
+                  className="btn btn-sm btn-ghost saut-fleche"
+                  disabled={!apres}
+                  title={apres ? `Plan suivant : ${apres.name}` : 'Dernier plan'}
+                  aria-label="Plan suivant"
+                  onClick={() => apres && allerAuPlan(apres)}
+                >
+                  →
+                </button>
+              </span>
             </>
           }
         />
@@ -403,6 +463,7 @@ export function Places(): JSX.Element {
       />
       </>
     )
+  }
 
   if (ficheOuverte)
     return (
@@ -432,6 +493,8 @@ export function Places(): JSX.Element {
       />
       </>
     )
+
+  if (plans) return <ListeDesPlans onOuvrir={allerAuPlan} />
 
   const rien =espaces.length === 0 && orphelins.length === 0
 
@@ -698,6 +761,7 @@ export function Places(): JSX.Element {
           onRelire={relire}
           onEfface={() => setChoisi(null)}
           onOuvrir={() => ouvrirFiche(choisi)}
+          onEditerPlan={editerPlan}
           onMurs={(p) => void ouvrirLesMurs(p)}
           onAjouterNiveau={(p) => {
             setRafale({ parentId: p.id, tier: 'niveau' })
@@ -966,12 +1030,16 @@ function Ligne({
       >
         <IconChevron className="caret" />
       </button>
+      {/* Le rond de découverte se pose au coin du plan, comme sur les tuiles :
+          tout se lit serré à gauche, rien n'est repoussé au bout de la ligne. */}
       <span className="mini">
         {map?.url ? <PlanCadre url={map.poster ?? map.url} zone={p.zone} /> : <IconPlace />}
+        <Jalon p={p} onVu={onVu} />
       </span>
       <span className="tx">
         {/* Le résumé n'a pas sa place ici : il rognait le nom. L'aperçu au
             survol du plan le montre, et le volet de droite l'écrit. */}
+        <span className="eyebrow tier">{p.tier === 'lieu' ? 'Bâtiment' : TIER_LABEL[p.tier]}</span>
         <b>{p.name}</b>
       </span>
       {pieces ? (
@@ -980,8 +1048,6 @@ function Ligne({
         </span>
       ) : null}
       {actions ? <span className="actions-ligne">{actions}</span> : null}
-      <span className="eyebrow tier">{p.tier === 'lieu' ? 'Bâtiment' : TIER_LABEL[p.tier]}</span>
-      <Jalon p={p} onVu={onVu} />
     </div>
   )
 }
@@ -1272,6 +1338,7 @@ function Volet({
   onRelire,
   onEfface,
   onOuvrir,
+  onEditerPlan,
   onMurs,
   onAjouterNiveau
 }: {
@@ -1280,6 +1347,8 @@ function Volet({
   onRelire: () => Promise<void>
   onEfface: () => void
   onOuvrir: () => void
+  /** Ouvrir son plan — murs, portes, lumières — comme depuis sa fiche. */
+  onEditerPlan: (p: Place) => void
   onMurs: (p: Place) => void
   /** Ouvrir la saisie d'un niveau sous ce lieu : il devient un bâtiment. */
   onAjouterNiveau: (p: Place) => void
@@ -1631,6 +1700,16 @@ function Volet({
           <IconPen />
           Ouvrir la fiche
         </button>
+        {/* Comme dans la fiche : une pièce s'édite sur le plan de son étage. */}
+        {f.mapItemId != null && !estPiece(f) ? (
+          <button
+            className="btn"
+            title="Ouvrir son plan : murs, portes, lumières"
+            onClick={() => onEditerPlan(f)}
+          >
+            Éditer le plan
+          </button>
+        ) : null}
         <span className="spacer" />
         {ecrit ? <span className="etat">enregistré</span> : null}
         {/* La confirmation tient dans le bouton : une seconde ligne ferait
@@ -1731,13 +1810,26 @@ function CielDeLEspace({
         <button
           className="btn btn-sm"
           aria-pressed={a?.nature === 'lune'}
-          title="La nuit sur tout l’espace : la même chose, à moitié"
+          title="La nuit sur tout l’espace : la même chose, un peu plus sombre"
           onClick={() => void poser({ nature: 'lune', cap })}
         >
           ☾ Lune
         </button>
+        <button
+          className="btn btn-sm"
+          aria-pressed={a?.nature === 'nuit'}
+          title="Il fait nuit sur tout l’espace : rien n’entre du dehors, et le regard ne distingue plus rien sans lampe"
+          onClick={() => void poser({ nature: 'nuit', cap })}
+        >
+          ● Nuit noire
+        </button>
       </div>
-      {a ? (
+      {a?.nature === 'nuit' ? (
+        <span className="murs-cap">
+          Nuit noire sur {lieux.length ? `ses ${lieux.length} lieux` : 'tous ses lieux'} — sans
+          lampe, portée ou posée, les joueurs n’y voient rien.
+        </span>
+      ) : a ? (
         <>
           <span className="murs-reglage" title="D’où vient la lumière : 0° le nord, 90° l’est">
             <span>Vient de</span>
@@ -1881,6 +1973,172 @@ function voisinsDe(places: Place[], courant: number): { avant: Place | null; apr
     avant: ici > 0 ? rangs[ici - 1].p : null,
     apres: ici >= 0 && ici < rangs.length - 1 ? rangs[ici + 1].p : null
   }
+}
+
+/**
+ * Les lieux qui ont un plan à eux, dans l'ordre de l'arbre.
+ *
+ * Une pièce taillée dans le plan de son étage n'en est qu'un morceau : elle
+ * n'y est pas. Un espace dont un niveau porte la même image ne compte qu'une
+ * fois, par ce niveau — c'est lui qui tient les murs.
+ */
+export function lesPlans(places: Place[]): Place[] {
+  return rangsDesLieux(places)
+    .map((r) => r.p)
+    .filter(
+      (p) =>
+        p.mapItemId != null &&
+        !p.zone &&
+        !places.some((q) => q.parentId === p.id && q.mapItemId === p.mapItemId && !q.zone)
+    )
+}
+
+/* Le plan d'avant et celui d'après, dans l'ordre de la liste. Ouvert sur une
+   pièce, on repart des plans qui l'entourent dans l'arbre. */
+function plansVoisins(places: Place[], courant: number): { avant: Place | null; apres: Place | null } {
+  const rang = new Map(rangsDesLieux(places).map((r, i) => [r.p.id, i]))
+  const ici = rang.get(courant) ?? -1
+  const liste = lesPlans(places)
+  return {
+    avant: [...liste].reverse().find((p) => (rang.get(p.id) ?? -1) < ici) ?? null,
+    apres: liste.find((p) => (rang.get(p.id) ?? -1) > ici) ?? null
+  }
+}
+
+/** La page « Plans » : chaque plan en grande vignette, un clic l'ouvre. */
+/** Ce qu'un plan tient déjà : de quoi voir d'un coup d'œil ce qui reste à préparer. */
+interface ContenuDuPlan {
+  lumieres: number
+  portes: number
+  sons: number
+}
+
+function ListeDesPlans({ onOuvrir }: { onOuvrir: (p: Place) => void }): JSX.Element {
+  const s = useStore()
+  const liste = useMemo(() => lesPlans(s.places), [s.places])
+
+  /* Lumières, portes et sons vivent chacun dans leur table : on les relit à
+     chaque visite de la page, un plan après l'autre, sans rien garder. */
+  const [contenus, setContenus] = useState<Map<number, ContenuDuPlan>>(new Map())
+  const ids = liste.map((p) => p.id).join(',')
+  useEffect(() => {
+    let vivant = true
+    void Promise.all(
+      liste.map(async (p) => {
+        const [lum, ouv, sons] = await Promise.all([
+          window.jdr.lumieres.of(p.id),
+          window.jdr.ouvertures.of(p.id),
+          window.jdr.sons.zones(p.id)
+        ])
+        const c: ContenuDuPlan = {
+          lumieres: lum.length,
+          portes: ouv.filter((o) => o.nature === 'porte').length,
+          sons: sons.length
+        }
+        return [p.id, c] as const
+      })
+    ).then((l) => vivant && setContenus(new Map(l)))
+    return () => {
+      vivant = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ids])
+
+  /* Les objets posés sur un plan : ceux du lieu même et ceux de ses pièces. */
+  const objetsDe = (p: Place): number => {
+    const ici = new Set([p.id, ...s.places.filter((q) => q.parentId === p.id && estPiece(q)).map((q) => q.id)])
+    return s.objets.reduce(
+      (n, o) => n + o.placements.filter((x) => x.port === 'lieu' && x.placeId != null && ici.has(x.placeId)).length,
+      0
+    )
+  }
+  return (
+    <section className="view">
+      <div className="vhead">
+        <div>
+          <h2>Plans</h2>
+          <p>
+            Les lieux qui ont un plan, dans l’ordre de la liste. Un clic l’ouvre ; ← et → , en
+            haut, passent au précédent ou au suivant.
+          </p>
+        </div>
+      </div>
+      {liste.length ? (
+        <div className="plans-grille">
+          {liste.map((p) => {
+            const map = s.allItems.find((i) => i.id === p.mapItemId)
+            const chemin = ascendants(s.places, p).map((q) => q.name)
+            return (
+              <button
+                key={p.id}
+                className="plan-vignette"
+                title={`Ouvrir le plan de ${p.name}`}
+                onClick={() => onOuvrir(p)}
+              >
+                <span className="vue">
+                  {map?.url ? (
+                    <img src={map.poster ?? map.url} alt="" loading="lazy" decoding="async" draggable={false} />
+                  ) : (
+                    <IconPlace />
+                  )}
+                  {/* On prépare ici : le plan reste net, un mot discret suffit. */}
+                  {p.seen ? null : <span className="pasvu">pas encore vu</span>}
+                </span>
+                <span className="nom">{p.name}</span>
+                {chemin.length ? <span className="chemin">{chemin.join(' › ')}</span> : null}
+                <ContenuPlan c={contenus.get(p.id)} objets={objetsDe(p)} ambiance={p.ambienceItemId != null} />
+              </button>
+            )
+          })}
+        </div>
+      ) : (
+        <div className="empty">
+          <b>Aucun plan</b>
+          Un lieu reçoit son plan depuis son volet, dans Lieux.
+        </div>
+      )}
+    </section>
+  )
+}
+
+/** La ligne de compteurs d'une vignette de plan ; un zéro reste pâle. */
+function ContenuPlan({
+  c,
+  objets,
+  ambiance
+}: {
+  c: ContenuDuPlan | undefined
+  objets: number
+  ambiance: boolean
+}): JSX.Element {
+  /* `sorte` donne sa couleur à l'icône — seulement quand il y a quelque chose. */
+  const pastille = (
+    n: number | undefined,
+    sorte: string,
+    icone: JSX.Element,
+    un: string,
+    plusieurs: string
+  ): JSX.Element => (
+    <span className={`p ${sorte}${n ? '' : ' zero'}`} title={n === undefined ? '' : `${n} ${n > 1 ? plusieurs : un}`}>
+      {icone}
+      {n ?? '…'}
+    </span>
+  )
+  return (
+    <span className="contenu">
+      {pastille(c?.lumieres, 'k-lum', <IconSoleil />, 'lumière', 'lumières')}
+      {pastille(c?.portes, 'k-porte', <IconPorte />, 'porte', 'portes')}
+      {pastille(objets, 'k-obj', <IconCoffre />, 'objet posé', 'objets posés')}
+      {pastille(c?.sons, 'k-son', <IconNote />, 'son posé', 'sons posés')}
+      <span
+        className={`p amb${ambiance ? '' : ' zero'}`}
+        title={ambiance ? 'Une ambiance part quand on met ce lieu en scène' : 'Aucune ambiance'}
+      >
+        <IconAudio />
+        {ambiance ? 'Ambiance' : 'Sans ambiance'}
+      </span>
+    </span>
+  )
 }
 
 /** Les contenants d'un lieu, du plus large au plus proche : l'espace, le bâtiment, le niveau. */
@@ -2027,6 +2285,9 @@ function FicheLieu({
   /** Le plan comme la lumière le laisse aux joueurs, sans murs ni repères. */
   const [vueJoueurs, setVueJoueurs] = useState(false)
   const mu = useMurs(p.id)
+  /** Les sons posés sur ce plan, et l'outil Son en main. */
+  const zs = useZonesSon(p.id)
+  const [sonArme, setSonArme] = useState(false)
   /** Le pion d'essai est posé, ou l'on attend son point de départ. */
   const enTest = mu.essai !== null || mu.attenteDepart
   const [outil, setOutil] = useState<OutilAnnotation>(null)
@@ -2041,6 +2302,15 @@ function FicheLieu({
    * qu'on ouvre une autre carte. Les joueurs voient l'image telle qu'elle est.
    */
   const [lum, setLum] = useState(100)
+  /** L'onglet ouvert du volet, quand rien n'est choisi sur le plan. */
+  const [onglet, setOnglet] = useState<'echelle' | 'quiquoi' | 'sons' | OngletMurs>('pieces')
+  /**
+   * Dans « Objets et PNJ » d'un plan qui a ses pièces : celle où l'on range.
+   * Une pièce n'a pas d'éditeur à elle, c'est donc d'ici qu'on la garnit.
+   */
+  const [pieceQq, setPieceQq] = useState<number | null>(null)
+  /** Un objet cliqué sur le plan : sa rangée se déplie dans le volet. */
+  const [ouvrirQq, setOuvrirQq] = useState<{ cle: string; n: number } | null>(null)
   const [remplacer, setRemplacer] = useState(false)
   /**
    * Un geste au rectangle sur la carte : garder ce cadre de l'image, ou
@@ -2052,6 +2322,12 @@ function FicheLieu({
    * en fractions de l'image, et la longueur qu'on tape, en mètres.
    */
   const [ech, setEch] = useState<EchellePlan | null>(null)
+  /** Un pion fantôme suit la souris sur le plan : on juge sa taille sur pièce. */
+  const [apercuPion, setApercuPion] = useState(false)
+  /** Où il est, et où il regarde — le pilote le fait marcher, la souris le pose. */
+  const [poseApercu, setPoseApercu] = useState({ x: 0.5, y: 0.5, cap: 0 })
+  /** La poussée du pilote, -1 à 1 sur chaque axe : lue à chaque image. */
+  const pousseApercu = useRef({ x: 0, y: 0 })
   const [trait, setTrait] = useState<{ a: PointMur; b: PointMur } | null>(null)
   const [metresTrait, setMetresTrait] = useState('')
   /**
@@ -2212,6 +2488,145 @@ function FicheLieu({
     }
   }, [p.id, mu.ouvertures])
 
+  /*
+   * Le pilote de l'aperçu : la même marche que le téléphone. Le pion avance
+   * tant qu'on pousse, à l'allure de ce plan pouce au bord, et les murs le
+   * retiennent. On juge ainsi l'allure avant que les joueurs la subissent.
+   */
+  const barrieresApercu = useMemo(() => {
+    if (!natCarte || !mu.liste.length) return null
+    const enPx = (q: PointMur): Pt => ({ x: q[0] * natCarte.w, y: q[1] * natCarte.h })
+    return barrieres(mu.liste, 'pas', enPx, mu.ouvertures)
+  }, [mu.liste, mu.ouvertures, natCarte])
+  const allureApercu = ech?.allure ?? null
+  /* La pose du moment, lue par la boucle sans attendre le dessin. */
+  const poseApercuRef = useRef(poseApercu)
+  poseApercuRef.current = poseApercu
+  useEffect(() => {
+    if (!apercuPion || allureApercu === null) return
+    let vivant = true
+    let image = 0
+    let avant = performance.now()
+    let dessin = 0
+    /* Le pas se compte à chaque image, mais la fiche ne se redessine que
+       vingt fois par seconde : c'est la cadence du téléphone, et tout le
+       plan se repeint à chaque fois. */
+    let q = poseApercuRef.current
+    let enMarche = false
+    const battre = (now: number): void => {
+      if (!vivant) return
+      image = requestAnimationFrame(battre)
+      const dt = Math.min(0.06, (now - avant) / 1000)
+      avant = now
+      const p = pousseApercu.current
+      const force = Math.min(1, Math.hypot(p.x, p.y))
+      if (force <= 0.08) {
+        /* Le dernier pas se dessine toujours ; ensuite, la souris peut avoir
+           déplacé le pion : on repart de là. */
+        if (enMarche) setPoseApercu(q)
+        else q = poseApercuRef.current
+        enMarche = false
+        return
+      }
+      enMarche = true
+      const l = Math.hypot(p.x, p.y) || 1
+      const pas = allureApercu * force * dt
+      const w = natCarte?.w ?? 1000
+      const h = natCarte?.h ?? 1000
+      let vise = {
+        x: Math.max(0.01, Math.min(0.99, q.x + (p.x / l) * pas)),
+        y: Math.max(0.01, Math.min(0.99, q.y + (p.y / l) * pas * (w / h)))
+      }
+      if (barrieresApercu) {
+        const a = pasContraint(barrieresApercu, { x: q.x * w, y: q.y * h }, { x: vise.x * w, y: vise.y * h }, { w, h }, 2)
+        vise = { x: a.x / w, y: a.y / h }
+      }
+      q = { x: vise.x, y: vise.y, cap: (Math.atan2(p.x, -p.y) * 180) / Math.PI }
+      if (now - dessin < 50) return
+      dessin = now
+      setPoseApercu(q)
+    }
+    image = requestAnimationFrame(battre)
+    return () => {
+      vivant = false
+      cancelAnimationFrame(image)
+    }
+  }, [apercuPion, allureApercu, barrieresApercu, natCarte])
+
+  /*
+   * Le pilote de l'essai : le même disque, qui fait marcher le pion d'essai à
+   * l'allure du plan. Les murs le retiennent comme ceux du téléphone ; s'il
+   * se tourne en marchant, son nez suit le pouce.
+   */
+  const pousseEssai = useRef({ x: 0, y: 0 })
+  const essaiRef = useRef(mu.essai)
+  essaiRef.current = mu.essai
+  const poserEssai = useRef(mu.setEssai)
+  poserEssai.current = mu.setEssai
+  const essaiPose = mu.essai !== null
+  const allureEssai = ech?.allure ?? ALLURE_DEFAUT
+  useEffect(() => {
+    if (!essaiPose) return
+    let vivant = true
+    let image = 0
+    let avant = performance.now()
+    let dessin = 0
+    /* La pose qu'on fait marcher ; `null` à l'arrêt : on repart alors de celle
+       du pion, que la souris a pu glisser entre-temps. */
+    let q: { x: number; y: number; cap: number } | null = null
+    const battre = (now: number): void => {
+      if (!vivant) return
+      image = requestAnimationFrame(battre)
+      const dt = Math.min(0.06, (now - avant) / 1000)
+      avant = now
+      const e = essaiRef.current
+      if (!e) return
+      const p = pousseEssai.current
+      const force = Math.min(1, Math.hypot(p.x, p.y))
+      if (force <= 0.08) {
+        if (q) poserEssai.current({ ...e, ...q })
+        q = null
+        return
+      }
+      if (!q) q = { x: e.x, y: e.y, cap: e.cap }
+      const l = Math.hypot(p.x, p.y) || 1
+      const pas = allureEssai * force * dt
+      const w = natCarte?.w ?? 1000
+      const h = natCarte?.h ?? 1000
+      let vise = {
+        x: Math.max(0.01, Math.min(0.99, q.x + (p.x / l) * pas)),
+        y: Math.max(0.01, Math.min(0.99, q.y + (p.y / l) * pas * (w / h)))
+      }
+      if (barrieresApercu) {
+        const a = pasContraint(barrieresApercu, { x: q.x * w, y: q.y * h }, { x: vise.x * w, y: vise.y * h }, { w, h }, 2)
+        vise = { x: a.x / w, y: a.y / h }
+      }
+      /* Le cap se compte depuis le haut, comme un pion : le calcul de l'aperçu. */
+      q = { x: vise.x, y: vise.y, cap: e.marche ? ((Math.atan2(p.x, -p.y) * 180) / Math.PI + 360) % 360 : q.cap }
+      if (now - dessin < 50) return
+      dessin = now
+      poserEssai.current({ ...e, ...q })
+    }
+    image = requestAnimationFrame(battre)
+    return () => {
+      vivant = false
+      cancelAnimationFrame(image)
+    }
+  }, [essaiPose, allureEssai, barrieresApercu, natCarte])
+
+  /* L'ambiance du lieu, choisie depuis la liste des sons du plan. */
+  const ambianceDuLieu = {
+    lieu: p,
+    onChanger: async (itemId: number | null): Promise<void> => {
+      await window.jdr.places.upsert({ id: p.id, name: p.name, ambienceItemId: itemId })
+      await s.refreshPlaces()
+    }
+  }
+
+  /* « Sons activés » : le pion d'essai déclenche les sons posés, pour le MJ seul. */
+  const [sonsEssai, setSonsEssai] = useState(false)
+  useSonsDEssai(sonsEssai, mu.essai, zs.zones, barrieresApercu, natCarte)
+
   /** La longueur du trait, en part de la largeur de l'image. */
   const longueurDuTrait = (t: { a: PointMur; b: PointMur }): number | null => {
     if (!carte?.width || !carte.height) return null
@@ -2328,6 +2743,57 @@ function FicheLieu({
       libres: dans.flatMap((l, i) => (l.length === 0 ? [i] : []))
     }
   }, [mu.formes, pieces])
+
+  /* « Objets et PNJ » d'un plan découpé : ce qu'on y ajoute va dans une pièce,
+     jamais dans l'étage. La pièce choisie s'allume sur le plan. */
+  const piecesQq = useMemo(() => (unique ? [] : pieces.filter(estPiece)), [unique, pieces])
+  const pieceRangee = piecesQq.find((q) => q.id === pieceQq) ?? piecesQq[0] ?? null
+  useEffect(() => {
+    if (onglet !== 'quiquoi' || !pieceRangee) return
+    const i = mu.formes.findIndex((f) => lieuDeLaForme(f)?.id === pieceRangee.id)
+    mu.setFormeVisee(i < 0 ? null : i)
+    return () => mu.setFormeVisee(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onglet, pieceRangee?.id, mu.formes])
+
+  /** Les objets posés en un point du plan, dans l'une de ses pièces. */
+  const objetsSurPlan = useMemo(() => {
+    const ids = new Set(piecesQq.map((q) => q.id))
+    return s.objets.flatMap((o) =>
+      o.placements
+        .filter((x) => x.port === 'lieu' && x.pos && x.placeId != null && ids.has(x.placeId))
+        .map((x) => ({ o, x }))
+    )
+  }, [s.objets, piecesQq])
+
+  /**
+   * Poser un objet en un point du plan. Il ne sort pas de sa pièce : lâché
+   * dehors, il est refusé. Un objet sans pièce prend celle où on le lâche.
+   */
+  const situerObjet = async (id: number, pt: { x: number; y: number }): Promise<boolean> => {
+    const o = s.objets.find((y) => y.placements.some((x) => x.id === id))
+    const x = o?.placements.find((y) => y.id === id)
+    if (!o || !x || x.port !== 'lieu') return false
+    const dans = (q: Place): boolean => !!q.zone && dansForme([pt.x, pt.y], q.zone)
+    const sienne = piecesQq.find((q) => q.id === x.placeId)
+    if (sienne) {
+      if (!dans(sienne)) {
+        s.toast(`« ${o.nom} » est rangé dans ${sienne.name} : pose-le dans cette pièce`, true)
+        return false
+      }
+      await window.jdr.objets.situer(id, pt)
+    } else {
+      const q = piecesQq.find(dans)
+      if (!q) {
+        s.toast('Pose-le dans une pièce du plan', true)
+        return false
+      }
+      await window.jdr.objets.situer(id, pt, q.id)
+      setPieceQq(q.id)
+    }
+    await s.refreshObjets()
+    return true
+  }
 
   /** Mettre une fiche dans une pièce sans nom : son contour, et son point dedans. */
   const placerDans = async (lieu: Place, i: number): Promise<void> => {
@@ -2456,8 +2922,9 @@ function FicheLieu({
      des murs ; repère et texte, ceux des annotations ; pièce, le tracé d'un
      lieu au rectangle (ou la désignation de ses murs). « Choisir » prend un
      mur, une porte, une lampe ou un repère, selon ce qu'on vise. */
-  const outilRail: OutilRail =
-    trace === 'lieu' || mu.pourPiece !== null
+  const outilRail: OutilRail = sonArme
+    ? 'son'
+    : trace === 'lieu' || mu.pourPiece !== null
       ? 'piece'
       : annote && outil
         ? outil
@@ -2469,6 +2936,16 @@ function FicheLieu({
   const sansOutils = !carte?.url || enTest || rognage || trace === 'etalonner'
   const pieceInterdite = estPiece(p) || unique || p.tier === 'espace'
 
+  /* Le volet suit l'outil qu'on prend : on trace une lampe, on voit la
+     lumière ; un mur, les traits. « Choisir » et les repères n'y touchent pas. */
+  useEffect(() => {
+    if (trace === 'etalonner') setOnglet('echelle')
+    else if (outilRail === 'lumiere') setOnglet('lumiere')
+    else if (outilRail === 'piece') setOnglet('pieces')
+    else if (outilRail === 'son') setOnglet('sons')
+    else if (['mur', 'rideau', 'porte', 'fenetre', 'gomme'].includes(outilRail)) setOnglet('traits')
+  }, [outilRail, trace])
+
   const choisirOutil = (o: OutilRail): void => {
     finirTrace()
     mu.setPourPiece(null)
@@ -2476,6 +2953,14 @@ function FicheLieu({
     mu.setOuvChoisie(null)
     mu.setLumChoisie(null)
     setChoisi(null)
+    setSonArme(o === 'son')
+    zs.setChoisie(null)
+    if (o === 'son') {
+      setMurs(false)
+      setAnnote(false)
+      setOutil(null)
+      return
+    }
     if (o === 'repere' || o === 'texte') {
       setMurs(false)
       setAnnote(true)
@@ -2523,6 +3008,8 @@ function FicheLieu({
       if (e.key === 'Escape' && !sansOutils) {
         if (mu.pourPiece !== null) return void mu.setPourPiece(null)
         if (trace === 'lieu' && rect) return void setRect(null)
+        if (sonArme && zs.choisie != null) return void zs.setChoisie(null)
+        if (sonArme) return void choisirOutil('choisir')
         if (trace === 'lieu' || annote) return void choisirOutil('choisir')
       }
       if (sansOutils) return
@@ -2795,6 +3282,11 @@ function FicheLieu({
               ou désigne les murs qui le bornent. Les murs fermés font déjà des pièces : nomme-les à droite.
             </span>
           ) : null
+        ) : outilRail === 'son' ? (
+          <span className="note">
+            Clique sur le plan pour poser un son · glisse le cercle pour le déplacer, tire sa poignée pour
+            l’agrandir · <kbd>Suppr</kbd> retire · jamais chez les joueurs
+          </span>
         ) : o.mj ? (
           <span className="note">Clique sur le plan pour poser · jamais chez les joueurs</span>
         ) : outilRail === 'choisir' ? (
@@ -3101,6 +3593,27 @@ function FicheLieu({
                     }}
                   />
                 ) : null}
+                {/* Les sons posés : du MJ seul, comme les repères. */}
+                {sonArme || (calques.mj && !vueJoueursOn && !enTest && zs.zones.length) ? (
+                  <CalqueSons z={zs} arme={sonArme && !sansOutils} />
+                ) : null}
+                {apercuPion && ech ? (
+                  <ApercuPion taille={ech.pionPourcent} pose={poseApercu} onPose={setPoseApercu} />
+                ) : null}
+                {/* Les objets posés : du MJ seul. Ils ne se prennent qu'avec
+                    l'onglet « Objets et PNJ » ouvert, pour ne pas gêner le tracé. */}
+                {piecesQq.length && calques.mj && !vueJoueursOn && !enTest ? (
+                  <CalqueObjets
+                    objets={objetsSurPlan}
+                    actif={onglet === 'quiquoi' && !sansOutils}
+                    onSituer={situerObjet}
+                    onOuvrir={(x) => {
+                      if (x.placeId != null) setPieceQq(x.placeId)
+                      setOnglet('quiquoi')
+                      setOuvrirQq((v) => ({ cle: `objet-${x.objetId}`, n: (v?.n ?? 0) + 1 }))
+                    }}
+                  />
+                ) : null}
               </CadreAnnote>
             ) : (
               <div className="fl-sans">
@@ -3200,7 +3713,40 @@ function FicheLieu({
 
         <aside className="fl-cote pe-volet">
           {enTest ? (
-            <VoletMurs m={mu} />
+            <VoletMurs
+              m={mu}
+              essaiEnPlus={
+                mu.essai ? (
+                  <div className="fl-bloc">
+                    <span className="eyebrow">Pilote</span>
+                    <Pilote
+                      onPousse={(v) => (pousseEssai.current = v)}
+                      note="Pousse le pilote : le pion d’essai marche comme celui d’un joueur sur son téléphone, à l’allure de ce plan, et les murs le retiennent."
+                    />
+                    <div className="murs-rangee">
+                      <button
+                        className={`btn btn-sm${sonsEssai ? ' btn-on' : ''}`}
+                        aria-pressed={sonsEssai}
+                        title="Le pion d’essai déclenche les sons posés — dans ton casque seulement, pas à la table"
+                        onClick={() => setSonsEssai((v) => !v)}
+                      >
+                        <IconNote />
+                        Sons activés
+                      </button>
+                    </div>
+                    <p className="note">
+                      {sonsEssai
+                        ? zs.zones.length
+                          ? 'Promène le pion : chaque son posé part quand il entre dans son cercle, et les murs l’arrêtent. Tu es seul à l’entendre.'
+                          : 'Aucun son posé sur ce plan.'
+                        : 'Les sons posés restent muets pendant l’essai.'}
+                    </p>
+                  </div>
+                ) : null
+              }
+            />
+          ) : sonArme ? (
+            <VoletSons z={zs} pieces={piecesQq} metres={ech?.metres ?? null} ambiance={ambianceDuLieu} />
           ) : lampeChoisie ? (
             <div className="pe-choix">
               <BarreLumiere m={mu} />
@@ -3229,15 +3775,54 @@ function FicheLieu({
           ) : (
             <>
               <h3 className="pe-volet-titre">Le plan de {p.name}</h3>
-              {ech ? (
+              <div className="pe-onglets" role="tablist" aria-label="Le plan">
+                {(
+                  [
+                    ['echelle', 'Échelle', null],
+                    ['pieces', 'Pièces', unique ? null : mu.formes.length],
+                    ['lumiere', 'Lumière', mu.lumieres.length],
+                    ['traits', 'Traits', mu.liste.length],
+                    ['quiquoi', 'Objets et PNJ', null],
+                    ['sons', 'Sons', zs.zones.length]
+                  ] as const
+                ).map(([k, l, n]) => (
+                  <button
+                    key={k}
+                    role="tab"
+                    aria-selected={onglet === k}
+                    onClick={() => {
+                      /* La pièce qu'on regardait dans « Pièces » est celle qu'on garnit. */
+                      const vue = mu.formeVisee !== null ? mu.formes[mu.formeVisee] : undefined
+                      const l = k === 'quiquoi' && vue ? lieuDeLaForme(vue) : null
+                      if (l) setPieceQq(l.id)
+                      setOnglet(k)
+                    }}
+                  >
+                    {l}
+                    {n !== null ? <span className="n">{n}</span> : null}
+                  </button>
+                ))}
+              </div>
+              {onglet === 'echelle' && ech ? (
                 <VoletEchelle
                   ech={ech}
                   onEtalonner={() => lancerGeste('etalonner')}
                   onRevenir={async () => setEch(await window.jdr.places.etalonner(p.id, null))}
                   onPionMain={async (main) => setEch(await window.jdr.pions.main(p.id, main))}
+                  onTaille={async (v) => {
+                    await window.jdr.pions.size(p.id, v)
+                    setEch(await window.jdr.places.echelle(p.id))
+                  }}
+                  apercu={apercuPion}
+                  onApercu={() => {
+                    if (!apercuPion) setPoseApercu({ x: 0.5, y: 0.5, cap: 0 })
+                    setApercuPion((a) => !a)
+                  }}
+                  onAllure={async (v) => setEch(await window.jdr.pions.allure(p.id, v))}
+                  onPousse={(v) => (pousseApercu.current = v)}
                 />
               ) : null}
-              {aDemeler.conflits.length || aDemeler.orphelins.length ? (
+              {onglet === 'pieces' && (aDemeler.conflits.length || aDemeler.orphelins.length) ? (
                 <div className="fl-bloc murs-conflit">
                   <span className="eyebrow">À démêler</span>
                   {aDemeler.conflits.map((c) => (
@@ -3270,6 +3855,47 @@ function FicheLieu({
                   ))}
                 </div>
               ) : null}
+              {onglet === 'quiquoi' && pieceRangee ? (
+                <>
+                  <div className="pe-qq-pieces">
+                    <span className="eyebrow">Dans la pièce</span>
+                    <div role="radiogroup" aria-label="Dans quelle pièce">
+                      {piecesQq.map((q) => (
+                        <button
+                          key={q.id}
+                          role="radio"
+                          aria-checked={q.id === pieceRangee.id}
+                          onClick={() => setPieceQq(q.id)}
+                        >
+                          {q.name}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <QuiQuoiDuLieu p={pieceRangee} surPlan ouvrir={ouvrirQq} />
+                </>
+              ) : onglet === 'quiquoi' ? (
+                <QuiQuoiDuLieu p={p} />
+              ) : null}
+              {/* Les sons posés, rangés par pièce : un son qu'on choisit prend
+                  l'outil Son, pour le régler et le déplacer sur le plan. */}
+              {onglet === 'sons' ? (
+                <VoletSons
+                  z={zs}
+                  pieces={piecesQq}
+                  metres={ech?.metres ?? null}
+                  ambiance={ambianceDuLieu}
+                  onChoisir={
+                    sansOutils
+                      ? undefined
+                      : (id) => {
+                          choisirOutil('son')
+                          zs.setChoisie(id)
+                        }
+                  }
+                />
+              ) : null}
+              {onglet === 'echelle' || onglet === 'quiquoi' || onglet === 'sons' ? null : (
               <VoletMurs
                 m={mu}
                 nomDeForme={(f) => (unique ? p.name : (lieuDeLaForme(f)?.name ?? null))}
@@ -3277,7 +3903,9 @@ function FicheLieu({
                 onEffacerPiece={(f) => void effacerPiece(f)}
                 pieceUnique={unique}
                 onPieceUnique={peutEtreUnique ? (oui) => void reglerUnique(oui) : undefined}
+                onglet={onglet}
               />
+              )}
               {onTermine ? (
                 <p className="pe-vers-fiche">
                   Le texte à lire, les secrets, les objets et les PNJ se préparent dans{' '}
@@ -3308,7 +3936,7 @@ function FicheLieu({
 }
 
 /** Un outil de la barre de gauche : sa touche, son icône, son groupe. */
-type OutilRail = 'choisir' | 'mur' | 'rideau' | 'porte' | 'fenetre' | 'lumiere' | 'piece' | 'gomme' | 'repere' | 'texte'
+type OutilRail = 'choisir' | 'mur' | 'rideau' | 'porte' | 'fenetre' | 'lumiere' | 'piece' | 'gomme' | 'repere' | 'texte' | 'son'
 
 const OUTILS_RAIL: { cle: OutilRail; label: string; touche: string; groupe?: string; mj?: boolean; icone: JSX.Element }[] = [
   { cle: 'choisir', label: 'Choisir', touche: 'v', icone: <IconSouris /> },
@@ -3320,7 +3948,9 @@ const OUTILS_RAIL: { cle: OutilRail; label: string; touche: string; groupe?: str
   { cle: 'piece', label: 'Pièce', touche: 'q', groupe: 'Tracer', icone: <IconOutilPiece /> },
   { cle: 'gomme', label: 'Gomme', touche: 'e', groupe: 'Tracer', icone: <IconGomme /> },
   { cle: 'repere', label: 'Repère', touche: 'a', groupe: 'MJ', mj: true, icone: <IconCercle /> },
-  { cle: 'texte', label: 'Texte', touche: 't', groupe: 'MJ', mj: true, icone: <IconType /> }
+  { cle: 'texte', label: 'Texte', touche: 't', groupe: 'MJ', mj: true, icone: <IconType /> },
+  /* Un son posé : il part quand un pion entre dans son cercle. */
+  { cle: 'son', label: 'Son', touche: 's', groupe: 'MJ', mj: true, icone: <IconNote /> }
 ]
 
 /* Les icônes des outils qui n'en avaient pas : un trait, un rideau, une porte,
@@ -4062,14 +4692,46 @@ function VoletEchelle({
   ech,
   onEtalonner,
   onRevenir,
-  onPionMain
+  onPionMain,
+  onTaille,
+  apercu,
+  onApercu,
+  onAllure,
+  onPousse
 }: {
   ech: EchellePlan
   onEtalonner: () => void
   onRevenir: () => void
   onPionMain: (main: boolean) => void
+  /** Régler la taille à la main : le lieu ne suit plus l'échelle. */
+  onTaille: (pourcent: number) => void
+  apercu: boolean
+  onApercu: () => void
+  /** L'allure des pions pilotés sur ce plan ; `null`, celle d'usine. */
+  onAllure: (allure: number | null) => void
+  /** La poussée du pilote, -1 à 1 sur chaque axe ; zéro, on lâche. */
+  onPousse: (v: { x: number; y: number }) => void
 }): JSX.Element {
   const inconnue = ech.metres === null
+  /* Le curseur bouge sur place et n'enregistre qu'au lâcher : un seul
+     « Défaire » pour un seul geste. */
+  const [taille, setTaille] = useState<number | null>(null)
+  const vue = taille ?? ech.pionPourcent
+  const lacher = (): void => {
+    if (taille === null) return
+    onTaille(taille)
+    setTaille(null)
+  }
+  /* L'allure, en pour cent de la largeur par seconde : même geste, un seul
+     enregistrement au lâcher. */
+  const [allure, setAllure] = useState<number | null>(null)
+  const allureVue = allure ?? ech.allure * 100
+  const lacherAllure = (): void => {
+    if (allure === null) return
+    onAllure(allure / 100)
+    setAllure(null)
+  }
+  const virgule = (v: number): string => String(Math.round(v * 10) / 10).replace('.', ',')
   const pourCent = (v: number): string => `${String(Math.round(v * 10) / 10).replace('.', ',')} %`
   return (
     <>
@@ -4115,37 +4777,367 @@ function VoletEchelle({
         <span className="eyebrow">Pions sur ce plan</span>
         <div className="ech-ligne">
           <span>Taille réelle</span>
-          <b>1,5 m</b>
+          <b>{inconnue ? '—' : ech.pionMain || taille !== null ? `≈ ${enMetres((vue / 100) * ech.metres!)}` : '1,5 m'}</b>
         </div>
-        <div className="ech-ligne">
+        <label className="murs-reglage">
           <span>À l’écran</span>
-          <b>{pourCent(ech.pionPourcent)} du plan</b>
-        </div>
+          <input
+            type="range"
+            min={2}
+            max={24}
+            step={0.1}
+            value={vue}
+            aria-label="Taille des pions, en part de la largeur du plan"
+            onChange={(e) => setTaille(Number(e.target.value))}
+            onPointerUp={lacher}
+            onKeyUp={lacher}
+            onBlur={lacher}
+          />
+          <Valeur
+            className="num"
+            value={vue}
+            min={2}
+            max={24}
+            step={0.1}
+            decimales={1}
+            unite=" %"
+            label="Taille des pions"
+            onChange={onTaille}
+          />
+        </label>
         <div className="murs-rangee">
           <button
-            className={`btn btn-sm${ech.pionMain ? ' btn-ghost' : ' btn-on'}`}
-            aria-pressed={!ech.pionMain}
-            onClick={() => onPionMain(false)}
+            className={`btn btn-sm${apercu ? ' btn-on' : ''}`}
+            aria-pressed={apercu}
+            title="Un pion fantôme suit la souris sur le plan, à la taille réglée"
+            onClick={onApercu}
           >
-            À l’échelle
+            Aperçu
           </button>
-          <button
-            className={`btn btn-sm${ech.pionMain ? ' btn-on' : ' btn-ghost'}`}
-            aria-pressed={ech.pionMain}
-            onClick={() => onPionMain(true)}
-          >
-            À la main
-          </button>
+          {ech.pionMain ? (
+            <button
+              className="btn btn-sm btn-ghost"
+              disabled={inconnue}
+              title={
+                inconnue
+                  ? 'Échelle inconnue : étalonne le plan, ou pose une porte'
+                  : 'Le pion refait 1,5 m, d’après l’échelle du plan'
+              }
+              onClick={() => onPionMain(false)}
+            >
+              Remettre à l’échelle
+            </button>
+          ) : null}
         </div>
+        {apercu ? <Pilote onPousse={onPousse} /> : null}
         <p className="note">
           {ech.pionMain
-            ? 'Réglée à la main sur ce lieu, depuis la Régie. Elle ne suit plus l’échelle.'
+            ? 'Réglée à ta façon sur ce lieu : elle ne suit plus l’échelle.'
             : inconnue
               ? 'Échelle inconnue : le pion garde la taille réglée à la main en attendant.'
-              : 'Calculée d’après l’échelle : un pion fait une case de 1,5 m, sur chaque plan.'}
+              : 'Calculée d’après l’échelle : un pion fait une case de 1,5 m. Bouge le curseur pour la régler à ta façon.'}
+        </p>
+      </div>
+      <div className="fl-bloc echelle-bloc">
+        <span className="eyebrow">Allure des pions</span>
+        <label className="murs-reglage">
+          <span>Par seconde</span>
+          <input
+            type="range"
+            min={ALLURE_MIN * 100}
+            max={ALLURE_MAX * 100}
+            step={0.5}
+            value={allureVue}
+            aria-label="Allure des pions pilotés, en part de la largeur du plan par seconde"
+            onChange={(e) => setAllure(Number(e.target.value))}
+            onPointerUp={lacherAllure}
+            onKeyUp={lacherAllure}
+            onBlur={lacherAllure}
+          />
+          <Valeur
+            className="num"
+            value={allureVue}
+            min={ALLURE_MIN * 100}
+            max={ALLURE_MAX * 100}
+            step={0.5}
+            decimales={1}
+            unite=" %"
+            label="Allure des pions"
+            onChange={(v) => onAllure(v / 100)}
+          />
+        </label>
+        <div className="ech-ligne">
+          <span>Traverse le plan en</span>
+          <b>{virgule(100 / allureVue)} s</b>
+        </div>
+        <div className="ech-ligne">
+          <span>Vitesse réelle</span>
+          <b>{inconnue ? '—' : `≈ ${virgule((allureVue / 100) * ech.metres!)} m/s`}</b>
+        </div>
+        <div className="murs-rangee">
+          {apercu ? null : (
+            <button className="btn btn-sm" title="Pose le pion du MJ sur le plan et fais-le marcher au pilote" onClick={onApercu}>
+              Essayer au pilote
+            </button>
+          )}
+          {ech.allureReglee ? (
+            <button
+              className="btn btn-sm btn-ghost"
+              title="Revenir à l’allure d’usine : 12 % de la largeur du plan par seconde"
+              onClick={() => onAllure(null)}
+            >
+              Allure par défaut
+            </button>
+          ) : null}
+        </div>
+        <p className="note">
+          Le pas le plus long qu’un joueur donne en poussant le disque de son téléphone, pouce au bord.
+          Un plan de ville veut une allure plus vive qu’un placard. Les pièces de cet étage la partagent.
         </p>
       </div>
     </>
+  )
+}
+
+/**
+ * Le pilote de l'aperçu : le disque du téléphone, à la souris. On le pousse,
+ * le pion marche ; on lâche, il s'arrête. Le bord vaut la pleine allure.
+ */
+function Pilote({
+  onPousse,
+  note = 'Pousse le pilote : le pion du MJ marche comme celui d’un joueur sur son téléphone, à l’allure de ce plan, et les murs le retiennent.'
+}: {
+  onPousse: (v: { x: number; y: number }) => void
+  note?: string
+}): JSX.Element {
+  const [pouce, setPouce] = useState({ x: 0, y: 0 })
+  const [pris, setPris] = useState(false)
+  /* Refermé en pleine poussée, il ne laisse pas le pion filer : on lâche au
+     démontage — et seulement là, la fonction change à chaque dessin. */
+  const lache = useRef(onPousse)
+  lache.current = onPousse
+  useEffect(() => () => lache.current({ x: 0, y: 0 }), [])
+  const suivre = (e: React.PointerEvent<HTMLDivElement>): void => {
+    const b = e.currentTarget.getBoundingClientRect()
+    const r = b.width / 2
+    const dx = e.clientX - (b.left + r)
+    const dy = e.clientY - (b.top + r)
+    const d = Math.hypot(dx, dy)
+    const max = Math.max(1, r - 16)
+    const k = d > max ? max / d : 1
+    onPousse({ x: (dx * k) / max, y: (dy * k) / max })
+    setPouce({ x: dx * k, y: dy * k })
+  }
+  const lacher = (e: React.PointerEvent<HTMLDivElement>): void => {
+    if (e.currentTarget.hasPointerCapture(e.pointerId)) e.currentTarget.releasePointerCapture(e.pointerId)
+    setPris(false)
+    onPousse({ x: 0, y: 0 })
+    setPouce({ x: 0, y: 0 })
+  }
+  return (
+    <div className="pe-pilote-rangee">
+      <div
+        className={`pe-pilote${pris ? ' pris' : ''}`}
+        title="Pousse : le pion marche à l’allure du plan, les murs le retiennent"
+        onPointerDown={(e) => {
+          e.preventDefault()
+          e.currentTarget.setPointerCapture(e.pointerId)
+          setPris(true)
+          suivre(e)
+        }}
+        onPointerMove={(e) => pris && suivre(e)}
+        onPointerUp={lacher}
+        onPointerCancel={lacher}
+      >
+        <span className="pouce" style={{ transform: `translate(${pouce.x}px, ${pouce.y}px)` }} />
+      </div>
+      <p className="note">{note}</p>
+    </div>
+  )
+}
+
+/**
+ * Le pion de l'aperçu : un vrai jeton, celui du MJ — son image des Paramètres,
+ * son nom —, à la taille des pions de ce lieu. Posé au milieu du plan, il y
+ * reste ; on le glisse où l'on veut juger sa taille, comme un pion en jeu.
+ * Seul le jeton prend la souris : autour, on continue de tracer.
+ */
+function ApercuPion({
+  taille,
+  pose,
+  onPose
+}: {
+  taille: number
+  pose: { x: number; y: number; cap: number }
+  onPose: (p: { x: number; y: number; cap: number }) => void
+}): JSX.Element {
+  const s = useStore()
+  const url = urlPortraitMj(s.poste.mjImage)
+  const nom = nomDuMj(s.poste)
+  const hote = useRef<HTMLDivElement>(null)
+  const pos = pose
+  /** L'écart entre la souris et le centre du jeton, pris à la saisie. */
+  const prise = useRef<{ dx: number; dy: number } | null>(null)
+  const borne = (v: number): number => Math.min(1, Math.max(0, v))
+  const versPlan = (e: React.PointerEvent): { x: number; y: number } | null => {
+    const b = hote.current?.getBoundingClientRect()
+    if (!b || !b.width || !b.height) return null
+    return { x: (e.clientX - b.left) / b.width, y: (e.clientY - b.top) / b.height }
+  }
+  return (
+    <div ref={hote} className="pion-layer avec-noms apercu-pion" style={{ ['--ps' as string]: taille }}>
+      <div
+        className="pion c-brass"
+        style={{ left: `${pos.x * 100}%`, top: `${pos.y * 100}%`, ['--rot' as string]: `${pos.cap}deg` }}
+        title="Glisse-le pour comparer sa taille au plan, ou fais-le marcher au pilote"
+        /* Le plan dessous ne doit rien savoir de ce geste : ni tracé, ni
+           déplacement de la vue, ni choix d'un mur. */
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => e.stopPropagation()}
+        onPointerDown={(e) => {
+          e.stopPropagation()
+          e.preventDefault()
+          const p = versPlan(e)
+          if (!p) return
+          prise.current = { dx: pos.x - p.x, dy: pos.y - p.y }
+          e.currentTarget.setPointerCapture(e.pointerId)
+        }}
+        onPointerMove={(e) => {
+          if (!prise.current) return
+          const p = versPlan(e)
+          if (p) onPose({ ...pos, x: borne(p.x + prise.current.dx), y: borne(p.y + prise.current.dy) })
+        }}
+        onPointerUp={(e) => {
+          prise.current = null
+          e.currentTarget.releasePointerCapture(e.pointerId)
+        }}
+      >
+        {url ? <img src={url} alt="" /> : <span className="ini">MJ</span>}
+        {pos.cap ? <span className="nez" /> : null}
+        <span className="lab">{nom}</span>
+      </div>
+    </div>
+  )
+}
+
+/**
+ * Les objets posés sur le plan d'un étage : une puce par exemplaire, au point
+ * où on l'a lâché. On en glisse un depuis la liste du volet (`GLISSE_OBJET`),
+ * on déplace une puce à la souris ; `onSituer` refuse un point hors de sa
+ * pièce, et la puce revient d'où elle venait. Un clic l'ouvre dans le volet.
+ */
+function CalqueObjets({
+  objets,
+  actif,
+  onSituer,
+  onOuvrir
+}: {
+  objets: { o: Objet; x: ObjetPlacement }[]
+  /** Les puces se prennent, le plan accepte qu'on y lâche un objet. */
+  actif: boolean
+  onSituer: (id: number, pt: { x: number; y: number }) => Promise<boolean>
+  onOuvrir: (x: ObjetPlacement) => void
+}): JSX.Element {
+  const s = useStore()
+  const hote = useRef<HTMLDivElement>(null)
+  /** La puce qu'on tire, et l'écart entre la souris et son centre. */
+  const [tire, setTire] = useState<{ id: number; x: number; y: number; dx: number; dy: number; bouge: boolean } | null>(
+    null
+  )
+  const versPlan = (cx: number, cy: number): { x: number; y: number } | null => {
+    const b = hote.current?.getBoundingClientRect()
+    if (!b || !b.width || !b.height) return null
+    return { x: (cx - b.left) / b.width, y: (cy - b.top) / b.height }
+  }
+  const situerRef = useRef(onSituer)
+  situerRef.current = onSituer
+
+  /* Lâcher une rangée du volet sur le plan. Le calque laisse passer la souris
+     pour le tracé : on écoute donc le document, et l'on ne garde que ce qui
+     tombe sur le plan lui-même — pas sur le volet qu'il déborde au zoom. */
+  useEffect(() => {
+    if (!actif) return
+    const surLePlan = (e: DragEvent): boolean => {
+      if (!e.dataTransfer?.types.includes(GLISSE_OBJET)) return false
+      const cadre = hote.current?.parentElement
+      if (!cadre || !cadre.contains(e.target as Node)) return false
+      const p = versPlan(e.clientX, e.clientY)
+      return !!p && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1
+    }
+    const dessus = (e: DragEvent): void => {
+      if (!surLePlan(e)) return
+      e.preventDefault()
+      e.dataTransfer!.dropEffect = 'move'
+    }
+    const lache = (e: DragEvent): void => {
+      if (!surLePlan(e)) return
+      e.preventDefault()
+      e.stopPropagation()
+      const id = Number(e.dataTransfer!.getData(GLISSE_OBJET))
+      const p = versPlan(e.clientX, e.clientY)
+      if (id && p) void situerRef.current(id, p)
+    }
+    document.addEventListener('dragover', dessus, true)
+    document.addEventListener('drop', lache, true)
+    return () => {
+      document.removeEventListener('dragover', dessus, true)
+      document.removeEventListener('drop', lache, true)
+    }
+  }, [actif])
+
+  return (
+    <div ref={hote} className={`pe-objets${actif ? ' actif' : ''}`}>
+      {objets.map(({ o, x }) => {
+        const enMain = tire?.id === x.id ? tire : null
+        const pos = enMain ?? x.pos!
+        const img = s.allItems.find((i) => i.id === o.imageItemId)
+        const f = s.objetFamilles.find((y) => y.id === o.familleId) ?? null
+        return (
+          <div
+            key={x.id}
+            className={`pe-objet ${x.etat}${enMain ? ' tire' : ''}`}
+            style={{ left: `${pos.x * 100}%`, top: `${pos.y * 100}%` }}
+            title={`${o.nom}${x.qte > 1 ? ` ×${x.qte}` : ''} — ${x.cible}${x.etat === 'trouve' ? ' · trouvé' : ' · caché'}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => {
+              if (!actif || e.button !== 0) return
+              e.stopPropagation()
+              e.preventDefault()
+              const p = versPlan(e.clientX, e.clientY)
+              if (!p || !x.pos) return
+              setTire({ id: x.id, x: x.pos.x, y: x.pos.y, dx: x.pos.x - p.x, dy: x.pos.y - p.y, bouge: false })
+              e.currentTarget.setPointerCapture(e.pointerId)
+            }}
+            onPointerMove={(e) => {
+              if (!enMain) return
+              const p = versPlan(e.clientX, e.clientY)
+              if (!p) return
+              const bouge = enMain.bouge || Math.hypot(e.movementX, e.movementY) > 0
+              setTire({ ...enMain, x: p.x + enMain.dx, y: p.y + enMain.dy, bouge })
+            }}
+            onPointerUp={(e) => {
+              if (!enMain) return
+              e.currentTarget.releasePointerCapture(e.pointerId)
+              if (!enMain.bouge) {
+                setTire(null)
+                onOuvrir(x)
+                return
+              }
+              /* La puce reste où on l'a lâchée le temps de la réponse ; refusée,
+                 elle revient à son point. */
+              void onSituer(x.id, { x: enMain.x, y: enMain.y }).finally(() => setTire(null))
+            }}
+          >
+            {img?.url ? (
+              <img src={img.poster ?? img.url} alt="" />
+            ) : (
+              <span className={`c-${f?.teinte ?? 'neutral'}`}>{glypheObjet(f?.glyphe ?? 'outils', 'glyphe')}</span>
+            )}
+          </div>
+        )
+      })}
+    </div>
   )
 }
 

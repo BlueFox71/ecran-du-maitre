@@ -105,7 +105,20 @@ export interface EchellePlan {
   pionMain: boolean
   /** La taille d'un pion à l'écran, en pour cent de la largeur du plan. */
   pionPourcent: number
+  /**
+   * L'allure des pions pilotés sur ce plan : la part de la largeur qu'ils
+   * parcourent en une seconde, pouce au bord du disque.
+   */
+  allure: number
+  /** L'allure a-t-elle été réglée sur ce plan, ou est-ce celle d'usine ? */
+  allureReglee: boolean
 }
+
+/** L'allure d'usine d'un pion piloté : 12 % de la largeur du plan par seconde. */
+export const ALLURE_DEFAUT = 0.12
+/** Les bornes de l'allure, en part de la largeur du plan par seconde. */
+export const ALLURE_MIN = 0.01
+export const ALLURE_MAX = 0.6
 
 export interface Place {
   id: number
@@ -222,6 +235,8 @@ export interface Lumiere {
   ouverture: number
   /** Où pointe le faisceau, en degrés, 0 vers le haut — comme un pion. */
   cap: number
+  /** Le nom que le MJ lui a donné ; null : « Lumière », tout simplement. */
+  nom: string | null
 }
 
 /** Les faisceaux proposés d'un clic à une lumière directive. */
@@ -265,9 +280,10 @@ export interface CalqueBrouillard {
    * Éclairage », « Lumière » — allume une lampe sur le pion du personnage qui
    * le porte, et elle le suit. Le rayon se lit dans le détail de l'effet ;
    * sans portée, c'est celui d'une torche. `ouverture`, le faisceau en
-   * degrés, tourné comme le pion — 360, tout autour.
+   * degrés, tourné comme le pion — 360, tout autour. `teinte`, la couleur
+   * de la lueur — blanc, aucune.
    */
-  porteurs: { characterId: number; rayon: number; ouverture: number; objet: string }[]
+  porteurs: { characterId: number; rayon: number; ouverture: number; objet: string; teinte: string }[]
   /** Le soleil ou la lune de cette carte ; `null`, la nuit noire d'avant. */
   astre: Astre | null
 }
@@ -280,8 +296,15 @@ export interface CalqueBrouillard {
  * on dit **d'où vient la lumière**. Dehors, tout est éclairé ; dans les
  * pièces, seul ce qui entre par les fenêtres et les portes ouvertes, en
  * traits parallèles que les murs arrêtent.
+ *
+ * La **nuit noire** est un ciel sans astre : rien n'entre du dehors, et le
+ * regard ne distingue plus rien dans le noir — seules les lampes, portées ou
+ * posées (une lampe de poche, un lampadaire), font voir. Son cap ne sert pas.
  */
-export type NatureAstre = 'soleil' | 'lune'
+export type NatureAstre = 'soleil' | 'lune' | 'nuit'
+
+/** Il fait nuit noire : le regard seul ne voit rien, il faut une lampe. */
+export const nuitNoire = (a: Astre | null | undefined): boolean => a?.nature === 'nuit'
 
 export interface Astre {
   nature: NatureAstre
@@ -311,8 +334,19 @@ export function ventDe(cap: number): string {
   return VENTS[((Math.round(cap / 45) % 8) + 8) % 8]
 }
 
-/** La force de chaque astre : la lune éclaire, mais à moitié. */
-export const FORCE_ASTRE: Record<NatureAstre, number> = { soleil: 1, lune: 0.5 }
+/** La force de chaque astre : la lune éclaire, un peu plus sombre ; la nuit noire, pas du tout. */
+export const FORCE_ASTRE: Record<NatureAstre, number> = { soleil: 1, lune: 0.7, nuit: 0 }
+
+/**
+ * La lumière commande-t-elle sur cette carte ? Dès qu'il y a une lampe —
+ * posée ou portée — ou un ciel, on ne voit que ce qui est éclairé : la
+ * portée du regard ne sert plus qu'aux cartes sans aucune lumière.
+ */
+export const lumiereCommande = (c: {
+  lumieres: unknown[]
+  porteurs: unknown[]
+  astre: Astre | null
+}): boolean => c.lumieres.length > 0 || c.porteurs.length > 0 || !!c.astre
 
 export interface Beat {
   id: number
@@ -468,6 +502,16 @@ export interface GaugeSpec {
   color: 'blood' | 'iris' | 'brass' | 'moss' | 'neutral'
   /** Le maximum est-il modifiable par le MJ (perte de SAN définitive, par ex.) */
   maxEditable?: boolean
+  /**
+   * La jauge vaut-elle aussi pour les PNJ ? Absente : oui. `false` : les
+   * fiches de PNJ ne la montrent pas — un figurant n'a pas de santé mentale.
+   */
+  pnj?: boolean
+}
+
+/** Les jauges qu'un personnage porte : toutes pour un joueur, celles des PNJ pour un PNJ. */
+export function jaugesDe<G extends { pnj?: boolean }>(gauges: G[], kind: 'pj' | 'pnj'): G[] {
+  return kind === 'pnj' ? gauges.filter((g) => g.pnj !== false) : gauges
 }
 
 export interface StatSpec {
@@ -513,6 +557,17 @@ export interface TemplateSpec {
    * dans les fiches d'avant — veut dire « autant qu'il veut ».
    */
   skillLimit?: number | null
+  /**
+   * La table ne se sert pas des compétences : elles disparaissent des fiches,
+   * du téléphone et de la préparation. La liste reste dans la fiche de
+   * campagne, et ce que les personnages avaient pris reste en base.
+   */
+  sansCompetences?: boolean
+  /**
+   * La règle de la préparation du personnage — voir `shared/preparation.ts`.
+   * Absente : 8 de départ, 40 points, plafond 20, compétences comprises.
+   */
+  preparation?: { depart?: number; points?: number; plafond?: number; competences?: boolean }
 }
 
 /**
@@ -581,6 +636,12 @@ export interface CharacterData {
   skills: Record<string, number>
   states: Record<string, boolean>
   notes?: string
+  /**
+   * Sa bourse : combien de chaque monnaie de la campagne, par clé (voir
+   * `@shared/monnaies`). Absente, tout est à zéro. Elle suit le personnage
+   * d'une séance à l'autre avec le reste de ses données.
+   */
+  bourse?: Record<string, number>
 }
 
 /**
@@ -672,6 +733,8 @@ export interface Character {
    * que le MJ n'a rien écrit.
    */
   butin: ButinLigne[]
+  /** PNJ : son état (blessé, à terre) se lit sur son pion, chez les joueurs aussi. */
+  etatVisible: boolean
   data: CharacterData
 }
 
@@ -704,6 +767,8 @@ export interface Objet {
   familleId: number | null
   /** Son image, prise dans la bibliothèque. Sans elle, le glyphe de sa famille. */
   imageItemId: number | null
+  /** Le cadre taillé dans l'image pour le bandeau de sa fiche ; `null`, au centre. */
+  imageCadre: CadreCarre | null
   /** Pièce unique, ou chose qui se compte — une corde, six bougies. */
   unique: boolean
   /** Combien on en pose d'un coup quand il se compte. Une pièce unique, c'est 1. */
@@ -716,6 +781,12 @@ export interface Objet {
    * quoi aucun total ne serait calculable.
    */
   valeur: number | null
+  /**
+   * Son prix dans les monnaies de la campagne, par clé — « 2 po 5 pa ».
+   * Remplace `valeur`, qui ne sert plus qu'à la migration 65 : elle a été
+   * reprise dans la première monnaie. `null` : pas de prix.
+   */
+  prix: Record<string, number> | null
   /** Ce que les joueurs ont sous les yeux quand ils le trouvent. Diffusable. */
   vu: string
   /**
@@ -738,6 +809,11 @@ export interface Objet {
   effets: EffetObjet[]
   /** Où ses exemplaires se trouvent, dans l'ordre où on les a posés. */
   placements: ObjetPlacement[]
+  /**
+   * Ses exemplaires jetés à la corbeille, dans la séance ouverte. Ils ne
+   * comptent nulle part ailleurs — ni posés, ni dans un lieu, ni dans un sac.
+   */
+  corbeille: ObjetPlacement[]
 }
 
 /**
@@ -748,10 +824,22 @@ export interface Objet {
  * gras, le détail ce qui la suit. Le moteur de fiches est un moteur de
  * gabarits ; ses objets ne peuvent pas être plus rigides que lui.
  */
+/** « Éclaire », « Lumière » : la tête d'un effet qui fait de l'objet une lampe. */
+export function estLumiere(tete: string): boolean {
+  const t = tete.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim()
+  return t.startsWith('eclair') || t.startsWith('lumi')
+}
+
+/** Cet objet éclaire-t-il ? Un de ses effets, au moins, est une lumière. */
+export const eclaire = (o: { effets: { tete: string }[] }): boolean =>
+  o.effets.some((e) => estLumiere(e.tete))
+
 export interface EffetObjet {
   id: string
   tete: string
   detail: string
+  /** La couleur de la lueur, pour un effet « Éclaire » ; sans elle, aucune. */
+  teinte?: string
 }
 
 /** Un rayon de la réserve. Huit sont livrés ; le MJ en ajoute et les renomme. */
@@ -864,8 +952,23 @@ export function ditEmplacements(cles: string[] | undefined): string {
 /** L'unité de valeur par défaut d'une campagne neuve. */
 export const UNITE_VALEUR_PAR_DEFAUT = 'pièces'
 
-/** Là où se trouve un exemplaire : un lieu, un PNJ, un joueur, un inventaire partagé. */
-export type PortObjet = 'lieu' | 'pnj' | 'pj' | 'inventaire'
+/**
+ * Là où se trouve un exemplaire : un lieu, un PNJ, un joueur, un inventaire
+ * partagé — ou la corbeille, où il n'a plus de cible.
+ */
+export type PortObjet = 'lieu' | 'pnj' | 'pj' | 'inventaire' | 'corbeille'
+
+/** Là où un exemplaire a été rangé au départ, et où « Ranger » le remet. */
+export interface EmplacementInitial {
+  port: PortObjet
+  placeId: number | null
+  characterId: number | null
+  inventaireId: number | null
+  emplacement: string | null
+  etat: 'cache' | 'trouve' | 'porte'
+  /** Le nom du lieu, du personnage ou de l'inventaire. */
+  cible: string
+}
 
 /**
  * Un exemplaire posé quelque part.
@@ -895,6 +998,14 @@ export interface ObjetPlacement {
   origineLieuId: number | null
   qte: number
   etat: 'cache' | 'trouve' | 'porte'
+  /** Où il a été rangé au départ ; `null` si sa cible a disparu depuis. */
+  initial: EmplacementInitial | null
+  /** Il n'est plus là où on l'avait rangé — corbeille comprise. */
+  deplace: boolean
+  /** Une lampe qu'on a éteinte : elle n'éclaire plus, même portée. */
+  eteinte: boolean
+  /** Posé dans un lieu, son point sur le plan (fractions de l'image) ; `null` : nulle part de précis. */
+  pos: { x: number; y: number } | null
 }
 
 /**
@@ -1072,6 +1183,21 @@ export interface Ouverture {
    * dont la clé est ailleurs dans la maison.
    */
   verrouillee: boolean
+  /**
+   * Le nom que le MJ lui a donné. Celui d'une porte commence toujours par
+   * « Porte » (`nomDePorte`) ; null : elle s'appelle comme sa nature.
+   */
+  nom: string | null
+}
+
+/**
+ * Le nom d'une porte, tel qu'on l'enregistre : toujours « Porte … ». On
+ * retire le « Porte » qu'on aurait tapé soi-même, pour ne pas l'avoir deux
+ * fois ; rien derrière, et la porte n'a plus de nom.
+ */
+export function nomDePorte(saisi: string | null | undefined): string | null {
+  const reste = (saisi ?? '').trim().replace(/^porte(\s+|$)/i, '').trim()
+  return reste ? `Porte ${reste}` : null
 }
 
 /**
@@ -1342,6 +1468,26 @@ export const TEXTE_COULEURS: { name: string; hex: string }[] = [
   { name: 'Encre', hex: '#0b1013' }
 ]
 
+/** La préparation des personnages, telle que le poste du MJ la suit. */
+export interface PreparationEtat {
+  ouverte: boolean
+  /** La répartition de tous est-elle à l'écran de la table ? */
+  ecran: boolean
+  /** Ouverte à cet instant (ISO), ou null. */
+  depuis: string | null
+  persos: {
+    id: number
+    nom: string
+    color: string | null
+    stats: Record<string, number>
+    skills: string[]
+    reste: number
+    valide: boolean
+    /** Le joueur a-t-il déjà posé quelque chose ? */
+    ouvert: boolean
+  }[]
+}
+
 export type SlidePayload = (
   | { type: 'black' }
   | { type: 'image'; itemId: number; url: string; title: string; caption?: string; frame?: Frame }
@@ -1368,6 +1514,24 @@ export type SlidePayload = (
       /** Nom du jeton de couleur du personnage — il borde le portrait. */
       color: string | null
       emojis: string[]
+    }
+  | {
+      /** La préparation des personnages, en direct : qui met ses points où. */
+      type: 'preparation'
+      /** Le départ et le plafond de la règle : les barres vont de l'un à l'autre. */
+      bornes: [number, number]
+      caracs: { key: string; code: string; nom: string }[]
+      persos: {
+        id: number
+        nom: string
+        /** Le prénom de celui qui le joue. */
+        joueur: string | null
+        /** La couleur du personnage, en hexadécimal. */
+        couleur: string
+        stats: Record<string, number>
+        reste: number
+        valide: boolean
+      }[]
     }
   | {
       /** L'écran d'avant la partie : « ça commence bientôt ». */
@@ -1462,6 +1626,16 @@ export interface Pion {
    * reste au MJ — `listPionsVus` l'efface avant qu'il ne parte.
    */
   anonyme: boolean
+  /**
+   * L'état d'un PNJ qui le montre (`Character.etatVisible`), lu sur ses PV.
+   * Un joueur n'en porte pas ici : le sien se lit dans `joueurs`.
+   */
+  etat?: EtatPion | null
+  /**
+   * Montré aux joueurs seulement quand l'un d'eux le voit : dans le champ de
+   * vision d'un joueur, il paraît ; hors de vue, il n'est pas dessiné chez eux.
+   */
+  regard: boolean
 }
 
 /**
@@ -1483,7 +1657,13 @@ export interface PionJoueur {
 /** Ce qu'un lieu porte : tous ses pions, et parmi eux les joueurs. */
 export interface PionsDuLieu {
   count: number
+  /** Tous les pions qui ont une fiche — PNJ compris, comme avant. */
   joueurs: PionJoueur[]
+  /**
+   * Les PNJ posés là : ceux qui ont une fiche, et les pions nommés qui n'en
+   * ont pas (`characterId` nul). Un pion d'objet sans nom n'y figure pas.
+   */
+  pnjs: (Omit<PionJoueur, 'characterId'> & { characterId: number | null })[]
 }
 
 /**
@@ -1590,6 +1770,141 @@ export interface AudioState {
   playing: boolean
   loop: boolean
   volume: number
+  /** Le son de la sonothèque qui joue, s'il vient d'elle ; null : un fichier nu. */
+  sonId: number | null
+  /** Le fondu enchaîné quand l'ambiance change, en secondes. */
+  fondu: number
+}
+
+/* ---------- Les sons : sonothèque, sons posés, régie du son ---------- */
+
+/**
+ * Trois natures, et chacune sa couleur partout : l'**ambiance** (une seule à
+ * la fois, la suivante la remplace en fondu), la **nappe** (une boucle qu'on
+ * superpose — pluie, vent, feu) et le **bruitage** (un coup, puis silence).
+ */
+export type NatureSon = 'ambiance' | 'nappe' | 'bruitage'
+
+export const NATURES_SON: Record<NatureSon, { label: string; pluriel: string }> = {
+  ambiance: { label: 'ambiance', pluriel: 'Ambiances' },
+  nappe: { label: 'nappe', pluriel: 'Nappes' },
+  bruitage: { label: 'bruitage', pluriel: 'Bruitages' }
+}
+
+/**
+ * Ce qu'un son fait sentir aux téléphones. Le motif est celui de
+ * `navigator.vibrate` : vibrer, se taire, vibrer… en millisecondes. Android
+ * le suit ; Safari, sur iPhone, ne vibre pour aucune page web.
+ */
+export type MotifVibration = 'coup' | 'grondement' | 'coeur' | 'frisson'
+
+export const MOTIFS_VIBRATION: Record<MotifVibration, { label: string; motif: number[] }> = {
+  coup: { label: 'Un coup', motif: [220] },
+  grondement: { label: 'Grondement', motif: [90, 40, 90, 40, 90, 40, 260] },
+  coeur: { label: 'Battement de cœur', motif: [90, 120, 140, 600, 90, 120, 140] },
+  frisson: { label: 'Frisson', motif: [30, 50, 30, 50, 30, 50, 30, 50, 30] }
+}
+
+export interface FichierSon {
+  itemId: number
+  titre: string
+  /** Durée en secondes, mesurée par l'examen des médias ; null s'il ne l'a pas encore vue. */
+  duree: number | null
+  url: string | null
+}
+
+/** Un son de la sonothèque : un nom, une nature, et un ou plusieurs fichiers. */
+export interface Son {
+  id: number
+  /** Le nom affiché : celui qu'on lui a donné, sinon celui de son premier fichier. */
+  nom: string
+  /** Pas de nom à lui : il suit son fichier, renommages compris. */
+  nomSuitFichier: boolean
+  emoji: string | null
+  nature: NatureSon
+  /** De 0 à 1. */
+  volume: number
+  /** En secondes ; sans effet sur un bruitage. */
+  fonduEntree: number
+  fonduSortie: number
+  /** La touche du Paravent, de « 1 » à « 9 » ; null : aucune. */
+  touche: string | null
+  /** Le rayon de la sonothèque ; vide : rangé nulle part. */
+  planche: string
+  vibration: MotifVibration | null
+  ord: number
+  /** Plusieurs : on en tire un au hasard à chaque fois. */
+  fichiers: FichierSon[]
+}
+
+/** Quand un son posé sur le plan se déclenche. */
+export type QuandZone = 'une' | 'chaque' | 'proche'
+/** Quels pions le déclenchent. */
+export type ParZone = 'joueurs' | 'pnj' | 'tous'
+/** Quels téléphones vibrent quand il part. */
+export type VibrerZone = 'aucun' | 'lui' | 'tous'
+
+/**
+ * Un son posé sur un plan : un cercle, et ce qui s'y passe quand un pion y
+ * entre. Il vit sur le lieu qui porte la carte, comme les murs et les lampes.
+ * Les murs l'arrêtent : un pion derrière une cloison n'entend rien.
+ */
+export interface ZoneSon {
+  id: number
+  placeId: number
+  sonId: number | null
+  nom: string
+  /** En fractions de la carte. */
+  x: number
+  y: number
+  /** En part de la largeur de la carte, comme le rayon d'une lampe. */
+  rayon: number
+  quand: QuandZone
+  par: ParZone
+  /** Le temps mort entre deux déclenchements « à chaque entrée », en secondes. */
+  tempsMort: number
+  /** Attendre le feu vert du MJ au Paravent plutôt que jouer tout seul. */
+  confirmer: boolean
+  vibrer: VibrerZone
+}
+
+/** Où en est un son posé, le temps d'une partie. */
+export type EtatZone = 'arme' | 'fait' | 'attente' | 'ecoute'
+
+/** Un son qui part : le moteur du poste du MJ le joue, le Paravent l'écrit. */
+export interface SonJoue {
+  /** Croissant : deux coups du même son restent deux coups. */
+  n: number
+  sonId: number
+  nom: string
+  emoji: string | null
+  nature: NatureSon
+  url: string | null
+  volume: number
+  /** Le pion qui l'a déclenché ; null : le MJ. */
+  qui: string | null
+  zoneId: number | null
+}
+
+/**
+ * La régie du son, telle que le processus principal la tient. L'ambiance
+ * reste dans `DisplayState.audio`, où elle était ; ici, tout le reste.
+ */
+export interface SonsMj {
+  /** Le volume général, de 0 à 1 : il pèse sur tout, ambiance comprise. */
+  general: number
+  /** Coupé : les sons posés s'allument au Paravent, mais ne partent pas seuls. */
+  auto: boolean
+  /** Les nappes lancées à la main. */
+  nappes: { sonId: number; url: string | null; volume: number; on: boolean }[]
+  /** Les sons posés « tant qu'on est proche » du lieu en scène, et leur gain du moment. */
+  sources: { zoneId: number; sonId: number; url: string | null; volume: number; gain: number }[]
+  /** L'état des sons posés sur le lieu en scène. */
+  zones: Record<number, EtatZone>
+  /** Ceux qui attendent le feu vert, avec qui les a réveillés. */
+  attente: { zoneId: number; qui: string | null }[]
+  /** Les derniers sons partis, du plus récent au plus ancien. */
+  journal: SonJoue[]
 }
 
 /* ---------- Les tours : à qui de jouer ---------- */
@@ -1714,6 +2029,12 @@ export interface DisplayState {
   } | null
   /** Le nom du joueur s'écrit-il sous son pion, sur l'écran des joueurs ? */
   pionLabels: boolean
+  /**
+   * Ce que la table voit d'une carte qui a des murs : « regards », seulement
+   * ce que leurs personnages ont sous les yeux (l'ombre) ; « jour », la carte
+   * entière, sans ombre. Les murs retiennent toujours le pas.
+   */
+  vision: 'regards' | 'jour'
   /** Et ses points de vie, juste en dessous ? */
   pionPv: boolean
   /**
@@ -1733,6 +2054,12 @@ export interface DisplayState {
   playerOpen: boolean
   /** Lieu où se tient la scène : c'est lui qui porte les pions. */
   placeId: number | null
+  /**
+   * La carte de ce lieu, l'élément de bibliothèque. Les pions et l'ombre ne se
+   * posent que sur elle (`montreLaCarte`) : basculer sur une autre image laisse
+   * le lieu en scène sans dessiner ses jetons sur un portrait.
+   */
+  carteDuLieu: number | null
   /**
    * Avance d'un cran chaque fois qu'une lampe ou une porte change d'état.
    *

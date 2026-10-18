@@ -18,6 +18,7 @@ import {
   IconSliders,
   IconTrash
 } from './Icons'
+import { useEchap } from '../echap'
 
 /**
  * La fenêtre des paramètres — ce qui se pose une fois et ne se retouche pas
@@ -53,13 +54,7 @@ export function Parametres({
   const s = useStore()
   const [rub, setRub] = useState<Rubrique>(depart ?? 'ecran')
 
-  useEffect(() => {
-    const touche = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', touche)
-    return () => document.removeEventListener('keydown', touche)
-  }, [onClose])
+  useEchap(onClose)
 
   const active = RUBRIQUES.find((r) => r.id === rub)!
   const surLePoste = !!active.poste
@@ -433,6 +428,20 @@ function Table(): JSX.Element {
               </select>
             </Ligne>
 
+            <Ligne
+              nom="Compétences"
+              aide="Décochée, la table ne s’en sert pas : elles disparaissent des fiches, du téléphone et de la préparation. Ce que les personnages avaient pris est gardé."
+            >
+              <input
+                type="checkbox"
+                checked={!spec?.sansCompetences}
+                aria-label="Se servir des compétences"
+                onChange={(e) => void poserFiche({ sansCompetences: e.target.checked ? undefined : true })}
+              />
+            </Ligne>
+
+            {!spec?.sansCompetences && (
+            <>
             <Ligne nom="Le joueur prend au plus" aide="Le nombre de compétences qu’une fiche accepte.">
               <input
                 type="number"
@@ -456,6 +465,8 @@ function Table(): JSX.Element {
                 ∞
               </button>
             </Ligne>
+            </>
+            )}
 
             <Ligne
               nom="La santé mentale, c’est"
@@ -493,20 +504,17 @@ function Table(): JSX.Element {
         />
       </Ligne>
 
+      {/* Les monnaies ont remplacé l'unité de valeur : elles se règlent dans
+          la fiche de campagne, à côté des jauges. On les rappelle ici. */}
       <Ligne
-        nom="Unité de valeur"
-        aide="Nommée une fois ; chaque objet ne porte qu’un nombre. Les catégories, elles, restent dans la réserve."
+        nom="Monnaies"
+        aide="Elles se règlent dans la fiche de campagne, onglet « Monnaies » : bourse des personnages et prix des objets."
       >
-        <input
-          type="text"
-          defaultValue={s.uniteValeur}
-          aria-label="Le nom de l’unité"
-          style={{ width: 160 }}
-          onBlur={async (e) => {
-            await window.jdr.objets.unite(e.target.value)
-            await s.refreshObjets()
-          }}
-        />
+        <span className="aide">
+          {s.reglages.monnaies.actif
+            ? s.reglages.monnaies.liste.map((m) => m.nom).join(', ') || 'aucune'
+            : 'pas de monnaie'}
+        </span>
       </Ligne>
     </>
   )

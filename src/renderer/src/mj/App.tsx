@@ -9,7 +9,9 @@ import { Menubar, type Rubrique } from './components/Menubar'
 import { Parametres } from './components/Parametres'
 import { FicheCampagne, FicheSeance, Carnet, DupliquerSeance } from './components/Fiches'
 import { FicheCampagne as FicheDeCampagne } from './modules/FicheCampagne'
-import { Ambience } from './components/Ambience'
+import { Sonorisation } from './components/Sonorisation'
+import { Sonotheque } from './modules/Sonotheque'
+import { useSons } from './sons'
 import { Ident } from './components/Ident'
 import { CacheMJ } from './components/CacheMJ'
 import { Home } from './components/Home'
@@ -21,7 +23,7 @@ import { Pupitre } from './modules/Pupitre'
 import { Pochette } from './modules/Pochette'
 import { Library } from './modules/Library'
 import { Editor } from './modules/Editor'
-import { Places } from './modules/Places'
+import { Places, lesPlans } from './modules/Places'
 import { Objets } from './modules/Objets'
 import { Timeline } from './modules/Timeline'
 import { Annexes } from './modules/Annexes'
@@ -32,7 +34,9 @@ import { Sheets } from './modules/Sheets'
 import { Dice } from './modules/Dice'
 import {
   IconChevron,
+  IconCadrage,
   IconCoffre,
+  IconNote,
   IconDoc,
   IconDie,
   IconFolder,
@@ -146,6 +150,9 @@ export function App(): JSX.Element {
   }, [])
 
   const sub = subtitle(s)
+  /* Le compte du rail, et le sous-titre qui se relit quand la sonothèque change. */
+  const nbSons = useSons((x) => x.liste.length)
+  const nbPlans = lesPlans(s.places).length
 
   /* Aucune campagne ouverte : l'accueil prend toute la fenêtre. Le rail n'a
      rien à montrer — ni moniteur, ni modules — tant qu'il n'y a pas de base. */
@@ -201,10 +208,17 @@ export function App(): JSX.Element {
             {/* L'Éditeur n'est plus dans le rail : on n'y va jamais pour lui-même, toujours
                 pour un document précis — depuis la Bibliothèque, la Chronologie ou un moment. */}
             <NavItem id="places" label="Lieux" count={s.places.length} icon={<IconPlace />} />
+            {/* Les seuls lieux qui ont un plan : on les feuillette d'un plan à l'autre. */}
+            <div className="nav-sous">
+              <NavItem id="plans" label="Plans" count={nbPlans} icon={<IconCadrage />} />
+            </div>
             {/* La réserve : ce qui se trouve, se ramasse, se porte. Elle est
                 de la matière, comme les lieux — on la prépare avant la séance,
                 puis on la pose. */}
             <NavItem id="objets" label="Objets" count={s.objets.length} icon={<IconCoffre />} />
+            {/* La sonothèque : les sons de la campagne, rangés en planches,
+                qu'on pose ensuite sur les plans et qu'on joue au Paravent. */}
+            <NavItem id="sons" label="Sons" count={nbSons} icon={<IconNote />} />
           </Group>
           <Group label="Table">
             <NavItem id="sheets" label="Fiches" count={s.characters.length} icon={<IconPeople />} />
@@ -296,7 +310,9 @@ export function App(): JSX.Element {
               {s.view === 'lib' && <Library />}
               {s.view === 'editor' && <Editor />}
               {s.view === 'places' && <Places />}
+              {s.view === 'plans' && <Places plans />}
               {s.view === 'objets' && <Objets />}
+              {s.view === 'sons' && <Sonotheque />}
               {s.view === 'timeline' && <Timeline />}
               {s.view === 'trame' && <Trame />}
               {s.view === 'annexes' && <Annexes />}
@@ -309,7 +325,7 @@ export function App(): JSX.Element {
         </div>
       </div>
 
-      <Ambience />
+      <Sonorisation />
     </div>
     {dessus}
     </div>
@@ -471,6 +487,10 @@ function subtitle(s: ReturnType<typeof useStore.getState>): string {
       return `${docCount(s)} documents rédigés`
     case 'places':
       return `${s.places.length} lieux`
+    case 'plans': {
+      const n = lesPlans(s.places).length
+      return `${n} plan${n > 1 ? 's' : ''}`
+    }
     case 'objets': {
       const poses = s.objets.reduce((n, o) => n + o.placements.length, 0)
       return `${s.objets.length} objets · ${s.objetFamilles.length} catégories · ${poses} posés`
@@ -479,6 +499,11 @@ function subtitle(s: ReturnType<typeof useStore.getState>): string {
       return `${s.session?.label ?? ''} · ${s.beats.length} moment${s.beats.length > 1 ? 's' : ''}`
     case 'trame':
       return `${s.session?.label ?? ''} · le scénario, pour le MJ seul`
+    case 'sons': {
+      const l = useSons.getState().liste
+      const n = (k: string): number => l.filter((x) => x.nature === k).length
+      return `${n('ambiance')} ambiances · ${n('nappe')} nappes · ${n('bruitage')} bruitages`
+    }
     case 'annexes':
       return `${s.session?.label ?? ''} · ${s.annexes.length} document${s.annexes.length > 1 ? 's' : ''}`
     case 'pupitre': {

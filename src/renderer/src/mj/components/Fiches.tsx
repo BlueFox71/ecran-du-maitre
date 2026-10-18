@@ -5,6 +5,7 @@ import { IconFolder, IconPeople, IconPen, IconPlus, IconTrash } from './Icons'
 import { PION_COULEURS } from '@shared/types'
 import type { CampaignPlayer, CarnetPlayer } from '@shared/types'
 import type { UiFolder } from '../../../../preload/index'
+import { useEchap } from '../echap'
 
 /* ============================================================
    La campagne : son identité, son dossier, ses joueurs
@@ -773,13 +774,7 @@ export function Fenetre({
   pied?: React.ReactNode
   children: React.ReactNode
 }): JSX.Element {
-  useEffect(() => {
-    const touche = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    document.addEventListener('keydown', touche)
-    return () => document.removeEventListener('keydown', touche)
-  }, [onClose])
+  useEchap(onClose)
 
   return (
     <div className="scrim" onClick={onClose}>

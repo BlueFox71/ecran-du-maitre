@@ -1,10 +1,21 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import { PION_COULEURS } from '@shared/types'
+import { PION_COULEURS, porteFranchissable } from '@shared/types'
 import { Pings, usePings } from '../shared/Pings'
-import { Brouillard } from '../shared/Brouillard'
+import { Brouillard, regardsDes, sousUnRegard } from '../shared/Brouillard'
 import { Visage } from '../shared/Visage'
-import { barrieres, pasContraint, type Pt } from '@shared/murs'
-import type { CadreCarre, CalqueBrouillard, MobilePing, PointMur } from '@shared/types'
+import { Piece } from '../shared/Piece'
+import { barrieres, pasContraint, seCroisent, type Pt } from '@shared/murs'
+import { bordsOuverture } from '@shared/ouvertures'
+import { modificateur, naturel, signe, type Naturel } from '@shared/jet'
+import {
+  depense,
+  exigenceTenue,
+  prochainCran,
+  type Exigence,
+  type ReglePreparation
+} from '@shared/preparation'
+import type { CadreCarre, CalqueBrouillard, MobilePing, Ouverture, PointMur } from '@shared/types'
+import { heureLocale } from '@shared/heure'
 
 /**
  * L'application du joueur, sur son téléphone.
@@ -39,11 +50,22 @@ window.addEventListener('beforeinstallprompt', (e) => {
  * le port du serveur, sans quoi les appels partiraient chez Vite, qui n'a
  * aucune campagne à offrir.
  */
-const PORT = '7777'
+const PORT = ((): string => {
+  /* Le port réglé au poste arrive dans l'adresse de renvoi ; on le garde pour
+     les rechargements, qui n'ont plus la requête. */
+  const vu = new URLSearchParams(location.search).get('p')
+  try {
+    if (vu) sessionStorage.setItem('jdr.port', vu)
+    return vu ?? sessionStorage.getItem('jdr.port') ?? '7777'
+  } catch {
+    return vu ?? '7777'
+  }
+})()
 const API = location.port === PORT ? '' : `${location.protocol}//${location.hostname}:${PORT}`
 
 interface Jauge { key: string; label: string; color: string; value: number; max: number }
-interface Carac { key: string; label: string; code: string | null; valeur: number }
+/** `mod` : ce que le jet ajoute au dé. Absent d'un serveur plus ancien, on le calcule. */
+interface Carac { key: string; label: string; code: string | null; valeur: number; mod?: number }
 interface Comp { key: string; label: string; valeur: number }
 interface PionVu {
   id: number
@@ -58,6 +80,8 @@ interface PionVu {
   characterId: number | null
   /** Le pion d'un PNJ : pas de regard non plus. */
   pnj?: boolean
+  /** Ne paraît que sous le regard d'un joueur, comme sur l'écran de la table. */
+  regard?: boolean
   url: string | null
   cadre: CadreCarre | null
   mien: boolean
@@ -90,6 +114,9 @@ interface ObjetTel {
   emplacements: string[]
   qte: number
   teinte: string | null
+  /** Une lampe : elle s'allume et s'éteint, et n'éclaire que portée. */
+  lampe?: boolean
+  allumee?: boolean
 }
 
 /** Un inventaire que le MJ a ouvert à la table : le camion, la malle. */
@@ -102,6 +129,8 @@ interface InventaireTel {
 interface Etat {
   campagne: string | null
   joueur: { id: number; nom: string; couleur: string | null } | null
+  /** Les couleurs des autres joueurs. Absent d'un serveur plus ancien. */
+  couleursPrises?: { cle: string; par: string }[]
   perso: {
     id: number
     nom: string
@@ -111,7 +140,10 @@ interface Etat {
     cadre: CadreCarre | null
     jauges: Jauge[]
     caracs: Carac[]
-    comps: Comp[]
+    /** null : la campagne ne se sert pas des compétences. */
+    comps: Comp[] | null
+    /** Sa bourse, une ligne par monnaie. Absente d'un serveur plus ancien. */
+    bourse?: { key: string; nom: string; abbr: string; teinte: string; image: string | null; valeur: number }[]
   } | null
   /** Ce qu'on lui a mis en main. Jamais ce qu'un autre a reçu. */
   pochette: { onglets: { id: number; nom: string }[]; docs: DocPoche[] }
@@ -121,8 +153,10 @@ interface Etat {
   /** Les inventaires ouverts, où chacun pioche. Absent d'un serveur plus ancien. */
   inventaires?: InventaireTel[]
   gele: boolean
+  /** Plein jour : la carte entière, sans ombre. */
+  jour?: boolean
   /** Le lieu à l'écran, et la taille de son plan : le repère des murs. */
-  lieu: { id: number; nom: string; plan: string | null; w: number | null; h: number | null } | null
+  lieu: { id: number; nom: string; plan: string | null; w: number | null; h: number | null; allure?: number } | null
   pions: PionVu[]
   /** Il avance dès qu'une porte ou une lampe bouge : c'est le signal de relire le calque. */
   calqueRev: number
@@ -130,6 +164,20 @@ interface Etat {
   tour: TourTel | null
   /** Le pion de celui qui joue : il porte un halo sur le plan. */
   pionEnJeuId: number | null
+  /** Le MJ a invité à préparer son personnage. Absent d'un serveur plus ancien. */
+  preparation?: PrepaTel | null
+}
+
+/** La préparation du personnage, telle que le téléphone la reçoit. */
+interface PrepaTel {
+  /** L'instant où le MJ l'a ouverte : une nouvelle invitation repart de zéro. */
+  depuis: string | null
+  regle: ReglePreparation
+  /** Combien de compétences au plus ; null : autant qu'on veut. */
+  limite: number | null
+  caracs: { key: string; code: string; nom: string }[]
+  comps: ({ key: string } & Exigence)[]
+  mien: { stats: Record<string, number>; skills: string[]; valide: boolean }
 }
 
 interface EntrantTel {
@@ -195,10 +243,42 @@ const cleAppareil = (): string | undefined => {
 export function Mobile(): JSX.Element {
   const [jeton, setJeton] = useState<string | null>(jetonGarde)
   const [etat, setEtat] = useState<Etat | null>(null)
+  /**
+   * Le navigateur a refusé de vibrer. Chrome n'obéit qu'à une page qu'on a
+   * touchée au moins une fois depuis son ouverture ; un iPhone, jamais. On le
+   * dit, et l'écran tremble à la place.
+   */
+  const [vibreBloque, setVibreBloque] = useState(false)
+  const vibrer = (motif: number[]): void => {
+    let ok = false
+    try {
+      ok = !!navigator.vibrate?.(motif)
+    } catch {
+      ok = false
+    }
+    if (ok) return
+    const corps = document.body
+    corps.classList.remove('m-frisson')
+    void corps.offsetWidth
+    corps.classList.add('m-frisson')
+    const total = motif.reduce((a, b) => a + b, 0)
+    setTimeout(() => corps.classList.remove('m-frisson'), Math.max(400, Math.min(2500, total)))
+    if (typeof navigator.vibrate === 'function') setVibreBloque(true)
+  }
+  /* Le premier toucher lève l'interdit : le bandeau s'en va. */
+  useEffect(() => {
+    if (!vibreBloque) return
+    const leve = (): void => setVibreBloque(false)
+    document.addEventListener('pointerdown', leve, { once: true })
+    return () => document.removeEventListener('pointerdown', leve)
+  }, [vibreBloque])
   const [convives, setConvives] = useState<Convive[] | null>(null)
   const [ferme, setFerme] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
   const [onglet, setOnglet] = useState<Onglet>('fiche')
+  /* La préparation refermée par le joueur, notée par son ouverture : une
+     nouvelle invitation du MJ la rouvre d'elle-même. */
+  const [prepaRangee, setPrepaRangee] = useState<string | null>(null)
   /* Les ondes de toute la table, la sienne comprise : on montre un point, on
      le voit partir. */
   const ondes = usePings()
@@ -261,6 +341,16 @@ export function Mobile(): JSX.Element {
       source = new EventSource(`${API}/api/stream?t=${encodeURIComponent(jeton)}`)
       source.addEventListener('state', (e) => setEtat(JSON.parse((e as MessageEvent).data)))
       source.addEventListener('ping', (e) => onde(JSON.parse((e as MessageEvent).data)))
+      /* Un bruitage du MJ se sent dans la main. Android obéit ; Safari, sur
+         iPhone, n'a pas `vibrate` — et rien ne doit casser pour autant. */
+      source.addEventListener('vibre', (e) => {
+        try {
+          const motif = JSON.parse((e as MessageEvent).data)
+          if (Array.isArray(motif)) vibrer(motif)
+        } catch {
+          /* Un motif illisible ne vibre pas, voilà tout. */
+        }
+      })
       source.onerror = () => {
         source?.close()
         if (vivant) reprise = setTimeout(brancher, 2500)
@@ -306,14 +396,35 @@ export function Mobile(): JSX.Element {
 
   /* ---------------- les écrans ---------------- */
 
+  if (etat?.preparation && etat.perso && prepaRangee !== etat.preparation.depuis) {
+    const depuis = etat.preparation.depuis
+    return (
+      <Preparation
+        key={depuis ?? ''}
+        prepa={etat.preparation}
+        nom={etat.perso.nom}
+        joueur={etat.joueur?.nom ?? null}
+        jeton={jeton!}
+        onRanger={() => setPrepaRangee(depuis)}
+      />
+    )
+  }
+
   if (etat) {
     return (
-      <Table
+      <>
+        {vibreBloque ? (
+          <div className="m-vibre-bloque" role="status">
+            Touche l’écran une fois : ton téléphone pourra vibrer quand le MJ le voudra.
+          </div>
+        ) : null}
+        <Table
         etat={etat}
         jeton={jeton!}
         ondes={ondes.pings}
         onglet={onglet}
         setOnglet={setOnglet}
+        onPreparer={etat.preparation && etat.perso ? () => setPrepaRangee(null) : null}
         onOublier={() => {
           /* On prévient le poste du MJ : sans cela sa ligne resterait en base,
              et l'appareil se compterait deux fois au prochain appairage. On ne
@@ -332,6 +443,7 @@ export function Mobile(): JSX.Element {
           setConvives(null)
         }}
       />
+      </>
     )
   }
 
@@ -505,6 +617,7 @@ function Table({
   ondes,
   onglet,
   setOnglet,
+  onPreparer,
   onOublier
 }: {
   etat: Etat
@@ -512,6 +625,8 @@ function Table({
   ondes: MobilePing[]
   onglet: Onglet
   setOnglet: (o: Onglet) => void
+  /** La préparation est ouverte mais rangée : de quoi y revenir. */
+  onPreparer: (() => void) | null
   onOublier: () => void
 }): JSX.Element {
   return (
@@ -528,6 +643,14 @@ function Table({
       </header>
 
       {etat.tour ? <BandeauTour tour={etat.tour} /> : null}
+      {onPreparer ? (
+        <button className="m-prp-rappel" onClick={onPreparer}>
+          {etat.preparation?.mien.valide
+            ? 'Personnage validé · le retoucher'
+            : 'Le MJ t’invite à préparer ton personnage'}
+          <span aria-hidden="true">›</span>
+        </button>
+      ) : null}
       <PoserSurAccueil />
 
       <main className="m-corps">
@@ -557,6 +680,273 @@ function Table({
           </button>
         ))}
       </nav>
+    </div>
+  )
+}
+
+/* ============================================================
+   Préparer son personnage
+   ============================================================ */
+
+/**
+ * Avant la séance, le joueur répartit ses points : une ligne par
+ * caractéristique, − et +, sa valeur et son modificateur qui bougent sous son
+ * pouce. Chaque geste part au poste du MJ — qui le suit, et peut le montrer à
+ * toute la table ; rien n'est écrit sur la fiche avant « Valider ».
+ *
+ * Le compte se fait ici et au serveur avec la même règle (`shared/preparation`) :
+ * un « + » grisé l'est parce que le serveur refuserait.
+ */
+function Preparation({
+  prepa,
+  nom,
+  joueur,
+  jeton,
+  onRanger
+}: {
+  prepa: PrepaTel
+  nom: string
+  /** Le prénom de celui qui tient le téléphone. */
+  joueur: string | null
+  jeton: string
+  onRanger: () => void
+}): JSX.Element {
+  const { regle, limite } = prepa
+  /* Le téléphone tient son brouillon : l'état qui revient du PC le
+     rattraperait en plein geste. On ne reprend celui du PC qu'à l'ouverture. */
+  const [stats, setStats] = useState<Record<string, number>>(() => ({ ...prepa.mien.stats }))
+  const [skills, setSkills] = useState<string[]>(() => [...prepa.mien.skills])
+  const [vue, setVue] = useState<'caracs' | 'comps'>('caracs')
+  const [fini, setFini] = useState(prepa.mien.valide)
+  const [erreur, setErreur] = useState<string | null>(null)
+  const [envoi, setEnvoi] = useState(false)
+
+  const reste = regle.points - depense(stats, regle)
+  /* Une compétence prise sort du compte si on retire le point qui l'ouvrait :
+     elle ne part pas au PC, et revient si le point revient. */
+  const tenuesDe = (st: Record<string, number>, sk: string[]): string[] =>
+    sk.filter((k) => {
+      const c = prepa.comps.find((x) => x.key === k)
+      return !!c && exigenceTenue(c, st)
+    })
+  const tenues = tenuesDe(stats, skills)
+
+  const envoyer = (st: Record<string, number>, sk: string[], valider = false): Promise<Response> =>
+    fetch(`${API}/api/preparation?t=${encodeURIComponent(jeton)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ stats: st, skills: tenuesDe(st, sk), valider })
+    })
+
+  /* Chaque geste part au PC, regroupés : cinq « + » d'affilée font un envoi. */
+  const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null)
+  const poser = (st: Record<string, number>, sk: string[]): void => {
+    setStats(st)
+    setSkills(sk)
+    if (minuteur.current) clearTimeout(minuteur.current)
+    minuteur.current = setTimeout(() => void envoyer(st, sk).catch(() => undefined), 150)
+  }
+  useEffect(
+    () => () => {
+      if (minuteur.current) clearTimeout(minuteur.current)
+    },
+    []
+  )
+
+  const valider = async (): Promise<void> => {
+    if (minuteur.current) clearTimeout(minuteur.current)
+    setEnvoi(true)
+    setErreur(null)
+    try {
+      const r = await envoyer(stats, skills, true)
+      if (!r.ok) return setErreur(((await r.json()) as { erreur?: string }).erreur ?? 'Refusé.')
+      setFini(true)
+    } catch {
+      setErreur('Le PC du MJ ne répond pas.')
+    } finally {
+      setEnvoi(false)
+    }
+  }
+
+  if (fini) {
+    return (
+      <div className="m-prp">
+        <div className="m-prp-fin">
+          <span className="m-eyebrow m-prp-ok">Écrit sur ta fiche</span>
+          <h1 className="m-prp-titre">{nom} est prêt·e</h1>
+          <p className="m-note m-gauche">
+            Le MJ voit ta répartition. Tant qu’il n’a pas clos la préparation, tu peux encore la
+            retoucher.
+          </p>
+          <div className="m-prp-bilan">
+            {prepa.caracs.map((c) => {
+              const v = stats[c.key] ?? regle.depart
+              const m = modificateur(v)
+              return (
+                <div key={c.key}>
+                  <b>{v}</b>
+                  <b className={m > 0 ? 'plus' : m < 0 ? 'moins' : ''}>{signe(m)}</b>
+                  <span className="m-prp-code">{c.code}</span>
+                  {c.nom !== c.code ? <span className="m-prp-nom">{c.nom}</span> : null}
+                </div>
+              )
+            })}
+          </div>
+          {regle.competences && prepa.comps.length ? (
+            <div>
+              <span className="m-eyebrow">Compétences</span>
+              <p className="m-prp-comps">
+                {tenues.map((k) => prepa.comps.find((c) => c.key === k)?.nom).join(' · ') ||
+                  'aucune'}
+              </p>
+            </div>
+          ) : null}
+        </div>
+        <div className="m-prp-pied">
+          <button className="m-btn" onClick={() => setFini(false)}>
+            Retoucher
+          </button>
+          <button className="m-btn" onClick={onRanger}>
+            Revenir à ma fiche
+          </button>
+        </div>
+      </div>
+    )
+  }
+
+  const avecComps = regle.competences && prepa.comps.length > 0
+  return (
+    <div className="m-prp">
+      <div className="m-prp-tete">
+        <div className="m-prp-haut">
+          <span className="m-eyebrow">Avant la séance · demandé par le MJ</span>
+          <button className="m-prp-ranger" onClick={onRanger}>
+            plus tard
+          </button>
+        </div>
+        <h1 className="m-prp-titre">{nom}</h1>
+        {joueur ? <span className="m-prp-joueur">joué par {joueur}</span> : null}
+        <div className="m-prp-reste">
+          <span>Points à répartir</span>
+          <span className={reste === 0 ? 'zero' : ''}>
+            <b>{reste}</b> / {regle.points}
+          </span>
+        </div>
+        <div className="m-prp-jauge">
+          <i
+            style={{
+              width: `${Math.min(100, ((regle.points - reste) / Math.max(1, regle.points)) * 100)}%`
+            }}
+          />
+        </div>
+      </div>
+
+      {avecComps ? (
+        <div className="m-prp-vues" role="tablist">
+          <button role="tab" aria-selected={vue === 'caracs'} onClick={() => setVue('caracs')}>
+            Caractéristiques
+          </button>
+          <button role="tab" aria-selected={vue === 'comps'} onClick={() => setVue('comps')}>
+            Compétences · {tenues.length}
+            {limite != null ? `/${limite}` : ''}
+          </button>
+        </div>
+      ) : null}
+
+      <div className="m-prp-corps">
+        {vue === 'caracs' || !avecComps ? (
+          prepa.caracs.map((c) => {
+            const v = stats[c.key] ?? regle.depart
+            const m = modificateur(v)
+            const suivant = prochainCran(v, regle)
+            const part = (v - regle.depart) / Math.max(1, regle.plafond - regle.depart)
+            return (
+              <div key={c.key} className="m-prp-ligne">
+                <b className="m-prp-code">{c.code}</b>
+                <span className="m-prp-nomb">
+                  <span>{c.nom !== c.code ? c.nom : ''}</span>
+                  <span className="m-prp-barre">
+                    <i style={{ width: `${part * 100}%` }} />
+                  </span>
+                </span>
+                <button
+                  aria-label={`Retirer un point en ${c.nom}`}
+                  disabled={v <= regle.depart}
+                  onClick={() => poser({ ...stats, [c.key]: v - 1 }, skills)}
+                >
+                  −
+                </button>
+                <b className="m-prp-val">{v}</b>
+                <button
+                  className="plus"
+                  aria-label={`Ajouter un point en ${c.nom}`}
+                  disabled={suivant === null || reste < suivant}
+                  onClick={() => poser({ ...stats, [c.key]: v + 1 }, skills)}
+                >
+                  +
+                </button>
+                <span className="m-prp-mod">
+                  <b className={m > 0 ? 'plus' : m < 0 ? 'moins' : ''}>{signe(m)}</b>
+                  <small>
+                    {suivant === null ? 'max' : `+1 = ${suivant} pt${suivant > 1 ? 's' : ''}`}
+                  </small>
+                </span>
+              </div>
+            )
+          })
+        ) : (
+          <>
+            <p className="m-note m-gauche">
+              {limite != null ? `${limite} au choix. ` : ''}Celles qui demandent une
+              caractéristique s’ouvrent dès que tu l’atteins.
+            </p>
+            {prepa.comps.map((c) => {
+              const ok = exigenceTenue(c, stats)
+              const pris = tenues.includes(c.key)
+              const plein = limite != null && tenues.length >= limite && !pris
+              const manque = c.statKey && c.min != null ? c.min - (stats[c.statKey] ?? 0) : 0
+              const sans = skills.filter((k) => k !== c.key)
+              return (
+                <button
+                  key={c.key}
+                  className={`m-prp-comp${pris ? ' pris' : ''}`}
+                  aria-pressed={pris}
+                  disabled={!ok || plein}
+                  onClick={() => poser(stats, pris ? sans : [...sans, c.key])}
+                >
+                  <span className="m-prp-coche">{pris ? '✓' : ''}</span>
+                  <span className="m-prp-cnom">
+                    <span>{c.nom}</span>
+                    {c.texte ? (
+                      <small className={ok ? '' : 'manque'}>
+                        {c.texte}
+                        {ok ? '' : ` · il te manque ${manque}`}
+                      </small>
+                    ) : null}
+                  </span>
+                </button>
+              )
+            })}
+          </>
+        )}
+      </div>
+
+      <div className="m-prp-pied">
+        {erreur ? <p className="m-prp-erreur">{erreur}</p> : null}
+        {/* Tous les points posés, ni plus ni moins : la fiche ne part pas à moitié faite. */}
+        {reste > 0 ? (
+          <p className="m-prp-avert">
+            Pose encore {reste} point{reste > 1 ? 's' : ''} pour valider.
+          </p>
+        ) : null}
+        <button
+          className="m-btn m-prp-valider"
+          disabled={envoi || reste !== 0}
+          onClick={() => void valider()}
+        >
+          Valider mon personnage
+        </button>
+      </div>
     </div>
   )
 }
@@ -694,12 +1084,14 @@ function Fiche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
           {p.caracs.map((c) => (
             <div className="m-cc" key={c.key} title={c.label}>
               <b>{c.valeur}</b>
+              <em>{signe(bonusDe(c))}</em>
               <span>{c.code ?? abrege(c.label)}</span>
             </div>
           ))}
         </div>
       </section>
 
+      {p.comps && (
       <section>
         <span className="m-eyebrow">Compétences</span>
         {p.comps.length === 0 ? (
@@ -716,21 +1108,42 @@ function Fiche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
           </div>
         )}
       </section>
+      )}
+
+      {p.bourse && p.bourse.length > 0 ? (
+        <section>
+          <span className="m-eyebrow">Ma bourse</span>
+          <div className="m-comps">
+            {p.bourse.map((m) => (
+              <div className="m-cp m-sou" key={m.key}>
+                <Piece teinte={m.teinte} url={m.image ? API + m.image : null} taille={22} />
+                <span>{m.nom}</span>
+                <span className="m-pts" />
+                <b>{m.valeur.toLocaleString('fr-FR')}</b>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
 
       <section>
         <span className="m-eyebrow">Ma couleur</span>
         <div className="m-teintes">
-          {PION_COULEURS.map((c) => (
-            <button
-              key={c.key}
-              className="m-tt"
-              style={{ ['--p' as string]: c.hex }}
-              aria-pressed={etat.joueur?.couleur === c.key}
-              aria-label={c.name}
-              title={c.name}
-              onClick={() => void changerCouleur(c.key)}
-            />
-          ))}
+          {PION_COULEURS.map((c) => {
+            const prise = etat.couleursPrises?.find((x) => x.cle === c.key)
+            return (
+              <button
+                key={c.key}
+                className={`m-tt${prise ? ' prise' : ''}`}
+                style={{ ['--p' as string]: c.hex }}
+                aria-pressed={etat.joueur?.couleur === c.key}
+                aria-label={prise ? `${c.name}, prise par ${prise.par}` : c.name}
+                title={prise ? `${c.name} — prise par ${prise.par}` : c.name}
+                disabled={!!prise}
+                onClick={() => void changerCouleur(c.key)}
+              />
+            )
+          })}
         </div>
         {refus ? <p className="m-erreur">{refus}</p> : null}
         <p className="m-note m-gauche">
@@ -810,6 +1223,17 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
     if (!r.ok) setErreur((await r.json().catch(() => ({}))).erreur ?? 'Impossible de le ranger.')
   }
 
+  /** Allumer ou éteindre sa lampe, sans la ranger. L'état revient par le flux. */
+  const allumer = async (placementId: number, allumee: boolean): Promise<void> => {
+    setErreur(null)
+    const r = await fetch(`${API}/api/allumer?t=${encodeURIComponent(jeton)}`, {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ placementId, allumee })
+    })
+    if (!r.ok) setErreur((await r.json().catch(() => ({}))).erreur ?? 'Impossible de l’allumer.')
+  }
+
   if (!etat.perso) {
     return (
       <div className="m-vue">
@@ -818,21 +1242,40 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
     )
   }
 
-  const ligne = (o: ObjetTel): JSX.Element => (
-    <button
-      key={o.placementId}
-      className={`m-objet${o.emplacement ? ' porte' : ''}`}
-      style={teinte(o.teinte)}
-      onClick={() => setOuvert(o.placementId)}
-    >
-      <span className="m-o-pastille" />
-      <span className="m-o-nom">
-        {o.nom}
-        {o.qte > 1 ? <b> ×{o.qte}</b> : null}
-      </span>
-      <span className="m-o-ou">{o.emplacement ? nomDe(o.emplacement) : 'inventaire'}</span>
-    </button>
-  )
+  /* Une lampe en main : la ligne s'ouvre comme les autres, et l'interrupteur
+     est à côté, sous le pouce. Dans le sac, elle n'éclaire pas : pas
+     d'interrupteur. */
+  const ligne = (o: ObjetTel): JSX.Element =>
+    o.lampe && o.emplacement ? (
+      <div key={o.placementId} className="m-objet porte m-lampe" style={teinte(o.teinte)}>
+        <span className="m-o-pastille" />
+        <button className="m-lampe-ouvrir" onClick={() => setOuvert(o.placementId)}>
+          <span className="m-o-nom">{o.nom}</span>
+          <span className="m-o-ou">{nomDe(o.emplacement)}</span>
+        </button>
+        <button
+          className={`m-lampe-bouton${o.allumee ? ' on' : ''}`}
+          aria-pressed={!!o.allumee}
+          onClick={() => void allumer(o.placementId, !o.allumee)}
+        >
+          {o.allumee ? 'Allumée' : 'Éteinte'}
+        </button>
+      </div>
+    ) : (
+      <button
+        key={o.placementId}
+        className={`m-objet${o.emplacement ? ' porte' : ''}`}
+        style={teinte(o.teinte)}
+        onClick={() => setOuvert(o.placementId)}
+      >
+        <span className="m-o-pastille" />
+        <span className="m-o-nom">
+          {o.nom}
+          {o.qte > 1 ? <b> ×{o.qte}</b> : null}
+        </span>
+        <span className="m-o-ou">{o.emplacement ? nomDe(o.emplacement) : 'inventaire'}</span>
+      </button>
+    )
 
   const enChoix = objets.find((o) => o.placementId === ouvert) ?? null
   /* On ne lui propose que les endroits où cette chose-là peut aller — une épée
@@ -1101,7 +1544,7 @@ function Poche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
                   </span>
                 ) : null}
                 {!d.lu ? <span className="point" /> : null}
-                <span className="h">{d.donneA.slice(11, 16)}</span>
+                <span className="h">{heureLocale(d.donneA)}</span>
               </span>
             </span>
           </Cadre>
@@ -1276,12 +1719,37 @@ function natureDite(genre: string): string {
 
 /* ---------------- le jet ---------------- */
 
+const bonusDe = (c: Carac): number => c.mod ?? modificateur(c.valeur)
+
+/** Un jet envoyé, tel que le serveur l'a compté. */
+interface JetFait {
+  n: number
+  carac: string
+  de: number
+  bonus: number
+  total: number
+  naturel: Naturel
+}
+
+/*
+ * Ses derniers jets de la soirée. Hors du composant : changer d'onglet ne doit
+ * pas les effacer, le joueur revient vérifier ce qu'il a annoncé. Une page
+ * rechargée repart à vide — c'est le journal du MJ qui fait foi.
+ */
+let mesJets: JetFait[] = []
+
+const NATUREL_DIT: Record<'critique' | 'maladresse', string> = {
+  critique: '20 naturel',
+  maladresse: '1 naturel'
+}
+
 function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
   const caracs = etat.perso?.caracs ?? []
   const [cle, setCle] = useState<string>(caracs[0]?.key ?? '')
   const [de, setDe] = useState<number | null>(null)
   const [envoi, setEnvoi] = useState<'non' | 'encours' | 'fait'>('non')
   const [erreur, setErreur] = useState<string | null>(null)
+  const [faits, setFaits] = useState<JetFait[]>(mesJets)
   const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => () => void (minuteur.current && clearTimeout(minuteur.current)), [])
@@ -1290,7 +1758,8 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
   }, [caracs, cle])
 
   const carac = caracs.find((c) => c.key === cle) ?? null
-  const bonus = carac?.valeur ?? 0
+  const bonus = carac ? bonusDe(carac) : 0
+  const nat = de === null ? null : naturel(de)
 
   /**
    * Envoyer vide la valeur du dé et laisse tout le reste en place : à la table
@@ -1311,6 +1780,18 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
       setEnvoi('non')
       return setErreur((await r.json()).erreur)
     }
+    /* Le compte du serveur fait foi ; un serveur plus ancien ne rend que le total. */
+    const rep = (await r.json()) as Partial<JetFait> & { total: number }
+    const fait: JetFait = {
+      n: (mesJets[0]?.n ?? 0) + 1,
+      carac: carac.code ?? abrege(carac.label),
+      de: rep.de ?? de,
+      bonus: rep.bonus ?? bonus,
+      total: rep.total,
+      naturel: rep.naturel ?? naturel(de)
+    }
+    mesJets = [fait, ...mesJets].slice(0, 8)
+    setFaits(mesJets)
     setDe(null)
     setEnvoi('fait')
     if (minuteur.current) clearTimeout(minuteur.current)
@@ -1337,7 +1818,7 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
               aria-pressed={c.key === cle}
               onClick={() => setCle(c.key)}
             >
-              {c.code ?? abrege(c.label)} <b>{c.valeur}</b>
+              {c.code ?? abrege(c.label)} <b>{signe(bonusDe(c))}</b>
             </button>
           ))}
         </div>
@@ -1365,7 +1846,8 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
           <span className="m-pt">choisis la valeur annoncée</span>
         ) : (
           <>
-            {de} + {bonus} = <b>{de + bonus}</b>
+            {de} {signe(bonus)} = <b>{de + bonus}</b>
+            {nat ? <span className={`m-nat m-nat-${nat}`}>{NATUREL_DIT[nat]}</span> : null}
           </>
         )}
       </div>
@@ -1375,8 +1857,12 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
       {/* Le bouton et la confirmation occupent la même place : rien ne bouge
           sous le pouce entre l'envoi et le jet suivant. */}
       {envoi === 'fait' ? (
-        <p className="m-envoye" role="status">
-          Jet envoyé au maître du jeu.
+        <p className={`m-envoye${faits[0]?.naturel ? ` m-envoye-${faits[0].naturel}` : ''}`} role="status">
+          {faits[0]
+            ? `Envoyé : ${faits[0].carac} ${faits[0].de} ${signe(faits[0].bonus)} = ${faits[0].total}${
+                faits[0].naturel ? ` · ${NATUREL_DIT[faits[0].naturel]}` : ''
+              }`
+            : 'Jet envoyé au maître du jeu.'}
         </p>
       ) : (
         <button
@@ -1387,6 +1873,24 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
           {envoi === 'encours' ? 'Envoi…' : 'Envoyer au maître du jeu'}
         </button>
       )}
+
+      {faits.length ? (
+        <section className="m-mesjets">
+          <span className="m-eyebrow">Mes jets</span>
+          <ol>
+            {faits.map((f) => (
+              <li key={f.n} className={f.naturel ? `m-nat-${f.naturel}` : undefined}>
+                <span>{f.carac}</span>
+                <span className="m-mj-calc">
+                  {f.de} {signe(f.bonus)}
+                </span>
+                <b>{f.total}</b>
+                {f.naturel ? <em>{NATUREL_DIT[f.naturel]}</em> : null}
+              </li>
+            ))}
+          </ol>
+        </section>
+      ) : null}
     </div>
   )
 }
@@ -1395,7 +1899,7 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
 
 /**
  * Le pas le plus long qu'un pouce donne en une seconde, en part de la largeur
- * de la carte. Une allure de marche, pas de course : on traverse une pièce en
+ * de la carte — celui d'usine : le MJ le règle plan par plan (`lieu.allure`). Une allure de marche, pas de course : on traverse une pièce en
  * quelques secondes, et le pouce a le temps de s'arrêter sur le seuil qu'il
  * visait. Plus vite, le pion glissait au-delà de la porte avant qu'on lâche.
  */
@@ -1522,6 +2026,30 @@ function Plan({
     return barrieres(calque.murs, 'pas', enPx, calque.ouvertures)
   }, [calque, nat])
 
+  /*
+   * Les portes du lieu, dans le même repère. Dessinées **sous** l'ombre, elles
+   * n'apparaissent que là où le personnage voit ; et quand le pas bute, c'est
+   * ici qu'on cherche si c'est une porte qui le retient — sinon le joueur
+   * sondait les murs à l'aveugle sans jamais savoir qu'il y avait un seuil.
+   */
+  const portes = useMemo(() => {
+    if (!calque || !nat) return []
+    const murs = new Map(calque.murs.map((m) => [m.id, m]))
+    const out: { o: Ouverture; a: Pt; b: Pt }[] = []
+    for (const o of calque.ouvertures) {
+      const m = o.nature === 'porte' ? murs.get(o.murId) : undefined
+      if (!m) continue
+      const { a, b } = bordsOuverture(m, o)
+      out.push({ o, a: { x: a[0] * nat.w, y: a[1] * nat.h }, b: { x: b[0] * nat.w, y: b[1] * nat.h } })
+    }
+    return out
+  }, [calque, nat])
+
+  /* Ce qui retient le pas, dit en clair. Posé à chaque image où l'on bute,
+     mais l'état ne bouge que quand le texte change. */
+  const [bute, setBute] = useState<string | null>(null)
+  const buteRef = useRef<{ texte: string | null; t: number }>({ texte: null, t: 0 })
+
   const pousser = async (q: { x: number; y: number; cap: number }): Promise<void> => {
     const r = await fetch(`${API}/api/pion?t=${encodeURIComponent(jeton)}`, {
       method: 'POST',
@@ -1533,6 +2061,9 @@ function Plan({
       setRefus(d.erreur === 'gele' ? 'L’écran est figé : ton pion ne bouge plus.' : d.erreur)
     } else setRefus(null)
   }
+
+  /** L'allure du pouce sur ce plan, réglée par le MJ ; sinon celle d'usine. */
+  const allure = etat.lieu?.allure ?? ALLURE
 
   /*
    * La marche : on avance tant qu'on pousse.
@@ -1562,7 +2093,7 @@ function Plan({
       const force = Math.min(1, Math.hypot(p.x, p.y))
       if (force > 0.08) {
         const l = Math.hypot(p.x, p.y) || 1
-        const pas = ALLURE * force * dt
+        const pas = allure * force * dt
         const w = nat?.w ?? 1000
         const h = nat?.h ?? 1000
         const q = poseRef.current
@@ -1571,14 +2102,35 @@ function Plan({
           y: Math.max(0.01, Math.min(0.99, q.y + (p.y / l) * pas * (w / h)))
         }
         if (barrieresPas) {
-          const a = pasContraint(
-            barrieresPas,
-            { x: q.x * w, y: q.y * h },
-            { x: vise.x * w, y: vise.y * h },
-            { w, h },
-            2
-          )
+          const de = { x: q.x * w, y: q.y * h }
+          const voulu = { x: vise.x * w, y: vise.y * h }
+          const a = pasContraint(barrieresPas, de, voulu, { w, h }, 2)
           vise = { x: a.x / w, y: a.y / h }
+          /* Moins de la moitié du pas : on bute. Une porte close droit devant ? */
+          const fait = Math.hypot(a.x - de.x, a.y - de.y)
+          const veut = Math.hypot(voulu.x - de.x, voulu.y - de.y)
+          let texte: string | null = null
+          if (veut > 0 && fait < veut / 2) {
+            const sonde = {
+              x: de.x + ((voulu.x - de.x) / veut) * w * 0.04,
+              y: de.y + ((voulu.y - de.y) / veut) * w * 0.04
+            }
+            const porte = portes.find(
+              (d) => !porteFranchissable(d.o) && seCroisent(de, sonde, d.a, d.b)
+            )
+            if (porte) {
+              const nom = porte.o.nom?.trim() || 'Porte'
+              texte = porte.o.verrouillee
+                ? `${nom} verrouillée : il faut que le maître du jeu l’ouvre.`
+                : `${nom} fermée : demande au maître du jeu de l’ouvrir.`
+            }
+          }
+          const r = buteRef.current
+          if (texte) r.t = now
+          if (texte !== r.texte && (texte || now - r.t > 1800)) {
+            r.texte = texte
+            setBute(texte)
+          }
         }
         if (suivre) capVise.current = (Math.atan2(p.x, -p.y) * 180) / Math.PI
         if (vise.x !== q.x || vise.y !== q.y) {
@@ -1586,6 +2138,10 @@ function Plan({
           geste.current = Date.now()
           aEnvoyer.current = true
         }
+      } else if (buteRef.current.texte && now - buteRef.current.t > 1800) {
+        /* Le pouce s'est levé : le mot reste le temps d'être lu, puis s'en va. */
+        buteRef.current.texte = null
+        setBute(null)
       }
 
       /*
@@ -1641,7 +2197,7 @@ function Plan({
       cancelAnimationFrame(image)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!mien, etat.gele, suivre, barrieresPas, nat?.w, nat?.h, jeton])
+  }, [!!mien, etat.gele, suivre, barrieresPas, portes, nat?.w, nat?.h, jeton, allure])
 
   /* ---- le pupitre : un disque qui fait marcher, un anneau qui fait tourner ---- */
 
@@ -1767,6 +2323,18 @@ function Plan({
         ),
     [etat.pions, pose.x, pose.y, pose.cap]
   )
+  /* Les pions « au regard » hors de tout champ de vision : on ne les dessine
+     pas, comme sur l'écran de la table. Sans calque, on ne peut pas savoir —
+     on les tait plutôt que de les trahir. */
+  const horsDeVue = useMemo(() => {
+    const auRegard = etat.pions.filter((p) => p.regard)
+    if (!auRegard.length || etat.jour) return new Set<number>()
+    if (!calque || !nat) return new Set(auRegard.map((p) => p.id))
+    const regards = regardsDes(calque, yeux, nat.w, nat.h)
+    return new Set(
+      auRegard.filter((p) => !sousUnRegard(regards, p.x * nat.w, p.y * nat.h)).map((p) => p.id)
+    )
+  }, [etat.pions, etat.jour, calque, nat, yeux])
 
   if (etat.gele || !etat.lieu) {
     return (
@@ -1812,13 +2380,44 @@ function Plan({
             }}
           />
         ) : null}
-        {calque?.murs.length && nat ? (
+        {portes.length && nat ? (
+          <svg
+            className="m-portes"
+            viewBox={`0 0 ${nat.w} ${nat.h}`}
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {portes.map(({ o, a, b }) => {
+              /* Le viewBox est en pixels de la carte : le trait se règle sur elle. */
+              const trait = Math.max(nat.w, nat.h) * 0.007
+              const ouverte = porteFranchissable(o)
+              return (
+                <line
+                  key={o.id}
+                  className={ouverte ? 'ouverte' : o.verrouillee ? 'verrou' : 'fermee'}
+                  x1={a.x}
+                  y1={a.y}
+                  x2={b.x}
+                  y2={b.y}
+                  strokeWidth={trait}
+                  strokeDasharray={ouverte ? `${trait} ${trait * 1.6}` : undefined}
+                />
+              )
+            })}
+          </svg>
+        ) : null}
+        {calque?.murs.length && nat && !etat.jour ? (
           <div className="m-ombre">
             <Brouillard calque={calque} yeux={yeux} w={nat.w} h={nat.h} />
           </div>
         ) : null}
         <Pings pings={ondes} />
-        {etat.pions.map((p) => {
+        {bute ? (
+          <p className="m-bute" role="status">
+            {bute}
+          </p>
+        ) : null}
+        {etat.pions.filter((p) => !horsDeVue.has(p.id)).map((p) => {
           const q = p.mien ? pose : { x: p.x, y: p.y, cap: p.rotation }
           return (
             <div

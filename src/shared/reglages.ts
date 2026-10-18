@@ -20,6 +20,7 @@
 import { OUVERTURE_REGARD } from '@shared/types'
 import { LARGEUR_DEFAUT } from '@shared/ouvertures'
 import type { Transition } from '@shared/types'
+import { lireMonnaies, monnaiesParDefaut, type ReglageMonnaies } from '@shared/monnaies'
 
 /** Ce que la base rend : des chaînes, et rien d'autre. */
 export type Brut = Record<string, string>
@@ -45,6 +46,8 @@ export interface ReglagesCampagne {
   mursLargeur: number
   /** Les PNJ ont-ils, eux aussi, une colonne « fiche de compétences » ? */
   pnjFiche: boolean
+  /** Les monnaies de la campagne, ou aucune — voir `@shared/monnaies`. */
+  monnaies: ReglageMonnaies
 }
 
 export const CAMPAGNE_DEFAUT: ReglagesCampagne = {
@@ -58,7 +61,9 @@ export const CAMPAGNE_DEFAUT: ReglagesCampagne = {
   mursGarde: false,
   mursLargeur: LARGEUR_DEFAUT,
   /* Masquée : un PNJ n'a pas de feuille remplie à la main, d'ordinaire. */
-  pnjFiche: false
+  pnjFiche: false,
+  /* Une campagne neuve n'a pas d'argent : le MJ l'active s'il en veut. */
+  monnaies: monnaiesParDefaut(null, false)
 }
 
 export function lireCampagne(b: Brut): ReglagesCampagne {
@@ -72,7 +77,10 @@ export function lireCampagne(b: Brut): ReglagesCampagne {
     mursAngle: nombre(b, 'murs.angle', CAMPAGNE_DEFAUT.mursAngle, 15, 360),
     mursGarde: oui(b, 'murs.garde', CAMPAGNE_DEFAUT.mursGarde),
     mursLargeur: nombre(b, 'murs.largeur', CAMPAGNE_DEFAUT.mursLargeur, 0.005, 0.5),
-    pnjFiche: oui(b, 'pnj.fiche', CAMPAGNE_DEFAUT.pnjFiche)
+    pnjFiche: oui(b, 'pnj.fiche', CAMPAGNE_DEFAUT.pnjFiche),
+    /* Jamais réglées, elles prennent le nom de l'ancienne unité de valeur des
+       objets : c'est dans cette monnaie que leurs prix ont été repris. */
+    monnaies: lireMonnaies(b['monnaies'], b['objets.unite'])
   }
 }
 

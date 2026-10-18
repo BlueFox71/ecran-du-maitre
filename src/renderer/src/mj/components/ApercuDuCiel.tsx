@@ -17,6 +17,7 @@ import { FORCE_ASTRE, ventDe, type Astre, type Mur, type Ouverture, type Place, 
 import { formesDesMurs } from '@shared/pieces'
 import { lueurDuDehors } from '@shared/murs'
 import { LumiereDuDehors, empreinteDehors, type Dehors } from '../../shared/Lueur'
+import { useEchap } from '../echap'
 
 /** La largeur de calcul d'un plan : la géométrie se fait en pixels, jamais en fractions. */
 const LARGEUR = 600
@@ -52,17 +53,9 @@ export function ApercuDuCiel({
     )
   }, [espace, places])
 
-  useEffect(() => {
-    /* Échap ferme la fenêtre, et elle seule : prise à la capture, la touche
-       n'atteint pas l'éditeur de plan resté dessous. */
-    const k = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return
-      e.stopPropagation()
-      onClose()
-    }
-    window.addEventListener('keydown', k, true)
-    return () => window.removeEventListener('keydown', k, true)
-  }, [onClose])
+  /* Échap ferme la fenêtre, et elle seule : la pile arrête la touche avant
+     l'éditeur de plan resté dessous. */
+  useEchap(onClose)
 
   /* Au corps de la page : le volet qui l'ouvre ne doit pas la rogner. */
   return createPortal(
@@ -122,7 +115,7 @@ function PlanSousLeCiel({ p, ciel }: { p: Place; ciel: Astre | null }): JSX.Elem
   const cap = source ? (((source.cap + p.nord) % 360) + 360) % 360 : 0
 
   const dehors = useMemo((): Dehors | null => {
-    if (!source || h <= 0) return null
+    if (!source || source.nature === 'nuit' || h <= 0) return null
     const enPx = (q: PointMur): { x: number; y: number } => ({ x: q[0] * w, y: q[1] * h })
     return {
       dedans: lueurDuDehors(murs, ouvertures, cap, w, h),
@@ -161,11 +154,19 @@ function PlanSousLeCiel({ p, ciel }: { p: Place; ciel: Astre | null }): JSX.Elem
             <rect x={0} y={0} width={w} height={h} fill="#000" mask={`url(#${id})`} />
           </svg>
         ) : null}
+        {/* La nuit noire : rien du dehors, le plan reste dans le noir. */}
+        {source?.nature === 'nuit' && h > 0 ? (
+          <svg viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+            <rect x={0} y={0} width={w} height={h} fill="#000" opacity={0.85} />
+          </svg>
+        ) : null}
       </div>
       <figcaption>
         <b>{p.name}</b>
         <span>
-          {source
+          {source?.nature === 'nuit'
+            ? `● nuit noire${ciel ? '' : ' · son réglage'}`
+            : source
             ? `${source.nature === 'soleil' ? '☀' : '☾'} ${ventDe(source.cap)}${ciel ? '' : ' · son réglage'}`
             : 'ni soleil ni lune'}
           {murs.length ? '' : ' · aucun mur : tout est dehors'}

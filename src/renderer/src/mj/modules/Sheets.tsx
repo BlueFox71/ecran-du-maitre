@@ -1,4 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
+import { heureLocale } from '@shared/heure'
+import { modificateur, signe } from '@shared/jet'
 import { currentCharacter, itemById, playerOf, templateOf, useStore } from '../store'
 import { usePoignee } from '../components/Poignee'
 import {
@@ -16,9 +18,10 @@ import {
 } from '../components/Icons'
 import { ChoixDansArbre } from '../components/ChoixDansArbre'
 import { ReprendreDUneSeance } from '../components/ReprendreDUneSeance'
-import { jaugeSanite } from '@shared/types'
+import { jaugeSanite, jaugesDe } from '@shared/types'
 import type { CharacterKind, Sexe } from '@shared/types'
 import { FicheCampagne } from './FicheCampagne'
+import { PreparationPersos } from '../components/PreparationPersos'
 import { Equipement } from './Equipement'
 import { Framed } from '../../shared/Slide'
 import { Visage } from '../../shared/Visage'
@@ -26,6 +29,7 @@ import { RognageCarre } from '../components/RognageCarre'
 import type { UiItem } from '../../../../preload/index'
 import { PION_COULEURS } from '@shared/types'
 import { ChampEmojis } from '../components/ChampEmojis'
+import { Bourse } from '../components/Bourse'
 import type {
   ButinLigne,
   CadreCarre,
@@ -35,6 +39,7 @@ import type {
   GaugeSpec,
   SheetTemplate
 } from '@shared/types'
+import { useEchap } from '../echap'
 
 /** États rapides proposés par défaut. Les gabarits pourront les redéfinir plus tard. */
 const STATES: { key: string; label: string; color?: 'iris' }[] = [
@@ -63,6 +68,27 @@ export function Sheets(): JSX.Element {
      la feuille, et la colonne « qui il est » reste, parce qu'on équipe
      quelqu'un, pas un numéro. */
   const [onglet, setOnglet] = useState<'fiche' | 'equipement'>('fiche')
+  /* Le volet de sa feuille, à droite : on peut le ranger pour donner la
+     largeur aux chiffres. Retenu sur ce poste. */
+  const [volet, setVolet] = useState<boolean>(() => {
+    try {
+      return localStorage.getItem('fiche.volet') !== 'masque'
+    } catch {
+      return true
+    }
+  })
+  const basculerVolet = (): void => {
+    const v = !volet
+    setVolet(v)
+    try {
+      localStorage.setItem('fiche.volet', v ? 'visible' : 'masque')
+    } catch {
+      /* rien : le choix vaudra pour cette fois */
+    }
+  }
+  /* Avant la séance, la page sert aussi à faire préparer les personnages :
+     la même place, une autre face. */
+  const [preparation, setPreparation] = useState(false)
   const absents = s.characters.filter((c) => c.kind !== 'pnj' && !c.present)
   const nHorsJeu = absents.filter((c) => c.horsJeu).length
   const nAbsents = absents.length - nHorsJeu
@@ -127,17 +153,41 @@ export function Sheets(): JSX.Element {
           </p>
         </div>
         <div className="spacer" />
-        <div className="seg-fiche" role="group" aria-label="Sa fiche ou son équipement">
-          <button className={onglet === 'fiche' ? 'on' : ''} onClick={() => setOnglet('fiche')}>
-            Sa fiche
-          </button>
+        {/* Les gestes de l'en-tête à la même hauteur : le sélecteur est plus
+            haut qu'un petit bouton, ils s'étirent à sa mesure. */}
+        <div className="fiche-gestes">
+        {preparation ? null : (
+          <div className="seg-fiche" role="group" aria-label="Sa fiche ou son équipement">
+            <button className={onglet === 'fiche' ? 'on' : ''} onClick={() => setOnglet('fiche')}>
+              Sa fiche
+            </button>
+            <button
+              className={onglet === 'equipement' ? 'on' : ''}
+              onClick={() => setOnglet('equipement')}
+            >
+              Son équipement
+            </button>
+          </div>
+        )}
+        {!preparation && onglet === 'fiche' ? (
           <button
-            className={onglet === 'equipement' ? 'on' : ''}
-            onClick={() => setOnglet('equipement')}
+            className={`btn btn-sm ${volet ? 'btn-c' : 'btn-ghost'}`}
+            aria-pressed={volet}
+            onClick={basculerVolet}
+            title={volet ? 'Ranger le volet de sa feuille, à droite' : 'Afficher le volet de sa feuille, à droite'}
           >
-            Son équipement
+            <IconPdf />
+            {volet ? 'Masquer sa feuille' : 'Afficher sa feuille'}
           </button>
-        </div>
+        ) : null}
+        <button
+          className={`btn btn-sm ${preparation ? 'btn-brass' : 'btn-c'}`}
+          aria-pressed={preparation}
+          onClick={() => setPreparation(!preparation)}
+          title="Faire répartir leurs points aux joueurs, sur leur téléphone"
+        >
+          {preparation ? 'Revenir aux fiches' : 'Préparation des personnages'}
+        </button>
         {/* La fiche est celle de la campagne : elle ne se choisit pas
             personnage par personnage, elle se règle une fois pour toutes. */}
         <button
@@ -148,95 +198,100 @@ export function Sheets(): JSX.Element {
           <IconSliders />
           Configuration
         </button>
-      </div>
-
-      <div className="sheet-shell">
-        <div className="card pc-list">
-          <div className="pc-rayons" role="group" aria-label="Joueurs ou PNJ">
-            <button
-              className={`pc-rayon${rayon === 'pj' ? ' on' : ''}`}
-              onClick={() => setRayon('pj')}
-            >
-              Joueurs<span className="n">{joueurs.length}</span>
-            </button>
-            <button
-              className={`pc-rayon${rayon === 'pnj' ? ' on' : ''}`}
-              onClick={() => setRayon('pnj')}
-              title="Les personnages que tu mènes toi — ils n’entrent jamais dans l’encart des joueurs"
-            >
-              PNJ<span className="n">{pnjs.length}</span>
-            </button>
-          </div>
-          <div className="pc-scroll">
-            {rayonne.length === 0 ? (
-              <p className="pc-vide">
-                {rayon === 'pnj'
-                  ? 'Aucun PNJ. Crée-le ici, ou fais une fiche à un pion déjà posé — clic droit dessus, en Régie.'
-                  : 'Aucun personnage joueur.'}
-              </p>
-            ) : null}
-            {rayonne.map((c) => (
-              <button
-                key={c.id}
-                className="pc-btn"
-                aria-current={c.id === s.currentCharacterId}
-                onClick={() => s.setCurrentCharacter(c.id)}
-              >
-                {/* La couleur, pas les initiales : autour de la table on se
-                    reconnaît à elle, et c'est elle qui cercle le pion. */}
-                <span
-                  className={`pip teinte c-${c.color ?? 'neutral'}`}
-                  title={couleurDite(c.color)}
-                />
-                <span style={{ minWidth: 0 }}>
-                  <span className="n">{c.name}</span>
-                  {/* Sous le nom, ce qui identifie : la personne qui le mène
-                      pour un joueur, son rôle pour un PNJ — qui n'est mené par
-                      personne, et pour qui un tiret ne dit rien. */}
-                  <span className="p">
-                    {c.kind === 'pnj' ? (c.occupation ?? 'sans rôle noté') : (c.player ?? '—')}
-                    {c.horsJeu ? ' · hors-jeu' : c.present ? '' : ' · absent'}
-                  </span>
-                </span>
-              </button>
-            ))}
-          </div>
-          {/* Créer un personnage se fait au bas de la liste, là où le regard
-              arrive quand il a fini de la lire — pas dans l'en-tête, où le
-              geste n'avait rien à voir avec ses voisins. */}
-          <button className="pc-neuf" onClick={() => setCreating(rayon)}>
-            <IconPlus />
-            {rayon === 'pnj' ? 'PNJ' : 'Personnage'}
-          </button>
-          {rayon === 'pj' && absents.length ? (
-            <button className="pc-neuf" onClick={() => setVoirAbsents(!voirAbsents)}>
-              {voirAbsents
-                ? 'Ranger les absents'
-                : [
-                    nAbsents ? `${nAbsents} absent${nAbsents > 1 ? 's' : ''}` : '',
-                    nHorsJeu ? `${nHorsJeu} hors-jeu` : ''
-                  ]
-                    .filter(Boolean)
-                    .join(' · ')}
-            </button>
-          ) : null}
-          {rayon === 'pnj' && s.sessions.length > 1 ? (
-            <button
-              className="pc-neuf"
-              onClick={() => setReprise(true)}
-              title="Copier dans cette séance un PNJ écrit pour une autre"
-            >
-              Reprendre d’une autre séance…
-            </button>
-          ) : null}
         </div>
-
-        {ch && tpl ? (
-          <SheetBody ch={ch} tpl={tpl} onglet={onglet} />
-        ) : (
-          <div className="empty">Sélectionne un personnage.</div>
-        )}
       </div>
+
+      {preparation ? (
+        <PreparationPersos />
+      ) : (
+        <div className="sheet-shell">
+          <div className="card pc-list">
+            <div className="pc-rayons" role="group" aria-label="Joueurs ou PNJ">
+              <button
+                className={`pc-rayon${rayon === 'pj' ? ' on' : ''}`}
+                onClick={() => setRayon('pj')}
+              >
+                Joueurs<span className="n">{joueurs.length}</span>
+              </button>
+              <button
+                className={`pc-rayon${rayon === 'pnj' ? ' on' : ''}`}
+                onClick={() => setRayon('pnj')}
+                title="Les personnages que tu mènes toi — ils n’entrent jamais dans l’encart des joueurs"
+              >
+                PNJ<span className="n">{pnjs.length}</span>
+              </button>
+            </div>
+            <div className="pc-scroll">
+              {rayonne.length === 0 ? (
+                <p className="pc-vide">
+                  {rayon === 'pnj'
+                    ? 'Aucun PNJ. Crée-le ici, ou fais une fiche à un pion déjà posé — clic droit dessus, en Régie.'
+                    : 'Aucun personnage joueur.'}
+                </p>
+              ) : null}
+              {rayonne.map((c) => (
+                <button
+                  key={c.id}
+                  className="pc-btn"
+                  aria-current={c.id === s.currentCharacterId}
+                  onClick={() => s.setCurrentCharacter(c.id)}
+                >
+                  {/* La couleur, pas les initiales : autour de la table on se
+                      reconnaît à elle, et c'est elle qui cercle le pion. */}
+                  <span
+                    className={`pip teinte c-${c.color ?? 'neutral'}`}
+                    title={couleurDite(c.color)}
+                  />
+                  <span style={{ minWidth: 0 }}>
+                    <span className="n">{c.name}</span>
+                    {/* Sous le nom, ce qui identifie : la personne qui le mène
+                        pour un joueur, son rôle pour un PNJ — qui n'est mené par
+                        personne, et pour qui un tiret ne dit rien. */}
+                    <span className="p">
+                      {c.kind === 'pnj' ? (c.occupation ?? 'sans rôle noté') : (c.player ?? '—')}
+                      {c.horsJeu ? ' · hors-jeu' : c.present ? '' : ' · absent'}
+                    </span>
+                  </span>
+                </button>
+              ))}
+            </div>
+            {/* Créer un personnage se fait au bas de la liste, là où le regard
+                arrive quand il a fini de la lire — pas dans l'en-tête, où le
+                geste n'avait rien à voir avec ses voisins. */}
+            <button className="pc-neuf" onClick={() => setCreating(rayon)}>
+              <IconPlus />
+              {rayon === 'pnj' ? 'PNJ' : 'Personnage'}
+            </button>
+            {rayon === 'pj' && absents.length ? (
+              <button className="pc-neuf" onClick={() => setVoirAbsents(!voirAbsents)}>
+                {voirAbsents
+                  ? 'Ranger les absents'
+                  : [
+                      nAbsents ? `${nAbsents} absent${nAbsents > 1 ? 's' : ''}` : '',
+                      nHorsJeu ? `${nHorsJeu} hors-jeu` : ''
+                    ]
+                      .filter(Boolean)
+                      .join(' · ')}
+              </button>
+            ) : null}
+            {rayon === 'pnj' && s.sessions.length > 1 ? (
+              <button
+                className="pc-neuf"
+                onClick={() => setReprise(true)}
+                title="Copier dans cette séance un PNJ écrit pour une autre"
+              >
+                Reprendre d’une autre séance…
+              </button>
+            ) : null}
+          </div>
+
+          {ch && tpl ? (
+            <SheetBody ch={ch} tpl={tpl} onglet={onglet} volet={volet} />
+          ) : (
+            <div className="empty">Sélectionne un personnage.</div>
+          )}
+        </div>
+      )}
 
       {creating && <FormFiche kind={creating} onClose={() => setCreating(null)} />}
       {reglage && <FicheCampagne onClose={() => setReglage(false)} />}
@@ -254,12 +309,15 @@ export function Sheets(): JSX.Element {
 function SheetBody({
   ch,
   tpl,
-  onglet
+  onglet,
+  volet
 }: {
   ch: Character
   tpl: SheetTemplate
   /** Ses chiffres, ou ce qu'il porte — le sélecteur est dans l'en-tête de vue. */
   onglet: 'fiche' | 'equipement'
+  /** Le volet de sa feuille est-il affiché ? Le bouton est dans l'en-tête de vue. */
+  volet: boolean
 }): JSX.Element {
   const s = useStore()
   const portrait = itemById(s.allItems, ch.portraitItemId)
@@ -268,7 +326,7 @@ function SheetBody({
   const direct = s.display?.slots[s.display.liveSlot]
   const enPresentation = direct?.type === 'presentation' && direct.characterId === ch.id
   /* Un PNJ n'a sa colonne de feuille que si la campagne le veut (Paramètres › Table). */
-  const avecFeuille = ch.kind !== 'pnj' || s.reglages.pnjFiche
+  const avecFeuille = (ch.kind !== 'pnj' || s.reglages.pnjFiche) && volet
   const colonnes = usePoignee({ variable: '--fiche-g', cle: 'fiche.largeurGauche', gauche: ':scope > .fiche-qui' })
   /** Ce qui est ouvert par-dessus la fiche : le choix d'une image, d'un PDF, ou sa lecture. */
   const [fenetre, setFenetre] = useState<
@@ -579,7 +637,7 @@ function SheetBody({
             <div className="sect-tete">
               <span className="eyebrow">Caractéristiques</span>
               <div className="spacer" />
-              <span className="sys">{legendeDerive(tpl.spec.stats)}</span>
+              <span className="sys">valeur · modificateur</span>
             </div>
             {tpl.spec.stats.length === 0 ? (
               <p className="rien">
@@ -590,7 +648,6 @@ function SheetBody({
               <div className="caracs">
                 {tpl.spec.stats.map((st) => {
                   const v = ch.data.stats[st.key] ?? 0
-                  const d = derived(v, st.derive)
                   return (
                     <div className="carac" key={st.key}>
                       <div className="code" title={st.label}>
@@ -607,7 +664,9 @@ function SheetBody({
                         }}
                         aria-label={st.label}
                       />
-                      {d ? <div className="half">{d}</div> : null}
+                      <div className="half" title="Ce que la carac ajoute au d20">
+                        {signe(modificateur(v))}
+                      </div>
                     </div>
                   )
                 })}
@@ -621,14 +680,14 @@ function SheetBody({
               <div className="spacer" />
               <span className="sys">chaque +/− est horodaté</span>
             </div>
-            {tpl.spec.gauges.length === 0 ? (
+            {jaugesDe(tpl.spec.gauges, ch.kind).length === 0 ? (
               <p className="rien">
                 La campagne ne définit aucune jauge. Ouvre «&nbsp;Configuration&nbsp;» pour en
                 ajouter.
               </p>
             ) : (
               <div className="jauges">
-                {tpl.spec.gauges.map((g) => {
+                {jaugesDe(tpl.spec.gauges, ch.kind).map((g) => {
                   const v = ch.data.gauges[g.key] ?? { value: 0, max: g.max }
                   const pct = v.max ? Math.round((v.value / v.max) * 100) : 0
                   return (
@@ -674,6 +733,9 @@ function SheetBody({
             )}
           </section>
 
+          <Bourse ch={ch} />
+
+          {!tpl.spec.sansCompetences && (
           <section className="sect sect-skills">
             <div className="sect-tete">
               <span className="eyebrow">Compétences</span>
@@ -777,6 +839,7 @@ function SheetBody({
               </div>
             )}
           </section>
+          )}
 
           {/* Le journal se lit au pied des chiffres qu'il enregistre, et non
               plus dans une colonne de 322 px où la raison du coup ne tenait
@@ -793,13 +856,14 @@ function SheetBody({
             <ol className="jrn">
               {s.charLog.map((e) => (
                 <li key={e.id}>
-                  <time>{e.at.slice(11, 16)}</time>
+                  <time>{heureLocale(e.at)}</time>
                   <span className={`delta ${e.delta < 0 ? 'dn' : 'up'}`}>
                     {shortLabel(e.label)} {e.delta < 0 ? '−' : '+'}
                     {Math.abs(e.delta)}
                   </span>
                   <span>
-                    {e.reason ?? 'ajusté par le MJ'} · {e.value}/{e.max}
+                    {e.reason ?? 'ajusté par le MJ'} ·{' '}
+                    {e.field.startsWith('bourse:') ? `${e.value} en bourse` : `${e.value}/${e.max}`}
                   </span>
                 </li>
               ))}
@@ -1765,13 +1829,7 @@ function LecteurFiche({
   onClose: () => void
 }): JSX.Element {
   /* Échap referme — sauf quand le focus est dans le PDF lui-même, qui garde le clavier. */
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [onClose])
+  useEchap(onClose)
 
   return (
     <div className="scrim plein" onClick={onClose}>
@@ -1841,25 +1899,6 @@ function ageDit(age: string | null): string {
   const a = age?.trim()
   if (!a) return ''
   return /^\d+$/.test(a) ? `${a} ans` : a
-}
-
-/**
- * Ce que dit la petite ligne sous « Caractéristiques » : à quoi sert le second
- * nombre de chaque tuile. Muette si la campagne ne dérive rien.
- */
-function legendeDerive(stats: { derive?: 'halves' | 'mod' | 'none' }[]): string {
-  if (stats.some((st) => st.derive === 'halves')) return 'valeur · moitié · cinquième'
-  if (stats.some((st) => st.derive === 'mod')) return 'valeur · modificateur'
-  return ''
-}
-
-function derived(v: number, mode?: 'halves' | 'mod' | 'none'): string {
-  if (mode === 'mod') {
-    const m = Math.floor((v - 10) / 2)
-    return `${m >= 0 ? '+' : ''}${m}`
-  }
-  if (mode === 'halves') return `${Math.floor(v / 2)} / ${Math.floor(v / 5)}`
-  return ''
 }
 
 function shortLabel(label: string): string {

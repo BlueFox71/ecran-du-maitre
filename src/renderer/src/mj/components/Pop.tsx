@@ -11,6 +11,7 @@
  * pas leurs panneaux pareil.
  */
 import { useEffect, useLayoutEffect, useRef, useState } from 'react'
+import { useEchap } from '../echap'
 
 export function Pop({
   x,
@@ -57,13 +58,7 @@ export function Pop({
     return () => obs.disconnect()
   }, [x, y, haut])
 
-  useEffect(() => {
-    const touche = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', touche)
-    return () => window.removeEventListener('keydown', touche)
-  }, [onClose])
+  useEchap(onClose)
 
   return (
     <>

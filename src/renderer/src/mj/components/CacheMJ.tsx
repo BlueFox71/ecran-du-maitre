@@ -8,6 +8,7 @@
  */
 import { useEffect, useState } from 'react'
 import { IconEyeOff } from './Icons'
+import { useEchap } from '../echap'
 
 const PHRASES = [
   'Pas de coup d’œil, aventurier !',
@@ -28,17 +29,7 @@ export function CacheMJ(): JSX.Element {
     })
   }
 
-  useEffect(() => {
-    if (!cache) return
-    const touche = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') {
-        e.stopPropagation()
-        setCache(false)
-      }
-    }
-    window.addEventListener('keydown', touche, true)
-    return () => window.removeEventListener('keydown', touche, true)
-  }, [cache])
+  useEchap(() => setCache(false), cache)
 
   return (
     <>

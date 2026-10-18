@@ -32,13 +32,18 @@ import * as players from './db/repos/players'
 import * as rolls from './db/repos/rolls'
 import { listPionsVus, movePion, tournerPion } from './db/repos/pions'
 import { calqueDe } from './db/repos/murs'
+import { echelleDe } from './db/repos/echelle'
 import { barrieres, pasContraint, type Pt } from '@shared/murs'
 import type { PointMur } from '@shared/types'
 import * as poche from './db/repos/pochette'
 import * as objets from './db/repos/objets'
 import * as carnet from './carnet'
-import { lirePoste, type ReglagesPoste } from '@shared/reglages'
+import { lireCampagne, lirePoste, type ReglagesPoste } from '@shared/reglages'
+import { monnaiesActives } from '@shared/monnaies'
+import { modificateur, naturel } from '@shared/jet'
+import * as reglagesCampagne from './db/repos/reglages'
 import * as display from './display'
+import * as prepa from './preparation'
 import { EMPLACEMENTS_OBJET, etatDeVie } from '@shared/types'
 import type { MobileInfo, MobileDevice, MobileNudge, MobilePing } from '@shared/types'
 
@@ -287,6 +292,12 @@ export async function open(): Promise<{ info: MobileInfo; qr: string | null }> {
       serveur!.listen(PORT(), '0.0.0.0', ok)
     }).catch((e) => {
       serveur = null
+      /* Le cas courant : un autre logiciel tient déjà le port (SteelSeries
+         Moments prend 7777). Dire quoi faire, pas recopier l'erreur système. */
+      if ((e as NodeJS.ErrnoException)?.code === 'EADDRINUSE')
+        throw new Error(
+          `Le port ${PORT()} est déjà pris par un autre logiciel. Choisis-en un autre dans Paramètres › Portables (7778, par exemple), puis rouvre l’accès.`
+        )
       throw new Error(`Impossible d'ouvrir le port ${PORT()} : ${String(e)}`)
     })
     console.log(`[portable] serveur ouvert sur ${baseUrl() ?? `le port ${PORT()}`}`)
@@ -380,6 +391,8 @@ function versMj(canal: string, charge: unknown): void {
 
 const prevenirMj = (): void => versMj('mobile:info', info())
 
+prepa.brancher(versMj, () => broadcast())
+
 /**
  * « Alexis déplace son pion. »
  *
@@ -438,6 +451,11 @@ function etatJoueur(playerId: number) {
     joueur: joueur
       ? { id: joueur.id, nom: joueur.name, couleur: joueur.color }
       : null,
+    /* Les couleurs déjà prises par un autre de la séance, et par qui : le
+       téléphone les barre plutôt que de laisser essayer et refuser ensuite. */
+    couleursPrises: joueursDeLaSeance()
+      .filter((p) => p.id !== playerId && p.color)
+      .map((p) => ({ cle: p.color!, par: p.name })),
     perso: perso
       ? {
           id: perso.id,
@@ -456,11 +474,26 @@ function etatJoueur(playerId: number) {
             key: st.key,
             label: st.label,
             code: st.code ?? null,
-            valeur: perso.data.stats[st.key] ?? 0
+            valeur: perso.data.stats[st.key] ?? 0,
+            /* Ce que le jet ajoute au dé : le téléphone l'affiche sur le bouton. */
+            mod: modificateur(perso.data.stats[st.key] ?? 10)
           })),
-          comps: fiche.spec.skills
-            .filter((sk) => sk.key in perso.data.skills)
-            .map((sk) => ({ key: sk.key, label: sk.label, valeur: perso.data.skills[sk.key] }))
+          /* null : la campagne ne se sert pas des compétences, la rubrique disparaît. */
+          comps: fiche.spec.sansCompetences
+            ? null
+            : fiche.spec.skills
+                .filter((sk) => sk.key in perso.data.skills)
+                .map((sk) => ({ key: sk.key, label: sk.label, valeur: perso.data.skills[sk.key] })),
+          /* Sa bourse, à lire seulement : c'est le MJ qui encaisse et qui
+             paie. Vide quand la campagne n'a pas d'argent. */
+          bourse: monnaiesActives(lireCampagne(reglagesCampagne.tous()).monnaies).map((m) => ({
+            key: m.key,
+            nom: m.nom,
+            abbr: m.abbr,
+            teinte: m.teinte,
+            image: httpMedia(portraitDe(m.imageItemId)),
+            valeur: perso.data.bourse?.[m.key] ?? 0
+          }))
         }
       : null,
     /*
@@ -517,6 +550,8 @@ function etatJoueur(playerId: number) {
 
     /* Le lieu et les pions ne sortent que si l'écran n'est pas gelé. */
     gele: d.frozen,
+    /* Plein jour : le téléphone montre la carte entière, sans ombre. */
+    jour: d.vision === 'jour',
     lieu: placeId != null ? lieuVu(placeId) : null,
     pions: pions.map((p) => {
       /* L'état se lit sur la vie du personnage — la première jauge du gabarit,
@@ -539,7 +574,9 @@ function etatJoueur(playerId: number) {
         url: httpMedia(relDeUrl(p.url)),
         cadre: p.cadre,
         mien: perso != null && p.characterId === perso.id,
-        etat: etatDeVie(vie && sien ? sien.data.gauges[vie.key] : null)
+        /* Un PNJ ne dit son état que si le MJ l'a voulu (sa case). */
+        etat: p.pnj ? (p.etat ?? null) : etatDeVie(vie && sien ? sien.data.gauges[vie.key] : null),
+        regard: p.regard
       }
     }),
     /*
@@ -572,7 +609,9 @@ function etatJoueur(playerId: number) {
         }
       : null,
     /* Le pion qui joue porte un halo sur le plan du téléphone aussi. */
-    pionEnJeuId: d.frozen ? null : (d.tour?.pionEnJeuId ?? null)
+    pionEnJeuId: d.frozen ? null : (d.tour?.pionEnJeuId ?? null),
+    /* Le MJ a invité à préparer son personnage : la règle, et où il en est. */
+    preparation: perso ? prepa.pourTelephone(perso.id) : null
   }
 }
 
@@ -596,6 +635,7 @@ function lieuVu(id: number): {
   plan: string | null
   w: number | null
   h: number | null
+  allure: number
 } {
   const r = getDb()
     .prepare(
@@ -617,7 +657,9 @@ function lieuVu(id: number): {
     nom: r?.name ?? 'Lieu',
     plan: httpMedia(r?.plan ?? null),
     w: r?.w ?? null,
-    h: r?.h ?? null
+    h: r?.h ?? null,
+    /* L'allure du pouce sur ce plan : réglée par le MJ dans l'éditeur. */
+    allure: echelleDe(id).allure
   }
 }
 
@@ -629,7 +671,7 @@ function lieuVu(id: number): {
  * en biais. Faute de mesure, un carré de mille : la géométrie reste juste pour
  * une carte carrée, et approchée pour les autres, ce qui vaut mieux que rien.
  */
-function repereDuPlan(placeId: number): { w: number; h: number } {
+export function repereDuPlan(placeId: number): { w: number; h: number } {
   const l = lieuVu(placeId)
   return l.w && l.h ? { w: l.w, h: l.h } : { w: 1000, h: 1000 }
 }
@@ -698,12 +740,14 @@ function router(req: IncomingMessage, res: ServerResponse): void {
     if (chemin === '/api/pair') return void lireJson(req, res, (b) => pair(res, url, b))
     if (chemin === '/api/stream') return stream(req, res, url)
     if (chemin === '/api/roll') return void lireJson(req, res, (b) => roll(res, url, b))
+    if (chemin === '/api/preparation') return void lireJson(req, res, (b) => preparer(res, url, b))
     if (chemin === '/api/calque') return calque(res, url)
     if (chemin === '/api/pion') return void lireJson(req, res, (b) => pion(res, url, b))
     if (chemin === '/api/ping') return void lireJson(req, res, (b) => ping(res, url, b))
     if (chemin === '/api/couleur') return void lireJson(req, res, (b) => couleur(res, url, b))
     if (chemin === '/api/pochette/lu') return void lireJson(req, res, (b) => pocheLu(res, url, b))
     if (chemin === '/api/equiper') return void lireJson(req, res, (b) => equiper(res, url, b))
+    if (chemin === '/api/allumer') return void lireJson(req, res, (b) => allumer(res, url, b))
     if (chemin === '/api/prendre') return void lireJson(req, res, (b) => prendre(res, url, b))
     if (chemin === '/api/remettre') return void lireJson(req, res, (b) => remettre(res, url, b))
     if (chemin === '/api/oublier') return void lireJson(req, res, () => oublier(res, url))
@@ -770,7 +814,10 @@ function pageMobile(res: ServerResponse, url: URL): void {
   if (dev) {
     const ip = adresseLocale()
     const vite = new URL(process.env.ELECTRON_RENDERER_URL!)
-    const cible = `http://${ip ?? vite.hostname}:${vite.port}/mobile.html${url.search}`
+    /* Chez Vite, la page ne sait plus sur quel port nous joindre : on le lui dit. */
+    const q = new URLSearchParams(url.search)
+    q.set('p', String(PORT()))
+    const cible = `http://${ip ?? vite.hostname}:${vite.port}/mobile.html?${q}`
     res.writeHead(302, { location: cible })
     res.end()
     return
@@ -901,6 +948,19 @@ function vignette(res: ServerResponse, nom: string, req: IncomingMessage): void 
 /* ---------------- l'appairage ---------------- */
 
 /** Qui joue à cette table — la seule chose qu'on montre sans jeton. */
+/**
+ * Les joueurs de la séance : ceux dont le personnage est à la table. Un absent
+ * n'a pas à tenter un téléphone qui passe, ni à retenir sa couleur. Une séance
+ * où personne n'est noté présent rend tout le monde, plutôt que de laisser la
+ * table devant une liste vide.
+ */
+function joueursDeLaSeance(): ReturnType<typeof players.listPlayers> {
+  const presents = new Set(chars.listJoueurs().map((c) => c.id))
+  const tous = players.listPlayers()
+  const ici = tous.filter((p) => p.characterId != null && presents.has(p.characterId))
+  return ici.length ? ici : tous
+}
+
 function table(res: ServerResponse, url: URL): void {
   if (!isDbOpen()) return json(res, 503, { erreur: 'Aucune campagne ouverte sur le poste du MJ.' })
 
@@ -915,7 +975,7 @@ function table(res: ServerResponse, url: URL): void {
   json(res, 200, {
     appaire: false,
     campagne: nomCampagne(),
-    joueurs: players.listPlayers().map((p) => {
+    joueurs: joueursDeLaSeance().map((p) => {
       const perso = p.characterId != null ? chars.getCharacter(p.characterId) : null
       return {
         id: p.id,
@@ -1058,9 +1118,34 @@ function equiper(res: ServerResponse, url: URL, corps: any): void {
 
   if (emplacement === null) objets.desequiper(placementId)
   else objets.equiper({ characterId: perso.id, emplacement, objetId: objetDuPlacement(placementId) })
+  /* Une lampe prise en main, ou rangée : la table relit sa lumière. */
+  display.calqueABouge()
 
   /* Le poste du MJ suit, et les téléphones aussi — celui du joueur, qui vient
      d'agir, et son second appareil s'il en a un. */
+  versMj('objets:changes', null)
+  broadcast()
+  json(res, 200, { ok: true })
+}
+
+/**
+ * Le joueur allume ou éteint sa lampe de poche. Même garde que pour ranger :
+ * seulement **ses** affaires. L'écran de la table relit son calque — la
+ * lumière qu'il porte en fait partie.
+ */
+function allumer(res: ServerResponse, url: URL, corps: any): void {
+  const ap = exige(res, url)
+  if (!ap) return
+  const joueur = players.getPlayer(ap.playerId)
+  const perso = joueur?.characterId != null ? chars.getCharacter(joueur.characterId) : null
+  if (!perso) return json(res, 409, { erreur: 'Aucun personnage ne t’est attribué.' })
+  const placementId = Number(corps.placementId)
+  if (!Number.isInteger(placementId)) return json(res, 400, { erreur: 'Objet inconnu.' })
+  if (objets.porteurDe(placementId) !== perso.id)
+    return json(res, 403, { erreur: 'Cet objet n’est pas à toi.' })
+
+  objets.allumer(placementId, !!corps.allumee)
+  display.calqueABouge()
   versMj('objets:changes', null)
   broadcast()
   json(res, 200, { ok: true })
@@ -1142,7 +1227,7 @@ function roll(res: ServerResponse, url: URL, corps: any): void {
   if (!carac) return json(res, 400, { erreur: 'Caractéristique inconnue.' })
   if (!Number.isInteger(de) || de < 1 || de > 20) return json(res, 400, { erreur: 'Valeur de dé impossible.' })
 
-  const bonus = perso.data.stats[carac.key] ?? 0
+  const bonus = modificateur(perso.data.stats[carac.key] ?? 10)
   rolls.recordRoll({
     characterId: perso.id,
     label: carac.label,
@@ -1159,7 +1244,9 @@ function roll(res: ServerResponse, url: URL, corps: any): void {
     die: de,
     total: de + bonus
   })
-  json(res, 200, { ok: true, total: de + bonus })
+  /* Le détail revient au joueur : son dé, ce qui s'y ajoute, et un 1 ou un 20
+     naturel dit tel quel — sinon « 17 » passait pour une réussite. */
+  json(res, 200, { ok: true, de, bonus, total: de + bonus, naturel: naturel(de) })
 }
 
 /**
@@ -1176,6 +1263,25 @@ function roll(res: ServerResponse, url: URL, corps: any): void {
  * l'écran**, et rien du tout si le MJ a gelé. Un téléphone ne peut donc pas
  * demander le calque d'un lieu que la table n'a pas encore vu.
  */
+/**
+ * Le joueur pose ses points, ou valide sa fiche. Seulement la sienne : le
+ * personnage vient de l'appareil, jamais du corps de la requête.
+ */
+function preparer(res: ServerResponse, url: URL, corps: any): void {
+  const ap = exige(res, url)
+  if (!ap) return
+  const joueur = players.getPlayer(ap.playerId)
+  if (joueur?.characterId == null) return json(res, 409, { erreur: 'Aucun personnage ne t’est attribué.' })
+  const stats = corps && typeof corps.stats === 'object' ? corps.stats : {}
+  const skills = Array.isArray(corps?.skills) ? corps.skills : []
+  const valider = corps?.valider === true
+  const refus = prepa.poser(joueur.characterId, stats, skills, valider)
+  if (refus) return json(res, 400, { erreur: refus })
+  /* Validée, la fiche a changé : son téléphone la relit. */
+  if (valider) broadcast()
+  json(res, 200, { ok: true })
+}
+
 function calque(res: ServerResponse, url: URL): void {
   const ap = exige(res, url)
   if (!ap) return
@@ -1249,7 +1355,7 @@ function pion(res: ServerResponse, url: URL, corps: any): void {
  * géométrie des deux côtés, `@shared/murs`, pas une seconde écriture qui
  * dériverait de la première.
  */
-function retenuParLesMurs(
+export function retenuParLesMurs(
   placeId: number,
   pion: { x: number; y: number },
   vers: { x: number; y: number }
@@ -1306,6 +1412,38 @@ function ping(res: ServerResponse, url: URL, corps: any): void {
   json(res, 200, { ok: true })
 }
 
+/**
+ * Faire vibrer des téléphones : ceux des personnages nommés, ou tous.
+ *
+ * Le téléphone n'obéit qu'une fois qu'on l'a touché — c'est la règle des
+ * navigateurs — et Safari, sur iPhone, ne vibre jamais pour une page web. On
+ * envoie quand même : celui qui ne sait pas vibrer l'ignore.
+ */
+/** Faire vibrer des téléphones ; rend combien ont reçu l'ordre. */
+export function vibrer(characterIds: number[] | 'tous', motif: number[]): number {
+  if (flux.size === 0 || !isDbOpen() || !motif.length) return 0
+  const vises =
+    characterIds === 'tous'
+      ? null
+      : new Set(
+          players
+            .listPlayers()
+            .filter((p) => p.characterId != null && characterIds.includes(p.characterId))
+            .map((p) => p.id)
+        )
+  const charge = JSON.stringify(motif)
+  let n = 0
+  for (const [token, liste] of flux) {
+    if (vises) {
+      const ap = appareilDe(token)
+      if (!ap || !vises.has(ap.playerId)) continue
+    }
+    for (const res of liste) res.write(`event: vibre\ndata: ${charge}\n\n`)
+    if (liste.length) n++
+  }
+  return n
+}
+
 function diffuserPing(onde: MobilePing): void {
   const charge = JSON.stringify(onde)
   for (const liste of flux.values()) {
@@ -1320,10 +1458,9 @@ function couleur(res: ServerResponse, url: URL, corps: any): void {
   const teinte = String(corps.couleur ?? '')
   if (!/^[a-z]+$/.test(teinte)) return json(res, 400, { erreur: 'Couleur inconnue.' })
 
-  /* Une couleur ne sert qu'une fois à la table. */
-  const prise = players
-    .listPlayers()
-    .find((p) => p.id !== ap.playerId && p.color === teinte)
+  /* Une couleur ne sert qu'une fois à la table — celle de la séance : un
+     absent ne la retient pas. */
+  const prise = joueursDeLaSeance().find((p) => p.id !== ap.playerId && p.color === teinte)
   if (prise) return json(res, 409, { erreur: `Cette couleur est déjà à ${prise.name}.` })
 
   players.updatePlayer(ap.playerId, { color: teinte })

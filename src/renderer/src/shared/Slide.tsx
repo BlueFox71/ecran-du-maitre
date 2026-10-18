@@ -1,6 +1,6 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { COLLAGE_CELLS, FRAME_NEUTRE, corpsDeCase, etatDeVie } from '@shared/types'
-import { Brouillard } from './Brouillard'
+import { Brouillard, regardsDes, sousUnRegard } from './Brouillard'
 import { Visage } from './Visage'
 import { barrieres, pasContraint, type Pt } from '@shared/murs'
 import { bordsOuverture } from '@shared/ouvertures'
@@ -20,6 +20,7 @@ import type {
   TextOverlay
 } from '@shared/types'
 import { urlPortraitMj } from './avatarsMj'
+import { modificateur, signe } from '@shared/jet'
 
 /**
  * De l'écran à la carte, et retour.
@@ -28,6 +29,48 @@ import { urlPortraitMj } from './avatarsMj'
  * l'image : tout ce qui doit mettre les deux en présence — l'ombre, une
  * cloison qui retient un pion — passe par là.
  */
+
+/** Ce que la scène du MJ montre de son calque : chaque case de « Affichage ». */
+export interface TraitsMj {
+  lampes: boolean
+  /** Le nom de chaque pièce, écrit sur le plan à son point d'ancrage. */
+  pieces: boolean
+  astre: boolean
+  portes: boolean
+  fenetres: boolean
+  murs: boolean
+  /** Les sons posés sur le plan, et où ils en sont. */
+  sons: boolean
+  /** Les objets posés en un point du plan, cachés ou trouvés. */
+  objets: boolean
+}
+
+/** Un objet posé sur le plan, en fractions de la carte, pour le MJ seul. */
+export interface ObjetSurCarte {
+  id: number
+  x: number
+  y: number
+  nom: string
+  etat: 'cache' | 'trouve' | 'porte'
+}
+
+/** Un son posé, tel que la scène du MJ le dessine. */
+export interface SonSurCarte {
+  id: number
+  /** En fractions de la carte ; le rayon, en part de sa largeur. */
+  x: number
+  y: number
+  rayon: number
+  nom: string
+  emoji: string
+  nature: 'ambiance' | 'nappe' | 'bruitage'
+  etat: 'arme' | 'fait' | 'attente' | 'ecoute'
+  /** Une source : son volume du moment, de 0 à 1. */
+  gain: number | null
+  /** Survolé au Paravent : il s'allume, même si la case « Sons » est décochée. */
+  vise?: boolean
+}
+
 export interface Repere {
   /** Le quart de tour de l'image, en degrés. */
   rot: number
@@ -47,6 +90,8 @@ export interface Repere {
   pionVersCarte: (u: number, v: number) => { x: number; y: number }
   /** Le rectangle qu'occupe l'image dans son cadre, et sa transformation. */
   cadre: { left: number; top: number; width: number; height: number }
+  /** La taille naturelle de l'image : celle où vivent les murs et les regards. */
+  nat: { w: number; h: number }
   transform: string
 }
 
@@ -114,6 +159,10 @@ export interface SlideExtras {
    * se veut `position: fixed`.
    */
   onPionMenu?: (pion: Pion, x: number, y: number) => void
+  /** Côté MJ : le clic gauche sur un pion le choisit — son détail s'ouvre. */
+  onPionClic?: (pion: Pion) => void
+  /** Le pion choisi, cerclé chez le MJ seul. */
+  pionChoisiId?: number | null
   /** Le nom du joueur s'écrit-il sous son pion ? Vrai par défaut. */
   pionLabels?: boolean
   /** Et ses points de vie, juste en dessous ? */
@@ -124,6 +173,8 @@ export interface SlideExtras {
   encart?: Encart
   /** Fourni côté MJ : l'encart se déplace à la souris. */
   onMoveEncart?: (x: number, y: number) => void
+  /** Côté MJ : un clic sur l'encart, sans le déplacer, ouvre son menu (sens, recentrer). */
+  onMenuEncart?: (x: number, y: number) => void
   /** Fourni côté MJ : la poignée du coin règle ses dimensions. */
   onSizeEncart?: (largeur: number, hauteur: number) => void
   /** Fourni côté MJ : les jauges s'ajustent d'un clic depuis l'encart. */
@@ -155,6 +206,19 @@ export interface SlideExtras {
    * les joueurs —, seules celles que le MJ a choisi de montrer.
    */
   lumieresMJ?: boolean
+  /**
+   * Côté MJ : ce que la carte montre de son calque, case par case (bouton
+   * « Affichage » du Paravent). Absent : rien de plus que les lampes.
+   */
+  traitsMj?: TraitsMj | null
+  /** Plein jour : la table voit toute la carte — un pion « au regard » se montre. */
+  jour?: boolean
+  /** Côté MJ : les pièces du plan à l'écran, nommées, en fractions de la carte. */
+  nomsPieces?: { nom: string; x: number; y: number }[]
+  /** Côté MJ : les sons posés sur le plan à l'écran. */
+  sonsMj?: SonSurCarte[]
+  /** Côté MJ : les objets posés sur le plan à l'écran. */
+  objetsMj?: ObjetSurCarte[]
   /** Texte en cours de modification dans la régie. */
   activeText?: number | null
   onPickText?: (id: number) => void
@@ -176,6 +240,7 @@ export function Slide({
   joueurs,
   encart,
   onMoveEncart,
+  onMenuEncart,
   onSizeEncart,
   onAjuster,
   fenetres,
@@ -186,6 +251,8 @@ export function Slide({
   onRemovePion,
   onRotatePion,
   onPionMenu,
+  onPionClic,
+  pionChoisiId,
   activeCell,
   onPickCell,
   onFrame,
@@ -193,7 +260,12 @@ export function Slide({
   activeText,
   onPickText,
   onPoserSurCarte,
-  lumieresMJ
+  lumieresMJ,
+  traitsMj,
+  nomsPieces,
+  sonsMj,
+  objetsMj,
+  jour
 }: { slide: SlidePayload; animate?: boolean } & SlideExtras): JSX.Element {
   const cls = `slide sl-${slide.type}${animate ? ' slide-fade' : ''}${
     onPoserSurCarte ? ' pose-point' : ''
@@ -340,6 +412,7 @@ export function Slide({
         encart={encart}
         joueurs={joueurs}
         onMove={onMoveEncart}
+        onMenu={onMenuEncart}
         onSize={onSizeEncart}
         onAjuster={onAjuster}
       />
@@ -351,7 +424,8 @@ export function Slide({
      Elles vivent dans la carte et suivent son cadrage, comme les murs. */
   const lampes =
     repere && brouillard && (slide.type === 'image' || slide.type === 'video')
-      ? brouillard.lumieres.filter((l) => lumieresMJ || l.icone)
+      ? /* Chez les joueurs, plus aucune icône : la lueur leur suffit. */
+        brouillard.lumieres.filter(() => (lumieresMJ ? (traitsMj?.lampes ?? true) : false))
       : []
   const iconesLumieres = lampes.length ? (
     <div className="lampes-zone" aria-hidden="true">
@@ -360,9 +434,7 @@ export function Slide({
         return (
           <span
             key={l.id}
-            className={`lampe-icone${l.allumee ? '' : ' eteinte'}${
-              lumieresMJ && !l.icone ? ' mj-seul' : ''
-            }`}
+            className={`lampe-icone${l.allumee ? '' : ' eteinte'}`}
             style={{ left: `${q.x * 100}%`, top: `${q.y * 100}%` }}
           >
             <svg viewBox="0 0 24 24">
@@ -411,6 +483,35 @@ export function Slide({
    * nombres. S'il n'est plus là — retiré, caché, resté dans l'autre lieu —,
    * l'image reprend son cadrage sans qu'on ait rien à défaire.
    */
+  /*
+   * Les pions « au regard » : chez les joueurs — et sur le moniteur, qui dit ce
+   * qu'ils voient —, on ne les dessine que si un joueur les a dans son champ
+   * de vision. Sur la scène du MJ (`onDropAt`), ils restent, en retrait.
+   */
+  /* Ceux qu'aucun joueur ne voit en ce moment. Chez le MJ, ils restent sur sa
+     scène mais s'assombrissent ; chez les joueurs, ils ne sont pas dessinés. */
+  const horsDeVue = ((): Set<number> => {
+    const auRegard = (pions ?? []).filter((p) => p.regard && !p.cache)
+    if (!auRegard.length || jour) return new Set()
+    if (!brouillard || !repere) return new Set(auRegard.map((p) => p.id))
+    const { w, h } = repere.nat
+    const regards = regardsDes(
+      brouillard,
+      yeux.map((o) => ({ ...o, ...repere.pionVersCarte(o.x, o.y) })),
+      w,
+      h
+    )
+    return new Set(
+      auRegard
+        .filter((p) => {
+          const c = repere.pionVersCarte(p.x, p.y)
+          return !sousUnRegard(regards, c.x * w, c.y * h)
+        })
+        .map((p) => p.id)
+    )
+  })()
+  const pionsVus = onDropAt ? (pions ?? []) : (pions ?? []).filter((p) => !horsDeVue.has(p.id))
+
   const suivi = focusPionId != null ? (pions ?? []).find((p) => p.id === focusPionId) : undefined
   const focus = suivi ? { x: suivi.x, y: suivi.y } : null
 
@@ -418,7 +519,8 @@ export function Slide({
     visual && ((pions && pions.length) || pointer || onDropAt) ? (
       <PionLayer
         repere={repere}
-        pions={pions ?? []}
+        pions={pionsVus}
+        horsDeVue={onDropAt ? horsDeVue : undefined}
         pionSize={pionSize}
         focusPionId={focusPionId ?? null}
         pionEnJeuId={pionEnJeuId ?? null}
@@ -430,6 +532,8 @@ export function Slide({
         onRemovePion={onRemovePion}
         onRotatePion={onRotatePion}
         onPionMenu={onPionMenu}
+        onPionClic={onPionClic}
+        pionChoisiId={pionChoisiId ?? null}
       />
     ) : null
 
@@ -474,6 +578,10 @@ export function Slide({
             yeux={yeux}
             ombre={ombre}
             surbrillance={surbrillance}
+            traitsMj={traitsMj}
+            nomsPieces={nomsPieces}
+            sonsMj={sonsMj}
+            objetsMj={objetsMj}
             onRepere={setRepere}
             onFrame={onFrame ? (f) => onFrame(null, f) : undefined}
           />
@@ -544,6 +652,10 @@ export function Slide({
                   yeux={cases.length === 1 ? yeux : undefined}
                   ombre={ombre}
                   surbrillance={cases.length === 1 ? surbrillance : undefined}
+                  traitsMj={cases.length === 1 ? traitsMj : undefined}
+                  nomsPieces={cases.length === 1 ? nomsPieces : undefined}
+                  sonsMj={cases.length === 1 ? sonsMj : undefined}
+                  objetsMj={cases.length === 1 ? objetsMj : undefined}
                   onRepere={cases.length === 1 ? setRepere : undefined}
                 />
                 {/* La légende appartient à la case : elle se range dedans, en
@@ -575,6 +687,16 @@ export function Slide({
     return (
       <div className={cls} key="attente">
         <Attente p={slide} />
+        {texte}
+        {bandeau}
+      </div>
+    )
+  }
+
+  if (slide.type === 'preparation') {
+    return (
+      <div className={cls} key="preparation">
+        <Repartition p={slide} />
         {texte}
         {bandeau}
       </div>
@@ -693,6 +815,82 @@ function Presentation({ p }: { p: Extract<SlidePayload, { type: 'presentation' }
           {p.occupation ? <div className="pres-occ">{p.occupation}</div> : null}
           {p.player ? <div className="pres-joueur">joué par {p.player}</div> : null}
         </div>
+      </div>
+    </div>
+  )
+}
+
+/* ============================================================
+   La préparation des personnages
+   ============================================================ */
+
+/**
+ * Qui met ses points où, pendant que chacun prépare son personnage : une
+ * ligne par caractéristique, une colonne par personnage. Le plus fort de
+ * chaque ligne prend la couleur de son joueur ; une ligne où personne ne
+ * dépasse 11 le dit — c'est là que la table a un trou.
+ */
+function Repartition({ p }: { p: Extract<SlidePayload, { type: 'preparation' }> }): JSX.Element {
+  const prets = p.persos.filter((x) => x.valide).length
+  const [bas, haut] = p.bornes
+  const part = (v: number): number => Math.max(0, Math.min(1, (v - bas) / Math.max(1, haut - bas)))
+  return (
+    <div className="rep" style={{ '--n': p.persos.length } as React.CSSProperties}>
+      <div className="rep-tete">
+        <div>
+          <div className="rep-kicker">Avant la séance</div>
+          <div className="rep-titre">Qui fait quoi dans l’équipe&nbsp;?</div>
+        </div>
+        <div className="rep-compte">
+          {prets} personnage{prets > 1 ? 's' : ''} sur {p.persos.length} prêt{prets > 1 ? 's' : ''}
+        </div>
+      </div>
+      <div className="rep-grille">
+        <div className="rep-coin" />
+        {p.persos.map((x) => (
+          <div key={x.id} className="rep-perso">
+            <span className="rep-nom">
+              <i style={{ background: x.couleur }} />
+              {x.nom}
+            </span>
+            {x.joueur ? <span className="rep-joueur">{x.joueur}</span> : null}
+            <span className={`rep-etat${x.valide ? ' ok' : ''}`}>
+              {x.valide ? '✓ prêt' : `${x.reste} point${x.reste > 1 ? 's' : ''} à poser`}
+            </span>
+          </div>
+        ))}
+        {p.caracs.map((c, i) => {
+          const vals = p.persos.map((x) => x.stats[c.key] ?? 0)
+          const max = Math.max(...vals, 0)
+          const trou = p.persos.length > 0 && max <= 11
+          return (
+            <Fragment key={c.key}>
+              <div className={`rep-carac${i % 2 ? ' pair' : ''}${trou ? ' trou' : ''}`}>
+                <b>{c.code}</b>
+                {c.nom !== c.code ? <span>{c.nom}</span> : null}
+                {trou ? <em>personne n’y brille</em> : null}
+              </div>
+              {p.persos.map((x) => {
+                const v = x.stats[c.key] ?? 0
+                const m = modificateur(v)
+                const fort = v === max && v >= 13
+                return (
+                  <div
+                    key={x.id}
+                    className={`rep-case${i % 2 ? ' pair' : ''}${fort ? ' fort' : ''}`}
+                    style={{ '--c': x.couleur } as React.CSSProperties}
+                  >
+                    <span className="rep-barre">
+                      <i style={{ width: `${part(v) * 100}%` }} />
+                    </span>
+                    <b>{v}</b>
+                    <span className={`rep-mod${m > 0 ? ' plus' : m < 0 ? ' moins' : ''}`}>{signe(m)}</span>
+                  </div>
+                )
+              })}
+            </Fragment>
+          )
+        })}
       </div>
     </div>
   )
@@ -1018,6 +1216,10 @@ export function Framed({
   yeux,
   ombre: montrerOmbre = true,
   surbrillance,
+  traitsMj,
+  nomsPieces,
+  sonsMj,
+  objetsMj,
   onRepere
 }: {
   url: string
@@ -1043,6 +1245,14 @@ export function Framed({
   ombre?: boolean
   /** Ce que le MJ survole dans son tableau : un halo, chez lui seulement. */
   surbrillance?: Surbrillance
+  /** Les traits du calque montrés au MJ : murs, portes, fenêtres, astre. */
+  traitsMj?: TraitsMj | null
+  /** Les pièces nommées, pour écrire leur nom sur le plan. */
+  nomsPieces?: { nom: string; x: number; y: number }[]
+  /** Les sons posés, dessinés pour le MJ seul. */
+  sonsMj?: SonSurCarte[]
+  /** Les objets posés, dessinés pour le MJ seul. */
+  objetsMj?: ObjetSurCarte[]
   /** L'image publie son repère : c'est par là qu'on passe de l'écran à la carte. */
   onRepere?: (r: Repere | null) => void
 }): JSX.Element {
@@ -1187,6 +1397,7 @@ export function Framed({
     return {
       rot: r,
       zoom: vue.zoom,
+      nat,
       pionVersEcran: (u, v) => {
         const X = (u - 0.5) * taille.w
         const Y = (v - 0.5) * taille.h
@@ -1304,15 +1515,23 @@ export function Framed({
       const mur = o && brouillard.murs.find((m) => m.id === o.murId)
       if (o && mur) {
         const b = bordsOuverture(mur, o)
+        /* Un trait seul se perdait sur un plan chargé : on l'épaissit, et un
+           anneau bat autour de la porte pour qu'on la trouve d'un coup d'œil. */
+        const cx = ((b.a[0] + b.b[0]) / 2) * w
+        const cy = ((b.a[1] + b.b[1]) / 2) * h
+        const long = Math.hypot((b.b[0] - b.a[0]) * w, (b.b[1] - b.a[1]) * h)
         dessin = (
-          <line
-            className="halo-porte"
-            x1={b.a[0] * w}
-            y1={b.a[1] * h}
-            x2={b.b[0] * w}
-            y2={b.b[1] * h}
-            strokeWidth={Math.max(6, w * 0.01)}
-          />
+          <>
+            <circle className="halo-cible" cx={cx} cy={cy} r={Math.max(long * 0.9, w * 0.028)} />
+            <line
+              className="halo-porte fort"
+              x1={b.a[0] * w}
+              y1={b.a[1] * h}
+              x2={b.b[0] * w}
+              y2={b.b[1] * h}
+              strokeWidth={Math.max(10, w * 0.016)}
+            />
+          </>
         )
       }
     }
@@ -1321,6 +1540,164 @@ export function Framed({
       <div className="brouillard-cadre" style={{ ...repere.cadre, transform: repere.transform }}>
         <svg className="brouillard" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
           {dessin}
+        </svg>
+      </div>
+    )
+  })()
+
+  /*
+   * Le calque, dessiné pour le MJ seul : les murs, les portes et les fenêtres
+   * qu'il a tracés, et d'où vient le soleil ou la lune. Ces traits ne passent
+   * que par `traitsMj`, que la fenêtre des joueurs ne reçoit jamais.
+   */
+  const traits = ((): JSX.Element | null => {
+    if (!traitsMj || !brouillard || !nat || !repere) return null
+    const { murs: voirMurs, portes, fenetres, astre, pieces } = traitsMj
+    const noms = pieces ? (nomsPieces ?? []) : []
+    const sons = (sonsMj ?? []).filter((z) => traitsMj.sons || z.vise)
+    const objets = traitsMj.objets ? (objetsMj ?? []) : []
+    if (!voirMurs && !portes && !fenetres && !astre && !noms.length && !sons.length && !objets.length)
+      return null
+    const w = nat.w
+    const h = nat.h
+    const ep = Math.max(2, w * 0.0025)
+    const ouvertures = brouillard.ouvertures.filter((o) => (o.nature === 'porte' ? portes : fenetres))
+    /* La nuit noire ne vient de nulle part : pas de repère au bord. */
+    const a = astre && brouillard.astre?.nature !== 'nuit' ? brouillard.astre : null
+    return (
+      <div className="brouillard-cadre traits-mj" style={{ ...repere.cadre, transform: repere.transform }}>
+        <svg className="brouillard" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+          {voirMurs
+            ? brouillard.murs
+                .filter((m) => m.pts.length > 1)
+                .map((m) => (
+                  <polyline
+                    key={`m${m.id}`}
+                    className={`trait-mur${m.nature === 'rideau' ? ' rideau' : ''}`}
+                    points={m.pts.map((p) => `${p[0] * w},${p[1] * h}`).join(' ')}
+                    strokeWidth={ep}
+                  />
+                ))
+            : null}
+          {ouvertures.map((o) => {
+            const mur = brouillard.murs.find((m) => m.id === o.murId)
+            if (!mur) return null
+            const b = bordsOuverture(mur, o)
+            return (
+              <line
+                key={`o${o.id}`}
+                className={`trait-${o.nature === 'porte' ? 'porte' : 'fenetre'}${o.ouverte ? ' ouverte' : ''}${
+                  o.verrouillee ? ' verrou' : ''
+                }`}
+                x1={b.a[0] * w}
+                y1={b.a[1] * h}
+                x2={b.b[0] * w}
+                y2={b.b[1] * h}
+                strokeWidth={ep * 2.6}
+              />
+            )
+          })}
+          {/* Les sons posés. Au repos, un simple repère : son émoji, sans
+              portée ni nom — dix cercles en tirets couvraient la carte
+              (Jules, 17 oct.). Le cercle et le nom ne viennent que quand le son
+              a quelque chose à dire : survolé, en attente du feu vert, ou
+              qu'une source se fait entendre. */}
+          {sons.map((z) =>
+            !(z.vise || z.etat === 'attente' || (z.gain ?? 0) > 0.02) ? (
+              <text
+                key={`s${z.id}`}
+                className={`trait-son repos ${z.nature} ${z.etat}`}
+                x={z.x * w}
+                y={z.y * h}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={Math.max(10, w * 0.011)}
+                strokeWidth={Math.max(2, w * 0.0025)}
+              >
+                {z.emoji || '♪'}
+              </text>
+            ) : (
+            <g key={`s${z.id}`} className={`trait-son ${z.nature} ${z.etat}${z.vise ? ' vise' : ''}`}>
+              <circle
+                cx={z.x * w}
+                cy={z.y * h}
+                r={z.rayon * w}
+                strokeWidth={z.vise ? ep * 2.4 : ep * 0.8}
+                strokeDasharray={z.etat === 'fait' ? `${ep * 1.5} ${ep * 3}` : `${ep * 4} ${ep * 3}`}
+                style={z.gain != null ? ({ fillOpacity: 0.06 + z.gain * 0.3 } as React.CSSProperties) : undefined}
+              />
+              <text
+                x={z.x * w}
+                y={z.y * h}
+                textAnchor="middle"
+                dominantBaseline="central"
+                fontSize={Math.max(10, w * 0.013)}
+                strokeWidth={Math.max(2, w * 0.003)}
+              >
+                {z.emoji} {z.nom}
+                {z.etat === 'attente' ? ' ✋' : ''}
+              </text>
+            </g>
+            )
+          )}
+          {/* Les objets posés : un losange, plein trouvé, creux tant qu'il
+              attend d'être découvert, et son nom dessous. */}
+          {objets.map((o) => {
+            const r = Math.max(5, w * 0.006)
+            return (
+              <g key={`b${o.id}`} className={`trait-objet ${o.etat}`} transform={`translate(${o.x * w} ${o.y * h})`}>
+                <path d={`M0 ${-r}L${r} 0L0 ${r}L${-r} 0Z`} strokeWidth={ep * 0.9} />
+                <text
+                  y={r * 1.4}
+                  textAnchor="middle"
+                  dominantBaseline="hanging"
+                  fontSize={Math.max(9, w * 0.011)}
+                  strokeWidth={Math.max(2, w * 0.003)}
+                >
+                  {o.nom}
+                </text>
+              </g>
+            )
+          })}
+          {noms.map((p, i) => (
+            <text
+              key={`n${i}`}
+              className="trait-piece"
+              x={p.x * w}
+              y={p.y * h}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={Math.max(11, w * 0.017)}
+              strokeWidth={Math.max(2, w * 0.004)}
+            >
+              {p.nom}
+            </text>
+          ))}
+          {a
+            ? (() => {
+                /* Au bord du plan, du côté d'où vient la lumière : on part du
+                   centre dans la direction du cap (0 le haut, 90 la droite) et
+                   on s'arrête au premier bord touché, moins le rayon. */
+                const r = Math.max(10, w * 0.016)
+                const dx = Math.sin((a.cap * Math.PI) / 180)
+                const dy = -Math.cos((a.cap * Math.PI) / 180)
+                const t = Math.min(
+                  Math.abs(dx) > 1e-6 ? (w / 2 - r * 1.4) / Math.abs(dx) : Infinity,
+                  Math.abs(dy) > 1e-6 ? (h / 2 - r * 1.4) / Math.abs(dy) : Infinity
+                )
+                return (
+            <g
+              className={`trait-astre ${a.nature}`}
+              transform={`translate(${w / 2 + dx * t} ${h / 2 + dy * t})`}
+            >
+              <circle r={r} />
+              <text textAnchor="middle" dominantBaseline="central" fontSize={Math.max(12, w * 0.02)}>
+                {a.nature === 'soleil' ? '☀' : '☾'}
+              </text>
+            </g>
+                )
+              })()
+            : null}
         </svg>
       </div>
     )
@@ -1448,6 +1825,7 @@ export function Framed({
       {/* Après l'image, jamais avant : peinte dessous, l'ombre ne se verrait
           pas. C'est le genre de détail qui ne se trouve qu'à l'écran. */}
       {ombre}
+      {traits}
       {halo}
     </div>
   )
@@ -1600,12 +1978,14 @@ function EncartJoueurs({
   encart,
   joueurs,
   onMove,
+  onMenu,
   onSize,
   onAjuster
 }: {
   encart: Encart
   joueurs: JoueurVu[]
   onMove?: (x: number, y: number) => void
+  onMenu?: (x: number, y: number) => void
   onSize?: (largeur: number, hauteur: number) => void
   onAjuster?: (characterId: number, key: string, delta: number) => void
 }): JSX.Element {
@@ -1695,6 +2075,11 @@ function EncartJoueurs({
           /* On n'enregistre qu'au relâchement : sinon les joueurs verraient
              l'encart trembler pendant qu'on le place. */
           if (bouge.current) onMove?.(pos.x, pos.y)
+          /* Pris sans bouger : c'est un clic, il ouvre le menu de l'encart —
+             toujours sous lui, au milieu, où qu'on ait cliqué. */ else {
+            const r = e.currentTarget.getBoundingClientRect()
+            onMenu?.(r.left + r.width / 2, r.bottom)
+          }
         }}
       >
         {joueurs.map((j) => (
@@ -1788,11 +2173,17 @@ function Jauge({
       </span>
       {onAjuster ? (
         <span className="pas">
+          {/* Dessinés plutôt qu'écrits : un « − » de police tombe rarement au
+              milieu de son bouton. */}
           <button onClick={() => onAjuster(-1)} aria-label={`Retirer 1 à ${j.label}`}>
-            −
+            <svg viewBox="0 0 10 10" aria-hidden="true">
+              <path d="M2 5h6" />
+            </svg>
           </button>
           <button onClick={() => onAjuster(1)} aria-label={`Ajouter 1 à ${j.label}`}>
-            +
+            <svg viewBox="0 0 10 10" aria-hidden="true">
+              <path d="M2 5h6M5 2v6" />
+            </svg>
           </button>
         </span>
       ) : null}
@@ -1894,7 +2285,10 @@ function PionLayer({
   live,
   onRemovePion,
   onRotatePion,
-  onPionMenu
+  onPionMenu,
+  onPionClic,
+  pionChoisiId,
+  horsDeVue
 }: Required<Pick<SlideExtras, 'pions' | 'pionSize' | 'pionLabels' | 'pionPv' | 'joueurs'>> & {
   /**
    * Le repère de l'image, quand il y en a une.
@@ -1919,6 +2313,10 @@ function PionLayer({
   onRemovePion?: (id: number) => void
   onRotatePion?: (id: number, deg: number) => void
   onPionMenu?: (pion: Pion, x: number, y: number) => void
+  onPionClic?: (pion: Pion) => void
+  pionChoisiId: number | null
+  /** Côté MJ : les pions « au regard » qu'aucun joueur ne voit en ce moment. */
+  horsDeVue?: Set<number>
 }): JSX.Element {
   const box = useRef<HTMLDivElement>(null)
 
@@ -1960,7 +2358,9 @@ function PionLayer({
         const j = p.characterId != null ? joueurs.find((x) => x.id === p.characterId) : undefined
         /* L'état se lit sur le pion même quand les PV sont cachés : on veut voir
            d'un coup d'œil qui tient debout, sans compter les points. */
-        const etat = etatDeVie(j?.pv)
+        /* Un PNJ n'est pas dans `joueurs` : son état, s'il le montre, voyage
+           avec son pion. */
+        const etat = j ? etatDeVie(j.pv) : (p.etat ?? null)
         return (
         <div
           key={p.id}
@@ -1970,7 +2370,11 @@ function PionLayer({
              regarde, et son visage reste droit. */
           className={`pion c-${p.color}${etat ? ` ${etat}` : ''}${p.cache ? ' embusque' : ''}${
             p.itemId != null ? ' objet' : ''
-          }${p.id === focusPionId ? ' suivi' : ''}${p.id === pionEnJeuId ? ' en-jeu' : ''}`}
+          }${p.id === focusPionId ? ' suivi' : ''}${p.id === pionEnJeuId ? ' en-jeu' : ''}${
+            p.regard && !p.cache ? ' au-regard' : ''
+          }${horsDeVue?.has(p.id) ? ' hors-vue' : ''}${
+            p.id === pionChoisiId ? ' choisi' : ''
+          }`}
           style={(() => {
             const q = repere ? repere.pionVersEcran(p.x, p.y) : { x: p.x, y: p.y }
             return {
@@ -1986,6 +2390,14 @@ function PionLayer({
             e.dataTransfer.setData('text/pion', String(p.id))
             e.dataTransfer.effectAllowed = 'move'
           }}
+          onClick={
+            onPionClic
+              ? (e) => {
+                  e.stopPropagation()
+                  onPionClic(p)
+                }
+              : undefined
+          }
           onContextMenu={
             onPionMenu
               ? (e) => {
@@ -2007,7 +2419,9 @@ function PionLayer({
             <span className="ini">{p.initials}</span>
           )}
           {p.rotation && p.itemId == null ? <span className="nez" /> : null}
-          {pionLabels && p.label ? <span className="lab">{p.label}</span> : null}
+          {/* Sans nom, il n'en porte pas non plus chez le MJ : la scène montre
+              ce que la table voit. Le survol le dit encore, à lui seul. */}
+          {pionLabels && p.label && !p.anonyme ? <span className="lab">{p.label}</span> : null}
           {pionPv && j?.pv ? (
             <span className="pv" title={j.pv.label}>
               {j.pv.value}

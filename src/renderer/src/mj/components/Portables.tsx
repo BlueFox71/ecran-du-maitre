@@ -27,7 +27,12 @@ export function Portables(): JSX.Element {
     try {
       s.setMobile((await window.jdr.mobile.open()).info)
     } catch (e) {
-      setErreur(String(e instanceof Error ? e.message : e))
+      setErreur(
+        String(e instanceof Error ? e.message : e).replace(
+          /^Error invoking remote method '[^']+': (Error: )?/,
+          ''
+        )
+      )
     } finally {
       setOccupe(false)
     }
@@ -45,6 +50,15 @@ export function Portables(): JSX.Element {
           Tout passe par le <b>Wi-Fi</b> de la maison — rien ne sort vers Internet.
         </p>
         {erreur ? <p className="pt-erreur">{erreur}</p> : null}
+        {/* Un port pris par un autre logiciel se règle au poste : on y mène. */}
+        {erreur && /déjà pris|ouvrir le port/.test(erreur) ? (
+          <button
+            className="btn btn-sm"
+            onClick={() => window.dispatchEvent(new CustomEvent('jdr:parametres', { detail: 'portables' }))}
+          >
+            Changer de port dans les Paramètres
+          </button>
+        ) : null}
         <button className="btn btn-brass" disabled={occupe} onClick={() => void ouvrir()}>
           {occupe ? 'Ouverture…' : 'Ouvrir l’accès'}
         </button>

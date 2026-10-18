@@ -1,6 +1,8 @@
 import { useStore } from '../store'
 import { useSaisieJet, VALEURS } from '../modules/jet'
 import { IconTrash } from './Icons'
+import { signe } from '@shared/jet'
+import { heureLocale } from '@shared/heure'
 
 /**
  * Noter un jet sans quitter la page où l'on est.
@@ -20,7 +22,7 @@ export function JetRapide(): JSX.Element {
     caracKey,
     setCaracKey,
     carac,
-    valeurDe,
+    bonusDe,
     bonus,
     valeur,
     setValeur,
@@ -78,7 +80,7 @@ export function JetRapide(): JSX.Element {
                   onChange={() => setCaracKey(x.key)}
                 />
                 <span className="t">{x.label}</span>
-                <b className="v">{valeurDe(x.key)}</b>
+                <b className="v">{signe(bonusDe(x.key))}</b>
               </label>
             ))}
           </div>
@@ -106,7 +108,7 @@ export function JetRapide(): JSX.Element {
         <p className="jr-som">
           {pret ? (
             <>
-              {valeur} + {bonus} = <b>{total}</b>
+              {valeur} {signe(bonus)} = <b>{total}</b>
             </>
           ) : (
             <span className="pt">Joueur, carac, dé.</span>
@@ -136,7 +138,7 @@ export function JetRapide(): JSX.Element {
           <span className="eyebrow">Derniers jets</span>
           {s.rolls.slice(0, 2).map((r) => (
             <div className={`jr-ligne c-${r.characterColor ?? 'neutral'}`} key={r.id}>
-              <span className="h">{r.at.slice(11, 16)}</span>
+              <span className="h">{heureLocale(r.at)}</span>
               <span className="t">
                 {(r.playerName?.trim() || r.characterName || 'MJ') + ' · ' + r.label}
               </span>

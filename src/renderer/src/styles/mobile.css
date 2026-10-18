@@ -416,6 +416,13 @@ img {
   font-size: 20px;
   font-variant-numeric: tabular-nums;
 }
+.m-cc em {
+  display: block;
+  font-family: ui-monospace, monospace;
+  font-size: 12px;
+  font-style: normal;
+  color: var(--label);
+}
 .m-cc span {
   font-family: ui-monospace, monospace;
   font-size: 10px;
@@ -433,6 +440,9 @@ img {
   gap: 8px;
   font-size: 14px;
   padding: 5px 2px;
+}
+.m-sou {
+  align-items: center;
 }
 .m-pts {
   flex: 1;
@@ -460,6 +470,23 @@ img {
 .m-tt[aria-pressed='true'] {
   border-color: var(--ground);
   box-shadow: 0 0 0 2px var(--brass);
+}
+/* Prise par un autre joueur : pâlie et barrée d'un trait. */
+.m-tt.prise {
+  position: relative;
+  opacity: 0.4;
+}
+.m-tt.prise::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: -3px;
+  bottom: -3px;
+  width: 2.5px;
+  margin-left: -1.25px;
+  border-radius: 2px;
+  background: var(--text);
+  transform: rotate(45deg);
 }
 
 .m-lecture {
@@ -574,6 +601,67 @@ img {
   }
 }
 
+/* Le dé naturel se dit à part du total : un 1 qui fait 17 reste une maladresse. */
+.m-nat {
+  display: inline-block;
+  margin-left: 10px;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  vertical-align: middle;
+}
+.m-nat-critique.m-nat,
+.m-envoye.m-envoye-critique {
+  color: var(--brass-ink);
+  background: var(--brass-wash);
+  border: 1px solid var(--brass);
+}
+.m-nat-maladresse.m-nat,
+.m-envoye.m-envoye-maladresse {
+  color: var(--blood);
+  background: var(--blood-wash);
+  border: 1px solid var(--blood);
+}
+
+/* Ses derniers jets : de quoi vérifier ce qu'on a annoncé. */
+.m-mesjets ol {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.m-mesjets li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  padding: 7px 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 8px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.m-mesjets .m-mj-calc {
+  font-family: ui-monospace, monospace;
+  color: var(--text-faint);
+}
+.m-mesjets b {
+  margin-left: auto;
+  font-family: ui-monospace, monospace;
+  font-variant-numeric: tabular-nums;
+  color: var(--text);
+}
+.m-mesjets em {
+  font-style: normal;
+  font-size: 12px;
+}
+.m-mesjets li.m-nat-critique em {
+  color: var(--brass);
+}
+.m-mesjets li.m-nat-maladresse em {
+  color: var(--blood);
+}
+
 /* --- le pion -------------------------------------------------------------- */
 .m-lieu-nom {
   font-size: 17px;
@@ -632,6 +720,47 @@ img {
   position: absolute;
   inset: 0;
   pointer-events: none;
+}
+/* Les portes, sous l'ombre : on ne voit que celles que son personnage voit. */
+.m-portes {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+}
+.m-portes line {
+  stroke-linecap: round;
+}
+.m-portes .fermee {
+  stroke: var(--brass);
+}
+.m-portes .verrou {
+  stroke: var(--blood);
+}
+.m-portes .ouverte {
+  stroke: var(--brass);
+  stroke-opacity: 0.45;
+}
+/* Ce qui retient le pas, posé sur la carte : rien ne bouge sous le pouce. */
+.m-bute {
+  position: absolute;
+  left: 50%;
+  bottom: 8px;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: calc(100% - 16px);
+  margin: 0;
+  padding: 6px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+  text-align: center;
+  color: var(--brass-ink);
+  background: rgba(10, 16, 19, 0.88);
+  border: 1px solid var(--brass-line);
+  pointer-events: none;
+  z-index: 3;
+  animation: m-parait 0.2s ease;
 }
 .brouillard {
   width: 100%;
@@ -1344,6 +1473,30 @@ img {
 .m-objet.porte .m-o-ou {
   color: var(--brass-ink);
 }
+/* Une lampe en main : son nom ouvre la feuille, l'interrupteur est à droite. */
+.m-lampe {
+  padding-block: 8px;
+}
+.m-lampe-ouvrir {
+  display: grid;
+  gap: 2px;
+  min-width: 0;
+  text-align: left;
+}
+.m-lampe-bouton {
+  padding: 8px 14px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  color: var(--text-faint);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.m-lampe-bouton.on {
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
 
 /* La feuille qui monte du bas : le pouce y arrive sans traverser l'écran. */
 .m-feuille-fond {
@@ -1661,4 +1814,393 @@ img {
   background: var(--brass);
   color: #1a1407;
   font-weight: 500;
+}
+
+/* La vibration refusée : l'écran tremble à la place, et l'on dit pourquoi. */
+body.m-frisson .m-app {
+  animation: m-frisson 0.12s linear infinite;
+}
+@keyframes m-frisson {
+  0% {
+    transform: translate(0, 0);
+  }
+  25% {
+    transform: translate(-3px, 1px);
+  }
+  50% {
+    transform: translate(2px, -2px);
+  }
+  75% {
+    transform: translate(-2px, -1px);
+  }
+  100% {
+    transform: translate(0, 0);
+  }
+}
+.m-vibre-bloque {
+  position: fixed;
+  left: 12px;
+  right: 12px;
+  bottom: calc(12px + env(safe-area-inset-bottom));
+  z-index: 50;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: var(--brass, #c9a24a);
+  color: #1a140a;
+  font-size: 14px;
+  text-align: center;
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.5);
+}
+
+/* ============================================================
+   Préparer son personnage
+   Tout l'écran, comme un formulaire qu'on remplit avant de jouer :
+   l'en-tête et le bouton restent, la liste du milieu défile si le
+   téléphone est petit.
+   ============================================================ */
+.m-prp {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+.m-prp-tete {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: calc(16px + env(safe-area-inset-top)) 18px 12px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.m-prp-haut {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+}
+.m-prp-haut .m-eyebrow {
+  flex: 1;
+  margin: 0;
+}
+.m-prp-ranger {
+  min-height: 36px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  font: inherit;
+  font-size: 12.5px;
+  text-decoration: underline;
+}
+.m-prp-titre {
+  margin: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-weight: 600;
+  font-size: 24px;
+  line-height: 1.15;
+}
+.m-prp-joueur {
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.m-prp-reste {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  margin-top: 6px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.m-prp-reste > span:last-child {
+  color: var(--text-dim);
+  font-family: ui-monospace, monospace;
+}
+.m-prp-reste b {
+  font-size: 28px;
+  font-weight: 600;
+  color: var(--brass-ink);
+}
+.m-prp-reste .zero b {
+  color: var(--moss);
+}
+.m-prp-jauge {
+  height: 6px;
+  border-radius: 3px;
+  background: var(--sunk);
+  overflow: hidden;
+}
+.m-prp-jauge i {
+  display: block;
+  height: 100%;
+  background: var(--brass);
+  transition: width 0.2s ease;
+}
+
+.m-prp-vues {
+  flex: none;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px;
+  padding: 10px 18px 2px;
+}
+.m-prp-vues button {
+  min-height: 44px;
+  border-radius: 9px;
+  border: 1px solid var(--line-soft);
+  background: none;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+}
+.m-prp-vues button[aria-selected='true'] {
+  border-color: var(--brass-line);
+  background: var(--raised);
+  color: var(--brass-ink);
+}
+
+.m-prp-corps {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 18px;
+}
+.m-prp-ligne {
+  display: grid;
+  grid-template-columns: 40px minmax(0, 1fr) 44px 30px 44px 50px;
+  align-items: center;
+  gap: 6px;
+  min-height: 52px;
+  padding: 0 4px 0 10px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--surface);
+}
+.m-prp-code {
+  font-family: ui-monospace, monospace;
+  font-size: 13px;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+}
+.m-prp-nomb {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  min-width: 0;
+}
+.m-prp-nomb > span:first-child {
+  font-size: 12px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m-prp-barre {
+  height: 3px;
+  border-radius: 2px;
+  background: var(--sunk);
+  overflow: hidden;
+}
+.m-prp-barre i {
+  display: block;
+  height: 100%;
+  background: var(--brass);
+}
+.m-prp-ligne button {
+  width: 44px;
+  height: 44px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--text);
+  font-size: 21px;
+  line-height: 1;
+  touch-action: manipulation;
+}
+.m-prp-ligne button.plus {
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
+.m-prp-ligne button:disabled {
+  opacity: 0.3;
+}
+.m-prp-val {
+  text-align: center;
+  font-family: ui-monospace, monospace;
+  font-size: 19px;
+  font-variant-numeric: tabular-nums;
+}
+.m-prp-mod {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  font-family: ui-monospace, monospace;
+}
+.m-prp-mod b,
+.m-prp-bilan b {
+  font-size: 15px;
+  color: var(--text-dim);
+}
+.m-prp-mod b.plus,
+.m-prp-bilan b.plus {
+  color: var(--moss);
+}
+.m-prp-mod b.moins,
+.m-prp-bilan b.moins {
+  color: var(--blood);
+}
+.m-prp-mod small {
+  font-size: 9.5px;
+  color: var(--text-faint);
+  white-space: nowrap;
+}
+
+.m-prp-comp {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-height: 52px;
+  padding: 6px 12px;
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+}
+.m-prp-comp.pris {
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+.m-prp-comp:disabled {
+  opacity: 0.55;
+}
+.m-prp-coche {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.m-prp-comp.pris .m-prp-coche {
+  border-color: var(--brass);
+  background: var(--brass);
+  color: #1a1406;
+}
+.m-prp-cnom {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.m-prp-cnom small {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+.m-prp-cnom small.manque {
+  color: var(--blood);
+}
+
+.m-prp-pied {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px 18px calc(16px + env(safe-area-inset-bottom));
+  border-top: 1px solid var(--line-soft);
+}
+.m-prp-pied .m-btn {
+  width: 100%;
+}
+.m-prp-valider {
+  min-height: 52px;
+  border: 0;
+  background: var(--brass);
+  color: #1a1406;
+  font-weight: 600;
+}
+.m-prp-avert,
+.m-prp-erreur {
+  margin: 0;
+  font-size: 12px;
+  text-align: center;
+  color: var(--brass);
+}
+.m-prp-erreur {
+  color: var(--blood);
+}
+
+.m-prp-fin {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: calc(22px + env(safe-area-inset-top)) 18px 12px;
+}
+.m-prp-fin .m-eyebrow {
+  margin: 0;
+}
+.m-prp-ok {
+  color: var(--moss);
+}
+.m-prp-bilan {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 7px;
+}
+.m-prp-bilan > div {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1px;
+  padding: 9px 4px;
+  border: 1px solid var(--line-soft);
+  border-radius: 9px;
+  background: var(--sunk);
+}
+.m-prp-bilan > div > b:first-child {
+  font-family: ui-monospace, monospace;
+  font-size: 20px;
+  color: var(--text);
+}
+.m-prp-bilan .m-prp-code {
+  font-size: 10.5px;
+  color: var(--label);
+}
+.m-prp-nom {
+  font-size: 10px;
+  color: var(--text-dim);
+}
+.m-prp-comps {
+  margin: 0;
+  font-size: 14px;
+}
+
+/* La préparation rangée : de quoi y revenir, sous l'en-tête. */
+.m-prp-rappel {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  min-height: 44px;
+  padding: 8px 15px;
+  border: 0;
+  border-bottom: 1px solid var(--brass-line);
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+}
+.m-prp-rappel span {
+  font-size: 20px;
 }

@@ -6,6 +6,7 @@ import { styleCarre } from '../../shared/Visage'
 import type { UiItem } from '../../../../preload/index'
 import { IconClose, IconCrop, IconImage, IconTrame, IconTrash } from './Icons'
 import type { CadreCarre, Trame, TrameCarte, TrameType } from '@shared/types'
+import { useEchap } from '../echap'
 
 /* ============================================================
    L'arborescence de la séance (la « trame » du code) : le scénario du
@@ -914,13 +915,7 @@ export function TrameEnJeu({ onClose }: { onClose: () => void }): JSX.Element {
   const [trame, changer, recharger] = useTrame()
   const [choix, setChoix] = useState<Choix>(null)
 
-  useEffect(() => {
-    const h = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [onClose])
+  useEchap(onClose)
 
   const faites = trame?.cartes.filter((c) => c.fait) ?? []
   const aPorteeMaintenant = trame?.cartes.filter((c) => !c.fait && aPortee(c, trame)) ?? []

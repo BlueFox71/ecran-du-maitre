@@ -21,6 +21,7 @@ import { IconChevron, IconClose, IconSearch, kindIcon } from './Icons'
 import { decorDossier, folderIcon } from './FolderIcons'
 import type { UiFolder, UiItem } from '../../../../preload/index'
 import type { ItemKind } from '@shared/types'
+import { useEchap } from '../echap'
 
 /** `vignettes` : des lignes et un volet d'aperçu à droite ; `lignes` : des lignes seules. */
 type Rendu = 'vignettes' | 'lignes'
@@ -50,6 +51,7 @@ export function ChoixDansArbre({
   onClose: () => void
 }): JSX.Element {
   const s = useStore()
+  useEchap(onClose)
   const [q, setQ] = useState('')
   const apercu = rendu === 'vignettes'
   /** La ligne qu'on regarde dans le volet d'aperçu, pas encore choisie. */

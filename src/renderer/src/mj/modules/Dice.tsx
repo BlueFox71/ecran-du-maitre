@@ -4,6 +4,8 @@ import { IconRotate, IconTrash } from '../components/Icons'
 import { initials } from './Sheets'
 import { FACES, useSaisieJet, VALEURS } from './jet'
 import type { Character, Roll } from '@shared/types'
+import { signe } from '@shared/jet'
+import { heureLocale } from '@shared/heure'
 
 /**
  * Jets de dés — **un journal, pas un dé**. Les joueurs lancent leurs propres dés
@@ -26,7 +28,7 @@ export function Dice(): JSX.Element {
     caracKey,
     setCaracKey,
     carac,
-    valeurDe,
+    bonusDe,
     bonus,
     valeur,
     setValeur,
@@ -121,7 +123,7 @@ export function Dice(): JSX.Element {
                       onChange={() => setCaracKey(x.key)}
                     />
                     <span className="t">{x.label}</span>
-                    <b className="v">{valeurDe(x.key)}</b>
+                    <b className="v">{signe(bonusDe(x.key))}</b>
                   </label>
                 ))}
               </div>
@@ -152,7 +154,7 @@ export function Dice(): JSX.Element {
                   <b>{perso!.player?.trim() || perso!.name}</b> · {carac!.label}
                   <br />
                   <span className="som">
-                    {valeur} + {bonus} = <b>{valeur! + bonus}</b>
+                    {valeur} {signe(bonus)} = <b>{valeur! + bonus}</b>
                   </span>
                 </>
               ) : (
@@ -268,7 +270,7 @@ function Corbeille(): JSX.Element {
           <div className="jetes">
             {s.rollTrash.map((r) => (
               <div className={`jete c-${r.characterColor ?? 'neutral'}`} key={r.id}>
-                <span className="h">{r.at.slice(11, 16)}</span>
+                <span className="h">{heureLocale(r.at)}</span>
                 <span className="t">
                   {r.playerName?.trim() || r.characterName || 'MJ'} · {r.label}
                 </span>
@@ -472,7 +474,7 @@ function RollRow({
   return (
     <tr className={`jr c-${r.characterColor ?? 'neutral'}${fresh ? ' fresh' : ''}`}>
       <td className="num" style={{ color: 'var(--text-faint)', fontSize: 11.5 }}>
-        {r.at.slice(11, 16)}
+        {heureLocale(r.at)}
       </td>
       <td>
         <span className="who">

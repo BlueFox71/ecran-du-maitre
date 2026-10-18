@@ -37,7 +37,9 @@ const PAGES: Record<Exclude<ViewId, 'editor'>, Maillon[]> = {
   lib: [{ label: 'Matière' }, { label: 'Bibliothèque' }],
   notes: [{ label: 'Matière' }, { label: 'Bloc-notes' }],
   places: [{ label: 'Matière' }, { label: 'Lieux' }],
+  plans: [{ label: 'Matière' }, { label: 'Lieux', view: 'places' }, { label: 'Plans' }],
   objets: [{ label: 'Matière' }, { label: 'Objets' }],
+  sons: [{ label: 'Matière' }, { label: 'Sons' }],
   sheets: [{ label: 'Table' }, { label: 'Fiches' }],
   pochette: [{ label: 'Table' }, { label: 'Pochette' }],
   dice: [{ label: 'Table' }, { label: 'Jets de dés' }]

@@ -1,8 +1,8 @@
 import { echelleDe } from './echelle'
 import { getDb } from '../index'
 import { mediaUrl } from '../../vault'
-import { upsertCharacter } from './characters'
-import { lisCadreCarre } from '@shared/types'
+import { listTemplates, upsertCharacter } from './characters'
+import { etatDeVie, jaugesDe, lisCadreCarre } from '@shared/types'
 import type { Pion, PionsDuLieu } from '@shared/types'
 
 /**
@@ -36,6 +36,7 @@ interface Row {
   rotation: number
   hidden: number
   anonyme: number
+  regard: number | null
   char_name: string | null
   char_color: string | null
   char_kind: string | null
@@ -43,16 +44,22 @@ interface Row {
   portrait_cadre: string | null
   item_title: string | null
   item_path: string | null
+  etat_visible: number | null
+  char_data: string | null
+  template_id: number | null
 }
 
 const SELECT = `
   SELECT p.id, p.place_id, p.character_id, p.item_id, p.label, p.x, p.y,
-         p.ord, p.rotation, p.hidden, p.anonyme,
+         p.ord, p.rotation, p.hidden, p.anonyme, p.regard,
          c.name        AS char_name,
          c.color       AS char_color,
          c.kind        AS char_kind,
          pi.rel_path   AS portrait_path,
          c.portrait_cadre,
+         c.etat_visible,
+         c.data        AS char_data,
+         c.template_id,
          i.title       AS item_title,
          i.rel_path    AS item_path
     FROM pion p
@@ -81,7 +88,8 @@ function toPion(r: Row): Pion {
     ord: r.ord,
     rotation: r.rotation,
     cache: !!r.hidden,
-    anonyme: !!r.anonyme
+    anonyme: !!r.anonyme,
+    regard: !!r.regard
   }
 }
 
@@ -91,9 +99,23 @@ function toPion(r: Row): Pion {
  */
 export function listPions(placeId: number | null): Pion[] {
   if (placeId == null) return []
-  return (
-    getDb().prepare(`${SELECT} WHERE p.place_id = ? ORDER BY p.ord, p.id`).all(placeId) as Row[]
-  ).map(toPion)
+  const rows = getDb()
+    .prepare(`${SELECT} WHERE p.place_id = ? ORDER BY p.ord, p.id`)
+    .all(placeId) as Row[]
+  /* L'état d'un PNJ qui le montre : sa première jauge, comme pour un joueur. */
+  const gabarits = rows.some((r) => r.char_kind === 'pnj' && r.etat_visible) ? listTemplates() : []
+  return rows.map((r) => {
+    const pion = toPion(r)
+    if (r.char_kind !== 'pnj' || !r.etat_visible || !r.char_data) return pion
+    const spec = gabarits.find((t) => t.id === r.template_id)?.spec
+    const cle = spec ? jaugesDe(spec.gauges, 'pnj')[0]?.key : undefined
+    try {
+      const pv = cle ? (JSON.parse(r.char_data) as { gauges?: Record<string, { value: number; max: number }> }).gauges?.[cle] : undefined
+      return { ...pion, etat: etatDeVie(pv) }
+    } catch {
+      return pion
+    }
+  })
 }
 
 /**
@@ -285,10 +307,19 @@ export function clearPions(placeId: number): number {
 export function pionsParLieu(): Record<number, PionsDuLieu> {
   const out: Record<number, PionsDuLieu> = {}
   for (const r of getDb().prepare(`${SELECT} ORDER BY p.place_id, p.ord, p.id`).all() as Row[]) {
-    const lieu = (out[r.place_id] ??= { count: 0, joueurs: [] })
+    const lieu = (out[r.place_id] ??= { count: 0, joueurs: [], pnjs: [] })
     lieu.count++
-    if (r.character_id == null) continue
     const pion = toPion(r)
+    const fiche = {
+      characterId: r.character_id,
+      name: pion.label,
+      color: pion.color,
+      url: pion.url,
+      cadre: pion.cadre,
+      initials: pion.initials
+    }
+    if (r.char_kind === 'pnj' || (r.character_id == null && r.label != null)) lieu.pnjs.push(fiche)
+    if (r.character_id == null) continue
     lieu.joueurs.push({
       characterId: r.character_id,
       name: pion.label,
@@ -301,3 +332,7 @@ export function pionsParLieu(): Record<number, PionsDuLieu> {
   return out
 }
 
+/** Ne le montrer aux joueurs que lorsqu'un d'eux le regarde — ou plus. */
+export function setRegard(id: number, on: boolean): void {
+  getDb().prepare(`UPDATE pion SET regard = ? WHERE id = ?`).run(on ? 1 : 0, id)
+}

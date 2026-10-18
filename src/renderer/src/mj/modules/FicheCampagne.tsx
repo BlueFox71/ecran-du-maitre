@@ -2,6 +2,9 @@ import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { IconCheck, IconClose, IconPeople, IconPlus, IconSearch, IconTrash } from '../components/Icons'
 import { jaugeSanite } from '@shared/types'
+import { MonnaiesCampagne } from '../components/MonnaiesCampagne'
+import { Confirmer } from '../components/Rangement'
+import { monnaiesPosees, type ReglageMonnaies } from '@shared/monnaies'
 import type {
   CatalogueEntry,
   GaugeSpec,
@@ -10,6 +13,7 @@ import type {
   StatSpec,
   TemplateSpec
 } from '@shared/types'
+import { useEchap } from '../echap'
 
 /**
  * La fiche de la campagne.
@@ -73,11 +77,20 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
     () => fiche?.spec ?? { rollSystem: 'd20-plus', gauges: [], stats: [], skills: [], skillLimit: null }
   )
   const [partie, setPartie] = useState<Partie>('stats')
+  /** L'onglet des monnaies, qui n'est pas une partie de la fiche. */
+  const [monnaies, setMonnaies] = useState(false)
   const [filtre, setFiltre] = useState('')
   const [catalogue, setCatalogue] = useState<CatalogueEntry[]>([])
   const [modeles, setModeles] = useState<SheetModel[]>([])
   const [tiroir, setTiroir] = useState(false)
   const [sale, setSale] = useState(false)
+  /* Les monnaies attendent « Appliquer », comme la fiche — sans en faire partie. */
+  const [argent, setArgent] = useState<ReglageMonnaies>(s.reglages.monnaies)
+  const argentPose = useMemo(() => monnaiesPosees(s.reglagesBrut['monnaies']), [s.reglagesBrut])
+  const argentSale = JSON.stringify(argent) !== JSON.stringify(s.reglages.monnaies)
+  /** La campagne perd son argent : on le dit avant de l'appliquer. */
+  const [masquer, setMasquer] = useState(false)
+  const modifie = sale || argentSale
   const [saisie, setSaisie] = useState({ code: '', label: '' })
   const champNeuf = useRef<HTMLInputElement>(null)
 
@@ -90,15 +103,8 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
   }, [])
 
   /* Échap referme le tiroir des modèles, puis l'écran. */
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent): void => {
-      if (e.key !== 'Escape') return
-      if (tiroir) setTiroir(false)
-      else onClose()
-    }
-    window.addEventListener('keydown', onKey)
-    return () => window.removeEventListener('keydown', onKey)
-  }, [tiroir, onClose])
+  useEchap(onClose)
+  useEchap(() => setTiroir(false), tiroir)
 
   const p = PARTIES[partie]
   const lignes = spec[partie] as (StatSpec | SkillSpec | GaugeSpec)[]
@@ -242,8 +248,12 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
 
   const nbPertes = pertes.stats.length + pertes.skills.length + pertes.gauges.length
 
-  const appliquer = async (): Promise<void> => {
-    if (nbPertes > 0 && s.characters.length > 0) {
+  const appliquer = async (masqueAccepte = false): Promise<void> => {
+    if (argentSale && s.reglages.monnaies.actif && !argent.actif && !masqueAccepte) {
+      setMasquer(true)
+      return
+    }
+    if (sale && nbPertes > 0 && s.characters.length > 0) {
       const liste = [...pertes.stats, ...pertes.skills, ...pertes.gauges].join(', ')
       if (
         !confirm(
@@ -254,8 +264,13 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
       )
         return
     }
-    await window.jdr.sheet.save({ name: nom.trim() || fiche?.name || 'Fiche', spec })
-    await s.refreshCharacters()
+    if (sale) {
+      await window.jdr.sheet.save({ name: nom.trim() || fiche?.name || 'Fiche', spec })
+      await s.refreshCharacters()
+    }
+    /* Les monnaies s'écrivent avec leur liste : à partir de là, elles sont sur
+       les fiches et ne se suppriment plus. */
+    if (argentSale) await s.poserReglage('monnaies', JSON.stringify(argent))
     setSale(false)
     s.toast(
       s.characters.length > 0
@@ -266,7 +281,7 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
   }
 
   const fermer = (): void => {
-    if (sale && !confirm('Fermer sans appliquer ? Les changements seront perdus.')) return
+    if (modifie && !confirm('Fermer sans appliquer ? Les changements seront perdus.')) return
     onClose()
   }
 
@@ -308,9 +323,9 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
               aria-label="Nom de la fiche"
               spellCheck={false}
             />
-            <span className={`fc-etat${sale ? ' sale' : ''}`}>
+            <span className={`fc-etat${modifie ? ' sale' : ''}`}>
               <span className="pt" />
-              {sale ? 'modifié' : 'enregistré'}
+              {modifie ? 'modifié' : 'enregistré'}
             </span>
           </div>
           <div className="fc-tiroir-hote">
@@ -372,8 +387,9 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
             <button
               key={k}
               role="tab"
-              aria-selected={partie === k}
+              aria-selected={!monnaies && partie === k}
               onClick={() => {
+                setMonnaies(false)
                 setPartie(k)
                 setFiltre('')
                 setSaisie({ code: '', label: '' })
@@ -383,6 +399,14 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
               <span className="n">{(spec[k] as unknown[]).length}</span>
             </button>
           ))}
+          {/* Les monnaies se règlent ici sans être de la fiche : elles
+              appartiennent à la campagne et ne partent pas dans les modèles. */}
+          <button role="tab" aria-selected={monnaies} onClick={() => setMonnaies(true)}>
+            Monnaies
+            <span className="n">
+              {argent.actif ? argent.liste.length : '—'}
+            </span>
+          </button>
           <div className="spacer" />
           <label className="fc-systeme">
             <span className="eyebrow">Jet</span>
@@ -393,19 +417,36 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
               }
               aria-label="Système de jet"
             >
-              <option value="d20-plus">d20 + caractéristique</option>
+              <option value="d20-plus">d20 + modificateur</option>
               <option value="d100-under">d100 sous la valeur</option>
             </select>
           </label>
         </div>
 
+        {monnaies ? (
+          <div className="fc-colonnes fc-une">
+            <MonnaiesCampagne r={argent} posees={argentPose} onChange={setArgent} />
+          </div>
+        ) : (
         <div className="fc-colonnes">
           <section className="card fc-carte">
             <header>
               <h4>{p.titre}</h4>
               <span className="sous">{p.sous}</span>
               <div className="spacer" />
-              {partie === 'skills' && <Limite valeur={limite} onChange={(n) => toucher({ ...spec, skillLimit: n })} />}
+              {partie === 'skills' && (
+                <label className="fc-sans-comp" title="Décochée : les compétences disparaissent des fiches, du téléphone et de la préparation">
+                  <input
+                    type="checkbox"
+                    checked={!spec.sansCompetences}
+                    onChange={(e) => toucher({ ...spec, sansCompetences: e.target.checked ? undefined : true })}
+                  />
+                  La table s’en sert
+                </label>
+              )}
+              {partie === 'skills' && !spec.sansCompetences && (
+                <Limite valeur={limite} onChange={(n) => toucher({ ...spec, skillLimit: n })} />
+              )}
               {partie === 'gauges' && (
                 <Sanite
                   gauges={spec.gauges}
@@ -454,6 +495,20 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
                       aria-label={`Nom — ${x.label}`}
                       spellCheck={false}
                     />
+                    {partie === 'gauges' && (
+                      <label
+                        className="fc-pnj"
+                        title="Décochée, les fiches de PNJ ne montrent pas cette jauge"
+                      >
+                        <input
+                          type="checkbox"
+                          checked={(x as GaugeSpec).pnj !== false}
+                          onChange={(e) => retoucher(x.key, { pnj: e.target.checked })}
+                          aria-label={`${x.label} — aussi pour les PNJ`}
+                        />
+                        PNJ
+                      </label>
+                    )}
                     {partie === 'gauges' && (
                       <input
                         className="plafond"
@@ -591,6 +646,7 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
             </div>
           </section>
         </div>
+        )}
 
         <footer className="fc-pied">
           <p className="fc-suite">
@@ -618,10 +674,30 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
           <button className="btn" onClick={fermer}>
             Annuler
           </button>
-          <button className="btn btn-brass" onClick={() => void appliquer()} disabled={!sale}>
+          <button className="btn btn-brass" onClick={() => void appliquer()} disabled={!modifie}>
             Appliquer à la campagne
           </button>
         </footer>
+
+        {masquer ? (
+          <Confirmer
+            titre="Passer la campagne sans monnaie ?"
+            oui="Appliquer à la campagne"
+            onOui={async () => {
+              setMasquer(false)
+              await appliquer(true)
+            }}
+            onNon={() => setMasquer(false)}
+          >
+            <p>
+              La bourse disparaît des fiches et des téléphones, le prix disparaît des objets.
+            </p>
+            <p>
+              <b>Rien n’est effacé</b> : les montants déjà saisis sont simplement masqués. Ils
+              reviennent tels quels si la campagne retrouve de l’argent.
+            </p>
+          </Confirmer>
+        ) : null}
       </div>
     </div>
   )

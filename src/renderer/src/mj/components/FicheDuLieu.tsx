@@ -43,6 +43,7 @@ import type {
 } from '@shared/types'
 import { TIER_LABEL } from '@shared/types'
 import { formesDesMurs } from '@shared/pieces'
+import { useEchap } from '../echap'
 
 /** L'éclair des déclencheurs. */
 function IconEclair(): JSX.Element {
@@ -243,6 +244,72 @@ export function FicheDuLieu({
   )
 }
 
+/**
+ * Les PNJ et les objets d'un lieu, seuls : l'onglet « Objets et PNJ » du volet
+ * de l'éditeur de plan. Le même panneau que la fiche, sans son cadre.
+ */
+export function QuiQuoiDuLieu({
+  p,
+  surPlan,
+  ouvrir
+}: {
+  p: Place
+  /** Les objets se glissent sur le plan d'à côté. */
+  surPlan?: boolean
+  /** Déplier cette rangée — un objet cliqué sur le plan. `n` relance le même. */
+  ouvrir?: { cle: string; n: number } | null
+}): JSX.Element {
+  const s = useStore()
+  const [fiche, setFiche] = useState<Fiche | null>(null)
+  const [deplie, setDeplie] = useState<string | null>(null)
+
+  const relire = async (): Promise<void> => setFiche(await window.jdr.fiche.lire(p.id))
+
+  useEffect(() => {
+    setFiche(null)
+    setDeplie(null)
+    void relire()
+    const h = (): void => void relire()
+    window.addEventListener('jdr:defait', h)
+    const lache = window.jdr.fiche.onRelue(h)
+    return () => {
+      window.removeEventListener('jdr:defait', h)
+      lache()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.id])
+  useEffect(() => {
+    if (ouvrir) setDeplie(ouvrir.cle)
+  }, [ouvrir])
+
+  const pnjsSeance = useMemo(() => s.characters.filter((c) => c.kind === 'pnj'), [s.characters])
+  const pnjsIci = useMemo(
+    () =>
+      (fiche?.pnjIds ?? [])
+        .map((id) => pnjsSeance.find((c) => c.id === id))
+        .filter((c): c is Character => !!c),
+    [fiche, pnjsSeance]
+  )
+
+  return (
+    <PanneauQuiQuoi
+      p={p}
+      cartes={fiche?.cartes ?? []}
+      pnjsIci={pnjsIci}
+      pnjsSeance={pnjsSeance}
+      objetsIci={exemplairesIci(s.objets, p.id, pnjsIci)}
+      relire={relire}
+      deplie={deplie}
+      onDeplier={setDeplie}
+      nu
+      surPlan={surPlan}
+    />
+  )
+}
+
+/** Le type du glisser d'un exemplaire, de la liste vers le plan : son id. */
+export const GLISSE_OBJET = 'application/x-jdr-placement'
+
 /** Les exemplaires d'objets du lieu : posés ici, ou portés par l'un de ses PNJ. */
 function exemplairesIci(objets: Objet[], placeId: number, pnjsIci: Character[]): Exemplaire[] {
   const ids = new Set(pnjsIci.map((c) => c.id))
@@ -311,14 +378,7 @@ function PanneauLieu({
     setNotes(p.notes ?? '')
   }, [p.id, p.summary, p.notes])
 
-  useEffect(() => {
-    if (!grand) return
-    const h = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') setGrand(false)
-    }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [grand])
+  useEchap(() => setGrand(false), grand)
 
   const ecrire = (patch: { summary?: string; notes?: string }): void => {
     enCours.current = true
@@ -1351,7 +1411,9 @@ function PanneauQuiQuoi({
   objetsIci,
   relire,
   deplie,
-  onDeplier
+  onDeplier,
+  nu = false,
+  surPlan = false
 }: {
   p: Place
   cartes: LieuCarte[]
@@ -1361,6 +1423,10 @@ function PanneauQuiQuoi({
   relire: () => Promise<void>
   deplie: string | null
   onDeplier: (cle: string | null) => void
+  /** Sans cadre ni titre : dans le volet de l'éditeur de plan. */
+  nu?: boolean
+  /** Dans l'éditeur de plan : un objet posé se glisse sur le plan. */
+  surPlan?: boolean
 }): JSX.Element {
   const s = useStore()
   const [cherche, setCherche] = useState('')
@@ -1409,13 +1475,15 @@ function PanneauQuiQuoi({
   }
 
   return (
-    <section className="fdl-pane fdl-qq">
-      <div className="fdl-tete">
-        <h3>Qui et quoi</h3>
-        <span className="fdl-compte">
-          {pnjsIci.length + objetsIci.length ? `${pnjsIci.length} PNJ · ${objetsIci.length} objet${objetsIci.length > 1 ? 's' : ''}` : ''}
-        </span>
-      </div>
+    <section className={nu ? 'fdl-qq fdl-qq-nu' : 'fdl-pane fdl-qq'}>
+      {nu ? null : (
+        <div className="fdl-tete">
+          <h3>Qui et quoi</h3>
+          <span className="fdl-compte">
+            {pnjsIci.length + objetsIci.length ? `${pnjsIci.length} PNJ · ${objetsIci.length} objet${objetsIci.length > 1 ? 's' : ''}` : ''}
+          </span>
+        </div>
+      )}
       <div className="fdl-corps">
         <div className="fdl-qq-chercher" ref={hote}>
           <div className="fdl-nouveau">
@@ -1550,8 +1618,21 @@ function PanneauQuiQuoi({
         })}
 
         {libres.length ? <span className="eyebrow fdl-qq-groupe">Objets posés · {libres.length}</span> : null}
+        {surPlan && libres.length ? (
+          <p className="fdl-vide">Glisse un objet sur le plan pour le poser à sa place dans {p.name}.</p>
+        ) : null}
         {libres.map((e) => (
-          <RangeeObjet key={e.x.id} e={e} p={p} cartes={cartes} pnjsIci={pnjsIci} relire={relire} deplie={deplie} onDeplier={onDeplier} />
+          <RangeeObjet
+            key={e.x.id}
+            e={e}
+            p={p}
+            cartes={cartes}
+            pnjsIci={pnjsIci}
+            relire={relire}
+            deplie={deplie}
+            onDeplier={onDeplier}
+            surPlan={surPlan}
+          />
         ))}
       </div>
     </section>
@@ -1566,7 +1647,8 @@ function RangeeObjet({
   pnjsIci,
   relire,
   deplie,
-  onDeplier
+  onDeplier,
+  surPlan = false
 }: {
   e: Exemplaire
   p: Place
@@ -1577,6 +1659,7 @@ function RangeeObjet({
   relire: () => Promise<void>
   deplie: string | null
   onDeplier: (cle: string | null) => void
+  surPlan?: boolean
 }): JSX.Element {
   const s = useStore()
   const differe = useDiffere()
@@ -1590,7 +1673,10 @@ function RangeeObjet({
   useEffect(() => setPrecision(x.precision ?? ''), [x.precision])
   useEffect(() => setSu(o.su), [o.su])
   const revele = cartes.find((c) => c.sorte === 'decouverte' && c.objetIds.includes(o.id))
-  const sousNom = tenu ? 'sur lui' : x.precision || 'endroit à préciser'
+  const sousNom = tenu
+    ? 'sur lui'
+    : [x.precision, x.pos ? 'sur le plan' : null].filter(Boolean).join(' · ') || 'endroit à préciser'
+  const glissable = surPlan && !tenu
 
   const basculer = async (): Promise<void> => {
     const etat = x.etat === 'cache' ? 'trouve' : 'cache'
@@ -1602,9 +1688,16 @@ function RangeeObjet({
   return (
     <>
       <div
-        className={`fdl-rangee${enfant ? ' enfant' : ''}${ouvert ? ' ouvert' : ''}`}
+        className={`fdl-rangee${enfant ? ' enfant' : ''}${ouvert ? ' ouvert' : ''}${glissable ? ' glissable' : ''}`}
         data-fdl={cle}
         onClick={() => onDeplier(ouvert ? null : cle)}
+        draggable={glissable}
+        title={glissable ? (x.pos ? 'Glisse-le ailleurs sur le plan' : 'Glisse-le sur le plan') : undefined}
+        onDragStart={(ev) => {
+          if (!glissable) return
+          ev.dataTransfer.setData(GLISSE_OBJET, String(x.id))
+          ev.dataTransfer.effectAllowed = 'move'
+        }}
       >
         {img?.url ? (
           <img className="fdl-rvig" src={img.poster ?? img.url} alt="" />
@@ -1726,6 +1819,18 @@ function RangeeObjet({
               >
                 <IconScreen />
                 Montrer à l’écran
+              </button>
+            ) : null}
+            {surPlan && x.pos ? (
+              <button
+                className="btn btn-sm btn-ghost"
+                title="Il reste dans la pièce, sans point précis"
+                onClick={async () => {
+                  await window.jdr.objets.situer(x.id, null)
+                  await s.refreshObjets()
+                }}
+              >
+                Ôter du plan
               </button>
             ) : null}
             <div className="spacer" />

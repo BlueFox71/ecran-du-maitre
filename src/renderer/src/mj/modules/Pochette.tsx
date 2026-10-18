@@ -34,6 +34,7 @@ import {
   kindIcon
 } from '../components/Icons'
 import type { PochetteDoc, PochetteOnglet } from '@shared/types'
+import { heureLocale } from '@shared/heure'
 
 /**
  * Une personne autour de la table, telle que la pochette la nomme : le MJ
@@ -470,7 +471,7 @@ function Carte({
               ? 'toute la table'
               : `${doc.characterName ?? doc.playerName} seul`}
           </span>
-          <span className="h">{doc.givenAt.slice(11, 16)}</span>
+          <span className="h">{heureLocale(doc.givenAt)}</span>
         </span>
         {/* Ce qui n'est pas montré n'a pas de lecteur : la ligne dirait
             « personne ne l'a ouvert » d'un document que personne n'a pu voir. */}

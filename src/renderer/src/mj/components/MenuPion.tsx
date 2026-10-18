@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import type { Pion } from '@shared/types'
+import { useEchap } from '../echap'
 
 /**
  * Le menu d'un pion — clic droit sur un jeton, dans la Régie ou au Pupitre.
@@ -38,16 +39,10 @@ export function MenuPion({
   useEffect(() => {
     if (!cible) return
     const clic = (): void => onFerme()
-    const touche = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onFerme()
-    }
     window.addEventListener('click', clic)
-    window.addEventListener('keydown', touche)
-    return () => {
-      window.removeEventListener('click', clic)
-      window.removeEventListener('keydown', touche)
-    }
+    return () => window.removeEventListener('click', clic)
   }, [cible, onFerme])
+  useEchap(onFerme, !!cible)
 
   if (!cible) return null
   const p = cible.pion

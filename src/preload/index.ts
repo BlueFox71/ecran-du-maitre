@@ -2,6 +2,11 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { Brut } from '@shared/reglages'
 import type {
   Annotation,
+  MotifVibration,
+  Son,
+  SonJoue,
+  SonsMj,
+  ZoneSon,
   FicheDuLieu,
   LieuScenario,
   SorteCarte,
@@ -28,6 +33,7 @@ import type {
   EchellePlan,
   EntrantTour,
   ToursMj,
+  PreparationEtat,
   EffetObjet,
   FolderNode,
   GlypheObjet,
@@ -277,6 +283,29 @@ const api = {
    * Les tours : à qui de jouer. Tout vit en mémoire dans le processus
    * principal ; chaque geste rend l'état entier, que `onState` annonce aussi.
    */
+  /**
+   * La préparation des personnages : le MJ invite, les joueurs répartissent
+   * leurs points sur leur téléphone. L'état vit dans le processus principal ;
+   * `onEtat` l'annonce à chaque point posé, `onEcrit` quand une fiche est
+   * validée — elle vient d'être écrite.
+   */
+  prepa: {
+    etat: () => call<PreparationEtat>('prepa:etat'),
+    ouvrir: () => call<PreparationEtat>('prepa:ouvrir'),
+    clore: () => call<PreparationEtat>('prepa:clore'),
+    montrer: (on: boolean) => call<PreparationEtat>('prepa:montrer', on),
+    onEtat: (cb: (e: PreparationEtat) => void) => {
+      const h = (_: unknown, e: PreparationEtat): void => cb(e)
+      ipcRenderer.on('prepa:etat', h)
+      return () => void ipcRenderer.removeListener('prepa:etat', h)
+    },
+    onEcrit: (cb: (characterId: number) => void) => {
+      const h = (_: unknown, id: number): void => cb(id)
+      ipcRenderer.on('prepa:ecrit', h)
+      return () => void ipcRenderer.removeListener('prepa:ecrit', h)
+    }
+  },
+
   tours: {
     etat: () => call<ToursMj | null>('tours:etat'),
     candidats: () => call<EntrantTour[]>('tours:candidats'),
@@ -317,6 +346,9 @@ const api = {
       cache?: boolean
     }) => call<DisplayState>('pions:add', input),
     move: (id: number, x: number, y: number) => call<DisplayState>('pions:move', id, x, y),
+    /** Marcher : comme `move`, mais les murs retiennent le pas. Rend où il est arrivé. */
+    marcher: (id: number, x: number, y: number) =>
+      call<{ x: number; y: number } | null>('pions:marcher', id, x, y),
     /** L'angle en degrés : c'est l'image qui tourne dans le jeton. */
     rotate: (id: number, deg: number) => call<DisplayState>('pions:rotate', id, deg),
     /** Le calque : devant tout le monde, ou derrière tout le monde. */
@@ -325,6 +357,8 @@ const api = {
     hide: (id: number, cache: boolean) => call<DisplayState>('pions:hide', id, cache),
     /** Le montrer sans son nom : les joueurs voient le jeton, pas qui c'est. */
     anonyme: (id: number, anonyme: boolean) => call<DisplayState>('pions:anonyme', id, anonyme),
+    /** Ne le montrer qu'à la portée des regards des joueurs. */
+    regard: (id: number, on: boolean) => call<DisplayState>('pions:regard', id, on),
     /** Lui faire une fiche : il devient un PNJ, sans bouger de la carte. */
     promote: (id: number) => call<DisplayState>('pions:promote', id),
     remove: (id: number) => call<DisplayState>('pions:remove', id),
@@ -333,7 +367,9 @@ const api = {
     focus: (id: number | null) => call<DisplayState>('pions:focus', id),
     size: (placeId: number, size: number) => call<DisplayState>('pions:size', placeId, size),
     /** Les pions de ce lieu suivent-ils l'échelle, ou la taille réglée à la main ? */
-    main: (placeId: number, main: boolean) => call<EchellePlan>('pions:main', placeId, main)
+    main: (placeId: number, main: boolean) => call<EchellePlan>('pions:main', placeId, main),
+    /** L'allure des pions pilotés sur ce plan ; `null`, celle d'usine. */
+    allure: (placeId: number, allure: number | null) => call<EchellePlan>('pions:allure', placeId, allure)
   },
 
   places: {
@@ -466,11 +502,13 @@ const api = {
         nom?: string
         familleId?: number | null
         imageItemId?: number | null
+        imageCadre?: CadreCarre | null
         unique?: boolean
         qte?: number
         poids?: string | null
         /** Un nombre seulement : l'unité appartient à la campagne. */
         valeur?: number | null
+        prix?: Record<string, number> | null
         vu?: string
         su?: string
         equipable?: boolean
@@ -505,20 +543,50 @@ const api = {
       call<{ objets: Objet[] }>('objets:equiper', input),
     /** Le retirer du corps sans le lui prendre : il retombe dans son sac. */
     desequiper: (placementId: number) => call<Objet | null>('objets:desequiper', placementId),
+    /** Cet exemplaire-là à un autre endroit du corps, ou au sac (`null`). */
+    porter: (placementId: number, emplacement: string | null) =>
+      call<Objet | null>('objets:porter', placementId, emplacement),
+    /** Son point sur le plan (`null` l'en retire) ; `placeId` le range dans une autre pièce du plan. */
+    situer: (placementId: number, pos: { x: number; y: number } | null, placeId?: number) =>
+      call<Objet | null>('objets:situer', placementId, pos, placeId),
+    /** Allumer ou éteindre une lampe portée, sans la ranger. */
+    allumer: (placementId: number, allumee: boolean) =>
+      call<Objet | null>('objets:allumer', placementId, allumee),
     /**
      * Faire passer un exemplaire à quelqu'un d'autre, ou le poser dans un lieu.
      * L'emplacement ne suit pas — ce qu'on ramasse tombe dans le sac.
      */
     donner: (
       placementId: number,
-      cible: { port: PortObjet; placeId?: number | null; characterId?: number | null }
-    ) => call<Objet | null>('objets:donner', placementId, cible),
+      cible: { port: PortObjet; placeId?: number | null; characterId?: number | null },
+      /** Combien en donner ; absent, tout l'exemplaire part. */
+      qte?: number
+    ) => call<Objet | null>('objets:donner', placementId, cible, qte),
     placement: (
       id: number,
       patch: { qte?: number; etat?: ObjetPlacement['etat']; precision?: string | null }
     ) => call<Objet | null>('objets:placement', id, patch),
     /** Retire un exemplaire de là où il était. L'objet, lui, reste en réserve. */
     reprendre: (id: number) => call<Objet | null>('objets:reprendre', id),
+    /** Le jeter à la corbeille : il quitte sa place mais garde son emplacement initial. */
+    jeter: (id: number) => call<Objet | null>('objets:jeter', id),
+    /** Remettre des exemplaires à leur emplacement initial ; rend combien ont bougé. */
+    ranger: (ids: number[]) => call<number>('objets:ranger', ids),
+    /** Là où il est devient son emplacement initial. */
+    fixerInitial: (id: number) => call<void>('objets:fixerInitial', id),
+    /** Choisir son emplacement de départ ailleurs, sans le déplacer. */
+    changerInitial: (
+      id: number,
+      cible: {
+        port: PortObjet
+        placeId?: number | null
+        characterId?: number | null
+        inventaireId?: number | null
+      }
+    ) => call<Objet | null>('objets:changerInitial', id, cible),
+    /** Supprimer pour de bon des exemplaires de la corbeille. */
+    supprimerJetes: (ids: number[]) => call<void>('objets:supprimerJetes', ids),
+    viderCorbeille: () => call<void>('objets:viderCorbeille'),
 
     /** Un inventaire partagé — le camion, la malle. Il naît fermé. */
     inventaireAdd: (nom: string) => call<Inventaire>('objets:inventaireAdd', nom),
@@ -531,8 +599,8 @@ const api = {
     remplir: (inventaireId: number, objetIds: number[]) =>
       call<number>('objets:remplir', inventaireId, objetIds),
     /** Remettre un exemplaire — celui d'un joueur, d'un lieu — dans un inventaire. */
-    remettre: (placementId: number, inventaireId: number) =>
-      call<string | null>('objets:remettre', placementId, inventaireId),
+    remettre: (placementId: number, inventaireId: number, qte?: number) =>
+      call<string | null>('objets:remettre', placementId, inventaireId, qte),
 
     /** Le nom de l'unité de valeur de la campagne — francs, crédits, pièces d'or. */
     unite: (unite: string) => call<string>('objets:unite', unite),
@@ -599,6 +667,8 @@ const api = {
         ouverte?: boolean
         /** Verrouiller referme : une porte à clé ne reste pas ouverte. */
         verrouillee?: boolean
+        /** Celui d'une porte commence toujours par « Porte » ; null l'efface. */
+        nom?: string | null
       }
     ) => call<Ouverture | null>('ouvertures:update', id, patch),
     remove: (id: number) => call<void>('ouvertures:remove', id),
@@ -607,6 +677,70 @@ const api = {
   },
 
   /** Les points de lumiere d'une carte : ce qui decide de ce qu'on y voit. */
+  /** La sonothèque, et les sons posés sur les plans. */
+  sons: {
+    list: () => call<Son[]>('sons:list'),
+    add: (input: { nom?: string; nature?: Son['nature']; planche?: string; itemIds?: number[] }) =>
+      call<Son | null>('sons:add', input),
+    addPlusieurs: (itemIds: number[], planche?: string) => call<Son[]>('sons:addPlusieurs', itemIds, planche),
+    update: (
+      id: number,
+      patch: Partial<
+        Pick<Son, 'nom' | 'emoji' | 'nature' | 'volume' | 'fonduEntree' | 'fonduSortie' | 'touche' | 'planche' | 'vibration'>
+      >
+    ) => call<Son | null>('sons:update', id, patch),
+    fichiers: (id: number, itemIds: number[]) => call<Son | null>('sons:fichiers', id, itemIds),
+    /** Un son, ou plusieurs d'un coup. */
+    remove: (id: number | number[]) => call<void>('sons:remove', id),
+    ordonner: (ids: number[]) => call<void>('sons:ordonner', ids),
+    planche: (avant: string, apres: string) => call<void>('sons:planche', avant, apres),
+    /** Rendre aux sons le nom de leur fichier ; sans liste, à tous. */
+    nomsDesFichiers: (ids?: number[]) => call<void>('sons:nomsDesFichiers', ids),
+    usages: () => call<{ id: number; sonId: number; placeId: number; nom: string; x: number; y: number }[]>('sons:usages'),
+    zones: (placeId: number | null) => call<ZoneSon[]>('sons:zones', placeId),
+    zoneAdd: (input: { placeId: number; x: number; y: number; sonId?: number | null; rayon?: number }) =>
+      call<ZoneSon | null>('sons:zoneAdd', input),
+    zoneUpdate: (
+      id: number,
+      patch: Partial<Pick<ZoneSon, 'sonId' | 'nom' | 'x' | 'y' | 'rayon' | 'quand' | 'par' | 'tempsMort' | 'confirmer' | 'vibrer'>>
+    ) => call<ZoneSon | null>('sons:zoneUpdate', id, patch),
+    zoneRemove: (id: number) => call<void>('sons:zoneRemove', id)
+  },
+
+  /** La régie du son, pendant la partie : rien ne s'y écrit, tout s'y joue. */
+  regieSon: {
+    etat: () => call<SonsMj>('regieSon:etat'),
+    jouer: (sonId: number) => call<SonsMj>('regieSon:jouer', sonId),
+    ambiance: (sonId: number | null) => call<SonsMj>('regieSon:ambiance', sonId),
+    nappe: (sonId: number) => call<SonsMj>('regieSon:nappe', sonId),
+    reglerNappe: (sonId: number, patch: { volume?: number; on?: boolean }) =>
+      call<SonsMj>('regieSon:reglerNappe', sonId, patch),
+    retirerNappe: (sonId: number) => call<SonsMj>('regieSon:retirerNappe', sonId),
+    regler: (patch: { general?: number; auto?: boolean }) => call<SonsMj>('regieSon:regler', patch),
+    silence: () => call<SonsMj>('regieSon:silence'),
+    feuVert: (zoneId: number) => call<SonsMj>('regieSon:feuVert', zoneId),
+    jouerZone: (zoneId: number) => call<SonsMj>('regieSon:jouerZone', zoneId),
+    rearmer: (zoneId: number) => call<SonsMj>('regieSon:rearmer', zoneId),
+    toutRearmer: () => call<SonsMj>('regieSon:toutRearmer'),
+    /** Rend combien de téléphones ont reçu l'ordre. */
+    vibrer: (motif: MotifVibration) => call<number>('regieSon:vibrer', motif),
+    onState: (cb: (e: SonsMj) => void) => {
+      const h = (_e: unknown, e: SonsMj): void => cb(e)
+      ipcRenderer.on('sons:state', h)
+      return (): void => void ipcRenderer.removeListener('sons:state', h)
+    },
+    onJoue: (cb: (j: SonJoue) => void) => {
+      const h = (_e: unknown, j: SonJoue): void => cb(j)
+      ipcRenderer.on('sons:joue', h)
+      return (): void => void ipcRenderer.removeListener('sons:joue', h)
+    },
+    onSilence: (cb: () => void) => {
+      const h = (): void => cb()
+      ipcRenderer.on('sons:silence', h)
+      return (): void => void ipcRenderer.removeListener('sons:silence', h)
+    }
+  },
+
   lumieres: {
     of: (placeId: number | null) => call<Lumiere[]>('lumieres:of', placeId),
     add: (input: {
@@ -634,6 +768,8 @@ const api = {
         ouverture?: number
         /** Où pointe le faisceau, 0 vers le haut. */
         cap?: number
+        /** null l'efface : elle redevient « Lumière ». */
+        nom?: string | null
       }
     ) => call<Lumiere | null>('lumieres:update', id, patch),
     remove: (id: number) => call<void>('lumieres:remove', id)
@@ -849,6 +985,8 @@ const api = {
     /** Reposer la table de butin d'un PNJ, entière. */
     setButin: (id: number, lignes: ButinLigne[]) =>
       call<Character>('characters:setButin', id, lignes),
+    /** Un PNJ montre-t-il son état (blessé, à terre) sur son pion ? */
+    etatVisible: (id: number, on: boolean) => call<Character>('characters:etatVisible', id, on),
     remove: (id: number) => call<void>('characters:remove', id),
     adjust: (id: number, key: string, delta: number, reason?: string | null, maxDelta = 0) =>
       call<{ character: Character; log: CharacterLogEntry[] }>(
@@ -869,6 +1007,9 @@ const api = {
     setState: (id: number, key: string, on: boolean) =>
       call<Character>('characters:setState', id, key, on),
     log: (id: number) => call<CharacterLogEntry[]>('characters:log', id),
+    /** Ajouter ou retirer de sa bourse, monnaie par monnaie ; chaque écart est journalisé. */
+    bourse: (id: number, ecarts: Record<string, number>, reason?: string | null) =>
+      call<{ character: Character; log: CharacterLogEntry[] }>('characters:bourse', id, ecarts, reason),
     /** Des PNJ repris de leur fichier texte. Renvoie la fonction de désabonnement. */
     onRelus: (cb: () => void) => {
       const h = (): void => cb()
@@ -953,6 +1094,8 @@ const api = {
     arreterPresentation: () => call<DisplayState>('display:arreterPresentation'),
     freeze: (on: boolean) => call<DisplayState>('display:freeze', on),
     pionLabels: (on: boolean) => call<DisplayState>('display:pionLabels', on),
+    /** Ombre des regards, ou plein jour, sur l'écran des joueurs et les téléphones. */
+    vision: (v: 'regards' | 'jour') => call<DisplayState>('display:vision', v),
     pionPv: (on: boolean) => call<DisplayState>('display:pionPv', on),
     encart: (patch: Partial<Encart>) => call<DisplayState>('display:encart', patch),
     /** Pose une image en fenêtre par-dessus le direct ; déjà ouverte, la ramène devant. */
@@ -968,7 +1111,7 @@ const api = {
     openPlayer: () => call<DisplayState>('display:openPlayer'),
     closePlayer: () => call<DisplayState>('display:closePlayer'),
     togglePlayer: () => call<DisplayState>('display:togglePlayer'),
-    audio: (patch: { itemId?: number | null; url?: string | null; title?: string | null; playing?: boolean; loop?: boolean; volume?: number }) =>
+    audio: (patch: { itemId?: number | null; url?: string | null; title?: string | null; playing?: boolean; loop?: boolean; volume?: number; sonId?: number | null; fondu?: number }) =>
       call<DisplayState>('display:audio', patch),
 
     /** Met un lieu en scène : sa carte part à l'écran, ses pions reviennent. */

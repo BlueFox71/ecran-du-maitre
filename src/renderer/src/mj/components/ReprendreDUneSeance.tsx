@@ -10,6 +10,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { IconPeople, IconPlace, IconPlus } from './Icons'
 import type { Character, GameSession, Place } from '@shared/types'
+import { useEchap } from '../echap'
 
 type Nature = 'lieu' | 'pnj'
 
@@ -37,6 +38,7 @@ export function ReprendreDUneSeance({
   onClose: () => void
 }): JSX.Element {
   const s = useStore()
+  useEchap(onClose)
   const autres = s.sessions.filter((x) => x.id !== s.session?.id)
   const [seance, setSeance] = useState<number | null>(autres[0]?.id ?? null)
   const [lieux, setLieux] = useState<Place[]>([])

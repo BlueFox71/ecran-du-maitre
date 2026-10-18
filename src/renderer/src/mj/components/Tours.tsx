@@ -4,6 +4,7 @@ import { Visage } from '../../shared/Visage'
 import { IconTours } from './Icons'
 import { totalTour } from '@shared/types'
 import type { EntrantTour, Pion, ToursMj } from '@shared/types'
+import { useEchap } from '../echap'
 
 /**
  * Les tours : à qui de jouer, au Paravent comme à la Régie.
@@ -182,6 +183,84 @@ function Frise({ tours }: { tours: ToursMj }): JSX.Element {
 
 /* ---------------- l'initiative ---------------- */
 
+/**
+ * Le dé lancé à la table, choisi dans une grille de 1 à 20 plutôt que tapé :
+ * un clic sur la case l'ouvre, un clic sur le nombre le note et la referme.
+ * La grille se pose en position fixe, pour ne pas être rognée par la liste
+ * qui défile.
+ */
+function ChoixDe({
+  valeur,
+  nom,
+  onChoisir
+}: {
+  valeur: number | null
+  nom: string
+  onChoisir: (de: number | null) => void
+}): JSX.Element {
+  const [ou, setOu] = useState<{ x: number; y: number } | null>(null)
+
+  useEffect(() => {
+    if (!ou) return
+    const dehors = (ev: MouseEvent): void => {
+      if (!(ev.target as HTMLElement).closest('.tr-de-grille, .tr-de-case')) setOu(null)
+    }
+    window.addEventListener('mousedown', dehors)
+    return () => window.removeEventListener('mousedown', dehors)
+  }, [ou])
+  /* Échap referme la grille, et seulement elle : la fenêtre d'initiative,
+     dessous, attend son tour dans la pile. */
+  useEchap(() => setOu(null), !!ou)
+
+  const choisir = (de: number | null): void => {
+    onChoisir(de)
+    setOu(null)
+  }
+
+  return (
+    <>
+      <button
+        className={`tr-de-case num${valeur == null ? ' vide' : ''}${ou ? ' on' : ''}`}
+        onClick={(ev) => {
+          if (ou) return setOu(null)
+          const r = ev.currentTarget.getBoundingClientRect()
+          setOu({ x: r.left, y: r.bottom + 4 })
+        }}
+        aria-label={`Dé de ${nom}`}
+        aria-expanded={!!ou}
+        title="Choisir le dé lancé à la table"
+      >
+        {valeur ?? '—'}
+      </button>
+      {ou ? (
+        <div
+          className="tr-de-grille"
+          role="listbox"
+          aria-label={`Dé de ${nom}`}
+          style={{ left: ou.x, top: Math.min(ou.y, window.innerHeight - 190) }}
+        >
+          {Array.from({ length: 20 }, (_, i) => i + 1).map((n) => (
+            <button
+              key={n}
+              role="option"
+              aria-selected={valeur === n}
+              className={`num${valeur === n ? ' on' : ''}${n === 1 ? ' echec' : ''}${n === 20 ? ' reussite' : ''}`}
+              onClick={() => choisir(n)}
+            >
+              {n}
+            </button>
+          ))}
+          {valeur != null ? (
+            <button className="tr-de-effacer" onClick={() => choisir(null)}>
+              Effacer
+            </button>
+          ) : null}
+        </div>
+      ) : null}
+    </>
+  )
+}
+
 function Initiative({ tours }: { tours: ToursMj }): JSX.Element {
   const stats = useStore((s) => s.sheet?.spec.stats ?? [])
   const [candidats, setCandidats] = useState<EntrantTour[]>([])
@@ -191,13 +270,7 @@ function Initiative({ tours }: { tours: ToursMj }): JSX.Element {
   }, [nb])
 
   /* Échap referme sans rien trier, comme le bouton Annuler. */
-  useEffect(() => {
-    const h = (ev: KeyboardEvent): void => {
-      if (ev.key === 'Escape') void api().annuler()
-    }
-    window.addEventListener('keydown', h)
-    return () => window.removeEventListener('keydown', h)
-  }, [])
+  useEchap(() => void api().annuler())
 
   const nombre = (v: string): number | null => (v.trim() === '' ? null : Number(v))
   const caracNom = stats.find((s) => s.key === tours.caracKey)
@@ -207,8 +280,8 @@ function Initiative({ tours }: { tours: ToursMj }): JSX.Element {
       <div className="tr-init-tete">
         <h3>Initiative</h3>
         <p>
-          Note le dé lancé à la table ; la carac vient de la fiche. Le total range l’ordre, du plus
-          haut au plus bas.
+          Note le dé lancé à la table ; le modificateur vient de la fiche. Le total range
+          l’ordre, du plus haut au plus bas.
         </p>
         <label className="tr-carac">
           <span className="eyebrow">Carac</span>
@@ -251,16 +324,10 @@ function Initiative({ tours }: { tours: ToursMj }): JSX.Element {
                   </span>
                 </td>
                 <td>
-                  <input
-                    id={`tr-de-${e.cle}`}
-                    type="number"
-                    min={1}
-                    max={100}
-                    className="num"
-                    value={e.de ?? ''}
-                    placeholder="—"
-                    onChange={(ev) => void api().saisir(e.cle, { de: nombre(ev.target.value) })}
-                    aria-label={`Dé de ${e.nom}`}
+                  <ChoixDe
+                    valeur={e.de}
+                    nom={e.nom}
+                    onChoisir={(de) => void api().saisir(e.cle, { de })}
                   />
                 </td>
                 <td>

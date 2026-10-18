@@ -18,26 +18,18 @@
  * n'a pas de bouton « Rideaux » à ne jamais toucher, et un plan qui n'a qu'une
  * seule nature n'a pas de filtres du tout.
  */
-import { useEffect, useMemo, useState } from 'react'
-import { Valeur } from './Valeur'
+import { useMemo, useState } from 'react'
 import { dansForme, formesDesMurs, type Forme } from '@shared/pieces'
 import { bordsOuverture } from '@shared/ouvertures'
 import {
-  ventDe,
-  type Astre,
   type CalqueBrouillard,
-  type CielDuLieu,
   type Lumiere,
   type Mur,
   type Ouverture,
   type Place
 } from '@shared/types'
 import {
-  IconCheck,
   IconClose,
-  IconEye,
-  IconEyeOff,
-  IconFenetre,
   IconPorte,
   IconRideau,
   IconSoleil,
@@ -60,8 +52,9 @@ type Nature = 'eclairage' | 'porte' | 'rideau' | 'fenetre'
 const NATURES: { cle: Nature; label: string; icone: JSX.Element }[] = [
   { cle: 'eclairage', label: 'Éclairage', icone: <IconSoleil /> },
   { cle: 'porte', label: 'Portes', icone: <IconPorte /> },
-  { cle: 'rideau', label: 'Rideaux', icone: <IconRideau /> },
-  { cle: 'fenetre', label: 'Fenêtres', icone: <IconFenetre /> }
+  { cle: 'rideau', label: 'Rideaux', icone: <IconRideau /> }
+  /* Plus de fenêtres ici : elles ne se manœuvrent pas, le tableau n'a rien à
+     en dire. Elles restent sur la carte (« Affichage »). */
 ]
 
 /** Une pièce et ce qu'elle contient — plus le fourre-tout de ce qui n'est nulle part. */
@@ -77,7 +70,7 @@ interface Salle {
 
 /** Une salle où il n'y a rien à montrer ne s'affiche pas. */
 const vide = (s: Salle): boolean =>
-  !s.lumieres.length && !s.portes.length && !s.rideaux.length && !s.fenetres.length
+  !s.lumieres.length && !s.portes.length && !s.rideaux.length
 
 /** Le milieu d'une ouverture, pour savoir dans quelle pièce elle donne. */
 function milieuEtNormale(
@@ -127,116 +120,6 @@ function milieuEtNormaleDuMur(trait: Mur): { m: [number, number]; n: [number, nu
   const dy = b[1] - a[1]
   const len = Math.hypot(dx, dy) || 1
   return { m: [a[0] + dx * t, a[1] + dy * t], n: [-dy / len, dx / len] }
-}
-
-/**
- * La lumière du dehors, réglée en partie : le jour qui tourne, la lune qui se
- * lève. Le curseur suit la main à l'écran et n'écrit qu'au relâchement — sans
- * quoi chaque pixel du geste repartirait vers les joueurs.
- *
- * Le cap se compte depuis le nord. Quand l'espace règle le ciel pour tous ses
- * lieux, c'est lui qu'on change d'ici : le soleil se couche sur tout le
- * domaine à la fois, pas pièce par pièce.
- */
-function Dehors({ placeId, vu }: { placeId: number; vu: Astre | null }): JSX.Element {
-  const [lieu, setLieu] = useState<Astre | null>(null)
-  const [ciel, setCiel] = useState<CielDuLieu['general']>(null)
-  /* Le calque à l'écran a bougé (`vu`) : on relit ce qui l'a fait bouger. */
-  useEffect(() => {
-    let vivant = true
-    void Promise.all([window.jdr.places.get(placeId), window.jdr.places.ciel(placeId)]).then(
-      ([p, c]) => {
-        if (!vivant) return
-        setLieu(p?.astre ?? null)
-        setCiel(c.general)
-      }
-    )
-    return () => {
-      vivant = false
-    }
-  }, [placeId, vu?.nature, vu?.cap])
-  const astre = ciel ? ciel.astre : lieu
-  const [cap, setCap] = useState(astre?.cap ?? 135)
-  useEffect(() => setCap(astre?.cap ?? 135), [astre?.cap])
-  const poser = (a: Astre | null): void => {
-    if (ciel) {
-      setCiel(a ? { ...ciel, astre: a } : null)
-      void window.jdr.places.cielEspace(ciel.espaceId, a)
-    } else {
-      setLieu(a)
-      void window.jdr.places.astre(placeId, a)
-    }
-  }
-  const tourner = (v: number): void => {
-    if (astre) poser({ ...astre, cap: ((v % 360) + 360) % 360 })
-  }
-  return (
-    <section className="tb-dehors">
-      <div className="tb-salle-tete">
-        <b title={ciel ? `Réglé pour tout l’espace « ${ciel.nom} »` : undefined}>
-          Dehors{ciel ? <em className="tb-ciel"> · tout « {ciel.nom} »</em> : null}
-        </b>
-        <span className="tb-mini">
-          {/* Le ciel de l'espace ne s'éteint pas d'ici : « Aucune » rendrait
-              à chaque lieu le sien, ce qui se décide sur l'espace. */}
-          {ciel ? null : (
-            <button
-              className="tb-b"
-              disabled={!astre}
-              title="Ni soleil ni lune : seules les lampes éclairent"
-              onClick={() => poser(null)}
-            >
-              Aucune
-            </button>
-          )}
-          <button
-            className={`tb-b${astre?.nature === 'soleil' ? ' on' : ''}`}
-            disabled={astre?.nature === 'soleil'}
-            title="Le jour : dehors éclairé, et ce qui entre par les fenêtres et les portes ouvertes"
-            onClick={() => poser({ nature: 'soleil', cap })}
-          >
-            ☀ Soleil
-          </button>
-          <button
-            className={`tb-b${astre?.nature === 'lune' ? ' on' : ''}`}
-            disabled={astre?.nature === 'lune'}
-            title="La nuit : la même chose, à moitié"
-            onClick={() => poser({ nature: 'lune', cap })}
-          >
-            ☾ Lune
-          </button>
-        </span>
-      </div>
-      {astre ? (
-        <label className="tb-cap" title="D’où vient la lumière : 0° le nord, 90° l’est">
-          <span>Vient de</span>
-          <input
-            type="range"
-            min={0}
-            max={359}
-            step={1}
-            value={Math.round(cap)}
-            onChange={(e) => setCap(Number(e.target.value))}
-            onPointerUp={() => tourner(cap)}
-            onKeyUp={() => tourner(cap)}
-          />
-          <Valeur
-            className="num"
-            value={Math.round(cap)}
-            min={0}
-            max={359}
-            unite="°"
-            label="D’où vient la lumière"
-            onChange={(v) => {
-              setCap(v)
-              tourner(v)
-            }}
-          />
-          <em>{ventDe(cap)}</em>
-        </label>
-      ) : null}
-    </section>
-  )
 }
 
 export function TableauDeScene({
@@ -372,8 +255,7 @@ export function TableauDeScene({
   const montre = (s: Salle): boolean =>
     (voit('eclairage') && s.lumieres.length > 0) ||
     (voit('porte') && s.portes.length > 0) ||
-    (voit('rideau') && s.rideaux.length > 0) ||
-    (voit('fenetre') && s.fenetres.length > 0)
+    (voit('rideau') && s.rideaux.length > 0)
 
   return (
     <aside className="tableau" onMouseLeave={() => onSurvol(null)}>
@@ -443,7 +325,6 @@ export function TableauDeScene({
         ) : null}
       </header>
 
-      {placeId != null ? <Dehors placeId={placeId} vu={calque.astre} /> : null}
 
       <div className="tb-salles">
         {salles.filter(montre).map((s) => {
@@ -478,108 +359,91 @@ export function TableauDeScene({
                 ) : null}
               </div>
 
+              {/* La lampe est elle-même le bouton, comme la porte : un clic
+                  l'allume ou la souffle — jaune allumée, sans couleur éteinte.
+                  Elle porte la croix qui la retire : la tuile n'est donc pas un
+                  <button>, mais en a le rôle et le clavier. */}
               {(voit('eclairage') ? s.lumieres : []).map((l) => (
                 <div
                   key={`l${l.id}`}
-                  className={`tb-ligne${
+                  role="button"
+                  tabIndex={0}
+                  aria-pressed={l.allumee}
+                  className={`tb-ligne tb-lampe ${l.allumee ? 'allumee' : 'eteinte'}${
                     survol && survol.quoi === 'lumiere' && survol.id === l.id ? ' vise' : ''
                   }`}
+                  title={l.allumee ? 'Allumée — cliquer pour la souffler' : 'Éteinte — cliquer pour la rallumer'}
                   onMouseEnter={(e) => {
                     e.stopPropagation()
                     onSurvol({ quoi: 'lumiere', id: l.id })
+                  }}
+                  onClick={() => void basculer(l, !l.allumee)}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter' && e.key !== ' ') return
+                    e.preventDefault()
+                    void basculer(l, !l.allumee)
                   }}
                 >
                   <span className={`tb-pastille${l.allumee ? ' on' : ''}`}>
                     <IconSoleil />
                   </span>
-                  <span className="tb-nom">Lampe</span>
-                  <button
-                    className={`btn btn-sm${l.allumee ? ' btn-on' : ' btn-ghost'}`}
-                    title={l.allumee ? 'Souffler cette lampe' : 'Rallumer cette lampe'}
-                    onClick={() => void basculer(l, !l.allumee)}
-                  >
-                    {l.allumee ? 'Allumée' : 'Éteinte'}
-                  </button>
-                  {/* L'icône chez les joueurs : une lampe posée sur la table se
-                      montre ; une bougie qu'on allume, la lueur suffit. */}
-                  <button
-                    className={`tb-oeil${l.icone ? ' on' : ''}`}
-                    aria-pressed={l.icone}
-                    title={
-                      l.icone
-                        ? 'Les joueurs voient l’icône de cette lampe — cliquer pour la leur cacher'
-                        : 'Les joueurs ne voient que la lueur — cliquer pour leur montrer l’icône'
-                    }
-                    onClick={() => void window.jdr.lumieres.update(l.id, { icone: !l.icone })}
-                  >
-                    {l.icone ? <IconEye /> : <IconEyeOff />}
-                  </button>
+                  <span className="tb-nom">
+                    {l.nom ?? 'Lampe'}
+                    <em>{l.allumee ? 'allumée' : 'éteinte'}</em>
+                  </span>
                   {/* La lanterne qu'un joueur emporte s'en va de la pièce. */}
                   <button
                     className="tb-oter"
                     title="Retirer cette lampe"
                     aria-label="Retirer cette lampe"
-                    onClick={() => void window.jdr.lumieres.remove(l.id)}
+                    onClick={(e) => {
+                      e.stopPropagation()
+                      void window.jdr.lumieres.remove(l.id)
+                    }}
+                    onKeyDown={(e) => e.stopPropagation()}
                   >
                     <IconClose />
                   </button>
                 </div>
               ))}
 
+              {/* La porte est elle-même le bouton : un clic l'ouvre ou la
+                  referme, verte ouverte, neutre fermée. Verrouillée, le clic la
+                  déverrouille et l'ouvre du même geste. */}
               {(voit('porte') ? s.portes : []).map((o) => (
-                <div
+                <button
                   key={`o${o.id}`}
-                  className={`tb-ligne${
+                  type="button"
+                  className={`tb-ligne tb-porte ${o.verrouillee ? 'verrou' : o.ouverte ? 'ouverte' : 'fermee'}${
                     survol && survol.quoi === 'ouverture' && survol.id === o.id ? ' vise' : ''
                   }`}
+                  aria-pressed={o.ouverte}
+                  title={
+                    o.verrouillee
+                      ? 'Verrouillée — cliquer pour la déverrouiller et l’ouvrir'
+                      : o.ouverte
+                        ? 'Ouverte — cliquer pour la refermer'
+                        : 'Fermée — cliquer pour l’ouvrir'
+                  }
                   onMouseEnter={(e) => {
                     e.stopPropagation()
                     onSurvol({ quoi: 'ouverture', id: o.id })
                   }}
+                  onClick={() =>
+                    void window.jdr.ouvertures.update(
+                      o.id,
+                      o.verrouillee ? { verrouillee: false, ouverte: true } : { ouverte: !o.ouverte }
+                    )
+                  }
                 >
                   <span className={`tb-pastille porte${o.verrouillee ? ' close' : ''}`}>
-                    {o.verrouillee ? <IconVerrou /> : <IconCheck />}
+                    {o.verrouillee ? <IconVerrou /> : <IconPorte />}
                   </span>
                   <span className="tb-nom">
-                    Porte
-                    <em>
-                      {o.verrouillee ? 'verrouillée' : o.ouverte ? 'ouverte' : 'fermée'}
-                    </em>
+                    {o.nom ?? 'Porte'}
+                    <em>{o.verrouillee ? 'verrouillée' : o.ouverte ? 'ouverte' : 'fermée'}</em>
                   </span>
-                  {o.verrouillee ? (
-                    <button
-                      className="btn btn-sm"
-                      title="Déverrouiller : elle s’ouvre du même geste"
-                      onClick={() =>
-                        void window.jdr.ouvertures.update(o.id, {
-                          verrouillee: false,
-                          ouverte: true
-                        })
-                      }
-                    >
-                      Déverrouiller
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        className={`btn btn-sm${o.ouverte ? ' btn-on' : ''}`}
-                        disabled={o.ouverte}
-                        title="Ouvrir cette porte"
-                        onClick={() => void window.jdr.ouvertures.update(o.id, { ouverte: true })}
-                      >
-                        Ouvrir
-                      </button>
-                      <button
-                        className={`btn btn-sm${o.ouverte ? '' : ' btn-on'}`}
-                        disabled={!o.ouverte}
-                        title="Refermer cette porte"
-                        onClick={() => void window.jdr.ouvertures.update(o.id, { ouverte: false })}
-                      >
-                        Fermer
-                      </button>
-                    </>
-                  )}
-                </div>
+                </button>
               ))}
 
               {(voit('rideau') ? s.rideaux : []).map((m) => (
@@ -619,29 +483,6 @@ export function TableauDeScene({
                 </div>
               ))}
 
-              {/* Une fenêtre ne se manœuvre pas : elle arrête le pas et laisse
-                  voir, toujours. Elle est là pour qu'on la trouve sur la carte
-                  — le survol l'allume — et pour qu'on sache d'où vient le jour. */}
-              {(voit('fenetre') ? s.fenetres : []).map((o) => (
-                <div
-                  key={`v${o.id}`}
-                  className={`tb-ligne${
-                    survol && survol.quoi === 'ouverture' && survol.id === o.id ? ' vise' : ''
-                  }`}
-                  onMouseEnter={(e) => {
-                    e.stopPropagation()
-                    onSurvol({ quoi: 'ouverture', id: o.id })
-                  }}
-                >
-                  <span className="tb-pastille fenetre">
-                    <IconFenetre />
-                  </span>
-                  <span className="tb-nom">
-                    Fenêtre
-                    <em>on voit au travers</em>
-                  </span>
-                </div>
-              ))}
             </section>
           )
         })}

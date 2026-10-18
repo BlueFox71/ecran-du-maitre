@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import type { CadreCarre } from '@shared/types'
 import { styleCarre } from '../../shared/Visage'
 import { Valeur } from './Valeur'
+import { useEchap } from '../echap'
 
 /*
  * Tailler le carré du pion dans un portrait — ou, avec `rapport`, un cadre
@@ -97,13 +98,7 @@ export function RognageCarre({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [url])
 
-  useEffect(() => {
-    const touche = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onClose()
-    }
-    window.addEventListener('keydown', touche)
-    return () => window.removeEventListener('keydown', touche)
-  }, [onClose])
+  useEchap(onClose)
 
   const poser = (v: Vise): void => {
     if (!nat) return

@@ -26,6 +26,9 @@ import * as rolls from '../db/repos/rolls'
 import * as pions from '../db/repos/pions'
 import * as display from '../display'
 import * as tours from '../tours'
+import * as prepa from '../preparation'
+import * as regieSon from '../sons'
+import * as sons from '../db/repos/sons'
 import * as defaire from '../defaire'
 import * as fsLib from '../library'
 import * as examen from '../examen'
@@ -34,6 +37,7 @@ import { synchroniserPnjBientot } from '../pnjTexte'
 import { mediaUrl, profilDir, vignetteUrl } from '../vault'
 import { IMPORTABLE, IMAGE_EXT, VIDEO_EXT, AUDIO_EXT } from '../kinds'
 import { lireCampagne, type Brut } from '@shared/reglages'
+import { monnaiesActives } from '@shared/monnaies'
 import type {
   Astre,
   CollageLayout,
@@ -192,6 +196,8 @@ export function registerIpc(): void {
        quelque chose tout de suite, sinon il faudrait rouvrir la campagne. */
     if (cle === 'sortie.ecran') display.setOutput(lus.sortieEcran)
     if (cle === 'murs.angle') display.calqueABouge()
+    /* Les téléphones lisent la bourse dans ces monnaies. */
+    if (cle === 'monnaies') mobile.broadcast()
     return brut
   })
   on('reglages:poste', () => carnet.reglagesPoste())
@@ -340,12 +346,24 @@ export function registerIpc(): void {
   on('places:ofSession', (sessionId: number) => places.listPlaces(sessionId))
   on('places:duplicate', (id: number) => places.duplicatePlace(id))
   on('places:get', (id: number) => places.getPlace(id))
-  on('places:upsert', (input: any) => places.upsertPlace(input))
   on('places:remove', (id: number) => places.removePlace(id))
   on('places:move', (id: number, parentId: number | null, beforeId: number | null) =>
     places.movePlace(id, parentId, beforeId)
   )
   on('places:etage', (id: number, tier: 'niveau' | 'lieu') => places.changerEtage(id, tier))
+  /* Le lieu à l'écran suit sa carte : l'image affichée, et celle sur laquelle
+     les écrans acceptent de poser les pions (`carteDuLieu`). */
+  const carteChangee = (id: number, ancienne: number, neuve: number): void => {
+    const slide = slideOf(neuve)
+    if (slide) display.carteRemplacee(id, ancienne, slide)
+  }
+  on('places:upsert', (input: any) => {
+    const p = places.upsertPlace(input)
+    /* Seule la carte compte ici : une description tapée ne rediffuse rien. */
+    if (p.id === display.getState().placeId && p.mapItemId !== display.getState().carteDuLieu)
+      display.refreshPions()
+    return p
+  })
   on('places:rogner', (id: number, cadre: { x: number; y: number; w: number; h: number }) => {
     const p = places.getPlace(id)
     const item = p?.mapItemId ? lib.getItem(p.mapItemId) : null
@@ -354,6 +372,7 @@ export function registerIpc(): void {
     const neuf = lib.itemByPath(rel)
     if (!neuf) throw new Error('L’image rognée n’a pas été retrouvée')
     places.recalerApresRognage(id, item.id, neuf.id, cadre)
+    carteChangee(id, item.id, neuf.id)
     return places.getPlace(id)
   })
   /* Caler l'image sous les murs : elle ne change pas, ce sont les murs, les
@@ -379,6 +398,7 @@ export function registerIpc(): void {
       const neuf = lib.itemByPath(rel)
       if (!neuf) throw new Error('L’image tournée n’a pas été retrouvée')
       places.recalerApresRognage(id, item.id, neuf.id, cadre)
+      carteChangee(id, item.id, neuf.id)
       return places.getPlace(id)
     }
   )
@@ -403,6 +423,8 @@ export function registerIpc(): void {
         nouvelle,
         places.cadrePourRemplacer(lib.getItem(ancienne), lib.getItem(nouvelle))
       )
+    if (ancienne != null) carteChangee(id, ancienne, nouvelle)
+    else display.refreshPions()
     return { place: places.getPlace(id), pieces: suivent }
   })
   on('places:zone', (id: number, zone: PointMur[] | null, ancre?: PointMur | null) =>
@@ -460,6 +482,12 @@ export function registerIpc(): void {
     mobile.broadcast()
     return v
   }
+  /* Ce qui change de main peut être une lampe : l'écran des joueurs relit son
+     calque. Ce n'est qu'un compteur — rien de ce que le MJ sait ne part. */
+  const eclaireAutrement = <T>(v: T): T => {
+    display.calqueABouge()
+    return remue(v)
+  }
 
   on('objets:list', () => ({
     objets: objets.listObjets(),
@@ -473,16 +501,35 @@ export function registerIpc(): void {
   on('objets:remove', (id: number) => remue(objets.removeObjet(id)))
   on('objets:poser', (input: any) => remue(objets.poser(input)))
   on('objets:placement', (id: number, patch: any) => remue(objets.majPlacement(id, patch)))
+  on('objets:situer', (id: number, pos: { x: number; y: number } | null, placeId?: number) =>
+    remue(objets.situer(id, pos, placeId))
+  )
   on('objets:reprendre', (id: number) => remue(objets.reprendre(id)))
+  /* La corbeille, et le retour de chaque exemplaire à son emplacement initial. */
+  on('objets:jeter', (id: number) => remue(objets.jeter(id)))
+  on('objets:ranger', (ids: number[]) => remue(objets.ranger(ids)))
+  on('objets:fixerInitial', (id: number) => objets.fixerInitial(id))
+  on('objets:changerInitial', (id: number, cible: any) => objets.changerInitial(id, cible))
+  on('objets:supprimerJetes', (ids: number[]) => objets.supprimerJetes(ids))
+  on('objets:viderCorbeille', () => objets.viderCorbeille())
   /* Équiper : poser un objet sur quelqu'un, à un endroit du corps. Ce canal ne
      touche pas `display` non plus — l'équipement d'un personnage reste chez le
      MJ tant que personne n'a décidé de le montrer. */
   on('objets:equiper', (input: { characterId: number; emplacement: string; objetId: number | null }) =>
-    remue(objets.equiper(input))
+    eclaireAutrement(objets.equiper(input))
   )
-  on('objets:desequiper', (placementId: number) => remue(objets.desequiper(placementId)))
+  on('objets:desequiper', (placementId: number) => eclaireAutrement(objets.desequiper(placementId)))
+  on('objets:porter', (placementId: number, emplacement: string | null) =>
+    eclaireAutrement(objets.porter(placementId, emplacement))
+  )
+  /* Allumer ou éteindre sa lampe de poche, sans la ranger. */
+  on('objets:allumer', (placementId: number, allumee: boolean) =>
+    eclaireAutrement(objets.allumer(placementId, allumee))
+  )
   /* Faire passer un exemplaire d'une main à l'autre, ou dans une pièce. */
-  on('objets:donner', (placementId: number, cible: any) => remue(objets.donner(placementId, cible)))
+  on('objets:donner', (placementId: number, cible: any, qte?: number) =>
+    eclaireAutrement(objets.donner(placementId, cible, qte))
+  )
   /* Les inventaires partagés : ce qu'on y range, ouvre ou ferme, les
      téléphones le voient tout de suite. */
   on('objets:inventaireAdd', (nom: string) => objets.addInventaire(nom))
@@ -493,8 +540,8 @@ export function registerIpc(): void {
   on('objets:remplir', (inventaireId: number, objetIds: number[]) =>
     remue(objets.remplir(inventaireId, objetIds))
   )
-  on('objets:remettre', (placementId: number, inventaireId: number) =>
-    remue(objets.remettre(placementId, inventaireId))
+  on('objets:remettre', (placementId: number, inventaireId: number, qte?: number) =>
+    remue(objets.remettre(placementId, inventaireId, qte))
   )
   on('objets:unite', (unite: string) => objets.setUniteValeur(unite))
   on('objets:familleAdd', (input: any) => objets.addFamille(input))
@@ -583,6 +630,56 @@ export function registerIpc(): void {
     display.calqueABouge()
     return r
   })
+
+  /* ---------------- sons : la sonothèque et les sons posés ---------------- */
+
+  /* Ce qui s'écrit en base se prépare, et se défait d'un Ctrl+Z. */
+  on('sons:list', () => sons.listSons())
+  on('sons:add', (input: any) => sons.addSon(input ?? {}))
+  /* Plusieurs fichiers d'un coup : un son chacun, sa nature devinée à la durée. */
+  on('sons:addPlusieurs', (itemIds: number[], planche?: string) =>
+    itemIds.map((id) => sons.addSon({ itemIds: [id], planche })).filter(Boolean)
+  )
+  on('sons:update', (id: number, patch: any) => sons.updateSon(id, patch ?? {}))
+  on('sons:fichiers', (id: number, itemIds: number[]) => sons.setFichiersSon(id, itemIds))
+  on('sons:remove', (id: number | number[]) => sons.removeSon(id))
+  on('sons:ordonner', (ids: number[]) => sons.ordonnerSons(ids))
+  on('sons:planche', (avant: string, apres: string) => sons.renommerPlanche(avant, apres))
+  on('sons:nomsDesFichiers', (ids?: number[]) => sons.nomsDesFichiers(ids))
+  on('sons:usages', () => sons.zonesParSon())
+  on('sons:zones', (placeId: number | null) => sons.listZones(placeId))
+  on('sons:zoneAdd', (input: any) => {
+    const z = sons.addZone(input)
+    if (z) regieSon.zoneChangee(z.id)
+    return z
+  })
+  on('sons:zoneUpdate', (id: number, patch: any) => {
+    const z = sons.updateZone(id, patch ?? {})
+    regieSon.zoneChangee(id)
+    return z
+  })
+  on('sons:zoneRemove', (id: number) => {
+    sons.removeZone(id)
+    regieSon.zoneChangee(id)
+  })
+
+  /* La régie du son : rien ne s'écrit, tout se joue. */
+  ipcMain.handle('regieSon:etat', () => regieSon.etat())
+  ipcMain.handle('regieSon:jouer', (_e, sonId: number) => regieSon.jouer(sonId))
+  ipcMain.handle('regieSon:ambiance', (_e, sonId: number | null) => regieSon.ambiance(sonId))
+  ipcMain.handle('regieSon:nappe', (_e, sonId: number) => regieSon.ajouterNappe(sonId))
+  ipcMain.handle('regieSon:reglerNappe', (_e, sonId: number, patch: any) =>
+    regieSon.reglerNappe(sonId, patch ?? {})
+  )
+  ipcMain.handle('regieSon:retirerNappe', (_e, sonId: number) => regieSon.retirerNappe(sonId))
+  ipcMain.handle('regieSon:regler', (_e, patch: any) => regieSon.regler(patch ?? {}))
+  ipcMain.handle('regieSon:silence', () => regieSon.silence())
+  ipcMain.handle('regieSon:feuVert', (_e, zoneId: number) => regieSon.feuVert(zoneId))
+  ipcMain.handle('regieSon:jouerZone', (_e, zoneId: number) => regieSon.jouerZone(zoneId))
+  ipcMain.handle('regieSon:rearmer', (_e, zoneId: number) => regieSon.rearmer(zoneId))
+  ipcMain.handle('regieSon:toutRearmer', () => regieSon.toutRearmer())
+  ipcMain.handle('regieSon:vibrer', (_e, motif: any) => regieSon.vibrerTous(motif))
+  regieSon.brancher()
 
   /* ---------------- chronologie ---------------- */
 
@@ -885,6 +982,12 @@ export function registerIpc(): void {
   /* Le butin ne bouge que chez le MJ : ni l'écran ni les téléphones n'en
      reçoivent quoi que ce soit, donc rien à rafraîchir de leur côté. */
   on('characters:setButin', (id: number, lignes: any[]) => chars.setButin(id, lignes))
+  /* L'état d'un PNJ sur son pion : il part à l'écran avec les pions. */
+  on('characters:etatVisible', (id: number, on: boolean) => {
+    const c = chars.setEtatVisible(id, on)
+    display.refreshPions()
+    return c
+  })
   on('characters:remove', (id: number) => {
     chars.removeCharacter(id)
     display.refreshJoueurs()
@@ -893,6 +996,8 @@ export function registerIpc(): void {
     /* Un point de vie perdu doit se voir à l'écran dans la seconde. */
     const r = chars.adjustGauge(id, key, delta, reason, maxDelta ?? 0)
     display.refreshJoueurs()
+    /* Un PNJ qui montre son état le change sur son pion. */
+    if (r.character.kind === 'pnj' && r.character.etatVisible) display.refreshPions()
     return r
   })
   /* Tout ce qui se lit sur un téléphone doit y changer en même temps qu'ici. */
@@ -913,6 +1018,12 @@ export function registerIpc(): void {
   })
   on('characters:setState', (id: number, key: string, on2: boolean) => chars.setState(id, key, on2))
   on('characters:log', (id: number) => chars.characterLog(id))
+  /* La bourse : le téléphone du joueur la lit, il doit la voir bouger. */
+  on('characters:bourse', (id: number, ecarts: Record<string, number>, reason?: string | null) => {
+    const r = chars.bougerBourse(id, ecarts, monnaiesActives(lireCampagne(reglages.tous()).monnaies), reason)
+    mobile.broadcast()
+    return r
+  })
 
   /* ---------------- jets ---------------- */
 
@@ -962,6 +1073,13 @@ export function registerIpc(): void {
   ipcMain.handle('tours:deplacer', (_e, cle: string, vers: number) => tours.deplacer(cle, vers))
   ipcMain.handle('tours:fin', () => tours.fin())
 
+  /* ---------------- préparation des personnages ---------------- */
+
+  ipcMain.handle('prepa:etat', () => prepa.etat())
+  ipcMain.handle('prepa:ouvrir', () => prepa.ouvrir())
+  ipcMain.handle('prepa:clore', () => prepa.clore())
+  ipcMain.handle('prepa:montrer', (_e, on: boolean) => prepa.montrer(on))
+
   /* ---------------- régie ---------------- */
 
   on('display:state', () => display.getState())
@@ -982,7 +1100,8 @@ export function registerIpc(): void {
     const it = lib.getItem(itemId)
     const url = mediaUrl(it?.relPath ?? null)
     if (!it || it.kind !== 'audio' || !url) return false
-    display.setAudio({ itemId, url, title: it.title, playing })
+    /* Un fichier nu, pas un son de la sonothèque : il ne garde pas le nom du précédent. */
+    display.setAudio({ itemId, url, title: it.title, playing, sonId: null, fondu: 2 })
     return true
   }
 
@@ -1029,6 +1148,7 @@ export function registerIpc(): void {
   on('display:arreterPresentation', () => display.arreterPresentation())
   on('display:freeze', (on2: boolean) => display.setFrozen(on2))
   on('display:pionLabels', (on2: boolean) => display.setPionLabels(on2))
+  on('display:vision', (v: 'regards' | 'jour') => display.setVision(v))
   on('display:pionPv', (on2: boolean) => display.setPionPv(on2))
   on('display:encart', (patch: any) => display.setEncart(patch))
   on('display:fenetre', (itemId: number) => display.ouvrirFenetre(itemId))
@@ -1116,6 +1236,25 @@ export function registerIpc(): void {
     pions.anonymiserPion(id, anonyme)
     return display.refreshPions()
   })
+  /* Le pion qu'on mène depuis son détail : les murs le retiennent comme ceux
+     des téléphones — la même géométrie, au même endroit. Il rend où il est
+     arrivé, pour que le pupitre se recale. */
+  on('pions:marcher', (id: number, x: number, y: number) => {
+    const p = pions.getPion(id)
+    if (!p) return null
+    const arrive = mobile.retenuParLesMurs(p.placeId, p, {
+      x: Math.max(0, Math.min(1, x)),
+      y: Math.max(0, Math.min(1, y))
+    })
+    pions.movePion(id, arrive.x, arrive.y)
+    display.refreshPions()
+    return arrive
+  })
+  /* Le pion qui ne paraît que sous un regard : la table le filtre elle-même. */
+  on('pions:regard', (id: number, on: boolean) => {
+    pions.setRegard(id, on)
+    return display.refreshPions()
+  })
   on('pions:remove', (id: number) => {
     pions.removePion(id)
     return display.refreshPions()
@@ -1142,6 +1281,11 @@ export function registerIpc(): void {
   })
   on('pions:main', (placeId: number, main: boolean) => {
     const e = echelle.poserPionMain(placeId, main)
+    display.refreshPions()
+    return e
+  })
+  on('pions:allure', (placeId: number, allure: number | null) => {
+    const e = echelle.poserAllure(placeId, allure)
     display.refreshPions()
     return e
   })

@@ -1,13 +1,13 @@
 import { useEffect, useRef, useState } from 'react'
 import { Slide } from '../shared/Slide'
 import { Pings, usePings } from '../shared/Pings'
-import { Visage } from '../shared/Visage'
+import { BandeauTour } from '../shared/BandeauTour'
+import { montreLaCarte } from '@shared/scene'
 import type {
   CalqueBrouillard,
   DisplayState,
   Pointer,
   SlidePayload,
-  TourVu,
   Transition
 } from '@shared/types'
 
@@ -82,6 +82,8 @@ export function Player(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [tId])
 
+  const surCarte = state ? montreLaCarte(state.slide, state.carteDuLieu) : false
+
   return (
     <div className="pv-root">
       <div className="pv-stage">
@@ -107,8 +109,14 @@ export function Player(): JSX.Element {
               <Slide
                 slide={state.slide}
                 animate={!under}
-                brouillard={calque}
-                pions={state.pions}
+                /* Les pions et l'ombre du lieu ne vont que sur sa carte : une
+                   lettre montrée par-dessus ne se couvre pas de ses jetons. */
+                brouillard={surCarte ? calque : null}
+                /* Plein jour : la carte entière, sans ombre ; les murs retiennent
+                   toujours le pas, ils sont seulement tus. */
+                ombre={state.vision !== 'jour'}
+                jour={state.vision === 'jour'}
+                pions={surCarte ? state.pions : undefined}
                 pionSize={state.pionSize}
                 focusPionId={state.focusPionId}
                 pionEnJeuId={state.tour?.pionEnJeuId ?? null}
@@ -150,35 +158,3 @@ export function Player(): JSX.Element {
   )
 }
 
-/**
- * « Au tour de … » en haut de l'image, pendant les tours.
- *
- * Celui qui joue, et celui qui suit : c'est ce que la table se demande. Un
- * participant caché n'a ni nom ni visage — « quelqu'un d'autre » —, et il
- * n'est pas compté non plus : `TourVu` ne le contient pas.
- */
-function BandeauTour({ tour }: { tour: TourVu }): JSX.Element | null {
-  const n = tour.ordre.length
-  if (!n && !tour.actifCache) return null
-  const enJeu = tour.actifCache ? null : tour.ordre[tour.curseur]
-  /* Caché, celui qui joue n'est pas dans l'ordre : le curseur montre déjà le suivant. */
-  const ensuite = n ? tour.ordre[tour.actifCache ? tour.curseur : (tour.curseur + 1) % n] : null
-  return (
-    <div className="pv-tour" key={`${tour.round}-${tour.curseur}-${tour.actifCache}`}>
-      {enJeu ? (
-        <span className={`pv-tour-rond c-${enJeu.color}`}>
-          {enJeu.url ? <Visage url={enJeu.url} cadre={enJeu.cadre} /> : enJeu.initials}
-        </span>
-      ) : (
-        <span className="pv-tour-rond inconnu">?</span>
-      )}
-      <span className="pv-tour-qui">
-        <span className="pv-tour-nom">Au tour de {enJeu ? enJeu.nom : 'quelqu’un d’autre'}</span>
-        {ensuite && ensuite !== enJeu ? (
-          <span className="pv-tour-ensuite">ensuite : {ensuite.nom}</span>
-        ) : null}
-      </span>
-      <span className="pv-tour-round">Round {tour.round}</span>
-    </div>
-  )
-}

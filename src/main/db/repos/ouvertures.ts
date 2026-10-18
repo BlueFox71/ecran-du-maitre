@@ -7,12 +7,12 @@
  * une porte sans mur n'ouvre sur rien.
  */
 import { getDb } from '../index'
-import { OUVERTURE_NATURES, type NatureOuverture, type Ouverture } from '@shared/types'
+import { OUVERTURE_NATURES, nomDePorte, type NatureOuverture, type Ouverture } from '@shared/types'
 import * as reglages from './reglages'
 import { lireCampagne } from '@shared/reglages'
 
 const SELECT = `
-  SELECT o.id, o.mur_id AS murId, o.nature, o.d, o.largeur, o.ouverte, o.verrouillee
+  SELECT o.id, o.mur_id AS murId, o.nature, o.d, o.largeur, o.ouverte, o.verrouillee, o.nom
     FROM ouverture o`
 
 const clamp = (v: number, min = 0, max = 1): number => Math.min(max, Math.max(min, v))
@@ -28,9 +28,14 @@ function toOuverture(r: any): Ouverture {
     d: clamp(r.d),
     largeur: clamp(r.largeur, LARGEUR.min, LARGEUR.max),
     ouverte: !!r.ouverte,
-    verrouillee: !!r.verrouillee
+    verrouillee: !!r.verrouillee,
+    nom: typeof r.nom === 'string' && r.nom.trim() ? r.nom : null
   }
 }
+
+/** Un nom qu'on accepte d'écrire : celui d'une porte commence par « Porte ». */
+const nomSur = (nature: NatureOuverture, v: string | null): string | null =>
+  nature === 'porte' ? nomDePorte(v) : (v ?? '').trim().slice(0, 80) || null
 
 /** Toutes les ouvertures des murs d'un lieu. */
 export function listOuvertures(placeId: number | null): Ouverture[] {
@@ -87,6 +92,8 @@ export function updateOuverture(
     largeur?: number
     ouverte?: boolean
     verrouillee?: boolean
+    /** null ou vide : elle reprend le nom de sa nature. */
+    nom?: string | null
   }
 ): Ouverture | null {
   const cur = getOuverture(id)
@@ -110,16 +117,18 @@ export function updateOuverture(
     : patch.ouverte !== undefined
       ? patch.ouverte
       : cur.ouverte
+  const nature = patch.nature && patch.nature in OUVERTURE_NATURES ? patch.nature : cur.nature
   getDb()
     .prepare(
       `UPDATE ouverture SET mur_id = @murId, nature = @nature, d = @d, largeur = @largeur,
-                            ouverte = @ouverte, verrouillee = @verrouillee
+                            ouverte = @ouverte, verrouillee = @verrouillee, nom = @nom
         WHERE id = @id`
     )
     .run({
       id,
       murId,
-      nature: patch.nature && patch.nature in OUVERTURE_NATURES ? patch.nature : cur.nature,
+      nature,
+      nom: nomSur(nature, patch.nom !== undefined ? patch.nom : cur.nom),
       d: patch.d !== undefined ? clamp(patch.d) : cur.d,
       largeur:
         patch.largeur !== undefined

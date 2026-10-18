@@ -120,7 +120,8 @@ export function HorlogeSeance(): JSX.Element | null {
       </div>
 
       {etat === 'avant' ? (
-        <button className="btn btn-brass btn-sm hs-large" onClick={() => noter('debut')}>
+        // Pas de laiton : le seul bouton doré en jeu est Basculer.
+        <button className="btn btn-sm hs-large" onClick={() => noter('debut')}>
           Commencer la séance
         </button>
       ) : (
@@ -138,7 +139,7 @@ export function HorlogeSeance(): JSX.Element | null {
               </button>
             ) : (
               <button
-                className="btn btn-brass btn-sm"
+                className="btn btn-sm"
                 onClick={() => noter('reprise')}
                 title={
                   etat === 'finie'

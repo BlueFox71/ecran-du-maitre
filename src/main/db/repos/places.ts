@@ -1,6 +1,7 @@
 import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { copierLigne } from '../copie'
 import { copierFiche } from './ficheLieu'
+import { fixerInitial } from './objets'
 import * as reglages from './reglages'
 import { lireCampagne } from '@shared/reglages'
 import { planDe } from './echelle'
@@ -52,7 +53,9 @@ function degres(v: number): number {
 }
 
 function versAstre(nature: unknown, cap: unknown): Astre | null {
-  return nature === 'soleil' || nature === 'lune' ? { nature, cap: degres(Number(cap)) } : null
+  return nature === 'soleil' || nature === 'lune' || nature === 'nuit'
+    ? { nature, cap: degres(Number(cap)) }
+    : null
 }
 
 function toPlace(r: any): Place {
@@ -316,7 +319,7 @@ function ecrireAstre(id: number, col: string, colCap: string, astre: Astre | nul
     return
   }
   const cap = Number.isFinite(astre.cap) ? degres(astre.cap) : 135
-  const nature = astre.nature === 'lune' ? 'lune' : 'soleil'
+  const nature = astre.nature === 'lune' || astre.nature === 'nuit' ? astre.nature : 'soleil'
   getDb().prepare(`UPDATE place SET ${col} = ?, ${colCap} = ? WHERE id = ?`).run(nature, cap, id)
 }
 
@@ -597,12 +600,14 @@ export function copierLieu(
     }
     for (const l of ids(`SELECT id FROM lumiere WHERE place_id = ?`, p.id))
       copierLigne('lumiere', l, { place_id: neuf })
+    for (const z of ids(`SELECT id FROM son_zone WHERE place_id = ?`, p.id))
+      copierLigne('son_zone', z, { place_id: neuf })
     for (const a of ids(`SELECT id FROM annotation WHERE place_id = ?`, p.id))
       copierLigne('annotation', a, { place_id: neuf })
 
     /* Un objet déjà trouvé là-bas est de nouveau à trouver ici. */
     for (const o of ids(`SELECT id FROM objet_placement WHERE place_id = ?`, p.id))
-      copierLigne('objet_placement', o, { place_id: neuf, session_id: sid, etat: 'cache' })
+      fixerInitial(copierLigne('objet_placement', o, { place_id: neuf, session_id: sid, etat: 'cache' }))
 
     /* Sa fiche : scénarios, découvertes et déclencheurs, PNJ qu'on y croise. */
     copierFiche(p.id, neuf)
@@ -683,10 +688,18 @@ export function recalerApresRognage(
                             clair = clair / @cw, penombre = penombre / @cw
           WHERE place_id = @id`
       ).run({ cx: c.x, cy: c.y, cw: c.w, ch: c.h, id: p.id })
+      db.prepare(
+        `UPDATE son_zone SET x = (x - @cx) / @cw, y = (y - @cy) / @ch, rayon = rayon / @cw
+          WHERE place_id = @id`
+      ).run({ cx: c.x, cy: c.y, cw: c.w, ch: c.h, id: p.id })
       for (const t of ['pion', 'annotation'])
         db.prepare(
           `UPDATE ${t} SET x = (x - @cx) / @cw, y = (y - @cy) / @ch WHERE place_id = @id`
         ).run({ cx: c.x, cy: c.y, cw: c.w, ch: c.h, id: p.id })
+      db.prepare(
+        `UPDATE objet_placement SET pos_x = (pos_x - @cx) / @cw, pos_y = (pos_y - @cy) / @ch
+          WHERE place_id = @id AND pos_x IS NOT NULL`
+      ).run({ cx: c.x, cy: c.y, cw: c.w, ch: c.h, id: p.id })
     }
   })()
 }
@@ -724,7 +737,7 @@ export function cadrePourRemplacer(
 }
 
 /** Ce qui se pose sur la carte d'un lieu et le suit quand il change de rôle. */
-const CALQUES = ['mur', 'lumiere', 'annotation', 'pion'] as const
+const CALQUES = ['mur', 'lumiere', 'son_zone', 'annotation', 'pion'] as const
 
 /** Les réglages de carte qu'un étage tient pour ses pièces. */
 const REGLAGES_CARTE =

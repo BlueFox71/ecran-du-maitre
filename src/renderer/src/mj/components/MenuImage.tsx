@@ -1,5 +1,6 @@
 import { useEffect } from 'react'
 import type { UiItem } from '../../../../preload/index'
+import { useEchap } from '../echap'
 
 /**
  * Le choix qu'ouvre un clic sur une image du Paravent : la préparer sur le
@@ -46,17 +47,13 @@ export function MenuImage({
   useEffect(() => {
     if (!cible) return
     const clic = (): void => onFerme()
-    const touche = (e: KeyboardEvent): void => {
-      if (e.key === 'Escape') onFerme()
-    }
     const t = window.setTimeout(() => window.addEventListener('click', clic), 0)
-    window.addEventListener('keydown', touche)
     return () => {
       window.clearTimeout(t)
       window.removeEventListener('click', clic)
-      window.removeEventListener('keydown', touche)
     }
   }, [cible, onFerme])
+  useEchap(onFerme, !!cible)
 
   if (!cible) return null
   const it = cible.item
