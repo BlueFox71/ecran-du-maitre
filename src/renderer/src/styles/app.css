@@ -15099,6 +15099,27 @@ button.ou-etat:hover {
   opacity: 1;
 }
 
+/* La barre de recherche, en tête du corps. */
+.pm-recherche {
+  flex: none;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+}
+.pm-recherche input {
+  width: 100%;
+}
+/* Les résultats : chaque groupe a pour titre son chemin, qui ramène à la rubrique. */
+.pm-resultats {
+  padding-top: 8px;
+}
+.pm-chemin-lien {
+  text-align: left;
+  cursor: pointer;
+}
+.pm-chemin-lien:hover {
+  color: var(--text);
+}
+
 .pm-corps {
   flex: 1;
   min-height: 0;
