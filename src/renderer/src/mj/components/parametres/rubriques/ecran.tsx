@@ -73,14 +73,156 @@ export const reglages: Reglage[] = [
         />
       )
     }
+  },
+  /* ---- En direct : tenu par l'écran des joueurs, perdu à la fermeture. ---- */
+  {
+    id: 'direct.vision',
+    rubrique: 'ecran',
+    nom: 'Vision',
+    aide: 'Ce que la table voit d’une carte qui a des murs.',
+    mots: ['regards', 'plein jour', 'ombre', 'brouillard', 'carte'],
+    direct: true,
+    Cmd: function Vision() {
+      const v = useStore((s) => s.display?.vision ?? 'regards')
+      return (
+        <Seg
+          valeur={v}
+          choix={[
+            { k: 'regards' as const, label: 'Leurs regards', aide: 'Ils ne voient que ce que leurs personnages ont sous les yeux : l’ombre couvre le reste' },
+            { k: 'jour' as const, label: 'Plein jour', aide: 'Toute la carte, sans ombre — les murs retiennent toujours le pas' }
+          ]}
+          onChoisir={(k) => void window.jdr.display.vision(k)}
+        />
+      )
+    }
+  },
+  {
+    id: 'direct.encart',
+    rubrique: 'ecran',
+    nom: 'Encart joueurs',
+    aide: 'Portraits, noms et points de vie, sur l’écran des joueurs.',
+    mots: ['encart', 'portraits', 'joueurs', 'pv', 'bandeau'],
+    direct: true,
+    Cmd: function EncartJoueurs() {
+      const on = useStore((s) => s.display?.encart.on ?? false)
+      return (
+        <input
+          type="checkbox"
+          aria-label="Encart joueurs"
+          checked={on}
+          onChange={(e) => void window.jdr.display.encart({ on: e.target.checked })}
+        />
+      )
+    }
+  },
+  {
+    id: 'direct.encart.sens',
+    rubrique: 'ecran',
+    nom: 'Sens de l’encart',
+    aide: 'Les joueurs en ligne ou en colonne.',
+    mots: ['encart', 'horizontal', 'vertical', 'ligne', 'colonne'],
+    direct: true,
+    Cmd: function EncartSens() {
+      const encart = useStore((s) => s.display?.encart)
+      return (
+        <Seg
+          valeur={encart?.sens ?? 'horizontal'}
+          choix={[
+            { k: 'horizontal' as const, label: 'En ligne', aide: 'Les joueurs en ligne' },
+            { k: 'vertical' as const, label: 'En colonne', aide: 'Les joueurs en colonne' }
+          ]}
+          /* Changer de sens fait pivoter la boîte, comme en Régie. */
+          onChoisir={(sens) =>
+            void window.jdr.display.encart({
+              sens,
+              largeur: encart?.hauteur ?? 13,
+              hauteur: encart?.largeur ?? 46
+            })
+          }
+        />
+      )
+    }
+  },
+  {
+    id: 'direct.encart.sm',
+    rubrique: 'ecran',
+    nom: 'Santé mentale dans l’encart',
+    aide: 'À côté de la vie de chaque joueur.',
+    mots: ['encart', 'sm', 'santé mentale', 'sanité'],
+    direct: true,
+    Cmd: function EncartSm() {
+      const encart = useStore((s) => s.display?.encart)
+      return (
+        <input
+          type="checkbox"
+          aria-label="Santé mentale dans l’encart"
+          checked={encart?.sm ?? false}
+          disabled={!encart?.on}
+          onChange={(e) => void window.jdr.display.encart({ sm: e.target.checked })}
+        />
+      )
+    }
+  },
+  {
+    id: 'direct.pions.noms',
+    rubrique: 'ecran',
+    nom: 'Noms sous les pions',
+    mots: ['pions', 'noms', 'étiquettes', 'joueurs'],
+    direct: true,
+    Cmd: function PionsNoms() {
+      const on = useStore((s) => s.display?.pionLabels ?? true)
+      return (
+        <input
+          type="checkbox"
+          aria-label="Noms sous les pions"
+          checked={on}
+          onChange={(e) => void window.jdr.display.pionLabels(e.target.checked)}
+        />
+      )
+    }
+  },
+  {
+    id: 'direct.pions.pv',
+    rubrique: 'ecran',
+    nom: 'PV sous les pions',
+    mots: ['pions', 'pv', 'points de vie', 'vie'],
+    direct: true,
+    Cmd: function PionsPv() {
+      const on = useStore((s) => s.display?.pionPv ?? false)
+      return (
+        <input
+          type="checkbox"
+          aria-label="PV sous les pions"
+          checked={on}
+          onChange={(e) => void window.jdr.display.pionPv(e.target.checked)}
+        />
+      )
+    }
+  },
+  {
+    id: 'direct.ambiance.volume',
+    rubrique: 'ecran',
+    nom: 'Volume de l’ambiance',
+    aide: 'La musique d’ambiance de l’écran des joueurs.',
+    mots: ['volume', 'ambiance', 'musique', 'son', 'niveau'],
+    direct: true,
+    Cmd: function AmbianceVolume() {
+      const volume = useStore((s) => s.display?.audio.volume ?? 0.35)
+      return (
+        <Curseur
+          label="Volume de l’ambiance"
+          valeur={Math.round(volume * 100)}
+          min={0}
+          max={100}
+          texte={(v) => `${v} %`}
+          onPoser={(v) => void window.jdr.display.audio({ volume: v / 100 })}
+        />
+      )
+    }
   }
 ]
 
-/** Ce qui n'est pas ici, et pourquoi : on le dit au pied de la rubrique. */
+/** Ce qui est aussi ailleurs : on le dit au pied de la rubrique. */
 export const apres = (
-  <p className="pm-aparte">
-    Restent en Régie et au Paravent : <b>noms</b> et <b>PV sous les pions</b>, l’
-    <b>encart des joueurs</b> et sa santé mentale, le <b>volume de l’ambiance</b>. On les
-    bascule en pleine scène — les deux pages en gardent donc chacune une copie, et c’est voulu.
-  </p>
+  <p className="pm-aparte">Ces commandes sont aussi sous la main au Paravent et en Régie.</p>
 )

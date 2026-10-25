@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useState } from 'react'
 import { useStore } from '../../store'
 import { IconClose, IconRouage } from '../Icons'
 import { useEchap } from '../../echap'
@@ -17,9 +17,10 @@ import { OuvrirCarnet } from './contexte'
  * ce qui **suit le poste** reste sur la machine du maître du jeu. Le bandeau
  * du haut le redit à chaque rubrique, pour qu'on n'ait jamais à le deviner.
  *
- * Ce qu'on ne trouvera pas ici, et volontairement : les noms et les PV sous
- * les pions, l'encart des joueurs, le volume de l'ambiance. On les bascule en
- * pleine scène — ils restent sous la main, en Régie et au Pupitre.
+ * Les commandes « en direct » (vision, encart, noms et PV sous les pions,
+ * volumes) y sont aussi, sous un sous-titre à part : elles se basculent en
+ * pleine scène, et les copies de la Régie et du Paravent restent. Leur état
+ * est tenu en mémoire, oublié à la fermeture de l'application.
  *
  * Les lignes elles-mêmes ne vivent pas ici : chacune est déclarée une fois
  * dans le registre (`registre.tsx`), une rubrique par fichier.
@@ -41,6 +42,24 @@ function LigneReglage({ r }: { r: Reglage }): JSX.Element {
     <Ligne id={r.id} nom={r.nom} aide={r.aide} pleine={r.pleine}>
       {campagne || poste ? <r.Cmd /> : <span className="aide">Ouvre une campagne pour régler ceci.</span>}
     </Ligne>
+  )
+}
+
+/** Des lignes du registre, le sous-titre « En direct » posé avant la première
+ *  qui l'est — partout où l'on en rend (la rubrique, chaque groupe de recherche). */
+function Lignes({ rows }: { rows: Reglage[] }): JSX.Element {
+  const premier = rows.findIndex((r) => r.direct)
+  return (
+    <>
+      {rows.map((r, i) => (
+        <Fragment key={r.id}>
+          {i === premier ? (
+            <p className="pm-sous pm-direct">En direct — oublié à la fermeture de l’application, comme au Paravent.</p>
+          ) : null}
+          <LigneReglage r={r} />
+        </Fragment>
+      ))}
+    </>
   )
 }
 
@@ -149,9 +168,7 @@ export function Parametres({
                       >
                         {groupe[0].chemin}
                       </button>
-                      {groupe.map((r) => (
-                        <LigneReglage key={r.id} r={r} />
-                      ))}
+                      <Lignes rows={groupe} />
                     </div>
                   )
                 })
@@ -173,9 +190,7 @@ export function Parametres({
               <div className="pm-panneau">
                 <Tete titre={active.nom} quoi={active.quoi} />
                 {active.Avant ? <active.Avant /> : null}
-                {lignes.map((r) => (
-                  <LigneReglage key={r.id} r={r} />
-                ))}
+                <Lignes rows={lignes} />
                 {active.apres ?? null}
               </div>
             </>
