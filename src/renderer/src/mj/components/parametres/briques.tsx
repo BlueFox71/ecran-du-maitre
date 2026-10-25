@@ -52,10 +52,12 @@ export function Bloc({ titre, children }: { titre: string; children: React.React
 export function Seg<T extends string>({
   valeur,
   choix,
+  desactive,
   onChoisir
 }: {
   valeur: T
   choix: { k: T; label: string; aide?: string }[]
+  desactive?: boolean
   onChoisir: (k: T) => void
 }): JSX.Element {
   return (
@@ -65,6 +67,7 @@ export function Seg<T extends string>({
           key={c.k}
           className={valeur === c.k ? 'on' : ''}
           title={c.aide}
+          disabled={desactive}
           onClick={() => onChoisir(c.k)}
         >
           {c.label}

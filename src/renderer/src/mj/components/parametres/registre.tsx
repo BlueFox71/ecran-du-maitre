@@ -80,7 +80,7 @@ export const RUBRIQUES: InfoRubrique[] = [
     id: 'campagne',
     nom: 'La campagne',
     icone: <IconDoc />,
-    quoi: 'Son nom, son système, et le dossier où elle vit.'
+    quoi: 'Son nom, son système, le dossier où elle vit, et les joueurs qui s’y assoient.'
   },
   {
     id: 'regles',
@@ -92,7 +92,7 @@ export const RUBRIQUES: InfoRubrique[] = [
     id: 'ecran',
     nom: 'Écran des joueurs',
     icone: <IconScreen />,
-    quoi: 'Comment l’image sort, et comment elle change. Trois choses qu’on pose une fois et qu’on ne retouche pas en pleine scène.',
+    quoi: 'Comment l’image sort et comment elle change, réglé une fois pour toutes. En dessous, ce qu’on bascule en pleine scène : vision, encart, noms et PV sous les pions, volume de l’ambiance.',
     apres: ecran.apres
   },
   {
@@ -112,7 +112,7 @@ export const RUBRIQUES: InfoRubrique[] = [
     id: 'sons',
     nom: 'Sons',
     icone: <IconAudio />,
-    quoi: 'Les sons posés sur les cartes.'
+    quoi: 'Les sons posés sur les cartes : leur volume général, et s’ils se déclenchent tout seuls.'
   },
   {
     id: 'biblio',

@@ -139,7 +139,7 @@ export function Equipement({ ch }: { ch: Character }): JSX.Element {
             {fond.capacite !== null ? (
               <button
                 className={`sys num eq-fond btn-lien${sacPlein(fond) ? ' plein' : ''}`}
-                title="Régler la capacité du sac"
+                title={sacPlein(fond) ? 'Son sac déborde — régler la capacité du sac' : 'Régler la capacité du sac'}
                 onClick={() => ouvrirParametres('regles', 'sac.capacite')}
               >
                 {ditSac(fond)}

@@ -226,6 +226,24 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
     setTiroir(false)
     setNom(m.name)
     toucher({ ...m.spec })
+    /* L'éditeur ne pose pas les règles (« Appliquer » garde celles de la
+       campagne) : si le modèle en a d'autres, on le dit au lieu de les perdre
+       sans un mot. Le toast ne montre que ce qui est marqué raté : d'où le
+       `true`, pour qu'il se voie. Une jauge de santé mentale « devinée »
+       (undefined) n'est pas « aucune » (null). */
+    const ici = s.sheet?.spec
+    const regles = (t: TemplateSpec): string =>
+      JSON.stringify([
+        t.rollSystem,
+        !!t.sansCompetences,
+        t.skillLimit ?? null,
+        t.sanityGauge === undefined ? '?' : t.sanityGauge
+      ])
+    if (ici && regles(ici) !== regles(m.spec))
+      s.toast(
+        'Les règles du modèle ne sont pas reprises : règle-les dans Paramètres › Règles du jeu.',
+        true
+      )
   }
 
   const garder = async (): Promise<void> => {

@@ -124,21 +124,27 @@ export const reglages: Reglage[] = [
     direct: true,
     Cmd: function EncartSens() {
       const encart = useStore((s) => s.display?.encart)
+      const actuel = encart?.sens ?? 'horizontal'
       return (
         <Seg
-          valeur={encart?.sens ?? 'horizontal'}
+          valeur={actuel}
+          /* Encart éteint : grisé, comme en Régie. */
+          desactive={!encart?.on}
           choix={[
             { k: 'horizontal' as const, label: 'En ligne', aide: 'Les joueurs en ligne' },
             { k: 'vertical' as const, label: 'En colonne', aide: 'Les joueurs en colonne' }
           ]}
-          /* Changer de sens fait pivoter la boîte, comme en Régie. */
-          onChoisir={(sens) =>
+          /* Changer de sens fait pivoter la boîte, comme en Régie. Le sens
+             déjà allumé ne la retourne pas : on clique volontiers ce qui est
+             allumé « pour confirmer ». */
+          onChoisir={(sens) => {
+            if (sens === actuel) return
             void window.jdr.display.encart({
               sens,
               largeur: encart?.hauteur ?? 13,
               hauteur: encart?.largeur ?? 46
             })
-          }
+          }}
         />
       )
     }
