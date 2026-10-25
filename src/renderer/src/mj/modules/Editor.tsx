@@ -36,16 +36,34 @@ export function Editor(): JSX.Element {
   const [zoom, setZoomLocal] = useState(s.poste.editeurZoom)
   const zoomTimer = useRef<number | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
-  const setZoom = useCallback(
-    (z: number) => {
-      const v = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 10) / 10
-      setZoomLocal(v)
+  /* L'écriture est différée ; tant qu'elle attend, `zoomTimer` est posé. */
+  const ecrireZoom = useCallback(
+    (v: number) => {
       if (zoomTimer.current) window.clearTimeout(zoomTimer.current)
-      zoomTimer.current = window.setTimeout(() => void s.poserPoste('editeur.zoom', v), 400)
+      zoomTimer.current = window.setTimeout(() => {
+        zoomTimer.current = null
+        void s.poserPoste('editeur.zoom', v)
+      }, 400)
     },
     // eslint-disable-next-line react-hooks/exhaustive-deps
     []
   )
+  const setZoom = useCallback(
+    (z: number) => {
+      const v = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z)) * 10) / 10
+      setZoomLocal(v)
+      ecrireZoom(v)
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    []
+  )
+  /* Un zoom réglé dans les Paramètres : l'Éditeur le suit. Pas pendant qu'une
+     écriture de sa propre loupe attend — le magasin porte alors encore
+     l'ancienne valeur, et la reprendre défairait le geste en cours. */
+  useEffect(() => {
+    if (zoomTimer.current) return
+    setZoomLocal(s.poste.editeurZoom)
+  }, [s.poste.editeurZoom])
   useEffect(() => {
     const el = scrollRef.current
     if (!el) return
@@ -54,8 +72,7 @@ export function Editor(): JSX.Element {
       e.preventDefault()
       setZoomLocal((z) => {
         const v = Math.round(Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, z + (e.deltaY < 0 ? 0.1 : -0.1))) * 10) / 10
-        if (zoomTimer.current) window.clearTimeout(zoomTimer.current)
-        zoomTimer.current = window.setTimeout(() => void s.poserPoste('editeur.zoom', v), 400)
+        ecrireZoom(v)
         return v
       })
     }

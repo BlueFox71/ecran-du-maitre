@@ -1,5 +1,6 @@
 import { useStore } from '../../../store'
-import { Seg } from '../briques'
+import { ZOOM_MAX, ZOOM_MIN } from '@shared/reglages'
+import { Curseur, Seg } from '../briques'
 import type { Reglage } from '../registre'
 
 /* ============================================================
@@ -41,6 +42,50 @@ export const reglages: Reglage[] = [
           checked={s.poste.rouvrir}
           aria-label="Rouvrir la dernière campagne au démarrage"
           onChange={(e) => void s.poserPoste('demarrage.rouvrir', e.target.checked)}
+        />
+      )
+    }
+  },
+  {
+    id: 'biblio.vignette',
+    rubrique: 'poste',
+    nom: 'Taille des vignettes',
+    aide: 'Elle était oubliée dès qu’on changeait de page. Elle tient, maintenant.',
+    mots: ['miniatures', 'aperçus', 'grille', 'taille', 'images'],
+    Cmd: function TailleVignettes() {
+      const s = useStore()
+      return (
+        <Seg
+          valeur={s.poste.vignette <= 130 ? 'p' : s.poste.vignette >= 190 ? 'g' : 'm'}
+          choix={[
+            { k: 'p' as const, label: 'Petites' },
+            { k: 'm' as const, label: 'Moyennes' },
+            { k: 'g' as const, label: 'Grandes' }
+          ]}
+          onChoisir={(k) =>
+            void s.poserPoste('biblio.vignette', k === 'p' ? 118 : k === 'g' ? 206 : 154)
+          }
+        />
+      )
+    }
+  },
+  {
+    id: 'editeur.zoom',
+    rubrique: 'poste',
+    nom: 'Zoom du texte dans l’Éditeur',
+    aide: 'Ctrl + molette, dans l’Éditeur, le règle aussi.',
+    mots: ['loupe', 'taille', 'police', 'lettres', 'grossir'],
+    Cmd: function ZoomEditeur() {
+      const s = useStore()
+      return (
+        <Curseur
+          valeur={s.poste.editeurZoom}
+          min={ZOOM_MIN}
+          max={ZOOM_MAX}
+          pas={0.1}
+          texte={(v) => `${Math.round(v * 100)} %`}
+          onPoser={(v) => void s.poserPoste('editeur.zoom', v)}
+          label="Zoom du texte dans l’Éditeur"
         />
       )
     }

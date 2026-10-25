@@ -116,7 +116,8 @@ export const RUBRIQUES: InfoRubrique[] = [
     id: 'biblio',
     nom: 'Bibliothèque',
     icone: <IconFolder />,
-    quoi: 'Le disque fait foi. Ce qui se règle ici tient à la façon de la regarder, et au graveur qui travaille derrière.'
+    poste: true,
+    quoi: 'Le disque fait foi. Ici, le graveur qui travaille derrière : il mesure les médias et grave leurs vignettes.'
   },
   {
     id: 'mj',

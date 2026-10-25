@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../../../store'
-import { Seg } from '../briques'
 import type { Reglage } from '../registre'
 
 /* ============================================================
@@ -8,29 +7,6 @@ import type { Reglage } from '../registre'
    ============================================================ */
 
 export const reglages: Reglage[] = [
-  {
-    id: 'biblio.vignette',
-    rubrique: 'biblio',
-    nom: 'Taille des vignettes',
-    aide: 'Elle était oubliée dès qu’on changeait de page. Elle tient, maintenant.',
-    mots: ['miniatures', 'aperçus', 'grille', 'taille', 'images'],
-    Cmd: function TailleVignettes() {
-      const s = useStore()
-      return (
-        <Seg
-          valeur={s.poste.vignette <= 130 ? 'p' : s.poste.vignette >= 190 ? 'g' : 'm'}
-          choix={[
-            { k: 'p' as const, label: 'Petites' },
-            { k: 'm' as const, label: 'Moyennes' },
-            { k: 'g' as const, label: 'Grandes' }
-          ]}
-          onChoisir={(k) =>
-            void s.poserPoste('biblio.vignette', k === 'p' ? 118 : k === 'g' ? 206 : 154)
-          }
-        />
-      )
-    }
-  },
   {
     id: 'graveur.etat',
     rubrique: 'biblio',
