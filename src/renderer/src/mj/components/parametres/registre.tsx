@@ -1,0 +1,173 @@
+import {
+  IconAudio,
+  IconClavier,
+  IconDie,
+  IconDoc,
+  IconFolder,
+  IconMurs,
+  IconPeople,
+  IconPortable,
+  IconSablier,
+  IconScreen,
+  IconSliders
+} from '../Icons'
+import * as campagne from './rubriques/campagne'
+import * as regles from './rubriques/regles'
+import * as ecran from './rubriques/ecran'
+import * as murs from './rubriques/murs'
+import * as biblio from './rubriques/biblio'
+import * as mj from './rubriques/mj'
+import * as portables from './rubriques/portables'
+import * as poste from './rubriques/poste'
+import * as touches from './rubriques/touches'
+
+/**
+ * Le registre des réglages : chaque réglage est déclaré une fois, ici, avec
+ * sa rubrique, son libellé, son aide et ses mots proches. La fenêtre des
+ * paramètres le rend, la recherche le lit — les deux voient donc la même
+ * chose, et un réglage ajouté se trouve sans qu'on ait à y penser.
+ */
+
+export type Rubrique =
+  | 'campagne'
+  | 'regles'
+  | 'ecran'
+  | 'attente'
+  | 'murs'
+  | 'sons'
+  | 'mj'
+  | 'portables'
+  | 'poste'
+  | 'biblio'
+  | 'touches'
+
+export interface InfoRubrique {
+  id: Rubrique
+  nom: string
+  icone: JSX.Element
+  /** Suit le poste plutôt que la campagne. */
+  poste?: boolean
+  /** La phrase de `Tete`. */
+  quoi: string
+  /** Ce qui précède les lignes et n'est pas un réglage (l'aperçu du profil). */
+  Avant?: () => JSX.Element
+  /** Ce qui suit les lignes et n'est pas un réglage (l'aparté de fin). */
+  apres?: JSX.Element
+}
+
+export interface Reglage {
+  /** La clé du réglage quand il en a une (`sac.capacite`), sinon un nom stable. */
+  id: string
+  rubrique: Rubrique
+  nom: string
+  aide?: string
+  /** Mots proches, pour la recherche : jamais vide pour un vrai réglage. */
+  mots: string[]
+  pleine?: boolean
+  /** « En direct » : tenu en mémoire, perdu au redémarrage. */
+  direct?: boolean
+  /** Les commandes de la ligne (ou le bloc entier si `pleine`). */
+  Cmd: () => JSX.Element
+}
+
+/* L'ordre compte : c'est celui de la navigation. « attente » et « sons »
+   n'ont pas encore de lignes — la navigation les tait tant qu'elles sont vides. */
+export const RUBRIQUES: InfoRubrique[] = [
+  {
+    id: 'campagne',
+    nom: 'La campagne',
+    icone: <IconDoc />,
+    quoi: 'Son nom, son système, et le dossier où elle vit.'
+  },
+  {
+    id: 'regles',
+    nom: 'Règles du jeu',
+    icone: <IconDie />,
+    quoi: 'Les règles que la campagne suit. Les premières étaient rangées dans un coin d’en-tête de la fiche : on ne les trouvait qu’en cherchant.'
+  },
+  {
+    id: 'ecran',
+    nom: 'Écran des joueurs',
+    icone: <IconScreen />,
+    quoi: 'Comment l’image sort, et comment elle change. Trois choses qu’on pose une fois et qu’on ne retouche pas en pleine scène.',
+    apres: ecran.apres
+  },
+  {
+    id: 'attente',
+    nom: 'Écran d’attente',
+    icone: <IconSablier />,
+    quoi: 'L’écran « Ça commence bientôt », avant que la séance ne démarre.'
+  },
+  {
+    id: 'murs',
+    nom: 'Murs et lumière',
+    icone: <IconMurs />,
+    quoi: 'Les valeurs de départ des cartes neuves. Chaque plan garde ensuite les siennes, réglées sur place — on ne refait pas ici le travail des murs.',
+    apres: murs.apres
+  },
+  {
+    id: 'sons',
+    nom: 'Sons',
+    icone: <IconAudio />,
+    quoi: 'Les sons posés sur les cartes.'
+  },
+  {
+    id: 'biblio',
+    nom: 'Bibliothèque',
+    icone: <IconFolder />,
+    quoi: 'Le disque fait foi. Ce qui se règle ici tient à la façon de la regarder, et au graveur qui travaille derrière.'
+  },
+  {
+    id: 'mj',
+    nom: 'Le maître du jeu',
+    icone: <IconPeople />,
+    poste: true,
+    quoi: 'Ton profil, d’une campagne à l’autre. C’est lui qui s’assoit à la table sur l’écran « Ça commence bientôt ».',
+    Avant: mj.Avant
+  },
+  {
+    id: 'portables',
+    nom: 'Portables',
+    icone: <IconPortable />,
+    poste: true,
+    quoi: 'Tout passe par le Wi-Fi de la maison — rien ne sort vers Internet. Le QR code, lui, reste en Régie : le tendre à la table est un geste de partie.'
+  },
+  {
+    id: 'poste',
+    nom: 'Le poste',
+    icone: <IconSliders />,
+    poste: true,
+    quoi: 'Ce qui te suit d’une campagne à l’autre. Les campagnes récentes, le carnet de joueurs et le catalogue de briques sont dans le menu Campagne : ce sont des gestes, pas des réglages.'
+  },
+  {
+    id: 'touches',
+    nom: 'Raccourcis',
+    icone: <IconClavier />,
+    poste: true,
+    quoi: 'Ils n’existaient que dans des info-bulles. En lecture seule pour l’instant — les rendre modifiables est un autre chantier.'
+  }
+]
+
+export const REGLAGES: Reglage[] = [
+  ...campagne.reglages,
+  ...regles.reglages,
+  ...ecran.reglages,
+  ...murs.reglages,
+  ...biblio.reglages,
+  ...mj.reglages,
+  ...portables.reglages,
+  ...poste.reglages,
+  ...touches.reglages
+]
+
+/** Pour `chercher` : le chemin « La campagne › Règles du jeu ». */
+export function cheminDe(r: Reglage): string {
+  const rub = RUBRIQUES.find((x) => x.id === r.rubrique)
+  if (!rub) return ''
+  return `${rub.poste ? 'Le poste' : 'La campagne'} › ${rub.nom}`
+}
+
+/** Ouvre les paramètres depuis n'importe où : sur une rubrique, voire sur un réglage. */
+export function ouvrirParametres(rubrique?: Rubrique, cible?: string): void {
+  window.dispatchEvent(new CustomEvent('jdr:parametres', { detail: { rubrique, cible } }))
+}

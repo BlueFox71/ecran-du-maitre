@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import { enCourt } from './Ident'
 import { IconCheck } from './Icons'
 import { useEchap } from '../echap'
+import type { Rubrique } from './parametres/registre'
 
 /**
  * La barre de menus, en haut à gauche — là où tous les logiciels la mettent.
@@ -17,16 +18,6 @@ import { useEchap } from '../echap'
  * pour la souris, et il a nos couleurs — y compris en thème clair, ce que le
  * menu de Windows ne saurait pas faire.
  */
-export type Rubrique =
-  | 'ecran'
-  | 'table'
-  | 'murs'
-  | 'biblio'
-  | 'mj'
-  | 'portables'
-  | 'poste'
-  | 'touches'
-
 export function Menubar({
   onFiche,
   onParametres

@@ -15207,6 +15207,13 @@ button.ou-etat:hover {
 .pm-ligne.pleine .cmd {
   justify-self: stretch;
 }
+/* Le réglage vers lequel on a été mené : il s'allume le temps qu'on le repère. */
+.pm-ligne {
+  transition: background 0.4s;
+}
+.pm-ligne.pm-cible {
+  background: var(--brass-wash);
+}
 
 .pm-bloc {
   margin-top: 16px;

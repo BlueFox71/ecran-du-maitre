@@ -5,8 +5,9 @@ import { avancer, reculer, suivreHistorique } from './historique'
 import { Ariane } from './components/Ariane'
 import { Monitor } from './components/Monitor'
 import { HorlogeSeance } from './components/HorlogeSeance'
-import { Menubar, type Rubrique } from './components/Menubar'
-import { Parametres } from './components/Parametres'
+import { Menubar } from './components/Menubar'
+import { Parametres } from './components/parametres/Parametres'
+import type { Rubrique } from './components/parametres/registre'
 import { FicheCampagne, FicheSeance, Carnet, DupliquerSeance } from './components/Fiches'
 import { FicheCampagne as FicheDeCampagne } from './modules/FicheCampagne'
 import { Sonorisation } from './components/Sonorisation'
@@ -64,12 +65,16 @@ export function App(): JSX.Element {
      vivent ici, au-dessus de tout : on les ouvre depuis le haut de l'écran,
      et elles ne doivent pas mourir quand on change de module. */
   const [fiche, setFiche] = useState<'campagne' | 'seance' | 'carnet' | 'fiche' | 'dupliquer' | null>(null)
-  const [params, setParams] = useState<{ depart?: Rubrique } | null>(null)
+  const [params, setParams] = useState<{ depart?: Rubrique; cible?: string } | null>(null)
 
   /* Une fenêtre qui renvoie vers une rubrique des paramètres (« modifier mon
      profil ») le demande par un évènement : elle ne tient pas l'état d'ici. */
   useEffect(() => {
-    const ouvrir = (e: Event): void => setParams({ depart: (e as CustomEvent<Rubrique>).detail })
+    /* Le détail est une rubrique (l'ancienne forme), ou { rubrique, cible }. */
+    const ouvrir = (e: Event): void => {
+      const d = (e as CustomEvent<Rubrique | { rubrique?: Rubrique; cible?: string } | null>).detail
+      setParams(d && typeof d === 'object' ? { depart: d.rubrique, cible: d.cible } : { depart: d ?? undefined })
+    }
     window.addEventListener('jdr:parametres', ouvrir)
     return () => window.removeEventListener('jdr:parametres', ouvrir)
   }, [])
@@ -166,7 +171,7 @@ export function App(): JSX.Element {
       {fiche === 'carnet' ? <Carnet onClose={() => setFiche(null)} /> : null}
       {fiche === 'dupliquer' ? <DupliquerSeance onClose={() => setFiche(null)} /> : null}
       {fiche === 'fiche' ? <FicheDeCampagne onClose={() => setFiche(null)} /> : null}
-      {params ? <Parametres depart={params.depart} onClose={() => setParams(null)} /> : null}
+      {params ? <Parametres depart={params.depart} cible={params.cible} onClose={() => setParams(null)} /> : null}
       <Toasts />
     </>
   )
