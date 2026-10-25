@@ -38,6 +38,14 @@ import { mediaUrl, profilDir, vignetteUrl } from '../vault'
 import { IMPORTABLE, IMAGE_EXT, VIDEO_EXT, AUDIO_EXT } from '../kinds'
 import { lireCampagne, type Brut } from '@shared/reglages'
 import { monnaiesActives } from '@shared/monnaies'
+import { apresLeCombat, apresUnTour, type Modif } from '@shared/modifs'
+import { noterJet } from '../jetDuPerso'
+
+/** Des bonus ont vieilli tout seuls : la fiche du MJ et les téléphones relisent. */
+function modifsVieillis(): void {
+  display.versMj('characters:relus', null)
+  mobile.broadcast()
+}
 import type {
   Astre,
   CollageLayout,
@@ -1053,6 +1061,12 @@ export function registerIpc(): void {
     mobile.broadcast()
     return c
   })
+  /* Ses bonus et malus : le téléphone les montre sur chaque carac. */
+  on('characters:setModifs', (id: number, modifs: Modif[]) => {
+    const c = chars.setModifs(id, modifs)
+    mobile.broadcast()
+    return c
+  })
   on('characters:setStat', (id: number, key: string, v: number) => {
     const c = chars.setStat(id, key, v)
     mobile.broadcast()
@@ -1073,7 +1087,16 @@ export function registerIpc(): void {
     rolls.listRolls(limit ?? 300, sessionOnly !== false)
   )
   on('rolls:roll', (req: any) => rolls.addRoll(req))
-  on('rolls:record', (req: any) => rolls.recordRoll(req))
+  /* Un jet saisi pour un personnage : le serveur refait le compte — carac,
+     bonus et malus — comme pour un téléphone, et use ce qui s'use. */
+  on('rolls:record', (req: any) => {
+    const perso = req?.characterId != null && req.caracKey ? chars.getCharacter(req.characterId) : null
+    if (!perso) return rolls.recordRoll(req)
+    const fait = noterJet(perso, String(req.caracKey), Number(req.die))
+    if (!fait) return rolls.recordRoll(req)
+    if (fait.use) mobile.broadcast()
+    return fait.roll
+  })
   on('rolls:formula', (formula: string, label?: string) => rolls.rollFormula(formula, label))
   on('rolls:stats', () => rolls.rollStats())
   on('rolls:trash', (id: number) => rolls.trashRoll(id))
@@ -1108,12 +1131,22 @@ export function registerIpc(): void {
   ipcMain.handle('tours:retirer', (_e, cle: string) => tours.retirer(cle))
   ipcMain.handle('tours:commencer', () => tours.commencer())
   ipcMain.handle('tours:annuler', () => tours.annuler())
-  ipcMain.handle('tours:suivant', () => tours.suivant())
+  /* Un round de plus : ce qui se comptait en tours en perd un. */
+  ipcMain.handle('tours:suivant', () => {
+    const avant = tours.etat()?.round
+    const t = tours.suivant()
+    if (t && avant != null && t.round > avant && chars.vieillirModifs(apresUnTour)) modifsVieillis()
+    return t
+  })
   ipcMain.handle('tours:precedent', () => tours.precedent())
   ipcMain.handle('tours:retarder', () => tours.retarder())
   ipcMain.handle('tours:main', (_e, cle: string) => tours.donnerMain(cle))
   ipcMain.handle('tours:deplacer', (_e, cle: string, vers: number) => tours.deplacer(cle, vers))
-  ipcMain.handle('tours:fin', () => tours.fin())
+  ipcMain.handle('tours:fin', () => {
+    const t = tours.fin()
+    if (chars.vieillirModifs(apresLeCombat)) modifsVieillis()
+    return t
+  })
 
   /* ---------------- préparation des personnages ---------------- */
 

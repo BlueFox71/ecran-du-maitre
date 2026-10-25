@@ -17,6 +17,7 @@ import {
 import type { CadreCarre, CalqueBrouillard, MobilePing, Ouverture, PointMur } from '@shared/types'
 import { heureLocale } from '@shared/heure'
 import { ditSac, sacPlein } from '@shared/sac'
+import { sommeBonus, type LigneBonus } from '@shared/modifs'
 
 /**
  * L'application du joueur, sur son téléphone.
@@ -66,7 +67,15 @@ const API = location.port === PORT ? '' : `${location.protocol}//${location.host
 
 interface Jauge { key: string; label: string; color: string; value: number; max: number }
 /** `mod` : ce que le jet ajoute au dé. Absent d'un serveur plus ancien, on le calcule. */
-interface Carac { key: string; label: string; code: string | null; valeur: number; mod?: number }
+interface Carac {
+  key: string
+  label: string
+  code: string | null
+  valeur: number
+  mod?: number
+  /** Ses bonus et malus sur cette carac — posés par le MJ, ou d'un objet porté. */
+  bonus?: LigneBonus[]
+}
 interface Comp { key: string; label: string; valeur: number }
 interface PionVu {
   id: number
@@ -1087,7 +1096,7 @@ function Fiche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
           {p.caracs.map((c) => (
             <div className="m-cc" key={c.key} title={c.label}>
               <b>{c.valeur}</b>
-              <em>{signe(bonusDe(c))}</em>
+              <em>{signe(modDe(c))}</em>
               <span>{c.code ?? abrege(c.label)}</span>
             </div>
           ))}
@@ -1809,7 +1818,10 @@ function natureDite(genre: string): string {
 
 /* ---------------- le jet ---------------- */
 
-const bonusDe = (c: Carac): number => c.mod ?? modificateur(c.valeur)
+/** Le modificateur de la carac seul, tel que la fiche le lit. */
+const modDe = (c: Carac): number => c.mod ?? modificateur(c.valeur)
+/** Ce que le jet ajoute au dé : le modificateur, plus ses bonus et malus. */
+const bonusDe = (c: Carac): number => modDe(c) + sommeBonus(c.bonus ?? [])
 
 /** Un jet envoyé, tel que le serveur l'a compté. */
 interface JetFait {
@@ -1817,6 +1829,7 @@ interface JetFait {
   carac: string
   de: number
   bonus: number
+  lignes: LigneBonus[]
   total: number
   naturel: Naturel
 }
@@ -1877,6 +1890,7 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
       carac: carac.code ?? abrege(carac.label),
       de: rep.de ?? de,
       bonus: rep.bonus ?? bonus,
+      lignes: rep.lignes ?? carac.bonus ?? [],
       total: rep.total,
       naturel: rep.naturel ?? naturel(de)
     }
@@ -1912,6 +1926,21 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
             </button>
           ))}
         </div>
+        {/* D'où vient le chiffre du bouton, dès qu'il n'est plus la carac seule. */}
+        {carac?.bonus?.length ? (
+          <ul className="m-bonus">
+            <li>
+              <span>{carac.label}</span>
+              <b>{signe(modDe(carac))}</b>
+            </li>
+            {carac.bonus.map((l, i) => (
+              <li key={i} className={l.valeur > 0 ? 'plus' : 'moins'}>
+                <span>{l.raison}</span>
+                <b>{signe(l.valeur)}</b>
+              </li>
+            ))}
+          </ul>
+        ) : null}
       </section>
 
       <section>

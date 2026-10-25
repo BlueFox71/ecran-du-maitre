@@ -4,6 +4,7 @@ import { fixerInitial } from './objets'
 import { couleurLibre, lisCadreCarre } from '@shared/types'
 import { emojisDe } from '@shared/emojis'
 import type { Monnaie } from '@shared/monnaies'
+import type { Modif } from '@shared/modifs'
 import type {
   ButinLigne,
   CadreCarre,
@@ -594,6 +595,45 @@ export function setButin(characterId: number, lignes: ButinLigne[]): Character {
     .prepare(`UPDATE character SET butin = ?, updated_at = datetime('now') WHERE id = ?`)
     .run(ecrisButin(propre), characterId)
   return getCharacter(characterId)!
+}
+
+/**
+ * Ses bonus et malus au jet, remplacés d'un bloc. Un bonus nul ou sans durée
+ * lisible ne s'écrit pas : il ne compterait pour rien.
+ */
+export function setModifs(characterId: number, modifs: Modif[]): Character {
+  const ch = getCharacter(characterId)
+  if (!ch) throw new Error('Personnage introuvable')
+  const propres = (Array.isArray(modifs) ? modifs : [])
+    .map((m) => ({ ...m, valeur: Math.trunc(Number(m.valeur)), raison: String(m.raison ?? '').trim() }))
+    .filter(
+      (m) =>
+        m.valeur !== 0 &&
+        (m.duree?.genre === 'retrait' ||
+          ((m.duree?.genre === 'jets' || m.duree?.genre === 'tours') && m.duree.reste >= 1))
+    )
+  const data = { ...ch.data }
+  if (propres.length) data.modifs = propres
+  else delete data.modifs
+  ecrisDonnees(characterId, data)
+  return getCharacter(characterId)!
+}
+
+/**
+ * Faire vieillir les bonus de tout le monde — un round passé, un combat fini.
+ * Rend vrai si quelqu'un a changé : à l'appelant de prévenir le MJ et les
+ * téléphones.
+ */
+export function vieillirModifs(f: (m: Modif[]) => Modif[]): boolean {
+  let change = false
+  for (const ch of listCharacters()) {
+    if (!ch.data.modifs?.length) continue
+    const apres = f(ch.data.modifs)
+    if (JSON.stringify(apres) === JSON.stringify(ch.data.modifs)) continue
+    setModifs(ch.id, apres)
+    change = true
+  }
+  return change
 }
 
 /** Montrer ou taire l'état d'un PNJ sur son pion. */

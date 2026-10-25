@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { templateOf, useStore } from '../store'
 import type { SkillSpec } from '@shared/types'
 import { modificateur } from '@shared/jet'
+import { bonusDuJet, sommeBonus, type LigneBonus } from '@shared/modifs'
 
 /**
  * Les faces du dé que la table utilise. La saisie est écrite pour le système
@@ -29,9 +30,11 @@ export function useSaisieJet(): {
   setCaracKey: (k: string) => void
   carac: SkillSpec | null
   valeurDe: (key: string) => number
-  /** Ce que la carac ajoute au dé : son modificateur, pas sa valeur. */
+  /** Ce que le jet ajoute au dé : le modificateur de la carac, plus ses bonus et malus. */
   bonusDe: (key: string) => number
   bonus: number
+  /** Les bonus et malus du jet en cours, chacun avec sa raison. */
+  lignes: LigneBonus[]
   valeur: number | null
   setValeur: (v: number | null) => void
   pret: boolean
@@ -67,7 +70,11 @@ export function useSaisieJet(): {
   )
 
   const valeurDe = (key: string): number => perso?.data.stats[key] ?? 0
-  const bonusDe = (key: string): number => modificateur(perso?.data.stats[key] ?? 10)
+  const stats = tpl?.spec.stats ?? []
+  const lignesDe = (key: string): LigneBonus[] =>
+    perso ? bonusDuJet(perso.data.modifs, s.objets, perso.id, stats.find((x) => x.key === key) ?? null) : []
+  const bonusDe = (key: string): number =>
+    modificateur(perso?.data.stats[key] ?? 10) + sommeBonus(lignesDe(key))
 
   /** Un changement de joueur peut changer de gabarit : la carac suit. */
   useEffect(() => {
@@ -80,6 +87,7 @@ export function useSaisieJet(): {
 
   const carac = caracs.find((x) => x.key === caracKey) ?? null
   const bonus = carac ? bonusDe(carac.key) : 0
+  const lignes = carac ? lignesDe(carac.key) : []
   const pret = !!perso && !!carac && valeur !== null
 
   /**
@@ -93,10 +101,13 @@ export function useSaisieJet(): {
       label: carac.label,
       system: 'd20-plus',
       target: bonus,
-      die: valeur
+      die: valeur,
+      /* Le serveur refait le compte et use les bonus « prochain jet ». */
+      caracKey: carac.key
     })
     setValeur(null)
     await s.refreshRolls()
+    if (perso.data.modifs?.length) await s.refreshCharacters()
     return true
   }
 
@@ -111,6 +122,7 @@ export function useSaisieJet(): {
     valeurDe,
     bonusDe,
     bonus,
+    lignes,
     valeur,
     setValeur,
     pret,

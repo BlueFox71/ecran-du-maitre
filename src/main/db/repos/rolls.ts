@@ -160,7 +160,8 @@ export function addRoll(req: RollRequest): Roll {
 export function recordRoll(req: RollRecord): Roll {
   const faces = req.system === 'd20-plus' ? 20 : 100
   const d = Math.min(faces, Math.max(1, Math.round(req.die)))
-  return saveRoll(req, resolve(req, d))
+  const r = resolve(req, d)
+  return saveRoll(req, req.detail ? { ...r, detail: req.detail } : r)
 }
 
 /** Jet libre : « 2d6+3 », « 1d100 », « 3d8 ». */

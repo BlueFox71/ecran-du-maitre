@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Brut } from '@shared/reglages'
+import type { Modif } from '@shared/modifs'
 import type {
   Annotation,
   MotifVibration,
@@ -1036,6 +1037,8 @@ const api = {
       call<Character>('characters:setStat', id, key, value),
     setState: (id: number, key: string, on: boolean) =>
       call<Character>('characters:setState', id, key, on),
+    /** Ses bonus et malus au jet, remplacés d'un bloc. */
+    setModifs: (id: number, modifs: Modif[]) => call<Character>('characters:setModifs', id, modifs),
     log: (id: number) => call<CharacterLogEntry[]>('characters:log', id),
     /** Ajouter ou retirer de sa bourse, monnaie par monnaie ; chaque écart est journalisé. */
     bourse: (id: number, ecarts: Record<string, number>, reason?: string | null) =>

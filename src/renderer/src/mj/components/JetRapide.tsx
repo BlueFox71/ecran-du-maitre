@@ -24,6 +24,7 @@ export function JetRapide(): JSX.Element {
     carac,
     bonusDe,
     bonus,
+    lignes,
     valeur,
     setValeur,
     pret,
@@ -109,6 +110,12 @@ export function JetRapide(): JSX.Element {
           {pret ? (
             <>
               {valeur} {signe(bonus)} = <b>{total}</b>
+              {lignes.length ? (
+                <span className="dont" title={lignes.map((l) => `${signe(l.valeur)} ${l.raison}`).join(' · ')}>
+                  {' '}
+                  dont {signe(lignes.reduce((n, l) => n + l.valeur, 0))}
+                </span>
+              ) : null}
             </>
           ) : (
             <span className="pt">Joueur, carac, dé.</span>

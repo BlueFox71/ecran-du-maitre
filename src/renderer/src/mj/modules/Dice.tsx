@@ -30,6 +30,7 @@ export function Dice(): JSX.Element {
     carac,
     bonusDe,
     bonus,
+    lignes,
     valeur,
     setValeur,
     pret,
@@ -156,6 +157,11 @@ export function Dice(): JSX.Element {
                   <span className="som">
                     {valeur} {signe(bonus)} = <b>{valeur! + bonus}</b>
                   </span>
+                  {lignes.length ? (
+                    <span className="dont">
+                      dont {lignes.map((l) => `${signe(l.valeur)} ${l.raison}`).join(', ')}
+                    </span>
+                  ) : null}
                 </>
               ) : (
                 <span className="pt">Joueur, caractéristique, valeur du dé.</span>

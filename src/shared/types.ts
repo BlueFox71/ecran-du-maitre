@@ -1,4 +1,5 @@
 /** Types partagés entre le processus principal, le préchargement et les interfaces. */
+import type { Modif } from './modifs'
 
 export type ItemKind = 'doc' | 'image' | 'video' | 'audio' | 'pdf' | 'other'
 
@@ -701,6 +702,11 @@ export interface CharacterData {
    * d'une séance à l'autre avec le reste de ses données.
    */
   bourse?: Record<string, number>
+  /**
+   * Ses bonus et malus au jet, posés par le MJ (voir `@shared/modifs`).
+   * Absents, aucun ; ceux de ses objets portés ne s'y écrivent pas.
+   */
+  modifs?: Modif[]
 }
 
 /**
@@ -1130,6 +1136,14 @@ export interface RollRequest {
  */
 export interface RollRecord extends RollRequest {
   die: number
+  /**
+   * La carac du jet. Fournie avec `characterId`, le serveur refait le compte
+   * lui-même — modificateur, bonus et malus — et use ceux qui se comptent en
+   * jets ; `target` est alors ignoré.
+   */
+  caracKey?: string
+  /** Le détail lu au journal, quand le compte en dit plus que « d20=14 +3 ». */
+  detail?: string
 }
 
 /* ---------- Annotations d'un lieu — pour le MJ seul ---------- */

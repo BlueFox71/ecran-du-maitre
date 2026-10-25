@@ -9941,6 +9941,95 @@ input[type='range']::-webkit-slider-thumb {
 .dp-gauche {
   justify-self: start;
 }
+/* Bonus et malus : la valeur en couleur, la raison, sur quoi, combien de temps. */
+.dp-modifs {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+}
+.dp-modifs li {
+  display: flex;
+  align-items: baseline;
+  gap: 7px;
+  font-size: 12.5px;
+  min-width: 0;
+}
+.dp-modifs b {
+  flex: none;
+  min-width: 26px;
+}
+.dp-modifs .plus b,
+.dp-modif-neuf .v.plus {
+  color: var(--moss);
+}
+.dp-modifs .moins b,
+.dp-modif-neuf .v.moins {
+  color: var(--blood);
+}
+.dp-modifs .r {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.dp-modifs .c,
+.dp-modifs .d {
+  flex: none;
+  font: 500 9.5px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.dp-modifs .d {
+  margin-left: auto;
+}
+.dp-modifs .objet .r {
+  font-style: italic;
+}
+.dp-modifs .x {
+  flex: none;
+  border: 0;
+  background: none;
+  color: var(--text-faint);
+  cursor: pointer;
+  padding: 0 2px;
+}
+.dp-modifs .x:hover {
+  color: var(--blood);
+}
+.dp-modif-neuf {
+  display: grid;
+  gap: 5px;
+}
+.dp-modif-neuf .ligne {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+.dp-modif-neuf .ligne .input {
+  flex: 1;
+  min-width: 0;
+}
+.dp-modif-neuf .ligne .input.n {
+  flex: none;
+  width: 52px;
+}
+.dp-modif-neuf .v {
+  min-width: 26px;
+  text-align: center;
+}
+/* Sous le total d'un jet saisi : d'où viennent les bonus et malus. */
+.apercu .dont {
+  display: block;
+  font-size: 11.5px;
+  color: var(--text-faint);
+}
+.jr-som .dont {
+  font-size: 11px;
+  color: var(--text-faint);
+}
 .dp-pied {
   display: flex;
   gap: 6px;

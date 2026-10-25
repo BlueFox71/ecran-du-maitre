@@ -3,6 +3,7 @@ import { Visage } from '../../shared/Visage'
 import { TexteCourt } from './TexteCourt'
 import { modificateur, signe } from '@shared/jet'
 import { PilotePion } from './PilotePion'
+import { BonusMalus } from './BonusMalus'
 import { eclaire, emplacementsDe, etatDeVie, jaugesDe, nomEmplacement } from '@shared/types'
 import type { ButinLigne, Character, GaugeSpec, Objet, ObjetPlacement, Pion } from '@shared/types'
 
@@ -141,6 +142,7 @@ export function DetailPion({
               ))}
             </div>
             <Competences ch={ch} />
+            <BonusMalus ch={ch} stats={spec?.stats ?? []} />
           </section>
           <section>
             <ObjetsPortes ch={ch} pose={pose} />

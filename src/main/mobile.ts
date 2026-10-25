@@ -29,7 +29,6 @@ import { copieReduite, vignettesDir } from './vault'
 import { plageDemandee } from './plage'
 import * as chars from './db/repos/characters'
 import * as players from './db/repos/players'
-import * as rolls from './db/repos/rolls'
 import { listPionsVus, movePion, tournerPion } from './db/repos/pions'
 import { calqueDe } from './db/repos/murs'
 import { echelleDe, planDe } from './db/repos/echelle'
@@ -45,6 +44,7 @@ import { modificateur, naturel } from '@shared/jet'
 import * as reglagesCampagne from './db/repos/reglages'
 import * as display from './display'
 import * as prepa from './preparation'
+import { bonusParCarac, noterJet } from './jetDuPerso'
 import { EMPLACEMENTS_OBJET, etatDeVie } from '@shared/types'
 import type { MobileInfo, MobileDevice, MobileNudge, MobilePing } from '@shared/types'
 
@@ -439,6 +439,7 @@ function etatJoueur(playerId: number) {
   const joueur = players.getPlayer(playerId)
   const perso = joueur?.characterId != null ? chars.getCharacter(joueur.characterId) : null
   const fiche = chars.campaignSheet()
+  const bonusCaracs = perso ? bonusParCarac(perso) : {}
   const d = display.getState()
 
   /* L'écran gelé fige aussi les téléphones : ce qu'ils montrent doit être ce
@@ -478,7 +479,9 @@ function etatJoueur(playerId: number) {
             code: st.code ?? null,
             valeur: perso.data.stats[st.key] ?? 0,
             /* Ce que le jet ajoute au dé : le téléphone l'affiche sur le bouton. */
-            mod: modificateur(perso.data.stats[st.key] ?? 10)
+            mod: modificateur(perso.data.stats[st.key] ?? 10),
+            /* Ses bonus et malus sur cette carac, chacun avec sa raison. */
+            bonus: bonusCaracs[st.key] ?? []
           })),
           /* null : la campagne ne se sert pas des compétences, la rubrique disparaît. */
           comps: fiche.spec.sansCompetences
@@ -1281,14 +1284,14 @@ function roll(res: ServerResponse, url: URL, corps: any): void {
   if (!carac) return json(res, 400, { erreur: 'Caractéristique inconnue.' })
   if (!Number.isInteger(de) || de < 1 || de > 20) return json(res, 400, { erreur: 'Valeur de dé impossible.' })
 
-  const bonus = modificateur(perso.data.stats[carac.key] ?? 10)
-  rolls.recordRoll({
-    characterId: perso.id,
-    label: carac.label,
-    system: 'd20-plus',
-    target: bonus,
-    die: de
-  })
+  const fait = noterJet(perso, carac.key, de)
+  if (!fait) return json(res, 400, { erreur: 'Caractéristique inconnue.' })
+  /* Un bonus « prochain jet » vient de s'user : la fiche du MJ et le
+     téléphone doivent le perdre aussi. */
+  if (fait.use) {
+    versMj('characters:relus', null)
+    broadcast()
+  }
 
   versMj('mobile:roll', {
     playerName: joueur!.name,
@@ -1296,11 +1299,19 @@ function roll(res: ServerResponse, url: URL, corps: any): void {
     color: joueur!.color,
     label: carac.label,
     die: de,
-    total: de + bonus
+    total: fait.total
   })
-  /* Le détail revient au joueur : son dé, ce qui s'y ajoute, et un 1 ou un 20
-     naturel dit tel quel — sinon « 17 » passait pour une réussite. */
-  json(res, 200, { ok: true, de, bonus, total: de + bonus, naturel: naturel(de) })
+  /* Le détail revient au joueur : son dé, ce qui s'y ajoute et pourquoi, et
+     un 1 ou un 20 naturel dit tel quel — sinon « 17 » passait pour une réussite. */
+  json(res, 200, {
+    ok: true,
+    de,
+    bonus: fait.bonus,
+    mod: fait.mod,
+    lignes: fait.lignes,
+    total: fait.total,
+    naturel: naturel(de)
+  })
 }
 
 /**
