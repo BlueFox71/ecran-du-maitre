@@ -14,6 +14,7 @@ import {
 import * as campagne from './rubriques/campagne'
 import * as regles from './rubriques/regles'
 import * as ecran from './rubriques/ecran'
+import * as attente from './rubriques/attente'
 import * as murs from './rubriques/murs'
 import * as sons from './rubriques/sons'
 import * as biblio from './rubriques/biblio'
@@ -71,8 +72,7 @@ export interface Reglage {
   Cmd: () => JSX.Element
 }
 
-/* L'ordre compte : c'est celui de la navigation. « attente »
-   n'a pas encore de lignes — la navigation la tait tant qu'elle est vide. */
+/* L'ordre compte : c'est celui de la navigation. */
 export const RUBRIQUES: InfoRubrique[] = [
   {
     id: 'campagne',
@@ -153,6 +153,7 @@ export const REGLAGES: Reglage[] = [
   ...campagne.reglages,
   ...regles.reglages,
   ...ecran.reglages,
+  ...attente.reglages,
   ...murs.reglages,
   ...sons.reglages,
   ...biblio.reglages,

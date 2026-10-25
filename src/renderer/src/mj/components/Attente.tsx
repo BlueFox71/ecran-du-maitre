@@ -6,7 +6,7 @@
  * Les réglages appartiennent à la campagne (`attente`, en JSON) : on les pose
  * une fois, on relance d'un clic à chaque séance.
  */
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { itemById, playerOf, useStore } from '../store'
 import { ChampEmojis } from './ChampEmojis'
 import { IconClose, IconSablier } from './Icons'
@@ -17,7 +17,7 @@ import type { SlidePayload } from '@shared/types'
 import { useEchap } from '../echap'
 import { emojiDe, useSons } from '../sons'
 
-interface ReglagesAttente {
+export interface ReglagesAttente {
   titre: string
   sousTitre: string
   emojis: string[]
@@ -59,7 +59,7 @@ const DEFAUT: ReglagesAttente = {
 
 const MINUTES_MAX = 180
 
-function lire(brut: string | undefined): ReglagesAttente {
+export function lireAttente(brut: string | undefined): ReglagesAttente {
   try {
     const r = JSON.parse(brut ?? '{}')
     return {
@@ -111,19 +111,32 @@ export function BoutonAttente(): JSX.Element {
   )
 }
 
-function FenetreAttente({ onClose }: { onClose: () => void }): JSX.Element {
-  const s = useStore()
-  useEchap(onClose)
-  const [r, setR] = useState<ReglagesAttente>(() => lire(s.reglagesBrut['attente']))
-  const pose = (patch: Partial<ReglagesAttente>): void => setR((x) => ({ ...x, ...patch }))
-  const portrait = urlPortraitMj(s.poste.mjImage)
-  const ambiances = useSons((x) => x.liste).filter((son) => son.nature === 'ambiance')
-  /* Un son retiré de la sonothèque depuis : on retombe sur le silence. */
-  const musique = ambiances.some((son) => son.id === r.musique) ? r.musique : null
 
-  /* Un même fichier importé deux fois ne se propose qu'une fois ; deux
-     fichiers du même nom, rangés dans deux dossiers, se disent leur dossier. */
-  const choix: { ids: number[]; fichier: number | null; nom: string; dossier: string }[] = []
+/**
+ * Les ambiances de la sonothèque qu'on peut proposer en musique d'attente.
+ * Un même fichier importé deux fois ne se propose qu'une fois ; deux fichiers
+ * du même nom, rangés dans deux dossiers, se disent leur dossier.
+ */
+interface ChoixAmbiance {
+  ids: number[]
+  fichier: number | null
+  nom: string
+  dossier: string
+}
+
+function useAmbiances(voulue: number | null): {
+  nb: number
+  choix: ChoixAmbiance[]
+  libelle: (c: ChoixAmbiance) => string
+  /** Le son retenu ; un son retiré de la sonothèque depuis : on retombe sur le silence. */
+  musique: number | null
+  choisi: number | undefined
+} {
+  const allItems = useStore((x) => x.allItems)
+  const ambiances = useSons((x) => x.liste).filter((son) => son.nature === 'ambiance')
+  const musique = ambiances.some((son) => son.id === voulue) ? voulue : null
+
+  const choix: ChoixAmbiance[] = []
   for (const son of ambiances) {
     const fichier = son.fichiers[0]?.itemId ?? null
     const deja = fichier == null ? null : choix.find((c) => c.fichier === fichier)
@@ -131,7 +144,7 @@ function FenetreAttente({ onClose }: { onClose: () => void }): JSX.Element {
       deja.ids.push(son.id)
       continue
     }
-    const chemin = itemById(s.allItems, fichier)?.relPath ?? ''
+    const chemin = itemById(allItems, fichier)?.relPath ?? ''
     choix.push({
       ids: [son.id],
       fichier,
@@ -139,9 +152,275 @@ function FenetreAttente({ onClose }: { onClose: () => void }): JSX.Element {
       dossier: chemin.split('/').slice(0, -1).join(' / ')
     })
   }
-  const libelle = (c: (typeof choix)[number]): string =>
+  const libelle = (c: ChoixAmbiance): string =>
     c.dossier && choix.some((x) => x !== c && x.nom === c.nom) ? `${c.nom} (${c.dossier})` : c.nom
-  const choisi = choix.find((c) => musique != null && c.ids.includes(musique))
+  const choisi = choix.find((c) => musique != null && c.ids.includes(musique))?.ids[0]
+  return { nb: ambiances.length, choix, libelle, musique, choisi }
+}
+
+/**
+ * Un champ texte. Dans la fenêtre de lancement il suit chaque frappe ; dans
+ * les Paramètres (`auBlur`) il garde son brouillon et n'écrit qu'en quittant
+ * le champ, pour ne pas enregistrer la campagne à chaque lettre.
+ */
+function ChampTexte({
+  id,
+  valeur,
+  onChange,
+  auBlur,
+  onEnter,
+  placeholder,
+  autoFocus
+}: {
+  id: string
+  valeur: string
+  onChange: (v: string) => void
+  auBlur?: boolean
+  onEnter?: () => void
+  placeholder?: string
+  autoFocus?: boolean
+}): JSX.Element {
+  const [brouillon, setBrouillon] = useState(valeur)
+  useEffect(() => setBrouillon(valeur), [valeur])
+  return (
+    <input
+      id={id}
+      type="text"
+      value={auBlur ? brouillon : valeur}
+      onChange={(e) => (auBlur ? setBrouillon(e.target.value) : onChange(e.target.value))}
+      onBlur={auBlur ? () => brouillon !== valeur && onChange(brouillon) : undefined}
+      onKeyDown={onEnter ? (e) => e.key === 'Enter' && onEnter() : undefined}
+      placeholder={placeholder}
+      autoFocus={autoFocus}
+    />
+  )
+}
+
+/**
+ * Les champs de l'écran d'attente, partagés par la fenêtre de lancement et
+ * les Paramètres. `seul` ne rend que le contrôle d'un champ, sans son
+ * libellé : c'est la ligne des Paramètres qui le nomme.
+ */
+export function ChampsAttente({
+  r,
+  onChange,
+  seul,
+  auBlur,
+  onEnter,
+  onProfil
+}: {
+  r: ReglagesAttente
+  onChange: (patch: Partial<ReglagesAttente>) => void
+  seul?: keyof ReglagesAttente
+  /** Les textes n'écrivent qu'en quittant le champ. */
+  auBlur?: boolean
+  onEnter?: () => void
+  /** Le lien vers le profil du MJ ; par défaut, la rubrique des Paramètres. */
+  onProfil?: () => void
+}): JSX.Element {
+  const s = useStore()
+  const portrait = urlPortraitMj(s.poste.mjImage)
+  const { nb, choix, libelle, choisi } = useAmbiances(r.musique)
+
+  /* Ceux qu'on attend : les joueurs de la séance, présents, encore en jeu. */
+  const attendus = s.characters.filter((c) => c.kind !== 'pnj' && c.present && !c.horsJeu)
+  const sousTitreDefaut = [s.campaign?.name, s.session?.label].filter(Boolean).join(' · ')
+
+  /* Dans la fenêtre : le champ, son libellé et son aide. Dans les Paramètres :
+     le champ seul, la ligne le nomme. */
+  const montre = (k: keyof ReglagesAttente): boolean => !seul || seul === k
+  const champ = (
+    k: keyof ReglagesAttente,
+    nom: string,
+    aide: string | null,
+    contenu: JSX.Element,
+    htmlFor?: string
+  ): JSX.Element | null => {
+    if (!montre(k)) return null
+    if (seul) return contenu
+    return (
+      <div className="field">
+        <label htmlFor={htmlFor}>{nom}</label>
+        {contenu}
+        {aide ? <p className="aide">{aide}</p> : null}
+      </div>
+    )
+  }
+
+  return (
+    <>
+      {champ(
+        'titre',
+        'Titre',
+        null,
+        <ChampTexte
+          id="att-titre"
+          valeur={r.titre}
+          onChange={(titre) => onChange({ titre })}
+          auBlur={auBlur}
+          onEnter={onEnter}
+          placeholder={DEFAUT.titre}
+          autoFocus={!seul}
+        />,
+        'att-titre'
+      )}
+      {champ(
+        'sousTitre',
+        'Au-dessus du titre',
+        'Vide : le nom de la campagne et de la séance.',
+        <ChampTexte
+          id="att-sous"
+          valeur={r.sousTitre}
+          onChange={(sousTitre) => onChange({ sousTitre })}
+          auBlur={auBlur}
+          onEnter={onEnter}
+          placeholder={sousTitreDefaut || 'Le nom de la campagne'}
+        />,
+        'att-sous'
+      )}
+      {champ(
+        'minutes',
+        'Compte à rebours',
+        'Il part au lancement ; à zéro, l’écran annonce « C’est l’heure ! ».',
+        <div className="att-minutes">
+          {[0, 5, 10, 15, 30].map((m) => (
+            <button
+              key={m}
+              type="button"
+              className={`btn btn-sm${r.minutes === m ? ' btn-on' : ''}`}
+              onClick={() => onChange({ minutes: m })}
+            >
+              {m ? `${m} min` : 'Aucun'}
+            </button>
+          ))}
+          <div className="avec-unite">
+            <input
+              id="att-min"
+              type="number"
+              min={0}
+              max={MINUTES_MAX}
+              value={r.minutes}
+              onChange={(e) =>
+                onChange({ minutes: Math.max(0, Math.min(MINUTES_MAX, Number(e.target.value) || 0)) })
+              }
+            />
+            <span className="unite">min</span>
+          </div>
+        </div>,
+        'att-min'
+      )}
+      {champ(
+        'lueurs',
+        'Couleurs du fond',
+        'Trois lueurs qui dérivent lentement dans le ciel. Préfère des teintes sombres : le titre reste lisible.',
+        <div className="att-lueurs">
+          {r.lueurs.map((c, i) => (
+            <input
+              key={i}
+              type="color"
+              value={c}
+              onChange={(e) => {
+                const l = [...r.lueurs] as [string, string, string]
+                l[i] = e.target.value
+                onChange({ lueurs: l })
+              }}
+              title={`Lueur ${i + 1}`}
+              aria-label={`Couleur de la lueur ${i + 1}`}
+            />
+          ))}
+          <span className="sep" />
+          {AMBIANCES.map((a) => (
+            <button
+              key={a.nom}
+              type="button"
+              className={`att-ambiance${a.lueurs.join() === r.lueurs.join() ? ' on' : ''}`}
+              onClick={() => onChange({ lueurs: a.lueurs })}
+              title={a.nom}
+              style={{ background: `linear-gradient(90deg, ${a.lueurs.join(', ')})` }}
+            >
+              {a.nom}
+            </button>
+          ))}
+        </div>
+      )}
+      {champ(
+        'musique',
+        'Musique d’attente',
+        nb
+          ? 'Elle tourne en boucle, et s’éteint en fondu quand l’attente quitte l’écran.'
+          : 'Aucune ambiance dans la sonothèque : ajoutes-y un son de nature « ambiance ».',
+        <select
+          id="att-musique"
+          value={choisi ?? ''}
+          onChange={(e) => onChange({ musique: e.target.value ? Number(e.target.value) : null })}
+        >
+          <option value="">Aucune</option>
+          {choix.map((c) => (
+            <option key={c.ids[0]} value={c.ids[0]}>
+              {libelle(c)}
+            </option>
+          ))}
+        </select>,
+        'att-musique'
+      )}
+      {montre('emojis') ? (
+        <ChampEmojis
+          id="att-emojis"
+          libelle={seul ? '' : 'Émojis'}
+          emojis={r.emojis}
+          onChange={(emojis) => onChange({ emojis })}
+          aide="Ils montent doucement derrière le titre."
+        />
+      ) : null}
+      {montre('joueurs') ? (
+        <label className="att-coche">
+          <input
+            type="checkbox"
+            checked={r.joueurs}
+            onChange={(e) => onChange({ joueurs: e.target.checked })}
+          />
+          {seul ? null : 'Montrer les joueurs attendus'}
+          <span className="aide">
+            {attendus.length
+              ? attendus.map((c) => c.name).join(', ')
+              : 'aucun joueur présent à cette séance'}
+          </span>
+        </label>
+      ) : null}
+      {montre('mj') ? (
+        <>
+          <label className="att-coche">
+            <input type="checkbox" checked={r.mj} onChange={(e) => onChange({ mj: e.target.checked })} />
+            {seul ? null : 'Me montrer autour de la table'}
+          </label>
+          {r.mj ? (
+            <div className="att-mj">
+              <span className="att-mj-face">
+                {portrait ? <img src={portrait} alt="" /> : <span>🎲</span>}
+              </span>
+              <span className="att-mj-nom">{nomDuMj(s.poste)}</span>
+              <button
+                type="button"
+                className="att-mj-lien"
+                onClick={onProfil ?? (() => window.dispatchEvent(new CustomEvent('jdr:parametres', { detail: 'mj' })))}
+                title="Ouvrir les paramètres, rubrique « Le maître du jeu »"
+              >
+                Modifier mon profil dans les paramètres
+              </button>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </>
+  )
+}
+
+function FenetreAttente({ onClose }: { onClose: () => void }): JSX.Element {
+  const s = useStore()
+  useEchap(onClose)
+  const [r, setR] = useState<ReglagesAttente>(() => lireAttente(s.reglagesBrut['attente']))
+  const pose = (patch: Partial<ReglagesAttente>): void => setR((x) => ({ ...x, ...patch }))
+  const { musique } = useAmbiances(r.musique)
 
   /* Le profil se modifie dans les paramètres : on garde ce qui est déjà
      réglé ici, on ferme, et la fenêtre des paramètres s'ouvre à sa place. */
@@ -209,155 +488,12 @@ function FenetreAttente({ onClose }: { onClose: () => void }): JSX.Element {
           <h3>Ça commence bientôt</h3>
         </header>
         <div className="body">
-          <div className="field">
-            <label htmlFor="att-titre">Titre</label>
-            <input
-              id="att-titre"
-              type="text"
-              value={r.titre}
-              onChange={(e) => pose({ titre: e.target.value })}
-              onKeyDown={(e) => e.key === 'Enter' && void lancer()}
-              placeholder={DEFAUT.titre}
-              autoFocus
-            />
-          </div>
-          <div className="field">
-            <label htmlFor="att-sous">Au-dessus du titre</label>
-            <input
-              id="att-sous"
-              type="text"
-              value={r.sousTitre}
-              onChange={(e) => pose({ sousTitre: e.target.value })}
-              onKeyDown={(e) => e.key === 'Enter' && void lancer()}
-              placeholder={sousTitreDefaut || 'Le nom de la campagne'}
-            />
-            <p className="aide">Vide : le nom de la campagne et de la séance.</p>
-          </div>
-          <div className="field">
-            <label htmlFor="att-min">Compte à rebours</label>
-            <div className="att-minutes">
-              {[0, 5, 10, 15, 30].map((m) => (
-                <button
-                  key={m}
-                  type="button"
-                  className={`btn btn-sm${r.minutes === m ? ' btn-on' : ''}`}
-                  onClick={() => pose({ minutes: m })}
-                >
-                  {m ? `${m} min` : 'Aucun'}
-                </button>
-              ))}
-              <div className="avec-unite">
-                <input
-                  id="att-min"
-                  type="number"
-                  min={0}
-                  max={MINUTES_MAX}
-                  value={r.minutes}
-                  onChange={(e) =>
-                    pose({ minutes: Math.max(0, Math.min(MINUTES_MAX, Number(e.target.value) || 0)) })
-                  }
-                />
-                <span className="unite">min</span>
-              </div>
-            </div>
-            <p className="aide">Il part au lancement ; à zéro, l’écran annonce « C’est l’heure ! ».</p>
-          </div>
-          <div className="field">
-            <label>Couleurs du fond</label>
-            <div className="att-lueurs">
-              {r.lueurs.map((c, i) => (
-                <input
-                  key={i}
-                  type="color"
-                  value={c}
-                  onChange={(e) => {
-                    const l = [...r.lueurs] as [string, string, string]
-                    l[i] = e.target.value
-                    pose({ lueurs: l })
-                  }}
-                  title={`Lueur ${i + 1}`}
-                  aria-label={`Couleur de la lueur ${i + 1}`}
-                />
-              ))}
-              <span className="sep" />
-              {AMBIANCES.map((a) => (
-                <button
-                  key={a.nom}
-                  type="button"
-                  className={`att-ambiance${a.lueurs.join() === r.lueurs.join() ? ' on' : ''}`}
-                  onClick={() => pose({ lueurs: a.lueurs })}
-                  title={a.nom}
-                  style={{ background: `linear-gradient(90deg, ${a.lueurs.join(', ')})` }}
-                >
-                  {a.nom}
-                </button>
-              ))}
-            </div>
-            <p className="aide">
-              Trois lueurs qui dérivent lentement dans le ciel. Préfère des teintes sombres : le
-              titre reste lisible.
-            </p>
-          </div>
-          <div className="field">
-            <label htmlFor="att-musique">Musique d’attente</label>
-            <select
-              id="att-musique"
-              value={choisi?.ids[0] ?? ''}
-              onChange={(e) => pose({ musique: e.target.value ? Number(e.target.value) : null })}
-            >
-              <option value="">Aucune</option>
-              {choix.map((c) => (
-                <option key={c.ids[0]} value={c.ids[0]}>
-                  {libelle(c)}
-                </option>
-              ))}
-            </select>
-            <p className="aide">
-              {ambiances.length
-                ? 'Elle tourne en boucle, et s’éteint en fondu quand l’attente quitte l’écran.'
-                : 'Aucune ambiance dans la sonothèque : ajoutes-y un son de nature « ambiance ».'}
-            </p>
-          </div>
-          <ChampEmojis
-            id="att-emojis"
-            libelle="Émojis"
-            emojis={r.emojis}
-            onChange={(emojis) => pose({ emojis })}
-            aide="Ils montent doucement derrière le titre."
+          <ChampsAttente
+            r={r}
+            onChange={pose}
+            onEnter={() => void lancer()}
+            onProfil={() => void modifierProfil()}
           />
-          <label className="att-coche">
-            <input
-              type="checkbox"
-              checked={r.joueurs}
-              onChange={(e) => pose({ joueurs: e.target.checked })}
-            />
-            Montrer les joueurs attendus
-            <span className="aide">
-              {attendus.length
-                ? attendus.map((c) => c.name).join(', ')
-                : 'aucun joueur présent à cette séance'}
-            </span>
-          </label>
-          <label className="att-coche">
-            <input type="checkbox" checked={r.mj} onChange={(e) => pose({ mj: e.target.checked })} />
-            Me montrer autour de la table
-          </label>
-          {r.mj ? (
-            <div className="att-mj">
-              <span className="att-mj-face">
-                {portrait ? <img src={portrait} alt="" /> : <span>🎲</span>}
-              </span>
-              <span className="att-mj-nom">{nomDuMj(s.poste)}</span>
-              <button
-                type="button"
-                className="att-mj-lien"
-                onClick={() => void modifierProfil()}
-                title="Ouvrir les paramètres, rubrique « Le maître du jeu »"
-              >
-                Modifier mon profil dans les paramètres
-              </button>
-            </div>
-          ) : null}
         </div>
         <footer>
           <button className="btn btn-ghost" onClick={onClose}>
