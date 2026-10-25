@@ -54,6 +54,16 @@ import {
   IconTrame
 } from './components/Icons'
 
+/* Chaque ouverture des paramètres porte un numéro : une fenêtre déjà ouverte
+   s'en sert pour reconnaître une nouvelle demande, même vers la même rubrique. */
+interface DemandeParametres {
+  depart?: Rubrique
+  cible?: string
+  n: number
+}
+let demandes = 0
+const demande = (p: { depart?: Rubrique; cible?: string }): DemandeParametres => ({ ...p, n: ++demandes })
+
 export function App(): JSX.Element {
   const s = useStore()
   /* Le rail garde la saisie des jets sous la main : ouverte, elle reste ouverte
@@ -65,7 +75,7 @@ export function App(): JSX.Element {
      vivent ici, au-dessus de tout : on les ouvre depuis le haut de l'écran,
      et elles ne doivent pas mourir quand on change de module. */
   const [fiche, setFiche] = useState<'seance' | 'carnet' | 'fiche' | 'dupliquer' | null>(null)
-  const [params, setParams] = useState<{ depart?: Rubrique; cible?: string } | null>(null)
+  const [params, setParams] = useState<DemandeParametres | null>(null)
 
   /* Une fenêtre qui renvoie vers une rubrique des paramètres (« modifier mon
      profil ») le demande par un évènement : elle ne tient pas l'état d'ici. */
@@ -73,7 +83,7 @@ export function App(): JSX.Element {
     /* Le détail est une rubrique (l'ancienne forme), ou { rubrique, cible }. */
     const ouvrir = (e: Event): void => {
       const d = (e as CustomEvent<Rubrique | { rubrique?: Rubrique; cible?: string } | null>).detail
-      setParams(d && typeof d === 'object' ? { depart: d.rubrique, cible: d.cible } : { depart: d ?? undefined })
+      setParams(demande(d && typeof d === 'object' ? { depart: d.rubrique, cible: d.cible } : { depart: d ?? undefined }))
     }
     window.addEventListener('jdr:parametres', ouvrir)
     return () => window.removeEventListener('jdr:parametres', ouvrir)
@@ -147,7 +157,7 @@ export function App(): JSX.Element {
       }
       if ((e.ctrlKey || e.metaKey) && e.key === ',') {
         e.preventDefault()
-        setParams({})
+        setParams(demande({}))
       }
     }
     window.addEventListener('keydown', onKey)
@@ -168,7 +178,7 @@ export function App(): JSX.Element {
       {fiche === 'carnet' ? <Carnet onClose={() => setFiche(null)} /> : null}
       {fiche === 'dupliquer' ? <DupliquerSeance onClose={() => setFiche(null)} /> : null}
       {fiche === 'fiche' ? <FicheDeCampagne onClose={() => setFiche(null)} /> : null}
-      {params ? <Parametres depart={params.depart} cible={params.cible} onClose={() => setParams(null)} /> : null}
+      {params ? <Parametres depart={params.depart} cible={params.cible} demande={params.n} onClose={() => setParams(null)} /> : null}
       <Toasts />
     </>
   )
@@ -176,7 +186,7 @@ export function App(): JSX.Element {
   if (s.ready && !s.project) {
     return (
       <div className="chassis">
-        <Menubar onFiche={setFiche} onParametres={(depart) => setParams({ depart })} />
+        <Menubar onFiche={setFiche} onParametres={(depart) => setParams(demande({ depart }))} />
         <div className="app sans-projet">
           <Home />
         </div>
@@ -187,7 +197,7 @@ export function App(): JSX.Element {
 
   return (
     <div className="chassis">
-    <Menubar onFiche={setFiche} onParametres={(depart) => setParams({ depart })} />
+    <Menubar onFiche={setFiche} onParametres={(depart) => setParams(demande({ depart }))} />
     <div className="app">
       <aside className="rail">
         <Monitor />
@@ -294,7 +304,7 @@ export function App(): JSX.Element {
             aria-haspopup="dialog"
             title="Paramètres — Ctrl ,"
             aria-label="Paramètres"
-            onClick={() => setParams(params ? null : {})}
+            onClick={() => setParams(params ? null : demande({}))}
           >
             <IconRouage />
           </button>

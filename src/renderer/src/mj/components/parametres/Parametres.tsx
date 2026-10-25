@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useState } from 'react'
+import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../../store'
 import { IconClose, IconRouage } from '../Icons'
 import { useEchap } from '../../echap'
@@ -66,11 +66,14 @@ function Lignes({ rows }: { rows: Reglage[] }): JSX.Element {
 export function Parametres({
   depart,
   cible,
+  demande,
   onClose
 }: {
   depart?: Rubrique
   /** L'id d'un réglage : on ouvre sa rubrique et on le montre. */
   cible?: string
+  /** Le numéro de la demande : une fenêtre déjà ouverte suit chaque nouvelle demande. */
+  demande?: number
   onClose: () => void
 }): JSX.Element {
   const s = useStore()
@@ -89,6 +92,21 @@ export function Parametres({
   /* Inscrit après : au sommet de la pile, Échap vide d'abord la recherche. */
   useEchap(() => setQ(''), q !== '')
 
+  /* Une nouvelle demande alors que la fenêtre est ouverte (« modifier mon
+     profil » depuis une autre rubrique) : on va à la rubrique, recherche vidée.
+     Le premier passage est l'ouverture elle-même, déjà réglée plus haut. */
+  const premiere = useRef(true)
+  useEffect(() => {
+    if (premiere.current) {
+      premiere.current = false
+      return
+    }
+    if (depart && !cible) {
+      setRub(depart)
+      setQ('')
+    }
+  }, [demande]) // eslint-disable-line react-hooks/exhaustive-deps
+
   /* Le réglage visé : on le fait venir sous les yeux, et on l'allume le temps
      qu'on le repère. */
   useEffect(() => {
@@ -96,6 +114,7 @@ export function Parametres({
     const r = REGLAGES.find((x) => x.id === cible)
     if (!r) return
     setRub(r.rubrique)
+    setQ('')
     let t: ReturnType<typeof setTimeout> | undefined
     const f = requestAnimationFrame(() => {
       const el = document.querySelector(`[data-reglage="${CSS.escape(cible)}"]`)
@@ -108,7 +127,7 @@ export function Parametres({
       cancelAnimationFrame(f)
       if (t) clearTimeout(t)
     }
-  }, [cible])
+  }, [cible, demande]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const active = RUBRIQUES.find((r) => r.id === rub)!
   const surLePoste = !!active.poste
