@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../../../store'
 import { MonnaiesCampagne } from '../../MonnaiesCampagne'
 import { Confirmer } from '../../Rangement'
@@ -209,11 +209,15 @@ export const reglages: Reglage[] = [
       const sale = JSON.stringify(argent) !== JSON.stringify(enregistre)
       /** La campagne perd son argent : on le dit avant de l'appliquer. */
       const [masquer, setMasquer] = useState(false)
-      /* Le réglage a changé ailleurs (une autre fenêtre, l'application même) :
-         un brouillon intact le suit ; un brouillon entamé reste à qui l'écrit. */
+      /* Le réglage a changé ailleurs (une annulation, un chargement tardif) :
+         un brouillon intact le suit ; un brouillon entamé reste à qui l'écrit.
+         « Intact » se juge contre la valeur d'avant le changement — contre la
+         nouvelle, tout brouillon paraîtrait modifié. */
       const suivi = JSON.stringify(enregistre)
+      const avant = useRef(suivi)
       useEffect(() => {
-        if (!sale) setArgent(enregistre)
+        if (JSON.stringify(argent) === avant.current) setArgent(enregistre)
+        avant.current = suivi
         // eslint-disable-next-line react-hooks/exhaustive-deps
       }, [suivi])
       const appliquer = async (masqueAccepte = false): Promise<void> => {
