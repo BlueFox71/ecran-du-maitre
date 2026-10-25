@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
+import { useContext, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../../../store'
 import { MonnaiesCampagne } from '../../MonnaiesCampagne'
 import { Confirmer } from '../../Rangement'
 import { monnaiesPosees, type ReglageMonnaies } from '@shared/monnaies'
 import { jaugeSanite, type TemplateSpec } from '@shared/types'
 import { Curseur } from '../briques'
+import { BrouillonMonnaies, type Brouillon } from '../contexte'
 import type { Reglage } from '../registre'
 
 /* ============================================================
@@ -30,6 +31,35 @@ function useFiche(): {
 
 /** Ce que montre une règle de la fiche tant que celle-ci n'est pas là. */
 const sansFiche = <span className="aide">La fiche de campagne n’est pas encore chargée.</span>
+
+/** Le brouillon des monnaies. Il est tenu par la fenêtre des Paramètres, pas
+ *  par la ligne : changer de rubrique ou chercher démonte la ligne, et le
+ *  travail (images, teintes, taux) ne doit pas partir avec elle. La fenêtre
+ *  demande aussi avant de se fermer sur un brouillon non appliqué. */
+export function useBrouillonMonnaies(): Brouillon {
+  const enregistre = useStore((s) => s.reglages.monnaies)
+  const campagne = useStore((s) => s.campaign?.id)
+  const [argent, setArgent] = useState<ReglageMonnaies>(enregistre)
+  /* Le réglage a changé ailleurs (une annulation, un chargement tardif) :
+     un brouillon intact le suit ; un brouillon entamé reste à qui l'écrit.
+     « Intact » se juge contre la valeur d'avant le changement — contre la
+     nouvelle, tout brouillon paraîtrait modifié. */
+  const suivi = JSON.stringify(enregistre)
+  const avant = useRef(suivi)
+  useEffect(() => {
+    if (JSON.stringify(argent) === avant.current) setArgent(enregistre)
+    avant.current = suivi
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [suivi])
+  /* Une autre campagne : le brouillon de la précédente ne la suit pas. */
+  const premiere = useRef(campagne)
+  useEffect(() => {
+    if (premiere.current === campagne) return
+    premiere.current = campagne
+    setArgent(useStore.getState().reglages.monnaies)
+  }, [campagne])
+  return { argent, setArgent, sale: suivi !== JSON.stringify(argent) }
+}
 
 export const reglages: Reglage[] = [
   {
@@ -125,7 +155,10 @@ export const reglages: Reglage[] = [
       const sanite = jaugeSanite(spec, spec.gauges)
       return (
         <select
-          value={spec.sanityGauge === null ? '__aucune' : (sanite?.key ?? '')}
+          /* Ni posée ni devinée, ou une jauge retirée depuis : « aucune ».
+             Sans cela le menu montrerait la première jauge sans qu'elle soit
+             choisie, et la choisir ne déclencherait rien. */
+          value={sanite?.key ?? '__aucune'}
           onChange={(e) =>
             void poserFiche({
               sanityGauge: e.target.value === '__aucune' ? null : e.target.value
@@ -204,22 +237,11 @@ export const reglages: Reglage[] = [
     Cmd: function Monnaies() {
       const s = useStore()
       const enregistre = s.reglages.monnaies
-      const [argent, setArgent] = useState<ReglageMonnaies>(enregistre)
+      /* Le même brouillon dans la rubrique et dans les résultats de recherche. */
+      const { argent, setArgent, sale } = useContext(BrouillonMonnaies)
       const posees = useMemo(() => monnaiesPosees(s.reglagesBrut['monnaies']), [s.reglagesBrut])
-      const sale = JSON.stringify(argent) !== JSON.stringify(enregistre)
       /** La campagne perd son argent : on le dit avant de l'appliquer. */
       const [masquer, setMasquer] = useState(false)
-      /* Le réglage a changé ailleurs (une annulation, un chargement tardif) :
-         un brouillon intact le suit ; un brouillon entamé reste à qui l'écrit.
-         « Intact » se juge contre la valeur d'avant le changement — contre la
-         nouvelle, tout brouillon paraîtrait modifié. */
-      const suivi = JSON.stringify(enregistre)
-      const avant = useRef(suivi)
-      useEffect(() => {
-        if (JSON.stringify(argent) === avant.current) setArgent(enregistre)
-        avant.current = suivi
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-      }, [suivi])
       const appliquer = async (masqueAccepte = false): Promise<void> => {
         if (enregistre.actif && !argent.actif && !masqueAccepte) {
           setMasquer(true)

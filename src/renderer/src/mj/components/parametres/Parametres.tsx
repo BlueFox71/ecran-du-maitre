@@ -6,7 +6,8 @@ import { Ligne, Onglet, Tete } from './briques'
 import { AILLEURS, REGLAGES, RUBRIQUES, cheminDe, type Ailleurs, type Reglage, type Rubrique } from './registre'
 import { chercher } from './chercher'
 import { Carnet } from '../Fiches'
-import { OuvrirCarnet } from './contexte'
+import { BrouillonMonnaies, OuvrirCarnet } from './contexte'
+import { useBrouillonMonnaies } from './rubriques/regles'
 
 /**
  * La fenêtre des paramètres — ce qui se pose une fois et ne se retouche pas
@@ -66,7 +67,7 @@ function Lignes({ rows }: { rows: Reglage[] }): JSX.Element {
 /** Un réglage qui vit ailleurs : où le trouver, et le bouton qui y mène — qui
  *  ferme d'abord les Paramètres. Sans campagne (ou, pour la séance, sans
  *  séance courante), il n'y a rien à ouvrir : on garde seulement le texte. */
-function LigneAilleurs({ a, onClose }: { a: Ailleurs; onClose: () => void }): JSX.Element {
+function LigneAilleurs({ a, onClose }: { a: Ailleurs; onClose: () => boolean }): JSX.Element {
   const campagne = useStore((s) => s.campaign)
   const seance = useStore((s) => s.session)
   const aller = a.aller && campagne && (!a.id.startsWith('seance.') || seance) ? a.aller : null
@@ -76,8 +77,7 @@ function LigneAilleurs({ a, onClose }: { a: Ailleurs; onClose: () => void }): JS
         <button
           className="btn btn-ghost"
           onClick={() => {
-            onClose()
-            aller.faire()
+            if (onClose()) aller.faire()
           }}
         >
           {aller.libelle}
@@ -113,7 +113,18 @@ export function Parametres({
   const ailleurs = useMemo(() => chercher(AILLEURS, q), [q])
   const cherche = q.trim() !== ''
 
-  useEchap(onClose)
+  /* Les monnaies attendent « Appliquer » : leur brouillon vit ici, pour
+     survivre aux rubriques et à la recherche, et l'on demande avant de le
+     perdre en fermant. Rend vrai si la fenêtre se ferme. */
+  const brouillon = useBrouillonMonnaies()
+  const fermer = (): boolean => {
+    if (brouillon.sale && !confirm('Fermer sans appliquer les monnaies ? Les changements seront perdus.'))
+      return false
+    onClose()
+    return true
+  }
+
+  useEchap(fermer)
   /* Inscrit après : au sommet de la pile, Échap vide d'abord la recherche. */
   useEchap(() => setQ(''), q !== '')
 
@@ -159,8 +170,9 @@ export function Parametres({
   const lignes = REGLAGES.filter((r) => r.rubrique === rub)
 
   return (
-    <div className="scrim plein" onMouseDown={onClose}>
+    <div className="scrim plein" onMouseDown={fermer}>
       <OuvrirCarnet.Provider value={() => setCarnet(true)}>
+      <BrouillonMonnaies.Provider value={brouillon}>
       <section
         className="parametres"
         role="dialog"
@@ -176,7 +188,7 @@ export function Parametres({
               {surLePoste ? 'Suit le poste' : `Suit la campagne · ${s.campaign?.name ?? '—'}`}
             </span>
           )}
-          <button className="pm-fermer" title="Fermer — Échap" aria-label="Fermer" onClick={onClose}>
+          <button className="pm-fermer" title="Fermer — Échap" aria-label="Fermer" onClick={fermer}>
             <IconClose />
           </button>
         </header>
@@ -221,7 +233,7 @@ export function Parametres({
                     <div className="pm-bloc">
                       <span className="eyebrow">Ailleurs</span>
                       {ailleurs.map((a) => (
-                        <LigneAilleurs key={a.id} a={a} onClose={onClose} />
+                        <LigneAilleurs key={a.id} a={a} onClose={fermer} />
                       ))}
                     </div>
                   ) : null}
@@ -269,6 +281,7 @@ export function Parametres({
           </span>
         </footer>
       </section>
+      </BrouillonMonnaies.Provider>
       </OuvrirCarnet.Provider>
       {carnet ? (
         /* Un clic dans le carnet ne doit pas remonter jusqu'au fond des Paramètres, qui se fermeraient. */

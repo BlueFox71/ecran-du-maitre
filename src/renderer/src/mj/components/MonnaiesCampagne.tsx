@@ -13,12 +13,11 @@ import {
 } from '@shared/monnaies'
 
 /**
- * L'onglet « Monnaies » de la fiche de campagne.
+ * Le bloc « Monnaies » des Paramètres (Règles du jeu).
  *
- * Il vit dans la fiche parce que c'est là qu'on règle ce que porte un
- * personnage, mais il n'en fait pas partie : les monnaies sont un réglage de
- * la campagne (`setting['monnaies']`) et ne partent pas dans les modèles. Ce
- * qu'on change ici attend « Appliquer à la campagne », comme le reste.
+ * Les monnaies sont un réglage de la campagne (`setting['monnaies']`) et ne
+ * partent pas dans les modèles de fiche. Ce qu'on change ici est un brouillon,
+ * tenu par la fenêtre des Paramètres : il attend « Appliquer les monnaies ».
  *
  * Une monnaie déjà posée sur les fiches (`posees`) se renomme, change d'image
  * ou de taux, mais ne se supprime plus : des bourses et des prix y sont
