@@ -5,6 +5,8 @@ import { useEchap } from '../../echap'
 import { Ligne, Onglet, Tete } from './briques'
 import { REGLAGES, RUBRIQUES, cheminDe, type Reglage, type Rubrique } from './registre'
 import { chercher } from './chercher'
+import { Carnet } from '../Fiches'
+import { OuvrirCarnet } from './contexte'
 
 /**
  * La fenêtre des paramètres — ce qui se pose une fois et ne se retouche pas
@@ -57,6 +59,9 @@ export function Parametres({
     () => REGLAGES.find((r) => r.id === cible)?.rubrique ?? depart ?? 'ecran'
   )
 
+  /* Le carnet s'ouvre par-dessus : il s'inscrit à Échap après nous, donc se ferme le premier. */
+  const [carnet, setCarnet] = useState(false)
+
   const [q, setQ] = useState('')
   const trouves = useMemo(() => chercher(CHERCHABLES, q), [q])
   const cherche = q.trim() !== ''
@@ -92,6 +97,7 @@ export function Parametres({
 
   return (
     <div className="scrim plein" onMouseDown={onClose}>
+      <OuvrirCarnet.Provider value={() => setCarnet(true)}>
       <section
         className="parametres"
         role="dialog"
@@ -194,6 +200,13 @@ export function Parametres({
           </span>
         </footer>
       </section>
+      </OuvrirCarnet.Provider>
+      {carnet ? (
+        /* Un clic dans le carnet ne doit pas remonter jusqu'au fond des Paramètres, qui se fermeraient. */
+        <div style={{ display: 'contents' }} onMouseDown={(e) => e.stopPropagation()}>
+          <Carnet onClose={() => setCarnet(false)} />
+        </div>
+      ) : null}
     </div>
   )
 }

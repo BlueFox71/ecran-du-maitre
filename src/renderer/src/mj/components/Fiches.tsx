@@ -1,84 +1,18 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { Pastille } from './Pastille'
-import { IconFolder, IconPeople, IconPen, IconPlus, IconTrash } from './Icons'
+import { IconPeople, IconPen, IconPlus, IconTrash } from './Icons'
 import { PION_COULEURS } from '@shared/types'
 import type { CampaignPlayer, CarnetPlayer } from '@shared/types'
 import type { UiFolder } from '../../../../preload/index'
 import { useEchap } from '../echap'
 
 /* ============================================================
-   La campagne : son identité, son dossier, ses joueurs
+   Les joueurs de la campagne (rendus dans Paramètres › La campagne)
    ============================================================ */
 
-export function FicheCampagne({
-  onClose,
-  onCarnet
-}: {
-  onClose: () => void
-  onCarnet: () => void
-}): JSX.Element {
-  const s = useStore()
-  const [nom, setNom] = useState(s.campaign?.name ?? '')
-  const [systeme, setSysteme] = useState(s.campaign?.system ?? '')
-
-  /* L'identité s'enregistre quand on quitte le champ : pas de bouton à viser
-     pour un nom qu'on corrige d'une lettre. */
-  const poser = async (): Promise<void> => {
-    const info = await window.jdr.project.update({
-      name: nom.trim() || (s.campaign?.name ?? ''),
-      system: systeme.trim() || null
-    })
-    if (info) useStore.setState({ project: info, campaign: info.campaign })
-    await s.refreshRecents()
-  }
-
-  return (
-    <Fenetre titre="La campagne" icone={<IconFolder />} onClose={onClose} large>
-      <div className="deux">
-        <div className="field">
-          <label htmlFor="fc-nom">Nom de la campagne</label>
-          <input
-            id="fc-nom"
-            type="text"
-            value={nom}
-            onChange={(e) => setNom(e.target.value)}
-            onBlur={() => void poser()}
-          />
-        </div>
-        <div className="field">
-          <label htmlFor="fc-sys">Système</label>
-          <input
-            id="fc-sys"
-            type="text"
-            value={systeme}
-            placeholder="maison — d20 + carac"
-            onChange={(e) => setSysteme(e.target.value)}
-            onBlur={() => void poser()}
-          />
-        </div>
-      </div>
-
-      <div className="field">
-        <label>Dossier de la campagne</label>
-        <div className="chemin-projet">
-          <code>{s.project?.dir ?? '—'}</code>
-          <button className="btn btn-sm btn-ghost" onClick={() => void window.jdr.project.reveal()}>
-            Ouvrir
-          </button>
-        </div>
-        <span className="eyebrow">
-          La base vit dans .ecran-du-maitre · tout le reste du dossier est la bibliothèque
-        </span>
-      </div>
-
-      <ListeJoueurs onCarnet={onCarnet} />
-    </Fenetre>
-  )
-}
-
 /** Les inscrits de la campagne, et le personnage que chacun mène. */
-function ListeJoueurs({ onCarnet }: { onCarnet: () => void }): JSX.Element {
+export function ListeJoueurs({ onCarnet }: { onCarnet: () => void }): JSX.Element {
   const s = useStore()
 
   const geste = async (fn: () => Promise<unknown>): Promise<void> => {

@@ -22,7 +22,7 @@ export function Menubar({
   onFiche,
   onParametres
 }: {
-  onFiche: (q: 'campagne' | 'seance' | 'carnet' | 'fiche' | 'dupliquer') => void
+  onFiche: (q: 'seance' | 'carnet' | 'fiche' | 'dupliquer') => void
   onParametres: (r?: Rubrique) => void
 }): JSX.Element {
   const s = useStore()
@@ -98,7 +98,7 @@ export function Menubar({
       </Menu>
 
       <Menu nom="Campagne" id="campagne" ouvert={ouvert} onOuvrir={setOuvert}>
-        <Mi label={s.campaign?.name ?? 'Aucune campagne'} coche on={() => onFiche('campagne')} />
+        <Mi label={s.campaign?.name ?? 'Aucune campagne'} coche on={() => onParametres('campagne')} />
         {recentes.length ? (
           <>
             <span className="eyebrow">Récentes</span>
@@ -116,7 +116,7 @@ export function Menubar({
           </>
         ) : null}
         <hr />
-        <Mi label="Configurer la campagne…" on={() => onFiche('campagne')} />
+        <Mi label="Configurer la campagne…" on={() => onParametres('campagne')} />
         <Mi label="Fiche de campagne…" on={() => onFiche('fiche')} />
         <Mi label="Carnet de joueurs…" on={() => onFiche('carnet')} />
         <hr />

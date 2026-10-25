@@ -1,6 +1,8 @@
-import { useState } from 'react'
+import { useContext, useState } from 'react'
 import { useStore } from '../../../store'
 import type { Reglage } from '../registre'
+import { ListeJoueurs } from '../../Fiches'
+import { OuvrirCarnet } from '../contexte'
 
 /* ============================================================
    La campagne — son identité et son dossier
@@ -75,6 +77,16 @@ export const reglages: Reglage[] = [
           </button>
         </div>
       )
+    }
+  },
+  {
+    id: 'joueurs',
+    rubrique: 'campagne',
+    nom: 'Joueurs de la campagne',
+    mots: ['joueurs', 'couleur', 'personnage', 'inscrire', 'table'],
+    pleine: true,
+    Cmd: function JoueursCampagne() {
+      return <ListeJoueurs onCarnet={useContext(OuvrirCarnet)} />
     }
   }
 ]

@@ -8,7 +8,7 @@ import { HorlogeSeance } from './components/HorlogeSeance'
 import { Menubar } from './components/Menubar'
 import { Parametres } from './components/parametres/Parametres'
 import type { Rubrique } from './components/parametres/registre'
-import { FicheCampagne, FicheSeance, Carnet, DupliquerSeance } from './components/Fiches'
+import { FicheSeance, Carnet, DupliquerSeance } from './components/Fiches'
 import { FicheCampagne as FicheDeCampagne } from './modules/FicheCampagne'
 import { Sonorisation } from './components/Sonorisation'
 import { Sonotheque } from './modules/Sonotheque'
@@ -64,7 +64,7 @@ export function App(): JSX.Element {
   /* Les fenêtres que la barre de menus et le rouage font paraître. Elles
      vivent ici, au-dessus de tout : on les ouvre depuis le haut de l'écran,
      et elles ne doivent pas mourir quand on change de module. */
-  const [fiche, setFiche] = useState<'campagne' | 'seance' | 'carnet' | 'fiche' | 'dupliquer' | null>(null)
+  const [fiche, setFiche] = useState<'seance' | 'carnet' | 'fiche' | 'dupliquer' | null>(null)
   const [params, setParams] = useState<{ depart?: Rubrique; cible?: string } | null>(null)
 
   /* Une fenêtre qui renvoie vers une rubrique des paramètres (« modifier mon
@@ -164,9 +164,6 @@ export function App(): JSX.Element {
   /* Les fenêtres du haut, les mêmes avec ou sans campagne ouverte. */
   const dessus = (
     <>
-      {fiche === 'campagne' ? (
-        <FicheCampagne onClose={() => setFiche(null)} onCarnet={() => setFiche('carnet')} />
-      ) : null}
       {fiche === 'seance' ? <FicheSeance onClose={() => setFiche(null)} /> : null}
       {fiche === 'carnet' ? <Carnet onClose={() => setFiche(null)} /> : null}
       {fiche === 'dupliquer' ? <DupliquerSeance onClose={() => setFiche(null)} /> : null}
