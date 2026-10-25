@@ -1,4 +1,8 @@
+import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../../../store'
+import { MonnaiesCampagne } from '../../MonnaiesCampagne'
+import { Confirmer } from '../../Rangement'
+import { monnaiesPosees, type ReglageMonnaies } from '@shared/monnaies'
 import { jaugeSanite, type TemplateSpec } from '@shared/types'
 import { Curseur } from '../briques'
 import type { Reglage } from '../registre'
@@ -113,7 +117,7 @@ export const reglages: Reglage[] = [
     id: 'fiche.sanite',
     rubrique: 'regles',
     nom: 'La santé mentale, c’est',
-    aide: 'Celle que l’encart des joueurs montre à côté de la vie.',
+    aide: 'Celle que l’encart des joueurs montre à côté de la vie. Une jauge ajoutée dans la fiche de campagne apparaît ici une fois appliquée.',
     mots: ['sanité', 'folie', 'jauge', 'raison', 'encart'],
     Cmd: function SanteMentale() {
       const { spec, poserFiche } = useFiche()
@@ -187,22 +191,74 @@ export const reglages: Reglage[] = [
       )
     }
   },
-  /* Les monnaies ont remplacé l'unité de valeur : elles se règlent dans
-     la fiche de campagne, à côté des jauges. On les rappelle ici. */
+  /* Les monnaies ont remplacé l'unité de valeur. Elles ne sont pas de la
+     fiche (elles ne partent pas dans les modèles), mais c'est une règle de la
+     table : elles se règlent ici, et attendent « Appliquer ». */
   {
     id: 'monnaies',
     rubrique: 'regles',
     nom: 'Monnaies',
-    aide: 'Elles se règlent dans la fiche de campagne, onglet « Monnaies » : bourse des personnages et prix des objets.',
-    mots: ['argent', 'bourse', 'pièces', 'prix', 'or', 'devise'],
+    aide: 'La bourse des personnages et le prix des objets.',
+    mots: ['argent', 'bourse', 'pièces', 'or', 'prix', 'devise'],
+    pleine: true,
     Cmd: function Monnaies() {
       const s = useStore()
+      const enregistre = s.reglages.monnaies
+      const [argent, setArgent] = useState<ReglageMonnaies>(enregistre)
+      const posees = useMemo(() => monnaiesPosees(s.reglagesBrut['monnaies']), [s.reglagesBrut])
+      const sale = JSON.stringify(argent) !== JSON.stringify(enregistre)
+      /** La campagne perd son argent : on le dit avant de l'appliquer. */
+      const [masquer, setMasquer] = useState(false)
+      /* Le réglage a changé ailleurs (une autre fenêtre, l'application même) :
+         un brouillon intact le suit ; un brouillon entamé reste à qui l'écrit. */
+      const suivi = JSON.stringify(enregistre)
+      useEffect(() => {
+        if (!sale) setArgent(enregistre)
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+      }, [suivi])
+      const appliquer = async (masqueAccepte = false): Promise<void> => {
+        if (enregistre.actif && !argent.actif && !masqueAccepte) {
+          setMasquer(true)
+          return
+        }
+        /* Les monnaies s'écrivent avec leur liste : à partir de là, elles sont
+           sur les fiches et ne se suppriment plus. */
+        await s.poserReglage('monnaies', JSON.stringify(argent))
+        /* Le brouillon reprend ce qui a été relu : il n'est plus « modifié ». */
+        setArgent(useStore.getState().reglages.monnaies)
+      }
       return (
-        <span className="aide">
-          {s.reglages.monnaies.actif
-            ? s.reglages.monnaies.liste.map((m) => m.nom).join(', ') || 'aucune'
-            : 'pas de monnaie'}
-        </span>
+        <div className="pm-monnaies">
+          <MonnaiesCampagne r={argent} posees={posees} onChange={setArgent} />
+          <div className="pm-monnaies-pied">
+            <span className="aide">
+              Une monnaie appliquée est sur les fiches : elle ne se supprime plus.
+            </span>
+            <div className="spacer" />
+            <button className="btn btn-sm btn-brass" disabled={!sale} onClick={() => void appliquer()}>
+              Appliquer les monnaies
+            </button>
+          </div>
+          {masquer ? (
+            <Confirmer
+              titre="Passer la campagne sans monnaie ?"
+              oui="Appliquer à la campagne"
+              onOui={async () => {
+                setMasquer(false)
+                await appliquer(true)
+              }}
+              onNon={() => setMasquer(false)}
+            >
+              <p>
+                La bourse disparaît des fiches et des téléphones, le prix disparaît des objets.
+              </p>
+              <p>
+                <b>Rien n’est effacé</b> : les montants déjà saisis sont simplement masqués. Ils
+                reviennent tels quels si la campagne retrouve de l’argent.
+              </p>
+            </Confirmer>
+          ) : null}
+        </div>
       )
     }
   }

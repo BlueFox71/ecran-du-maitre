@@ -16,12 +16,16 @@ import { useEffect, useRef } from 'react'
  */
 const pile: { fermer: () => void }[] = []
 
-window.addEventListener('keydown', (e) => {
-  if (e.key !== 'Escape' || e.defaultPrevented || pile.length === 0) return
-  e.preventDefault()
-  e.stopImmediatePropagation()
-  pile[pile.length - 1].fermer()
-})
+/* Hors du navigateur — les tests du registre des paramètres, qui passent
+   par ici en important leurs commandes —, il n'y a pas de touche à écouter. */
+if (typeof window !== 'undefined') {
+  window.addEventListener('keydown', (e) => {
+    if (e.key !== 'Escape' || e.defaultPrevented || pile.length === 0) return
+    e.preventDefault()
+    e.stopImmediatePropagation()
+    pile[pile.length - 1].fermer()
+  })
+}
 
 /** Inscrit `fermer` au sommet de la pile tant que `actif` est vrai. */
 export function useEchap(fermer: () => void, actif = true): void {

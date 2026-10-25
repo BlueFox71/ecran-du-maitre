@@ -1,10 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import { IconCheck, IconClose, IconPeople, IconPlus, IconSearch, IconTrash } from '../components/Icons'
-import { jaugeSanite } from '@shared/types'
-import { MonnaiesCampagne } from '../components/MonnaiesCampagne'
-import { Confirmer } from '../components/Rangement'
-import { monnaiesPosees, type ReglageMonnaies } from '@shared/monnaies'
+import { fusionnerRegles } from '@shared/regles'
+import { ouvrirParametres } from '../components/parametres/registre'
 import type {
   CatalogueEntry,
   GaugeSpec,
@@ -87,20 +85,16 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
     () => fiche?.spec ?? { rollSystem: 'd20-plus', gauges: [], stats: [], skills: [], skillLimit: null }
   )
   const [partie, setPartie] = useState<Partie>('stats')
-  /** L'onglet des monnaies, qui n'est pas une partie de la fiche. */
-  const [monnaies, setMonnaies] = useState(false)
   const [filtre, setFiltre] = useState('')
   const [catalogue, setCatalogue] = useState<CatalogueEntry[]>([])
   const [modeles, setModeles] = useState<SheetModel[]>([])
   const [tiroir, setTiroir] = useState(false)
   const [sale, setSale] = useState(false)
-  /* Les monnaies attendent « Appliquer », comme la fiche — sans en faire partie. */
-  const [argent, setArgent] = useState<ReglageMonnaies>(s.reglages.monnaies)
-  const argentPose = useMemo(() => monnaiesPosees(s.reglagesBrut['monnaies']), [s.reglagesBrut])
-  const argentSale = JSON.stringify(argent) !== JSON.stringify(s.reglages.monnaies)
-  /** La campagne perd son argent : on le dit avant de l'appliquer. */
-  const [masquer, setMasquer] = useState(false)
-  const modifie = sale || argentSale
+  const modifie = sale
+  /* Les règles du jeu — le jet, les compétences, la santé mentale — se
+     règlent dans les Paramètres : l'éditeur les lit sur la fiche courante,
+     jamais dans son brouillon, qui peut dater d'avant qu'on les change. */
+  const regles = s.sheet?.spec ?? spec
   const [saisie, setSaisie] = useState({ code: '', label: '' })
   const champNeuf = useRef<HTMLInputElement>(null)
 
@@ -146,7 +140,7 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
             key,
             label: e.label,
             code: e.code?.trim() || undefined,
-            derive: spec.rollSystem === 'd20-plus' ? 'mod' : 'halves'
+            derive: regles.rollSystem === 'd20-plus' ? 'mod' : 'halves'
           } as StatSpec)
         : partie === 'skills'
           ? ({ key, label: e.label } as SkillSpec)
@@ -258,11 +252,7 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
 
   const nbPertes = pertes.stats.length + pertes.skills.length + pertes.gauges.length
 
-  const appliquer = async (masqueAccepte = false): Promise<void> => {
-    if (argentSale && s.reglages.monnaies.actif && !argent.actif && !masqueAccepte) {
-      setMasquer(true)
-      return
-    }
+  const appliquer = async (): Promise<void> => {
     if (sale && nbPertes > 0 && s.characters.length > 0) {
       const liste = [...pertes.stats, ...pertes.skills, ...pertes.gauges].join(', ')
       if (
@@ -275,12 +265,14 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
         return
     }
     if (sale) {
-      await window.jdr.sheet.save({ name: nom.trim() || fiche?.name || 'Fiche', spec })
+      /* La composition vient du brouillon, les règles de la fiche courante :
+         une règle changée dans les Paramètres pendant qu'on composait tient. */
+      await window.jdr.sheet.save({
+        name: nom.trim() || fiche?.name || 'Fiche',
+        spec: fusionnerRegles(spec, s.sheet?.spec ?? spec)
+      })
       await s.refreshCharacters()
     }
-    /* Les monnaies s'écrivent avec leur liste : à partir de là, elles sont sur
-       les fiches et ne se suppriment plus. */
-    if (argentSale) await s.poserReglage('monnaies', JSON.stringify(argent))
     setSale(false)
     s.toast(
       s.characters.length > 0
@@ -290,9 +282,11 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
     onClose()
   }
 
-  const fermer = (): void => {
-    if (modifie && !confirm('Fermer sans appliquer ? Les changements seront perdus.')) return
+  /** Vrai si l'écran s'est fermé — on a pu y renoncer pour garder ses changements. */
+  const fermer = (): boolean => {
+    if (modifie && !confirm('Fermer sans appliquer ? Les changements seront perdus.')) return false
     onClose()
+    return true
   }
 
   /* ---------------- le catalogue affiché ---------------- */
@@ -303,8 +297,6 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
       .filter((e) => e.kind === GENRE[partie])
       .filter((e) => !q || sansAccent(e.label).includes(q) || sansAccent(e.code ?? '').includes(q))
   }, [catalogue, partie, filtre])
-
-  const limite = spec.skillLimit ?? null
 
   return (
     <div className="scrim plein" onClick={fermer}>
@@ -397,9 +389,8 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
             <button
               key={k}
               role="tab"
-              aria-selected={!monnaies && partie === k}
+              aria-selected={partie === k}
               onClick={() => {
-                setMonnaies(false)
                 setPartie(k)
                 setFiltre('')
                 setSaisie({ code: '', label: '' })
@@ -409,62 +400,24 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
               <span className="n">{(spec[k] as unknown[]).length}</span>
             </button>
           ))}
-          {/* Les monnaies se règlent ici sans être de la fiche : elles
-              appartiennent à la campagne et ne partent pas dans les modèles. */}
-          <button role="tab" aria-selected={monnaies} onClick={() => setMonnaies(true)}>
-            Monnaies
-            <span className="n">
-              {argent.actif ? argent.liste.length : '—'}
-            </span>
-          </button>
           <div className="spacer" />
-          <label className="fc-systeme">
-            <span className="eyebrow">Jet</span>
-            <select
-              value={spec.rollSystem}
-              onChange={(e) =>
-                toucher({ ...spec, rollSystem: e.target.value as TemplateSpec['rollSystem'] })
-              }
-              aria-label="Système de jet"
-            >
-              <option value="d20-plus">d20 + modificateur</option>
-              <option value="d100-under">d100 sous la valeur</option>
-            </select>
-          </label>
+          {/* Les règles et les monnaies ne sont plus ici : elles ont leur
+              rubrique dans les Paramètres. */}
+          <button
+            className="btn btn-sm btn-ghost"
+            onClick={() => {
+              if (fermer()) ouvrirParametres('regles')
+            }}
+          >
+            Règles du jeu dans les Paramètres →
+          </button>
         </div>
 
-        {monnaies ? (
-          <div className="fc-colonnes fc-une">
-            <MonnaiesCampagne r={argent} posees={argentPose} onChange={setArgent} />
-          </div>
-        ) : (
         <div className="fc-colonnes">
           <section className="card fc-carte">
             <header>
               <h4>{p.titre}</h4>
               <span className="sous">{p.sous}</span>
-              <div className="spacer" />
-              {partie === 'skills' && (
-                <label className="fc-sans-comp" title="Décochée : les compétences disparaissent des fiches, du téléphone et de la préparation">
-                  <input
-                    type="checkbox"
-                    checked={!spec.sansCompetences}
-                    onChange={(e) => toucher({ ...spec, sansCompetences: e.target.checked ? undefined : true })}
-                  />
-                  La table s’en sert
-                </label>
-              )}
-              {partie === 'skills' && !spec.sansCompetences && (
-                <Limite valeur={limite} onChange={(n) => toucher({ ...spec, skillLimit: n })} />
-              )}
-              {partie === 'gauges' && (
-                <Sanite
-                  gauges={spec.gauges}
-                  choisie={jaugeSanite(spec, spec.gauges)?.key ?? null}
-                  explicite={spec.sanityGauge !== undefined}
-                  onChange={(key) => toucher({ ...spec, sanityGauge: key })}
-                />
-              )}
             </header>
             <div className="fc-defile">
               {lignes.length === 0 ? (
@@ -656,7 +609,6 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
             </div>
           </section>
         </div>
-        )}
 
         <footer className="fc-pied">
           <p className="fc-suite">
@@ -689,116 +641,8 @@ export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element
           </button>
         </footer>
 
-        {masquer ? (
-          <Confirmer
-            titre="Passer la campagne sans monnaie ?"
-            oui="Appliquer à la campagne"
-            onOui={async () => {
-              setMasquer(false)
-              await appliquer(true)
-            }}
-            onNon={() => setMasquer(false)}
-          >
-            <p>
-              La bourse disparaît des fiches et des téléphones, le prix disparaît des objets.
-            </p>
-            <p>
-              <b>Rien n’est effacé</b> : les montants déjà saisis sont simplement masqués. Ils
-              reviennent tels quels si la campagne retrouve de l’argent.
-            </p>
-          </Confirmer>
-        ) : null}
       </div>
     </div>
-  )
-}
-
-/* ============================================================
-   La limite de compétences
-   ============================================================ */
-
-/**
- * Combien de compétences un joueur a le droit de prendre. Beaucoup de systèmes
- * maison tiennent à ce nombre — c'est lui qui fait qu'un personnage a un
- * métier plutôt que tous les métiers. « Sans limite » reste possible : on ne
- * force pas un plafond à qui n'en veut pas.
- */
-function Limite({
-  valeur,
-  onChange
-}: {
-  valeur: number | null
-  onChange: (n: number | null) => void
-}): JSX.Element {
-  return (
-    <span className="fc-limite">
-      <label htmlFor="fc-limite">Le joueur en prend au plus</label>
-      <input
-        id="fc-limite"
-        type="number"
-        min={1}
-        max={99}
-        value={valeur ?? ''}
-        placeholder="∞"
-        onChange={(e) => {
-          const n = Number(e.target.value)
-          onChange(e.target.value === '' || Number.isNaN(n) || n < 1 ? null : Math.min(99, n))
-        }}
-      />
-      <button
-        className={valeur === null ? 'on' : ''}
-        onClick={() => onChange(valeur === null ? 5 : null)}
-        title="Basculer entre un plafond et « autant qu'il veut »"
-      >
-        {valeur === null ? 'sans limite' : 'lever la limite'}
-      </button>
-    </span>
-  )
-}
-
-/* ============================================================
-   Laquelle est la santé mentale
-   ============================================================ */
-
-/**
- * L'écran des joueurs pose un cerveau à côté du cœur, et la fiche avertit
- * quand elle baisse : encore faut-il savoir de quelle jauge on parle.
- *
- * C'était deviné à une liste de clés en dur — « san », « sm »… — si bien
- * qu'une campagne qui appelait la sienne « lucidité » n'y avait pas droit. Le
- * gabarit le dit maintenant, et tant qu'il ne l'a pas dit la devinette
- * continue : les campagnes d'avant n'ont rien à ressaisir.
- */
-function Sanite({
-  gauges,
-  choisie,
-  explicite,
-  onChange
-}: {
-  gauges: GaugeSpec[]
-  choisie: string | null
-  /** Le gabarit a-t-il tranché, ou est-ce encore la devinette qui parle ? */
-  explicite: boolean
-  onChange: (key: string | null) => void
-}): JSX.Element | null {
-  if (!gauges.length) return null
-  return (
-    <span className="fc-sanite">
-      <label htmlFor="fc-sanite">La santé mentale, c’est</label>
-      <select
-        id="fc-sanite"
-        value={choisie ?? ''}
-        onChange={(e) => onChange(e.target.value === '' ? null : e.target.value)}
-      >
-        <option value="">— aucune —</option>
-        {gauges.map((g) => (
-          <option key={g.key} value={g.key}>
-            {g.label}
-          </option>
-        ))}
-      </select>
-      {!explicite && choisie ? <span className="fc-devine">devinée</span> : null}
-    </span>
   )
 }
 

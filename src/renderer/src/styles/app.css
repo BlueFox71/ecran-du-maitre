@@ -15228,6 +15228,17 @@ button.ou-etat:hover {
 .pm-ligne.pleine .cmd {
   justify-self: stretch;
 }
+/* Les monnaies : la carte de la fiche de campagne, et de quoi l'appliquer. */
+.pm-monnaies {
+  flex: 1 1 100%;
+  display: grid;
+  gap: 10px;
+}
+.pm-monnaies-pied {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
 /* Le réglage vers lequel on a été mené : il s'allume le temps qu'on le repère. */
 .pm-ligne {
   transition: background 0.4s;
