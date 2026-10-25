@@ -30,6 +30,15 @@ describe('chercher', () => {
     const a = { nom: 'Fondu', mots: [], chemin: 'x' }
     expect(chercher([bascule, a], 'fondu')).toEqual([a, bascule])
   })
+  it('ignore les petits mots de la requête', () => {
+    // « sons » trouve par son nom (rang 0), l'ambiance par son mot proche « son » (rang 1).
+    expect(chercher(tous, 'volume du son')).toEqual([sons, ambiance])
+    expect(chercher(tous, 'capacité pour porter')).toEqual([sac])
+  })
+  it('rien pour une requête faite que de petits mots', () => {
+    expect(chercher(tous, 'de la')).toEqual([])
+    expect(chercher(tous, "l' et du")).toEqual([])
+  })
   it('rien pour une recherche vide ou inconnue', () => {
     expect(chercher(tous, '   ')).toEqual([])
     expect(chercher(tous, 'xyz')).toEqual([])
