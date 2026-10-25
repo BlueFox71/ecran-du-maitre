@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { chercher, normaliser } from './chercher'
-import { REGLAGES, RUBRIQUES } from './registre'
+import { AILLEURS, REGLAGES, RUBRIQUES } from './registre'
 
 const sac = { nom: 'Capacité du sac', aide: 'Les places de chaque personnage', mots: ['inventaire', 'encombrement', 'charge', 'porter', 'emplacements'], chemin: 'La campagne › Règles du jeu' }
 const bascule = { nom: 'Manière de basculer, par défaut', mots: ['transition', 'fondu', 'volet'], chemin: 'La campagne › Écran des joueurs' }
@@ -44,5 +44,13 @@ describe('le registre', () => {
       expect(r.mots.length).toBeGreaterThan(0)
     }
     expect(new Set(REGLAGES.map((r) => r.id)).size).toBe(REGLAGES.length)
+  })
+  it('ce qui se règle ailleurs : ids uniques, distincts des réglages, mots non vides', () => {
+    const ids = new Set(REGLAGES.map((r) => r.id))
+    for (const a of AILLEURS) {
+      expect(ids.has(a.id)).toBe(false)
+      expect(a.mots.length).toBeGreaterThan(0)
+    }
+    expect(new Set(AILLEURS.map((a) => a.id)).size).toBe(AILLEURS.length)
   })
 })

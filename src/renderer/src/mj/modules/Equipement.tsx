@@ -22,6 +22,7 @@ import { EMPLACEMENTS_OBJET, ditEmplacements, emplacementsDe, nomEmplacement } f
 import type { Character, Objet, ObjetPlacement } from '@shared/types'
 import { Pop } from '../components/Pop'
 import { MenuDonner } from '../components/MenuDonner'
+import { ouvrirParametres } from '../components/parametres/registre'
 import { ditSac, etatSac, sacPlein } from '@shared/sac'
 
 /** Un objet posé sur le personnage : l'objet, et l'exemplaire qui est à lui. */
@@ -136,12 +137,13 @@ export function Equipement({ ch }: { ch: Character }): JSX.Element {
             <span className="eyebrow">Ce qu’il traîne</span>
             <div className="spacer" />
             {fond.capacite !== null ? (
-              <span
-                className={`sys num eq-fond${sacPlein(fond) ? ' plein' : ''}`}
-                title={sacPlein(fond) ? 'Son sac déborde : il ne peut plus rien y mettre' : 'Les places prises dans son sac'}
+              <button
+                className={`sys num eq-fond btn-lien${sacPlein(fond) ? ' plein' : ''}`}
+                title="Régler la capacité du sac"
+                onClick={() => ouvrirParametres('regles', 'sac.capacite')}
               >
                 {ditSac(fond)}
-              </span>
+              </button>
             ) : null}
           </div>
           {sac.length === 0 ? (

@@ -11,6 +11,8 @@ import {
   IconScreen,
   IconSliders
 } from '../Icons'
+import { useStore } from '../../store'
+import type { Cherchable } from './chercher'
 import * as campagne from './rubriques/campagne'
 import * as regles from './rubriques/regles'
 import * as ecran from './rubriques/ecran'
@@ -175,3 +177,71 @@ export function cheminDe(r: Reglage): string {
 export function ouvrirParametres(rubrique?: Rubrique, cible?: string): void {
   window.dispatchEvent(new CustomEvent('jdr:parametres', { detail: { rubrique, cible } }))
 }
+
+/**
+ * Ce qui se règle ailleurs que dans les Paramètres — par carte, par lieu, par
+ * séance, dans la fiche de campagne. Ce ne sont pas des lignes : la recherche
+ * les trouve quand même, dit où ils vivent et, quand on peut, y emmène.
+ */
+export interface Ailleurs extends Cherchable {
+  id: string
+  /** « Se règle sur chaque carte — dans Lieux, volet Murs. » */
+  ou: string
+  aller?: { libelle: string; faire: () => void }
+}
+
+const SUR_CARTE = 'Se règle sur chaque carte — dans Lieux, volet Murs.'
+const versLieux = {
+  libelle: 'Ouvrir les Lieux',
+  faire: (): void => useStore.getState().setView('places')
+}
+const PAR_SEANCE = 'Se règle pour chaque séance — Séance › Configurer la séance.'
+const fiche = (detail: 'seance' | 'fiche') => (): void => {
+  window.dispatchEvent(new CustomEvent('jdr:fiche', { detail }))
+}
+
+export const AILLEURS: Ailleurs[] = [
+  { id: 'carte.portee', nom: 'Portée du regard d’une carte', mots: ['vision', 'vue', 'distance', 'murs', 'carte'], chemin: 'Ailleurs', ou: SUR_CARTE, aller: versLieux },
+  { id: 'carte.zone', nom: 'Zone éclairée gardée d’une carte', mots: ['lumiere', 'eclairage', 'memoire', 'brouillard', 'carte'], chemin: 'Ailleurs', ou: SUR_CARTE, aller: versLieux },
+  { id: 'carte.ouvertures', nom: 'Largeur des ouvertures d’une carte', mots: ['portes', 'fenetres', 'passages', 'murs', 'carte'], chemin: 'Ailleurs', ou: SUR_CARTE, aller: versLieux },
+  { id: 'carte.soleil', nom: 'Soleil, lune et nord d’une carte', mots: ['nord', 'orientation', 'ombres', 'astre', 'jour', 'nuit', 'carte'], chemin: 'Ailleurs', ou: SUR_CARTE, aller: versLieux },
+  {
+    id: 'lieu.pions',
+    nom: 'Taille des pions d’un lieu',
+    mots: ['jetons', 'taille', 'echelle', 'lieu'],
+    chemin: 'Ailleurs',
+    ou: 'Se règle sur chaque lieu — en Régie, au-dessus de la ligne des pions.',
+    aller: { libelle: 'Ouvrir la Régie', faire: () => useStore.getState().setView('regie') }
+  },
+  {
+    id: 'seance.dossier',
+    nom: 'Dossier de la séance',
+    mots: ['dossier', 'repertoire', 'notes', 'seance'],
+    chemin: 'Ailleurs',
+    ou: PAR_SEANCE,
+    aller: { libelle: 'Configurer la séance', faire: fiche('seance') }
+  },
+  {
+    id: 'seance.presents',
+    nom: 'Présents à la séance',
+    mots: ['joueurs', 'personnages', 'presence', 'absents', 'seance'],
+    chemin: 'Ailleurs',
+    ou: PAR_SEANCE,
+    aller: { libelle: 'Configurer la séance', faire: fiche('seance') }
+  },
+  {
+    id: 'seance.pnj',
+    nom: 'PNJ sur la ligne des pions',
+    mots: ['pnj', 'figurants', 'pions', 'seance'],
+    chemin: 'Ailleurs',
+    ou: 'Se règle pour chaque séance — le « + » de la ligne des pions.'
+  },
+  {
+    id: 'fiche.composition',
+    nom: 'Composition de la fiche (caractéristiques, compétences, jauges)',
+    mots: ['fiche', 'caracteristiques', 'competences', 'jauges', 'feuille de personnage'],
+    chemin: 'Ailleurs',
+    ou: 'Dans la fiche de campagne.',
+    aller: { libelle: 'Ouvrir la fiche de campagne', faire: fiche('fiche') }
+  }
+]

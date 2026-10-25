@@ -89,6 +89,15 @@ export function App(): JSX.Element {
     return () => window.removeEventListener('jdr:parametres', ouvrir)
   }, [])
 
+  /* Les réglages qui vivent ailleurs (la recherche des Paramètres) renvoient
+     vers ces fenêtres par un évènement, comme `jdr:parametres` plus haut. */
+  useEffect(() => {
+    const ouvrir = (e: Event): void =>
+      setFiche((e as CustomEvent<'seance' | 'carnet' | 'fiche' | 'dupliquer'>).detail)
+    window.addEventListener('jdr:fiche', ouvrir)
+    return () => window.removeEventListener('jdr:fiche', ouvrir)
+  }, [])
+
   /* L'historique des pages : il écoute le magasin dès le départ. */
   useEffect(() => suivreHistorique(), [])
 

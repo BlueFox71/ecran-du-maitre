@@ -3,7 +3,7 @@ import { useStore } from '../../store'
 import { IconClose, IconRouage } from '../Icons'
 import { useEchap } from '../../echap'
 import { Ligne, Onglet, Tete } from './briques'
-import { REGLAGES, RUBRIQUES, cheminDe, type Reglage, type Rubrique } from './registre'
+import { AILLEURS, REGLAGES, RUBRIQUES, cheminDe, type Ailleurs, type Reglage, type Rubrique } from './registre'
 import { chercher } from './chercher'
 import { Carnet } from '../Fiches'
 import { OuvrirCarnet } from './contexte'
@@ -63,6 +63,30 @@ function Lignes({ rows }: { rows: Reglage[] }): JSX.Element {
   )
 }
 
+/** Un réglage qui vit ailleurs : où le trouver, et le bouton qui y mène — qui
+ *  ferme d'abord les Paramètres. Sans campagne (ou, pour la séance, sans
+ *  séance courante), il n'y a rien à ouvrir : on garde seulement le texte. */
+function LigneAilleurs({ a, onClose }: { a: Ailleurs; onClose: () => void }): JSX.Element {
+  const campagne = useStore((s) => s.campaign)
+  const seance = useStore((s) => s.session)
+  const aller = a.aller && campagne && (!a.id.startsWith('seance.') || seance) ? a.aller : null
+  return (
+    <Ligne nom={a.nom} aide={a.ou}>
+      {aller ? (
+        <button
+          className="btn btn-ghost"
+          onClick={() => {
+            onClose()
+            aller.faire()
+          }}
+        >
+          {aller.libelle}
+        </button>
+      ) : null}
+    </Ligne>
+  )
+}
+
 export function Parametres({
   depart,
   cible,
@@ -86,6 +110,7 @@ export function Parametres({
 
   const [q, setQ] = useState('')
   const trouves = useMemo(() => chercher(CHERCHABLES, q), [q])
+  const ailleurs = useMemo(() => chercher(AILLEURS, q), [q])
   const cherche = q.trim() !== ''
 
   useEchap(onClose)
@@ -170,27 +195,37 @@ export function Parametres({
         <div className="pm-corps">
           {cherche ? (
             <div className="pm-panneau pm-resultats">
-              {trouves.length === 0 ? (
+              {trouves.length === 0 && ailleurs.length === 0 ? (
                 <p className="pm-sous">Rien pour « {q.trim()} ».</p>
               ) : (
-                RUBRIQUES.map((rub) => {
-                  const groupe = trouves.filter((r) => r.rubrique === rub.id)
-                  if (groupe.length === 0) return null
-                  return (
-                    <div key={rub.id} className="pm-bloc">
-                      <button
-                        className="eyebrow pm-chemin-lien"
-                        onClick={() => {
-                          setQ('')
-                          setRub(rub.id)
-                        }}
-                      >
-                        {groupe[0].chemin}
-                      </button>
-                      <Lignes rows={groupe} />
+                <>
+                  {RUBRIQUES.map((rub) => {
+                    const groupe = trouves.filter((r) => r.rubrique === rub.id)
+                    if (groupe.length === 0) return null
+                    return (
+                      <div key={rub.id} className="pm-bloc">
+                        <button
+                          className="eyebrow pm-chemin-lien"
+                          onClick={() => {
+                            setQ('')
+                            setRub(rub.id)
+                          }}
+                        >
+                          {groupe[0].chemin}
+                        </button>
+                        <Lignes rows={groupe} />
+                      </div>
+                    )
+                  })}
+                  {ailleurs.length > 0 ? (
+                    <div className="pm-bloc">
+                      <span className="eyebrow">Ailleurs</span>
+                      {ailleurs.map((a) => (
+                        <LigneAilleurs key={a.id} a={a} onClose={onClose} />
+                      ))}
                     </div>
-                  )
-                })
+                  ) : null}
+                </>
               )}
             </div>
           ) : (

@@ -14166,6 +14166,17 @@ button.ou-etat:hover {
 .eq-volet .sys.eq-fond {
   margin-left: 10px;
 }
+.eq-volet button.btn-lien {
+  background: none;
+  border: 0;
+  padding: 0;
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 3px;
+}
+.eq-volet button.btn-lien:hover {
+  color: var(--text);
+}
 .eq-volet .sys.eq-fond.plein {
   color: var(--blood);
 }
