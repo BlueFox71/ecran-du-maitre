@@ -30,6 +30,10 @@ export function TexteEnPlace({
      est peut-être déjà détruit quand vient l'heure d'enregistrer. */
   const html = useRef<string | null>(null)
   const minuterie = useRef<number | null>(null)
+  /* Les textes qu'on a écrits nous-mêmes : quand la Chronologie les relit et
+     nous les rend — parfois en retard d'un enregistrement —, ce n'est pas un
+     changement venu d'ailleurs. */
+  const ecrits = useRef(new Set([item.body]))
 
   const ecrire = async (): Promise<void> => {
     if (minuterie.current) window.clearTimeout(minuterie.current)
@@ -37,6 +41,7 @@ export function TexteEnPlace({
     if (html.current === null) return
     const body = html.current
     html.current = null
+    ecrits.current.add(body)
     setEtat('saving')
     await window.jdr.items.update(item.id, { body })
     setEtat((e) => (e === 'saving' ? 'saved' : e))
@@ -56,11 +61,17 @@ export function TexteEnPlace({
 
   /* Le fichier réécrit hors de l'application (l'explorateur, une autre
      session) : la page ouverte le reprend, tant qu'on n'y a rien changé
-     soi-même — sinon notre frappe l'emporte, comme au dernier enregistrement. */
+     soi-même — sinon notre frappe l'emporte, comme au dernier enregistrement.
+
+     On ne regarde que quand le texte reçu change, et jamais au passage à
+     « Enregistré » : à cet instant la Chronologie tient encore le texte
+     d'avant la frappe, et le recharger rejetait le curseur en bas de page. */
   useEffect(() => {
-    if (!editor || etat !== 'saved' || item.body == null) return
+    if (!editor || item.body == null || ecrits.current.has(item.body)) return
+    if (html.current !== null) return
+    ecrits.current.add(item.body)
     if (item.body !== editor.getHTML()) editor.commands.setContent(item.body, false)
-  }, [editor, item.body, etat])
+  }, [editor, item.body])
 
   // Un personnage renommé ou recoloré : ses tags suivent.
   useEffect(() => {

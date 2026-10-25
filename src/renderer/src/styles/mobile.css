@@ -397,6 +397,18 @@ img {
 .m-piste i.g-iris { background: var(--iris); }
 .m-piste i.g-moss { background: var(--moss); }
 .m-piste i.g-brass { background: var(--brass); }
+.m-piste i.g-neutral { background: var(--text-faint); }
+.m-piste i.g-orange { background: var(--orange); }
+.m-piste i.g-argile { background: var(--argile); }
+.m-piste i.g-olive { background: var(--olive); }
+.m-piste i.g-fougere { background: var(--fougere); }
+.m-piste i.g-jade { background: var(--jade); }
+.m-piste i.g-azur { background: var(--azur); }
+.m-piste i.g-ardoise { background: var(--ardoise); }
+.m-piste i.g-outremer { background: var(--outremer); }
+.m-piste i.g-amethyste { background: var(--amethyste); }
+.m-piste i.g-prune { background: var(--prune); }
+.m-piste i.g-bruyere { background: var(--bruyere); }
 
 .m-caracs {
   display: grid;
@@ -1198,7 +1210,14 @@ img {
 
 .m-poche {
   display: grid;
-  gap: 13px;
+  /* En grille : deux de front sur un téléphone, davantage s'il y a la place. */
+  grid-template-columns: repeat(auto-fill, minmax(min(150px, 42vw), 1fr));
+  gap: 10px;
+  align-items: start;
+}
+/* Le mot d'une pochette vide prend toute la largeur, pas une case. */
+.m-poche > .m-note {
+  grid-column: 1 / -1;
 }
 /* La carte est un bouton, sauf pour un PDF : là, c'est un lien, qui ouvre le
    lecteur du navigateur. D'où la couleur et le soulignement remis à zéro. */
@@ -1221,7 +1240,7 @@ img {
   display: grid;
   place-items: center;
   position: relative;
-  aspect-ratio: 16 / 10;
+  aspect-ratio: 4 / 3;
   background: var(--sunk);
 }
 /*
@@ -1278,20 +1297,25 @@ img {
 }
 .m-doc .dit {
   display: grid;
-  gap: 5px;
-  padding: 11px 13px 13px;
+  gap: 4px;
+  padding: 8px 9px 9px;
 }
+/* Deux lignes au plus : la grille garde des cases de même allure. */
 .m-doc .t {
-  display: block;
-  font-size: 15px;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
+  overflow: hidden;
+  font-size: 13.5px;
   font-weight: 500;
   line-height: 1.3;
 }
 .m-doc .sous {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
-  gap: 7px;
-  font-size: 12px;
+  gap: 4px 6px;
+  font-size: 11px;
   color: var(--text-faint);
 }
 /* Ce qui n'est qu'à lui se dit, et se voit : c'est le sel du procédé. */
@@ -1403,12 +1427,43 @@ img {
 }
 .m-lire-pied {
   flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
   padding: 10px 14px calc(12px + env(safe-area-inset-bottom));
   font-size: 11.5px;
   color: var(--text-faint);
   text-align: center;
   border-top: 1px solid var(--line-soft);
   background: var(--ground);
+}
+.m-lire-pied .dit {
+  flex: 1;
+  min-width: 0;
+}
+/* Précédent, suivant : le glissement fait pareil, mais une vidéo garde le
+   doigt pour ses commandes. */
+.m-lire-fleche {
+  flex: none;
+  width: 40px;
+  height: 36px;
+  display: grid;
+  place-items: center;
+  font-size: 24px;
+  line-height: 1;
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--raised);
+}
+.m-lire-fleche:disabled {
+  opacity: 0.3;
+}
+.m-lire-rang {
+  flex: none;
+  font-size: 12px;
+  color: var(--text-faint);
+  font-variant-numeric: tabular-nums;
 }
 
 /* --- son sac, et ce qu'il porte ------------------------------------------ */
@@ -2203,4 +2258,15 @@ body.m-frisson .m-app {
 }
 .m-prp-rappel span {
   font-size: 20px;
+}
+
+/* Le fond du sac, à côté de son titre : discret tant qu'il reste de la place. */
+.m-sac-compte {
+  margin-left: 8px;
+  letter-spacing: 0.04em;
+  text-transform: none;
+  font-variant-numeric: tabular-nums;
+}
+.m-sac-compte.plein {
+  color: var(--blood);
 }

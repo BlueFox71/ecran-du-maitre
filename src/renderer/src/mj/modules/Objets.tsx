@@ -21,6 +21,7 @@ import {
   IconCoffre,
   IconCrop,
   IconDonner,
+  IconLoupe,
   IconEye,
   IconEyeOff,
   IconImage,
@@ -49,6 +50,7 @@ import { ModaleNouvelObjet } from '../components/NouvelObjet'
 import { RognageCarre } from '../components/RognageCarre'
 import { Piece } from '../../shared/Piece'
 import { ditMontant, monnaiesActives, type Monnaie } from '@shared/monnaies'
+import { ditPlaces, refusSac } from '@shared/sac'
 import {
   BoutonCorbeille,
   Confirmer,
@@ -477,8 +479,6 @@ function GrilleObjets({
             </span>
             <span className="sous">
               {f?.nom ?? 'sans catégorie'}
-              {o.equipable ? <span className="pt">·</span> : null}
-              {o.equipable ? 'se porte' : null}
             </span>
             <OuIlEst o={o} />
           </button>
@@ -577,15 +577,22 @@ function BoutonInventaire({
           } else return
           await s.refreshObjets()
         } catch (err) {
-          s.toast('L’objet n’a pas été rangé.', true)
+          s.toast(refusSac(err) ?? 'L’objet n’a pas été rangé.', true)
           console.error('[inventaire]', err)
         }
       }}
-      title={inv.ouvert ? 'Ouvert : les joueurs le voient sur leur portable' : 'Fermé aux joueurs'}
+      title={
+        inv.ouvert
+          ? 'Dans le Sac : les joueurs y piochent depuis leur portable'
+          : inv.enPochette
+            ? 'Dans la Pochette : les joueurs en voient les images'
+            : 'Fermé aux joueurs'
+      }
     >
       <IconCoffre />
       <span className="lib">{inv.nom}</span>
       {inv.ouvert ? <span className="inv-ouvert">ouvert</span> : null}
+      {inv.enPochette ? <span className="inv-ouvert">pochette</span> : null}
       <span className="n">{n}</span>
     </button>
   )
@@ -606,18 +613,24 @@ function VueInventaire({ inv, onSupprime }: { inv: Inventaire; onSupprime: () =>
   contenu.sort((a, b) => a.o.nom.localeCompare(b.o.nom, 'fr'))
   const rayons = s.objetFamilles.filter((f) => !f.masquee)
 
-  const maj = async (patch: { nom?: string; ouvert?: boolean }): Promise<void> => {
+  /* Ce que la Pochette ne montrera pas : un objet sans image n'a rien à y faire voir. */
+  const sansImage = contenu.filter(({ o }) => o.imageItemId == null).length
+  const maj = async (patch: { nom?: string; ouvert?: boolean; enPochette?: boolean }): Promise<void> => {
     await window.jdr.objets.inventaireUpdate(inv.id, patch)
     await s.refreshObjets()
   }
   const remplir = async (ids: number[]): Promise<void> => {
     const n = await window.jdr.objets.remplir(inv.id, ids)
     await s.refreshObjets()
-    s.toast(
-      n === 0
-        ? 'Rien à ranger : déjà au complet ici, ou pièces uniques posées ailleurs.'
-        : `${n} objet${n > 1 ? 's' : ''} rangé${n > 1 ? 's' : ''} dans « ${inv.nom} »`
-    )
+    /* Rangés, ils apparaissent sous la main : rien à dire. Rien de rangé, en
+       revanche, doit se voir — seuls les ratés s'affichent en bas d'écran. */
+    if (n === 0)
+      s.toast(
+        ids.length === 0
+          ? 'Ce rayon est vide.'
+          : 'Rien à ranger : déjà au complet ici, ou pièces uniques posées ailleurs.',
+        true
+      )
   }
 
   return (
@@ -638,22 +651,46 @@ function VueInventaire({ inv, onSupprime }: { inv: Inventaire; onSupprime: () =>
           }}
         />
         <div className="spacer" />
-        <button
-          className="inv-bascule"
-          aria-pressed={inv.ouvert}
-          onClick={() => void maj({ ouvert: !inv.ouvert })}
-          title={inv.ouvert ? 'Le fermer : il disparaît des portables' : 'L’ouvrir : chacun y pioche depuis son portable'}
-        >
-          <span className="rail" />
-          {inv.ouvert ? 'Ouvert aux joueurs' : 'Fermé aux joueurs'}
-        </button>
+        {/* Fermé, dans le Sac pour y piocher, ou dans la Pochette pour voir. */}
+        <div className="inv-mode" role="radiogroup" aria-label="Ce que les joueurs en voient">
+          <button
+            role="radio"
+            aria-checked={!inv.ouvert && !inv.enPochette}
+            onClick={() => void maj({ ouvert: false, enPochette: false })}
+            title="Personne ne le voit sur son portable"
+          >
+            Fermé
+          </button>
+          <button
+            role="radio"
+            aria-checked={inv.ouvert}
+            onClick={() => void maj({ ouvert: true })}
+            title="Dans la page Sac des portables : chacun y pioche"
+          >
+            Dans le Sac
+          </button>
+          <button
+            role="radio"
+            aria-checked={inv.enPochette}
+            onClick={() => void maj({ enPochette: true })}
+            title="Dans la Pochette, un onglet à son nom : les images de ce qu’il tient, à regarder"
+          >
+            Dans la Pochette
+          </button>
+        </div>
       </div>
 
       <div className="pane-body inv-corps">
         <p className="inv-aide">
           {inv.ouvert
             ? 'Visible sur tous les portables, dans la page Sac. Chacun pioche : l’objet tombe dans son sac. Il peut aussi y remettre ce qu’il a.'
-            : 'Personne ne le voit sur son portable. Remplis-le tranquillement avant de l’ouvrir.'}
+            : inv.enPochette
+              ? `Dans la Pochette de toute la table, onglet « ${inv.nom} » : on y voit l’image de chaque objet, sans rien prendre. Ce que tu y ranges la rejoint.${
+                  sansImage
+                    ? ` ${sansImage} objet${sansImage > 1 ? 's' : ''} sans image n’y ${sansImage > 1 ? 'sont' : 'est'} pas.`
+                    : ''
+                }`
+              : 'Personne ne le voit sur son portable. Remplis-le tranquillement avant de l’ouvrir.'}
         </p>
         <div className="inv-outils">
           <button
@@ -972,7 +1009,7 @@ function ListeObjets({
         <span />
         <span className="nm">Objet</span>
         <span className="col">Catégorie</span>
-        <span className="col">Poids</span>
+        <span className="col">Place</span>
         <span className="col">Valeur</span>
         <span className="col">Posé</span>
       </div>
@@ -1007,7 +1044,7 @@ function ListeObjets({
               ) : null}
             </span>
             <span className="col">{f?.nom ?? '—'}</span>
-            <span className="col">{o.poids || '—'}</span>
+            <span className="col">{ditPlaces(o.places)}</span>
             <span className="col">{ditMontant(o.prix, monnaies) || '—'}</span>
             <span className="col">
               {n > 0
@@ -1031,10 +1068,32 @@ function ListeObjets({
  * local le temps de la frappe, et se recale quand on change d'objet — d'où la
  * `key` posée par la vue.
  */
+/** L'image d'un objet en grand, par-dessus tout : un clic ou Échap la referme. */
+function ImageEnGrand({ url, nom, onClose }: { url: string; nom: string; onClose: () => void }): JSX.Element {
+  useEchap(onClose)
+  return (
+    <div className="scrim image-en-grand" onClick={onClose} role="dialog" aria-modal="true" aria-label={nom}>
+      <img src={url} alt={nom} draggable={false} />
+    </div>
+  )
+}
+
+/** Ce qu'on porte va d'abord en main : un objet neuf y est proposé d'office (voir `addObjet`). */
+const MAINS = ['main-g', 'main-d']
+
+/* Les mains en tête de la liste à cocher, le reste dans l'ordre de la poupée. */
+const EMPLACEMENTS_CHOIX = [
+  ...EMPLACEMENTS_OBJET.filter((e) => MAINS.includes(e.cle)),
+  ...EMPLACEMENTS_OBJET.filter((e) => !MAINS.includes(e.cle))
+]
+
+/** Les places qu'un objet peut prendre dans un sac. */
+const PLACES = [0.5, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]
+
 function FicheObjet({ o }: { o: Objet }): JSX.Element {
   const s = useStore()
   const [nom, setNom] = useState(o.nom)
-  const [poids, setPoids] = useState(o.poids ?? '')
+  const [bonusSac, setBonusSac] = useState(o.bonusSac ? ditPlaces(o.bonusSac) : '')
   /* Le prix se tape monnaie par monnaie ; chaque case garde sa frappe. */
   const [prix, setPrix] = useState<Record<string, string>>(() =>
     Object.fromEntries(Object.entries(o.prix ?? {}).map(([k, n]) => [k, String(n)]))
@@ -1044,6 +1103,7 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
   const [su, setSu] = useState(o.su)
   const [image, setImage] = useState(false)
   const [rogner, setRogner] = useState(false)
+  const [zoom, setZoom] = useState(false)
   const [effetOuvert, setEffetOuvert] = useState<{
     x: number
     y: number
@@ -1123,6 +1183,15 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
         <span className="compte num">{totalPose > 0 ? `${totalPose} en jeu` : 'jamais posé'}</span>
       </div>
 
+      {zoom && urlImage ? (
+        /* L'image elle-même, pas l'affiche réduite : on zoome pour voir le détail. */
+        <ImageEnGrand
+          url={img?.kind === 'image' ? (img.url ?? urlImage) : urlImage}
+          nom={o.nom}
+          onClose={() => setZoom(false)}
+        />
+      ) : null}
+
       <div className="pane-body flush">
         <div className={`fiche-vign c-${famille?.teinte ?? 'neutral'}`}>
           {urlImage ? (
@@ -1133,6 +1202,12 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
             glypheObjet(famille?.glyphe ?? 'outils', 'grand')
           )}
           <span className="vign-actions">
+            {urlImage ? (
+              <button className="changer" onClick={() => setZoom(true)} title="Voir l’image en grand">
+                <IconLoupe />
+                zoomer
+              </button>
+            ) : null}
             {urlImage ? (
               <button className="changer" onClick={() => setRogner(true)} title="Choisir la partie de l’image que montre la fiche">
                 <IconCrop />
@@ -1227,14 +1302,30 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
               </label>
             ) : null}
 
-            <label className="champ">
-              <span>Poids</span>
+            <label className="champ" title="Les places qu’il prend dans un sac — 0,5 pour une boîte de cachets, 2 pour un gros livre">
+              <span>Place occupée</span>
+              <select value={o.places} onChange={(e) => pose({ places: Number(e.target.value) })}>
+                {/* Une valeur d'avant la liste reste lisible tant qu'on ne la change pas. */}
+                {(PLACES.includes(o.places) ? PLACES : [...PLACES, o.places].sort((a, b) => a - b)).map((n) => (
+                  <option key={n} value={n}>
+                    {ditPlaces(n)}
+                  </option>
+                ))}
+              </select>
+            </label>
+
+            {/* Un sac à dos, une besace : porté, il agrandit le sac. */}
+            <label className="champ" title="Les places qu’il ajoute au sac de celui qui le porte — un sac à dos">
+              <span>Augmente le sac de</span>
               <input
-                value={poids}
-                placeholder="—"
+                inputMode="decimal"
+                value={bonusSac}
+                placeholder="0"
                 onChange={(e) => {
-                  setPoids(e.target.value)
-                  tape({ poids: e.target.value.trim() || null })
+                  setBonusSac(e.target.value)
+                  const t = e.target.value.trim()
+                  const n = t ? Number(t.replace(',', '.')) : 0
+                  if (Number.isFinite(n) && n >= 0) tape({ bonusSac: n })
                 }}
               />
             </label>
@@ -1316,58 +1407,38 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
           <div className="bloc-tete">
             <span className="eyebrow">Ce qu’il fait</span>
           </div>
-          <label className={`bascule${o.equipable ? ' on' : ''}`}>
-            <input
-              type="checkbox"
-              checked={o.equipable}
-              onChange={(e) =>
-                pose({
-                  equipable: e.target.checked,
-                  emplacements: e.target.checked
-                    ? emplacementsDe(o).length
-                      ? emplacementsDe(o)
-                      : [EMPLACEMENTS_OBJET[0].cle]
-                    : []
-                })
-              }
-            />
-            Se porte — occupe un emplacement
-          </label>
-
           {/* Plusieurs endroits possibles, et non un seul : une épée va dans
               l'une ou l'autre main, une bague à l'un ou l'autre doigt. On coche
               ce qui convient ; c'est l'exemplaire qui dira où il est vraiment. */}
-          {o.equipable ? (
-            <div className="emplacements">
-              <span className="eyebrow">Où il peut se porter</span>
-              <div className="emp-choix">
-                {EMPLACEMENTS_OBJET.map((e) => {
-                  const pris = emplacementsDe(o).includes(e.cle)
-                  return (
-                    <button
-                      key={e.cle}
-                      className={`emp${pris ? ' on' : ''}`}
-                      aria-pressed={pris}
-                      onClick={() =>
-                        pose({
-                          emplacements: pris
-                            ? emplacementsDe(o).filter((x) => x !== e.cle)
-                            : [...emplacementsDe(o), e.cle]
-                        })
-                      }
-                    >
-                      {e.nom}
-                    </button>
-                  )
-                })}
-              </div>
-              {emplacementsDe(o).length === 0 ? (
-                <p className="emp-rien">
-                  Aucun endroit coché&nbsp;: il ne pourra se poser sur personne.
-                </p>
-              ) : null}
+          <div className="emplacements">
+            <span className="eyebrow">Où il peut se porter</span>
+            <div className="emp-choix">
+              {EMPLACEMENTS_CHOIX.map((e) => {
+                const pris = emplacementsDe(o).includes(e.cle)
+                return (
+                  <button
+                    key={e.cle}
+                    className={`emp${pris ? ' on' : ''}`}
+                    aria-pressed={pris}
+                    onClick={() =>
+                      pose({
+                        emplacements: pris
+                          ? emplacementsDe(o).filter((x) => x !== e.cle)
+                          : [...emplacementsDe(o), e.cle]
+                      })
+                    }
+                  >
+                    {e.nom}
+                  </button>
+                )
+              })}
             </div>
-          ) : null}
+            {emplacementsDe(o).length === 0 ? (
+              <p className="emp-rien">
+                Aucun endroit coché&nbsp;: il ne pourra se poser sur personne.
+              </p>
+            ) : null}
+          </div>
 
           {/* Ce qui s'épuise ne tient pas au fait de se porter : une fiole a
               trois doses sans occuper d'emplacement. L'emplacement, lui, n'a de
@@ -1573,9 +1644,12 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
           oui="Ranger"
           onNon={() => setDemande(null)}
           onOui={async () => {
-            await window.jdr.objets.ranger(aRanger.map((p) => p.id))
-            await s.refreshObjets()
-            setDemande(null)
+            try {
+              await window.jdr.objets.ranger(aRanger.map((p) => p.id))
+            } finally {
+              await s.refreshObjets()
+              setDemande(null)
+            }
           }}
         >
           <ul className="rgm-recap">

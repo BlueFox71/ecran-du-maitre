@@ -16,6 +16,7 @@ import {
 } from '@shared/preparation'
 import type { CadreCarre, CalqueBrouillard, MobilePing, Ouverture, PointMur } from '@shared/types'
 import { heureLocale } from '@shared/heure'
+import { ditSac, sacPlein } from '@shared/sac'
 
 /**
  * L'application du joueur, sur son téléphone.
@@ -152,6 +153,8 @@ interface Etat {
   emplacements: { cle: string; nom: string }[]
   /** Les inventaires ouverts, où chacun pioche. Absent d'un serveur plus ancien. */
   inventaires?: InventaireTel[]
+  /** Ce que tient son sac ; `capacite` nulle, sans limite. Absent d'un serveur plus ancien. */
+  sac?: { charge: number; capacite: number | null } | null
   gele: boolean
   /** Plein jour : la carte entière, sans ombre. */
   jour?: boolean
@@ -1302,7 +1305,12 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
         <div className="m-objets">{portes.map(ligne)}</div>
       )}
 
-      <h2 className="m-titre">Dans mon sac</h2>
+      <h2 className="m-titre">
+        Dans mon sac
+        {etat.sac && etat.sac.capacite !== null ? (
+          <span className={`m-sac-compte${sacPlein(etat.sac) ? ' plein' : ''}`}>{ditSac(etat.sac)}</span>
+        ) : null}
+      </h2>
       {sac.length === 0 ? (
         <p className="m-note">Ton sac est vide.</p>
       ) : (
@@ -1434,6 +1442,9 @@ function Poche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
 
   const vus = docs.filter((d) => rang === 'tout' || d.ongletId === rang)
   const doc = docs.find((d) => d.id === ouvert) ?? null
+  /* Ce qu'on feuillette d'un glissement, dans l'ordre de la liste : les images
+     et les vidéos du rangement ouvert. Un PDF s'ouvre ailleurs, il n'en est pas. */
+  const feuilletables = vus.filter((d) => d.genre !== 'pdf')
 
   /**
    * « Je l'ai ouvert. »
@@ -1552,7 +1563,14 @@ function Poche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
         })}
       </div>
 
-      {doc ? <Lire doc={doc} onClose={() => setOuvert(null)} /> : null}
+      {doc ? (
+        <Lire
+          doc={doc}
+          suite={feuilletables}
+          onAller={ouvre}
+          onClose={() => setOuvert(null)}
+        />
+      ) : null}
     </div>
   )
 }
@@ -1567,11 +1585,35 @@ function Poche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
  * Un PDF ne passe plus par ici : sa carte est un lien, et il s'ouvre dans le
  * lecteur du navigateur.
  */
-function Lire({ doc, onClose }: { doc: DocPoche; onClose: () => void }): JSX.Element {
+function Lire({
+  doc,
+  suite,
+  onAller,
+  onClose
+}: {
+  doc: DocPoche
+  /** Les documents qu'on feuillette d'ici, dans l'ordre de la liste. */
+  suite: DocPoche[]
+  onAller: (d: DocPoche) => void
+  onClose: () => void
+}): JSX.Element {
+  const i = suite.findIndex((d) => d.id === doc.id)
+  const avant = i > 0 ? suite[i - 1] : null
+  const apres = i >= 0 && i < suite.length - 1 ? suite[i + 1] : null
+  /* Glisser vers la gauche montre la suivante, comme on tourne une page. */
+  const glisse = (sens: -1 | 1): void => {
+    const d = sens > 0 ? apres : avant
+    if (d) onAller(d)
+  }
   return (
     <div className="m-lire">
       <div className="m-lire-tete">
         <span className="t">{doc.titre}</span>
+        {suite.length > 1 && i >= 0 ? (
+          <span className="m-lire-rang">
+            {i + 1} / {suite.length}
+          </span>
+        ) : null}
         <button onClick={onClose}>fermer</button>
       </div>
       <div className="m-lire-corps">
@@ -1582,11 +1624,33 @@ function Lire({ doc, onClose }: { doc: DocPoche; onClose: () => void }): JSX.Ele
         {doc.genre === 'video' ? (
           <video src={API + (doc.url ?? '')} controls playsInline />
         ) : (
-          <ImagePincee src={API + (doc.url ?? '')} alt={doc.titre} />
+          <ImagePincee key={doc.id} src={API + (doc.url ?? '')} alt={doc.titre} onGlisse={glisse} />
         )}
       </div>
       <div className="m-lire-pied">
-        {doc.sien ? 'Le maître du jeu ne l’a donné qu’à toi.' : 'Toute la table a ce document.'}
+        {suite.length > 1 ? (
+          <button
+            className="m-lire-fleche"
+            disabled={!avant}
+            onClick={() => glisse(-1)}
+            aria-label="Précédent"
+          >
+            ‹
+          </button>
+        ) : null}
+        <span className="dit">
+          {doc.sien ? 'Le maître du jeu ne l’a donné qu’à toi.' : 'Toute la table a ce document.'}
+        </span>
+        {suite.length > 1 ? (
+          <button
+            className="m-lire-fleche"
+            disabled={!apres}
+            onClick={() => glisse(1)}
+            aria-label="Suivant"
+          >
+            ›
+          </button>
+        ) : null}
       </div>
     </div>
   )
@@ -1600,7 +1664,16 @@ function Lire({ doc, onClose }: { doc: DocPoche; onClose: () => void }): JSX.Ele
  * (`user-scalable=no`), sans quoi le pincement sur la carte du pion agrandirait
  * toute l'application. L'image fait donc son zoom elle-même.
  */
-function ImagePincee({ src, alt }: { src: string; alt: string }): JSX.Element {
+function ImagePincee({
+  src,
+  alt,
+  onGlisse
+}: {
+  src: string
+  alt: string
+  /** Un glissement franc, l'image entière à l'écran : −1 vers la précédente, 1 vers la suivante. */
+  onGlisse?: (sens: -1 | 1) => void
+}): JSX.Element {
   const cadre = useRef<HTMLDivElement>(null)
   const [vue, setVue] = useState({ s: 1, x: 0, y: 0 })
   const doigts = useRef(new Map<number, { x: number; y: number }>())
@@ -1611,6 +1684,8 @@ function ImagePincee({ src, alt }: { src: string; alt: string }): JSX.Element {
   } | null>(null)
   const dernierToucher = useRef<{ t: number; x: number; y: number } | null>(null)
   const bouge = useRef(false)
+  /* Le geste a-t-il eu deux doigts à un moment ? Un pincement n'est pas un glissement. */
+  const pince = useRef(false)
 
   /* Le contenu ne quitte jamais le cadre : agrandi, ses bords restent dehors. */
   const borner = (s: number, x: number, y: number): { s: number; x: number; y: number } => {
@@ -1653,6 +1728,8 @@ function ImagePincee({ src, alt }: { src: string; alt: string }): JSX.Element {
         e.currentTarget.setPointerCapture(e.pointerId)
         doigts.current.set(e.pointerId, local(e))
         bouge.current = doigts.current.size > 1
+        if (doigts.current.size === 1) pince.current = false
+        if (doigts.current.size > 1) pince.current = true
         reprendre(vue)
       }}
       onPointerMove={(e) => {
@@ -1678,6 +1755,19 @@ function ImagePincee({ src, alt }: { src: string; alt: string }): JSX.Element {
       }}
       onPointerUp={(e) => {
         const p = local(e)
+        /* Un glissement franc, à l'horizontale, sur l'image entière : on
+           change de photo. Agrandie, le même geste la déplace. */
+        const d0 = depart.current
+        if (onGlisse && d0 && vue.s === 1 && !pince.current && doigts.current.size === 1) {
+          const dx = p.x - d0.milieu.x
+          const dy = p.y - d0.milieu.y
+          if (Math.abs(dx) > 50 && Math.abs(dx) > Math.abs(dy) * 1.5) {
+            doigts.current.delete(e.pointerId)
+            reprendre(vue)
+            onGlisse(dx < 0 ? 1 : -1)
+            return
+          }
+        }
         doigts.current.delete(e.pointerId)
         if (doigts.current.size === 0 && !bouge.current) {
           /* Deux touchers rapprochés : on agrandit là où l'on a touché, ou

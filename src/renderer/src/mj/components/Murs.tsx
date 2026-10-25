@@ -93,6 +93,7 @@ import {
   IconGomme,
   IconLoupe,
   IconPen,
+  IconCercle,
   IconPlus,
   IconRotate,
   IconSouris,
@@ -280,6 +281,11 @@ export function useMurs(placeId: number): {
   /** La pièce qu'on regarde dans la liste : elle s'éclaire sur le plan. */
   formeVisee: number | null
   setFormeVisee: (i: number | null) => void
+  /** La porte ou la lampe dont on écrit le nom dans la liste : elle se signale sur le plan. */
+  ouvVisee: number | null
+  setOuvVisee: (id: number | null) => void
+  lumVisee: number | null
+  setLumVisee: (id: number | null) => void
   poser: (nature: NatureMur, traces: PointMur[][], retraits?: Retrait[]) => Promise<void>
   /**
    * Les murs qu'on désigne pour en faire une pièce ; `null`, on ne désigne
@@ -376,6 +382,8 @@ export function useMurs(placeId: number): {
   const [ouvChoisie, setOuvChoisie] = useState<number | null>(null)
   const [pourPiece, setPourPiece] = useState<number[] | null>(null)
   const [formeVisee, setFormeVisee] = useState<number | null>(null)
+  const [ouvVisee, setOuvVisee] = useState<number | null>(null)
+  const [lumVisee, setLumVisee] = useState<number | null>(null)
   const [attenteDepart, setAttenteDepart] = useState(false)
   const [outil, setOutil] = useState<OutilMur>('selection')
   const [nature, setNature] = useState<NatureMur>('mur')
@@ -882,6 +890,10 @@ export function useMurs(placeId: number): {
     oterLumiere,
     formeVisee,
     setFormeVisee,
+    ouvVisee,
+    setOuvVisee,
+    lumVisee,
+    setLumVisee,
     outil,
     setOutil,
     nature,
@@ -1345,11 +1357,14 @@ function ChampNom({
   nom,
   prefixe,
   placeholder,
+  libelle = 'Nom',
   onNom
 }: {
   nom: string
   prefixe?: string
   placeholder: string
+  /** null : le champ seul, quand la ligne d'une liste dit déjà ce qu'on nomme. */
+  libelle?: string | null
   onNom: (nom: string) => void
 }): JSX.Element {
   const [v, setV] = useState(nom)
@@ -1359,7 +1374,7 @@ function ChampNom({
   }
   return (
     <label className="murs-reglage lb-reglage lb-nom">
-      <span>Nom</span>
+      {libelle ? <span>{libelle}</span> : null}
       <span className="lb-nom-champ">
         {prefixe ? <span className="lb-nom-pre">{prefixe.trim()}</span> : null}
         <input
@@ -1380,6 +1395,64 @@ function ChampNom({
         />
       </span>
     </label>
+  )
+}
+
+/**
+ * Les portes ou les lumières du plan, chacune avec son champ de nom : on les
+ * baptise à la suite, sans aller les cliquer une à une sur la carte. La cible
+ * les choisit, pour voir laquelle c'est.
+ */
+function ListeANommer({
+  titre,
+  lignes,
+  prefixe,
+  placeholder
+}: {
+  titre: string
+  lignes: {
+    id: number
+    nom: string
+    onNom: (nom: string) => void
+    onVoir: () => void
+    /** Le champ a la main, ou la souris est sur la ligne : la signaler sur le plan. */
+    onVise: (oui: boolean) => void
+  }[]
+  prefixe?: string
+  placeholder: string
+}): JSX.Element | null {
+  if (!lignes.length) return null
+  return (
+    <>
+      <span className="eyebrow">
+        {titre} · {lignes.length}
+      </span>
+      <div className="murs-noms">
+        {lignes.map((l) => (
+          <div
+            key={l.id}
+            className="nm"
+            onMouseEnter={() => l.onVise(true)}
+            onMouseLeave={(e) => {
+              if (!e.currentTarget.contains(document.activeElement)) l.onVise(false)
+            }}
+            onFocus={() => l.onVise(true)}
+            onBlur={() => l.onVise(false)}
+          >
+            <button className="nm-voir" title="La choisir sur le plan" onClick={l.onVoir}>
+              <IconCercle />
+            </button>
+            <ChampNom
+              nom={l.nom}
+              prefixe={prefixe}
+              placeholder={placeholder}
+              libelle={null}
+              onNom={l.onNom}
+            />
+          </div>
+        ))}
+      </div>
+    </>
   )
 }
 
@@ -1662,6 +1735,8 @@ export function CalqueMurs({
   onDepart,
   formes = [],
   formeVisee = null,
+  ouvVisee = null,
+  lumVisee = null,
   nomDeForme,
   mode,
   outil,
@@ -1726,6 +1801,9 @@ export function CalqueMurs({
   nomDeForme?: (f: Forme) => string | null
   /** La pièce qu'on regarde dans la liste : on l'éclaire. */
   formeVisee?: number | null
+  /** La porte, la lampe qu'on nomme dans la liste : on la signale. */
+  ouvVisee?: number | null
+  lumVisee?: number | null
   /** La largeur que prendra l'ouverture qu'on s'apprête à poser. */
   largeurOuv?: number
   /** Les points de lumière posés sur cette carte. */
@@ -3365,8 +3443,19 @@ export function CalqueMurs({
           key={o.id}
           className={`ouv n-${o.nature}${franchie ? ' ouverte' : ''}${
             o.verrouillee ? ' verrouillee' : ''
-          }${refus === o.id ? ' refus' : ''}${ouvChoisie === o.id ? ' on' : ''}`}
+          }${refus === o.id ? ' refus' : ''}${ouvChoisie === o.id ? ' on' : ''}${
+            ouvVisee === o.id ? ' visee' : ''
+          }`}
         >
+          {/* Une porte n'est qu'un trait : on l'entoure, qu'on la trouve de loin. */}
+          {ouvVisee === o.id ? (
+            <circle
+              cx={milieu.x}
+              cy={milieu.y}
+              r={Math.max(16, Math.hypot(z.x - a.x, z.y - a.y) / 2 + 8)}
+              className="visee-halo"
+            />
+          ) : null}
           <path d={`M${a.x} ${a.y}L${z.x} ${z.y}`} className="trou" />
           <path d={`M${a.x} ${a.y}L${z.x} ${z.y}`} className="marque" data-ouv={o.id} />
           <title>
@@ -3435,6 +3524,7 @@ export function CalqueMurs({
               }`}
             />
           ) : null}
+          {lumVisee === l.id ? <circle cx={c.x} cy={c.y} r={18} className="visee-halo" /> : null}
           <circle cx={c.x} cy={c.y} r={9} className="pastille" data-lum={l.id} />
           <path
             className="rais"
@@ -4200,6 +4290,20 @@ export function VoletMurs({
             {pieceUnique ? null : (
               <p className="texte">Clique une ligne : la pièce se colorie sur le plan.</p>
             )}
+            <ListeANommer
+              titre="Portes"
+              prefixe="Porte "
+              placeholder="de la cave…"
+              lignes={m.ouvertures
+                .filter((o) => o.nature === 'porte')
+                .map((o) => ({
+                  id: o.id,
+                  nom: (o.nom ?? '').replace(/^Porte\s*/, ''),
+                  onNom: (reste) => void m.reglerOuverture(o.id, { nom: nomDePorte(reste) }),
+                  onVoir: () => m.setOuvChoisie(o.id),
+                  onVise: (oui) => m.setOuvVisee(oui ? o.id : null)
+                }))}
+            />
           </div>
           ) : null}
 
@@ -4213,6 +4317,17 @@ export function VoletMurs({
                 ? `${m.lumieres.length} lumière${m.lumieres.length > 1 ? 's' : ''} sur cette carte, ${allumees} allumée${allumees > 1 ? 's' : ''} — hors d'elles, les joueurs ne verront rien.`
                 : 'Aucune lumière : le regard porte partout, comme avant.'}
             </p>
+            <ListeANommer
+              titre="Les lumières"
+              placeholder="Lustre du salon…"
+              lignes={m.lumieres.map((l) => ({
+                id: l.id,
+                nom: l.nom ?? '',
+                onNom: (nom) => void m.reglerLumiere(l.id, { nom: nom || null }),
+                onVoir: () => m.setLumChoisie(l.id),
+                onVise: (oui) => m.setLumVisee(oui ? l.id : null)
+              }))}
+            />
             <GardeEclairee m={m} />
             <PorteeDuRegard m={m} />
             <LumiereDuDehorsReglage m={m} />

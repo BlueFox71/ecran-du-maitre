@@ -168,6 +168,12 @@ export interface Place {
    */
   pieceUnique: boolean
   /**
+   * Un bâtiment épingle ce qui peut y arriver à tous ses lieux : ses
+   * découvertes, déclencheurs et scénarios se lisent aussi sur la fiche de
+   * chacun de ses niveaux et de ses pièces, marqués de son nom.
+   */
+  epingleArrivees: boolean
+  /**
    * Jusqu'où un regard porte sur cette carte, en part de sa largeur.
    *
    * `null` — sans limite : le regard va jusqu'au mur, comme avant. Sinon, il
@@ -196,7 +202,29 @@ export interface Place {
    * carte elles se ressemblent toutes.
    */
   ouvLargeur: number | null
+  /**
+   * Les autres apparences de sa carte — la nuit, l'incendie, après
+   * l'effondrement. Seul le lieu qui porte le plan en a ; ses pièces suivent.
+   */
+  apparences: Apparence[]
+  /** L'apparence montrée ; `null`, la carte elle-même. */
+  apparenceId: number | null
+  /** Les images et vidéos à montrer ici, dans leur ordre — au Paravent, avec le moment. */
+  imageIds: number[]
   docCount: number
+}
+
+/**
+ * Une autre image de la même carte, au même cadrage. Seule l'image change :
+ * murs, lampes, brouillard et pions restent où ils sont — c'est pourquoi elle
+ * doit avoir les proportions de la carte.
+ */
+export interface Apparence {
+  id: number
+  placeId: number
+  itemId: number
+  nom: string
+  ord: number
 }
 
 /**
@@ -360,6 +388,8 @@ export interface Beat {
   items: Item[]
   /** Les PNJ que ce moment met en scène : la Régie les range devant les autres. */
   pnjIds: number[]
+  /** Le Paravent montre les portraits des joueurs, pour les présenter d'un clic. */
+  presenterJoueurs: boolean
 }
 
 /** Ce qu'est une carte de la trame : le départ, ce qui se passe, ce qu'ils doivent obtenir, une issue. */
@@ -407,6 +437,14 @@ export interface LieuScenario {
   placeId: number
   titre: string
   info: string
+  /** Joué pendant la partie : il se range avec les découvertes trouvées. */
+  fait: boolean
+  /** Où ça se passe sur le plan de l'étage, en fractions ; `null`, pas posé. */
+  pos: { x: number; y: number } | null
+  /** Le moment où il mène. */
+  beatId: number | null
+  objetIds: number[]
+  pnjIds: number[]
 }
 
 /** Ce qu'on découvre là, ou ce que les joueurs y déclenchent. */
@@ -424,6 +462,8 @@ export interface LieuCarte {
   si: string
   alors: string
   fait: boolean
+  /** Où ça se passe sur le plan de l'étage, en fractions ; `null`, pas posée. */
+  pos: { x: number; y: number } | null
   /** Le moment où mène un déclencheur. */
   beatId: number | null
   objetIds: number[]
@@ -494,12 +534,31 @@ export interface CampaignPlayer {
 
 export type FieldType = 'gauge' | 'stat' | 'skill' | 'text' | 'number'
 
+/** Les couleurs qu'une jauge peut porter : les teintes du thème, en clair comme en sombre. */
+export type CouleurJauge =
+  | 'blood'
+  | 'orange'
+  | 'argile'
+  | 'brass'
+  | 'olive'
+  | 'moss'
+  | 'fougere'
+  | 'jade'
+  | 'azur'
+  | 'ardoise'
+  | 'outremer'
+  | 'iris'
+  | 'amethyste'
+  | 'prune'
+  | 'bruyere'
+  | 'neutral'
+
 export interface GaugeSpec {
   key: string
   label: string
   min: number
   max: number
-  color: 'blood' | 'iris' | 'brass' | 'moss' | 'neutral'
+  color: CouleurJauge
   /** Le maximum est-il modifiable par le MJ (perte de SAN définitive, par ex.) */
   maxEditable?: boolean
   /**
@@ -775,6 +834,10 @@ export interface Objet {
   qte: number
   /** Ce qu'il pèse, tel que le MJ l'écrit : « 1,2 kg », « deux mains ». */
   poids: string | null
+  /** Les places qu'il prend dans un sac : 1 d'ordinaire, 0,5 pour une boîte de cachets. */
+  places: number
+  /** Les places qu'il ajoute au sac de celui qui le **porte** — un sac à dos. */
+  bonusSac: number
   /**
    * Ce qu'il vaut, **en nombre seulement** : l'unité appartient à la campagne
    * (voir `uniteValeur`), pas à l'objet. « 40 », jamais « 40 francs » — sans
@@ -1016,7 +1079,10 @@ export interface ObjetPlacement {
 export interface Inventaire {
   id: number
   nom: string
+  /** Dans le Sac des joueurs : ils y piochent depuis leur téléphone. */
   ouvert: boolean
+  /** Dans la Pochette : ils voient les images de ce qu'il tient, sans rien prendre. */
+  enPochette: boolean
   /** Ce qui est passé par là depuis le lancement de l'app, le plus récent en dernier. */
   journal: { heure: string; texte: string }[]
 }
@@ -1490,7 +1556,19 @@ export interface PreparationEtat {
 
 export type SlidePayload = (
   | { type: 'black' }
-  | { type: 'image'; itemId: number; url: string; title: string; caption?: string; frame?: Frame }
+  | {
+      type: 'image'
+      itemId: number
+      url: string
+      title: string
+      caption?: string
+      frame?: Frame
+      /**
+       * Montrée sous une autre apparence : `url` est alors celle de l'image de
+       * l'apparence, et `itemId` reste la carte — les pions s'y posent toujours.
+       */
+      apparence?: number
+    }
   | {
       type: 'video'
       itemId: number
@@ -1545,6 +1623,11 @@ export type SlidePayload = (
       fin: number | null
       /** Les trois lueurs du fond, en hexadécimal ; absentes, celles d'usine. */
       lueurs?: [string, string, string]
+      /**
+       * L'ambiance de la sonothèque lancée avec l'attente. Elle s'éteint en
+       * fondu quand l'attente quitte l'écran — si c'est encore elle qui joue.
+       */
+      musique?: number | null
       /** Ceux qu'on attend autour de la table. */
       joueurs: {
         id: number
@@ -1774,6 +1857,11 @@ export interface AudioState {
   sonId: number | null
   /** Le fondu enchaîné quand l'ambiance change, en secondes. */
   fondu: number
+  /**
+   * La pause qui vient s'éteint en ce nombre de secondes ; absent, un fondu
+   * court. Il ne vaut que pour la diffusion qui le porte.
+   */
+  extinction?: number
 }
 
 /* ---------- Les sons : sonothèque, sons posés, régie du son ---------- */

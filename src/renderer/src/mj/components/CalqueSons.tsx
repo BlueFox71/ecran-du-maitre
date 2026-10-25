@@ -34,6 +34,10 @@ export interface FiltresSons {
 }
 const SANS_FILTRE: FiltresSons = { par: null, quand: null, avant: null }
 
+function sansAccents(t: string): string {
+  return t.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('fr-FR')
+}
+
 /** Le son posé passe-t-il les filtres ? Une source n'attend jamais de feu vert. */
 function passe(x: ZoneSon, f: FiltresSons): boolean {
   if (f.par && x.par !== f.par) return false
@@ -607,6 +611,9 @@ export function VoletSons({
   const apercu = useSons((x) => x.apercu)
   const s = useStore()
   const zone = z.zones.find((x) => x.id === z.choisie) ?? null
+  /* Ce qu'on tape pour trouver le son par son nom ; un autre son posé repart de zéro. */
+  const [cherche, setCherche] = useState('')
+  useEffect(() => setCherche(''), [zone?.id])
   /* Quitter l'outil Son, ou l'éditeur, coupe le son qu'on y écoutait. */
   useEffect(() => () => arreterApercu(), [])
 
@@ -709,6 +716,20 @@ export function VoletSons({
   )
   const regler = (patch: Patch): void => void z.regler(zone.id, patch)
   const quand = QUANDS.find((q) => q.cle === zone.quand)!
+  const choisirSon = (id: number | null): void => {
+    const n = liste.find((x) => x.id === id)
+    /* Une nappe se fait entendre de près ; un bruitage, à l'entrée. */
+    regler({
+      sonId: id,
+      ...(n && n.nature !== 'bruitage' && zone.quand !== 'proche' ? { quand: 'proche' as const } : {}),
+      ...(n && n.nature === 'bruitage' && zone.quand === 'proche' ? { quand: 'chaque' as const } : {})
+    })
+  }
+  /* La recherche passe par-dessus les accents et les majuscules ; le son déjà
+     choisi reste dans la liste, sans quoi le menu ne saurait plus l'afficher. */
+  const q = sansAccents(cherche.trim())
+  const trouves = q ? liste.filter((x) => sansAccents(x.nom).includes(q)) : liste
+  const proposes = son && !trouves.includes(son) ? [son, ...trouves] : trouves
 
   return (
     <div className={`snd-volet n-${son?.nature ?? 'bruitage'}`}>
@@ -728,26 +749,41 @@ export function VoletSons({
 
       <div className="field">
         <label htmlFor="snd-z-son">Son</label>
+        {liste.length > 1 ? (
+          <input
+            className="snd-cherche"
+            type="search"
+            aria-label="Rechercher un son par son nom"
+            placeholder="Rechercher un son…"
+            value={cherche}
+            onChange={(e) => setCherche(e.target.value)}
+            onKeyDown={(e) => {
+              e.stopPropagation()
+              /* Entrée prend le premier son trouvé. */
+              if (e.key === 'Enter' && q && trouves.length) {
+                choisirSon(trouves[0].id)
+                setCherche('')
+              } else if (e.key === 'Escape') setCherche('')
+            }}
+          />
+        ) : null}
+        {q && !trouves.length ? <span className="snd-aide">Aucun son ne porte ce nom.</span> : null}
         <div className="snd-ligne">
           <select
             id="snd-z-son"
             value={zone.sonId ?? ''}
             onChange={(e) => {
-              const id = e.target.value ? Number(e.target.value) : null
-              const n = liste.find((x) => x.id === id)
-              /* Une nappe se fait entendre de près ; un bruitage, à l'entrée. */
-              regler({
-                sonId: id,
-                ...(n && n.nature !== 'bruitage' && zone.quand !== 'proche' ? { quand: 'proche' as const } : {}),
-                ...(n && n.nature === 'bruitage' && zone.quand === 'proche' ? { quand: 'chaque' as const } : {})
-              })
+              choisirSon(e.target.value ? Number(e.target.value) : null)
+              setCherche('')
             }}
           >
-            <option value="">— Choisir un son —</option>
+            <option value="">
+              {q ? `— ${trouves.length} son${trouves.length > 1 ? 's' : ''} trouvé${trouves.length > 1 ? 's' : ''} —` : '— Choisir un son —'}
+            </option>
             {(['bruitage', 'nappe', 'ambiance'] as NatureSon[]).map((n) =>
-              liste.some((x) => x.nature === n) ? (
+              proposes.some((x) => x.nature === n) ? (
                 <optgroup key={n} label={NATURES_SON[n].pluriel}>
-                  {liste
+                  {proposes
                     .filter((x) => x.nature === n)
                     .map((x) => (
                       <option key={x.id} value={x.id}>

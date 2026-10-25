@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
+import { Minuteries, useMinuteries } from './Minuteries'
 
 /**
  * L'horloge de la séance, au pied du rail : on la commence en début de soirée,
@@ -65,6 +66,7 @@ export function HorlogeSeance(): JSX.Element | null {
   const sessionId = useStore((s) => s.session?.id ?? null)
   const [evs, setEvs] = useState<Evenement[]>([])
   const [maintenant, setMaintenant] = useState(Date.now())
+  const minuteries = useMinuteries(sessionId)
 
   // La séance change : on relit sa liste.
   useEffect(() => {
@@ -101,6 +103,9 @@ export function HorlogeSeance(): JSX.Element | null {
     setEvs(suite)
     setMaintenant(Date.now())
     void window.jdr.reglages.poserCampagne(cle(sessionId), JSON.stringify(suite))
+    /* Les minuteries suivent l'horloge : le repas ne fait pas tomber le générateur. */
+    if (t === 'pause' || t === 'fin') minuteries.suspendre()
+    if (t === 'reprise') minuteries.relancer()
   }
 
   const debut = evs.find((e) => e.t === 'debut')?.at
@@ -173,6 +178,8 @@ export function HorlogeSeance(): JSX.Element | null {
           </div>
         </>
       )}
+
+      <Minuteries m={minuteries} />
     </div>
   )
 }

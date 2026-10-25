@@ -70,6 +70,7 @@ import {
   type Item,
   type Objet,
   type ObjetPlacement,
+  type Pion,
   type Place,
   type PlaceTier,
   type PointMur,
@@ -79,7 +80,18 @@ import { ALLURE_DEFAUT, ALLURE_MAX, ALLURE_MIN } from '@shared/types'
 import { boiteDe, centreDe, dansForme, pointInterieur, type Forme } from '@shared/pieces'
 import { barrieres, carreDAngle, mettreDEquerre, pasContraint, type Pt } from '@shared/murs'
 import { BoutonEquerre } from '../components/BoutonEquerre'
-import { FicheDuLieu, GLISSE_OBJET, QuiQuoiDuLieu } from '../components/FicheDuLieu'
+import {
+  ARTICLES_SITUES,
+  ArriveesDuLieu,
+  FicheDuLieu,
+  GLISSE_ARTICLE,
+  MarqueGenre,
+  GLISSE_OBJET,
+  GLISSE_PNJ,
+  PIONS_POSES,
+  QuiQuoiDuLieu,
+  situerArticle
+} from '../components/FicheDuLieu'
 import { ApercuDuCiel } from '../components/ApercuDuCiel'
 import { SuiteAriane } from '../components/SuiteAriane'
 import { CalqueSons, VoletSons, useSonsDEssai, useZonesSon } from '../components/CalqueSons'
@@ -2303,7 +2315,7 @@ function FicheLieu({
    */
   const [lum, setLum] = useState(100)
   /** L'onglet ouvert du volet, quand rien n'est choisi sur le plan. */
-  const [onglet, setOnglet] = useState<'echelle' | 'quiquoi' | 'sons' | OngletMurs>('pieces')
+  const [onglet, setOnglet] = useState<'echelle' | 'quiquoi' | 'arrivees' | 'sons' | OngletMurs>('pieces')
   /**
    * Dans « Objets et PNJ » d'un plan qui a ses pièces : celle où l'on range.
    * Une pièce n'a pas d'éditeur à elle, c'est donc d'ici qu'on la garnit.
@@ -2311,6 +2323,13 @@ function FicheLieu({
   const [pieceQq, setPieceQq] = useState<number | null>(null)
   /** Un objet cliqué sur le plan : sa rangée se déplie dans le volet. */
   const [ouvrirQq, setOuvrirQq] = useState<{ cle: string; n: number } | null>(null)
+  /**
+   * Dans « Ce qui peut arriver » : le lieu dont on lit les articles — l'étage
+   * lui-même, ou l'une de ses pièces. `null`, le premier de la liste.
+   */
+  const [lieuArr, setLieuArr] = useState<number | null>(null)
+  /** Une pastille cliquée sur le plan : son article se déplie dans le volet. */
+  const [ouvrirArr, setOuvrirArr] = useState<{ cle: string; n: number } | null>(null)
   const [remplacer, setRemplacer] = useState(false)
   /**
    * Un geste au rectangle sur la carte : garder ce cadre de l'image, ou
@@ -2755,6 +2774,118 @@ function FicheLieu({
     return () => mu.setFormeVisee(null)
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [onglet, pieceRangee?.id, mu.formes])
+
+  /* « Ce qui peut arriver » : l'étage lui-même, puis ses pièces. La pièce
+     choisie s'allume sur le plan, comme pour les objets. */
+  const lieuxArr = useMemo(() => [p, ...piecesQq], [p, piecesQq])
+  const lieuArrive = lieuxArr.find((q) => q.id === lieuArr) ?? lieuxArr[0]
+  useEffect(() => {
+    if (onglet !== 'arrivees' || lieuArrive.id === p.id) return
+    const i = mu.formes.findIndex((f) => lieuDeLaForme(f)?.id === lieuArrive.id)
+    mu.setFormeVisee(i < 0 ? null : i)
+    return () => mu.setFormeVisee(null)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [onglet, lieuArrive.id, mu.formes])
+
+  /* Les articles posés sur ce plan — de l'étage et de ses pièces —, relus
+     quand l'un bouge, ici ou dans le volet. */
+  const [articlesPlan, setArticlesPlan] = useState<ArticlePose[]>([])
+  const cleLieuxArr = lieuxArr.map((q) => q.id).join(',')
+  useEffect(() => {
+    let vivant = true
+    const relire = async (): Promise<void> => {
+      const fiches = await Promise.all(lieuxArr.map((q) => window.jdr.fiche.lire(q.id)))
+      if (!vivant) return
+      setArticlesPlan(
+        fiches.flatMap((f, i): ArticlePose[] => [
+          ...f.cartes.flatMap((c): ArticlePose[] =>
+            c.pos
+              ? [{ cle: `c${c.id}`, genre: c.sorte, titre: c.titre, fait: c.fait, pos: c.pos, placeId: lieuxArr[i].id }]
+              : []
+          ),
+          ...f.scenarios.flatMap((sc, k): ArticlePose[] =>
+            sc.pos
+              ? [
+                  {
+                    cle: `s${sc.id}`,
+                    genre: 'scenario',
+                    num: k + 1,
+                    titre: sc.titre || 'Sans titre',
+                    fait: sc.fait,
+                    pos: sc.pos,
+                    placeId: lieuxArr[i].id
+                  }
+                ]
+              : []
+          )
+        ])
+      )
+    }
+    void relire()
+    const h = (): void => void relire()
+    window.addEventListener(ARTICLES_SITUES, h)
+    window.addEventListener('jdr:defait', h)
+    const lache = window.jdr.fiche.onRelue(h)
+    return () => {
+      vivant = false
+      window.removeEventListener(ARTICLES_SITUES, h)
+      window.removeEventListener('jdr:defait', h)
+      lache()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cleLieuxArr])
+
+  /**
+   * Poser un article en un point du plan. Celui d'une pièce ne sort pas de
+   * sa pièce : lâché dehors, il est refusé. Celui de l'étage va partout.
+   */
+  const situerArt = async (cle: string, placeId: number, pt: { x: number; y: number }): Promise<boolean> => {
+    const lieu = lieuxArr.find((q) => q.id === placeId)
+    if (!lieu) {
+      s.toast('Cet article n’est pas de ce plan', true)
+      return false
+    }
+    if (lieu.id !== p.id && !(lieu.zone && dansForme([pt.x, pt.y], lieu.zone))) {
+      s.toast(`Il est prévu dans ${lieu.name} : pose-le dans cette pièce`, true)
+      return false
+    }
+    await situerArticle(cle, pt)
+    return true
+  }
+
+  /*
+   * Les PNJ posés d'avance : leurs pions sur ce plan, cachés tant que la
+   * scène ne les amène pas. Un pion se range au cadrage neutre de l'écran
+   * des joueurs, pas sur le plan : il faut le format de cet écran pour
+   * passer de l'un à l'autre.
+   */
+  const [pionsPlan, setPionsPlan] = useState<Pion[]>([])
+  useEffect(() => {
+    let vivant = true
+    const relire = async (): Promise<void> => {
+      const r = await window.jdr.pions.of(p.id)
+      if (vivant) setPionsPlan(r.pions)
+    }
+    void relire()
+    const h = (): void => void relire()
+    window.addEventListener(PIONS_POSES, h)
+    return () => {
+      vivant = false
+      window.removeEventListener(PIONS_POSES, h)
+    }
+  }, [p.id, onglet])
+  const pionsPnj = useMemo(() => pionsPlan.filter((x) => x.pnj), [pionsPlan])
+  const sortie =
+    s.screens.find((x) => x.id === s.display?.outputDisplayId) ?? s.screens.find((x) => !x.primary) ?? s.screens[0] ?? null
+  const formatEcran = sortie ? sortie.width / sortie.height : 16 / 9
+  const poserPnj = async (characterId: number, pt: { x: number; y: number }): Promise<void> => {
+    await window.jdr.pions.add({ placeId: p.id, characterId, x: pt.x, y: pt.y, cache: true })
+    window.dispatchEvent(new Event(PIONS_POSES))
+  }
+  const deplacerPion = async (id: number, pt: { x: number; y: number }): Promise<void> => {
+    await window.jdr.pions.move(id, pt.x, pt.y)
+    window.dispatchEvent(new Event(PIONS_POSES))
+  }
 
   /** Les objets posés en un point du plan, dans l'une de ses pièces. */
   const objetsSurPlan = useMemo(() => {
@@ -3516,6 +3647,8 @@ function FicheLieu({
                   onDepart={(x, y) => mu.partirDe(x, y)}
                   formes={mu.formes}
                   formeVisee={mu.formeVisee}
+                  ouvVisee={mu.ouvVisee}
+                  lumVisee={mu.lumVisee}
                   nomDeForme={(f) => (unique ? p.name : (lieuDeLaForme(f)?.name ?? null))}
                   ouvChoisie={mu.ouvChoisie}
                   onOuvChoisie={mu.setOuvChoisie}
@@ -3611,6 +3744,35 @@ function FicheLieu({
                       if (x.placeId != null) setPieceQq(x.placeId)
                       setOnglet('quiquoi')
                       setOuvrirQq((v) => ({ cle: `objet-${x.objetId}`, n: (v?.n ?? 0) + 1 }))
+                    }}
+                  />
+                ) : null}
+                {/* Les PNJ posés d'avance : leurs pions, que le MJ voit seul tant
+                    qu'ils sont cachés. Ils se prennent avec « Objets et PNJ ». */}
+                {calques.mj && !vueJoueursOn && !enTest ? (
+                  <CalquePnj
+                    pions={pionsPnj}
+                    format={formatEcran}
+                    actif={onglet === 'quiquoi' && !sansOutils}
+                    onPoser={poserPnj}
+                    onDeplacer={deplacerPion}
+                    onOuvrir={(x) => {
+                      setOnglet('quiquoi')
+                      if (x.characterId != null)
+                        setOuvrirQq((v) => ({ cle: `pnj-${x.characterId}`, n: (v?.n ?? 0) + 1 }))
+                    }}
+                  />
+                ) : null}
+                {/* Ce qui peut arriver, posé sur le plan : du MJ seul, comme les objets. */}
+                {calques.mj && !vueJoueursOn && !enTest ? (
+                  <CalqueArrivees
+                    articles={articlesPlan}
+                    actif={onglet === 'arrivees' && !sansOutils}
+                    onSituer={situerArt}
+                    onOuvrir={(a) => {
+                      setLieuArr(a.placeId)
+                      setOnglet('arrivees')
+                      setOuvrirArr((v) => ({ cle: a.cle, n: (v?.n ?? 0) + 1 }))
                     }}
                   />
                 ) : null}
@@ -3783,6 +3945,7 @@ function FicheLieu({
                     ['lumiere', 'Lumière', mu.lumieres.length],
                     ['traits', 'Traits', mu.liste.length],
                     ['quiquoi', 'Objets et PNJ', null],
+                    ['arrivees', 'Ce qui peut arriver', null],
                     ['sons', 'Sons', zs.zones.length]
                   ] as const
                 ).map(([k, l, n]) => (
@@ -3872,10 +4035,34 @@ function FicheLieu({
                       ))}
                     </div>
                   </div>
-                  <QuiQuoiDuLieu p={pieceRangee} surPlan ouvrir={ouvrirQq} />
+                  <QuiQuoiDuLieu p={pieceRangee} surPlan ouvrir={ouvrirQq} pionsPnj={pionsPnj} />
                 </>
               ) : onglet === 'quiquoi' ? (
-                <QuiQuoiDuLieu p={p} />
+                <QuiQuoiDuLieu p={p} surPlan ouvrir={ouvrirQq} pionsPnj={pionsPnj} />
+              ) : null}
+              {/* Ce qui peut arriver : l'étage, ou l'une de ses pièces. Une ligne
+                  glissée sur le plan y pose l'article. */}
+              {onglet === 'arrivees' ? (
+                <>
+                  {lieuxArr.length > 1 ? (
+                    <div className="pe-qq-pieces">
+                      <span className="eyebrow">Ce qui est prévu dans</span>
+                      <div role="radiogroup" aria-label="Dans quel lieu">
+                        {lieuxArr.map((q) => (
+                          <button
+                            key={q.id}
+                            role="radio"
+                            aria-checked={q.id === lieuArrive.id}
+                            onClick={() => setLieuArr(q.id)}
+                          >
+                            {q.id === p.id ? `${q.name} (tout le plan)` : q.name}
+                          </button>
+                        ))}
+                      </div>
+                    </div>
+                  ) : null}
+                  <ArriveesDuLieu p={lieuArrive} ouvrir={ouvrirArr} />
+                </>
               ) : null}
               {/* Les sons posés, rangés par pièce : un son qu'on choisit prend
                   l'outil Son, pour le régler et le déplacer sur le plan. */}
@@ -3895,7 +4082,7 @@ function FicheLieu({
                   }
                 />
               ) : null}
-              {onglet === 'echelle' || onglet === 'quiquoi' || onglet === 'sons' ? null : (
+              {onglet === 'echelle' || onglet === 'quiquoi' || onglet === 'arrivees' || onglet === 'sons' ? null : (
               <VoletMurs
                 m={mu}
                 nomDeForme={(f) => (unique ? p.name : (lieuDeLaForme(f)?.name ?? null))}
@@ -5134,6 +5321,287 @@ function CalqueObjets({
             ) : (
               <span className={`c-${f?.teinte ?? 'neutral'}`}>{glypheObjet(f?.glyphe ?? 'outils', 'glyphe')}</span>
             )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
+/**
+ * Du plan au cadrage neutre d'un pion, et retour. L'image y est entière et
+ * centrée dans l'écran des joueurs : l'axe où elle touche les bords ne change
+ * pas, l'autre se resserre. `image` et `ecran` sont des largeurs sur hauteurs.
+ */
+function planVersPion(pt: { x: number; y: number }, image: number, ecran: number): { x: number; y: number } {
+  return image >= ecran
+    ? { x: pt.x, y: (pt.y - 0.5) * (ecran / image) + 0.5 }
+    : { x: (pt.x - 0.5) * (image / ecran) + 0.5, y: pt.y }
+}
+function pionVersPlan(pt: { x: number; y: number }, image: number, ecran: number): { x: number; y: number } {
+  return image >= ecran
+    ? { x: pt.x, y: (pt.y - 0.5) * (image / ecran) + 0.5 }
+    : { x: (pt.x - 0.5) * (ecran / image) + 0.5, y: pt.y }
+}
+
+/**
+ * Les pions de PNJ posés sur le plan : un rond à son portrait, en pointillé
+ * tant qu'il est caché. On en glisse un depuis le volet (`GLISSE_PNJ`), on
+ * déplace un pion à la souris ; un clic l'ouvre dans le volet.
+ */
+function CalquePnj({
+  pions,
+  format,
+  actif,
+  onPoser,
+  onDeplacer,
+  onOuvrir
+}: {
+  pions: Pion[]
+  /** Le format de l'écran des joueurs, largeur sur hauteur. */
+  format: number
+  actif: boolean
+  onPoser: (characterId: number, pt: { x: number; y: number }) => Promise<void>
+  onDeplacer: (id: number, pt: { x: number; y: number }) => Promise<void>
+  onOuvrir: (x: Pion) => void
+}): JSX.Element {
+  const hote = useRef<HTMLDivElement>(null)
+  const [tire, setTire] = useState<{ id: number; x: number; y: number; dx: number; dy: number; bouge: boolean } | null>(
+    null
+  )
+  /* Le format de l'image se lit sur le calque, qui la couvre exactement ; il
+     n'est connu qu'une fois le calque posé. */
+  const [image, setImage] = useState<number | null>(null)
+  useEffect(() => {
+    const el = hote.current
+    if (!el) return
+    const lire = (): void => {
+      const b = el.getBoundingClientRect()
+      setImage(b.width && b.height ? b.width / b.height : null)
+    }
+    lire()
+    const ro = new ResizeObserver(lire)
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [])
+  const versPlan = (cx: number, cy: number): { x: number; y: number } | null => {
+    const b = hote.current?.getBoundingClientRect()
+    if (!b || !b.width || !b.height) return null
+    return { x: (cx - b.left) / b.width, y: (cy - b.top) / b.height }
+  }
+  const poserRef = useRef(onPoser)
+  poserRef.current = onPoser
+  const formatRef = useRef(format)
+  formatRef.current = format
+
+  useEffect(() => {
+    if (!actif) return
+    const surLePlan = (e: DragEvent): boolean => {
+      if (!e.dataTransfer?.types.includes(GLISSE_PNJ)) return false
+      const cadre = hote.current?.parentElement
+      if (!cadre || !cadre.contains(e.target as Node)) return false
+      const p = versPlan(e.clientX, e.clientY)
+      return !!p && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1
+    }
+    const dessus = (e: DragEvent): void => {
+      if (!surLePlan(e)) return
+      e.preventDefault()
+      e.dataTransfer!.dropEffect = 'move'
+    }
+    const lache = (e: DragEvent): void => {
+      if (!surLePlan(e)) return
+      e.preventDefault()
+      e.stopPropagation()
+      const id = Number(e.dataTransfer!.getData(GLISSE_PNJ))
+      const p = versPlan(e.clientX, e.clientY)
+      const b = hote.current?.getBoundingClientRect()
+      if (id && p && b) void poserRef.current(id, planVersPion(p, b.width / b.height, formatRef.current))
+    }
+    document.addEventListener('dragover', dessus, true)
+    document.addEventListener('drop', lache, true)
+    return () => {
+      document.removeEventListener('dragover', dessus, true)
+      document.removeEventListener('drop', lache, true)
+    }
+  }, [actif])
+
+  return (
+    <div ref={hote} className={`pe-pnjs${actif ? ' actif' : ''}`}>
+      {image
+        ? pions.map((x) => {
+            const enMain = tire?.id === x.id ? tire : null
+            const pos = enMain ?? pionVersPlan({ x: x.x, y: x.y }, image, format)
+            return (
+              <div
+                key={x.id}
+                className={`pe-pnj${x.cache ? ' cache' : ''}${enMain ? ' tire' : ''}`}
+                style={{ left: `${pos.x * 100}%`, top: `${pos.y * 100}%` }}
+                title={`${x.label} — ${x.cache ? 'caché des joueurs' : 'visible des joueurs'}`}
+                onMouseDown={(e) => e.stopPropagation()}
+                onClick={(e) => e.stopPropagation()}
+                onPointerDown={(e) => {
+                  if (!actif || e.button !== 0) return
+                  e.stopPropagation()
+                  e.preventDefault()
+                  const p = versPlan(e.clientX, e.clientY)
+                  if (!p) return
+                  const ici = pionVersPlan({ x: x.x, y: x.y }, image, format)
+                  setTire({ id: x.id, x: ici.x, y: ici.y, dx: ici.x - p.x, dy: ici.y - p.y, bouge: false })
+                  e.currentTarget.setPointerCapture(e.pointerId)
+                }}
+                onPointerMove={(e) => {
+                  if (!enMain) return
+                  const p = versPlan(e.clientX, e.clientY)
+                  if (!p) return
+                  const bouge = enMain.bouge || Math.hypot(e.movementX, e.movementY) > 0
+                  setTire({ ...enMain, x: p.x + enMain.dx, y: p.y + enMain.dy, bouge })
+                }}
+                onPointerUp={(e) => {
+                  if (!enMain) return
+                  e.currentTarget.releasePointerCapture(e.pointerId)
+                  if (!enMain.bouge) {
+                    setTire(null)
+                    onOuvrir(x)
+                    return
+                  }
+                  void onDeplacer(x.id, planVersPion({ x: enMain.x, y: enMain.y }, image, format)).finally(() =>
+                    setTire(null)
+                  )
+                }}
+              >
+                {x.url ? <img src={x.url} alt="" /> : <span>{x.initials}</span>}
+              </div>
+            )
+          })
+        : null}
+    </div>
+  )
+}
+
+/** Une découverte, un déclencheur ou un scénario posé sur le plan. */
+interface ArticlePose {
+  /** `c12` pour une carte, `s4` pour un scénario. */
+  cle: string
+  genre: 'decouverte' | 'declencheur' | 'scenario'
+  /** Le numéro d'un scénario dans sa fiche. */
+  num?: number
+  titre: string
+  fait: boolean
+  pos: { x: number; y: number }
+  /** Le lieu dont il est : l'étage, ou l'une de ses pièces. */
+  placeId: number
+}
+
+const GENRE_ARTICLE: Record<ArticlePose['genre'], string> = {
+  decouverte: 'Découverte',
+  declencheur: 'Déclencheur',
+  scenario: 'Scénario'
+}
+
+/**
+ * Ce qui peut arriver ici, posé sur le plan : une pastille par article, à la
+ * marque de sa sorte. On en glisse un depuis le volet (`GLISSE_ARTICLE`), on
+ * déplace une pastille à la souris ; `onSituer` refuse un point hors de sa
+ * pièce, et la pastille revient. Un clic l'ouvre dans le volet.
+ */
+function CalqueArrivees({
+  articles,
+  actif,
+  onSituer,
+  onOuvrir
+}: {
+  articles: ArticlePose[]
+  /** Les pastilles se prennent, le plan accepte qu'on y lâche un article. */
+  actif: boolean
+  onSituer: (cle: string, placeId: number, pt: { x: number; y: number }) => Promise<boolean>
+  onOuvrir: (a: ArticlePose) => void
+}): JSX.Element {
+  const hote = useRef<HTMLDivElement>(null)
+  /** La pastille qu'on tire, et l'écart entre la souris et son centre. */
+  const [tire, setTire] = useState<{ cle: string; x: number; y: number; dx: number; dy: number; bouge: boolean } | null>(
+    null
+  )
+  const versPlan = (cx: number, cy: number): { x: number; y: number } | null => {
+    const b = hote.current?.getBoundingClientRect()
+    if (!b || !b.width || !b.height) return null
+    return { x: (cx - b.left) / b.width, y: (cy - b.top) / b.height }
+  }
+  const situerRef = useRef(onSituer)
+  situerRef.current = onSituer
+
+  /* Lâcher une ligne du volet sur le plan : comme pour les objets, on écoute
+     le document, et l'on ne garde que ce qui tombe sur le plan lui-même. */
+  useEffect(() => {
+    if (!actif) return
+    const surLePlan = (e: DragEvent): boolean => {
+      if (!e.dataTransfer?.types.includes(GLISSE_ARTICLE)) return false
+      const cadre = hote.current?.parentElement
+      if (!cadre || !cadre.contains(e.target as Node)) return false
+      const p = versPlan(e.clientX, e.clientY)
+      return !!p && p.x >= 0 && p.x <= 1 && p.y >= 0 && p.y <= 1
+    }
+    const dessus = (e: DragEvent): void => {
+      if (!surLePlan(e)) return
+      e.preventDefault()
+      e.dataTransfer!.dropEffect = 'move'
+    }
+    const lache = (e: DragEvent): void => {
+      if (!surLePlan(e)) return
+      e.preventDefault()
+      e.stopPropagation()
+      const [cle, lieu] = e.dataTransfer!.getData(GLISSE_ARTICLE).split('@')
+      const p = versPlan(e.clientX, e.clientY)
+      if (cle && Number(lieu) && p) void situerRef.current(cle, Number(lieu), p)
+    }
+    document.addEventListener('dragover', dessus, true)
+    document.addEventListener('drop', lache, true)
+    return () => {
+      document.removeEventListener('dragover', dessus, true)
+      document.removeEventListener('drop', lache, true)
+    }
+  }, [actif])
+
+  return (
+    <div ref={hote} className={`pe-arrivees${actif ? ' actif' : ''}`}>
+      {articles.map((a) => {
+        const enMain = tire?.cle === a.cle ? tire : null
+        const pos = enMain ?? a.pos
+        return (
+          <div
+            key={a.cle}
+            className={`pe-article${a.fait ? ' fait' : ''}${enMain ? ' tire' : ''}`}
+            style={{ left: `${pos.x * 100}%`, top: `${pos.y * 100}%` }}
+            title={`${GENRE_ARTICLE[a.genre]}${a.num ? ` n° ${a.num}` : ''} — ${a.titre}${a.fait ? (a.genre === 'scenario' ? ' · joué' : a.genre === 'decouverte' ? ' · trouvée' : ' · déclenché') : ''}`}
+            onMouseDown={(e) => e.stopPropagation()}
+            onClick={(e) => e.stopPropagation()}
+            onPointerDown={(e) => {
+              if (!actif || e.button !== 0) return
+              e.stopPropagation()
+              e.preventDefault()
+              const p = versPlan(e.clientX, e.clientY)
+              if (!p) return
+              setTire({ cle: a.cle, x: a.pos.x, y: a.pos.y, dx: a.pos.x - p.x, dy: a.pos.y - p.y, bouge: false })
+              e.currentTarget.setPointerCapture(e.pointerId)
+            }}
+            onPointerMove={(e) => {
+              if (!enMain) return
+              const p = versPlan(e.clientX, e.clientY)
+              if (!p) return
+              const bouge = enMain.bouge || Math.hypot(e.movementX, e.movementY) > 0
+              setTire({ ...enMain, x: p.x + enMain.dx, y: p.y + enMain.dy, bouge })
+            }}
+            onPointerUp={(e) => {
+              if (!enMain) return
+              e.currentTarget.releasePointerCapture(e.pointerId)
+              if (!enMain.bouge) {
+                setTire(null)
+                onOuvrir(a)
+                return
+              }
+              void onSituer(a.cle, a.placeId, { x: enMain.x, y: enMain.y }).finally(() => setTire(null))
+            }}
+          >
+            <MarqueGenre genre={a.genre} num={a.num} />
           </div>
         )
       })}

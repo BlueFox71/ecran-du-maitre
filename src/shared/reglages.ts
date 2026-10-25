@@ -48,6 +48,8 @@ export interface ReglagesCampagne {
   pnjFiche: boolean
   /** Les monnaies de la campagne, ou aucune — voir `@shared/monnaies`. */
   monnaies: ReglageMonnaies
+  /** Les places du sac d'un personnage, avant sac à dos ; 0, sans limite. */
+  sacCapacite: number
 }
 
 export const CAMPAGNE_DEFAUT: ReglagesCampagne = {
@@ -63,7 +65,10 @@ export const CAMPAGNE_DEFAUT: ReglagesCampagne = {
   /* Masquée : un PNJ n'a pas de feuille remplie à la main, d'ordinaire. */
   pnjFiche: false,
   /* Une campagne neuve n'a pas d'argent : le MJ l'active s'il en veut. */
-  monnaies: monnaiesParDefaut(null, false)
+  monnaies: monnaiesParDefaut(null, false),
+  /* Sans limite : une campagne déjà commencée ne voit pas ses sacs se fermer
+     tant que le MJ n'a rien réglé. */
+  sacCapacite: 0
 }
 
 export function lireCampagne(b: Brut): ReglagesCampagne {
@@ -80,7 +85,8 @@ export function lireCampagne(b: Brut): ReglagesCampagne {
     pnjFiche: oui(b, 'pnj.fiche', CAMPAGNE_DEFAUT.pnjFiche),
     /* Jamais réglées, elles prennent le nom de l'ancienne unité de valeur des
        objets : c'est dans cette monnaie que leurs prix ont été repris. */
-    monnaies: lireMonnaies(b['monnaies'], b['objets.unite'])
+    monnaies: lireMonnaies(b['monnaies'], b['objets.unite']),
+    sacCapacite: Math.round(nombre(b, 'sac.capacite', CAMPAGNE_DEFAUT.sacCapacite, 0, 999))
   }
 }
 

@@ -23,7 +23,8 @@ export function DetailPion({
   ch,
   focusId,
   onFerme,
-  onFait
+  onFait,
+  pose
 }: {
   pion: Pion | null
   ch: Character | null
@@ -31,6 +32,8 @@ export function DetailPion({
   onFerme: () => void
   /** Après un geste sur le pion : relire la scène et la présence. */
   onFait: () => Promise<void>
+  /** Poser l'un de ses objets sur le plan ; absent, aucun lieu à l'écran. */
+  pose?: PoseObjet
 }): JSX.Element | null {
   const s = useStore()
   if (!pion && !ch) return null
@@ -140,7 +143,7 @@ export function DetailPion({
             <Competences ch={ch} />
           </section>
           <section>
-            <ObjetsPortes ch={ch} />
+            <ObjetsPortes ch={ch} pose={pose} />
           </section>
           {pion ? (
             <section className="dp-piloter">
@@ -372,10 +375,21 @@ function Competences({ ch }: { ch: Character }): JSX.Element | null {
 }
 
 /**
+ * Un objet qu'il pose dans le lieu : le détecteur qu'on cale dans le couloir,
+ * la balise au pied de l'arbre. Le bouton arme l'outil, un clic sur le plan
+ * dit où — comme une lumière qu'on pose.
+ */
+export interface PoseObjet {
+  /** L'exemplaire qui attend son clic ; `null`, rien d'armé. */
+  arme: number | null
+  armer: (placementId: number | null) => void
+}
+
+/**
  * Ce que la réserve a posé sur lui : porté, puis dans le sac. Chaque objet qui
  * se porte a son menu — le sac, ou l'un de ses endroits encore libres sur lui.
  */
-function ObjetsPortes({ ch }: { ch: Character }): JSX.Element {
+function ObjetsPortes({ ch, pose }: { ch: Character; pose?: PoseObjet }): JSX.Element {
   const s = useStore()
   const surLui = s.objets.flatMap((o) => o.placements.filter((p) => p.characterId === ch.id).map((p) => ({ o, p })))
   const portes = surLui.filter((x) => x.p.emplacement)
@@ -411,6 +425,20 @@ function ObjetsPortes({ ch }: { ch: Character }): JSX.Element {
       </select>
     )
   }
+  const poser = (o: Objet, p: ObjetPlacement): JSX.Element | null => {
+    if (!pose) return null
+    const arme = pose.arme === p.id
+    return (
+      <button
+        className={`dp-poser${arme ? ' on' : ''}`}
+        aria-pressed={arme}
+        title={arme ? 'Clique sur le plan où le poser — Échap pour renoncer' : `${ch.name} pose ${o.nom} dans le lieu`}
+        onClick={() => pose.armer(arme ? null : p.id)}
+      >
+        poser
+      </button>
+    )
+  }
 
   return (
     <>
@@ -432,6 +460,7 @@ function ObjetsPortes({ ch }: { ch: Character }): JSX.Element {
                   {p.eteinte ? 'éteinte' : 'allumée'}
                 </button>
               ) : null}
+              {poser(o, p)}
             </li>
           ))}
         </ul>
@@ -446,6 +475,7 @@ function ObjetsPortes({ ch }: { ch: Character }): JSX.Element {
               {choix(o, p)}
               {o.nom}
               <span className="q num">×{p.qte}</span>
+              {poser(o, p)}
             </li>
           ))}
         </ul>

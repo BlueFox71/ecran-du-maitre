@@ -26,6 +26,7 @@ import { IconClose, glypheObjet } from './Icons'
 import { initials } from '../modules/Sheets'
 import { nomEmplacement } from '@shared/types'
 import type { Character, Objet, ObjetPlacement } from '@shared/types'
+import { refusSac } from '@shared/sac'
 
 /** Ce qu'un joueur a sur lui : l'objet, et l'exemplaire qui est à lui. */
 interface Avoir {
@@ -95,7 +96,7 @@ export function BandeJoueurs(): JSX.Element | null {
         return
       }
     } catch (err) {
-      s.toast('L’objet n’est pas arrivé jusqu’à lui.', true)
+      s.toast(refusSac(err) ?? 'L’objet n’est pas arrivé jusqu’à lui.', true)
       console.error('[bande]', err)
       return
     }

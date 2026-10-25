@@ -17,6 +17,7 @@ import { useStore } from '../store'
 import { Pop } from './Pop'
 import { IconClose, IconDonner } from './Icons'
 import type { ObjetPlacement } from '@shared/types'
+import { refusSac } from '@shared/sac'
 
 export function MenuDonner({
   x,
@@ -63,7 +64,7 @@ export function MenuDonner({
     try {
       await window.jdr.objets.donner(p.id, cible, qte)
     } catch (e) {
-      s.toast('L’objet n’a pas changé de mains.', true)
+      s.toast(refusSac(e) ?? 'L’objet n’a pas changé de mains.', true)
       console.error('[donner]', e)
       return
     }
@@ -78,7 +79,7 @@ export function MenuDonner({
     try {
       await window.jdr.objets.remettre(p.id, inventaireId, qte)
     } catch (e) {
-      s.toast('L’objet n’a pas été rangé.', true)
+      s.toast(refusSac(e) ?? 'L’objet n’a pas été rangé.', true)
       console.error('[ranger]', e)
       return
     }

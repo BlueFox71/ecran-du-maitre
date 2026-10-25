@@ -11,26 +11,45 @@ import type { FicheDuLieu, LieuCarte, LieuScenario, SorteCarte } from '@shared/t
 
 const SORTES: SorteCarte[] = ['decouverte', 'declencheur']
 
+/** Ce qu'une ligne de carte ou de scénario rend tel quel de la base. */
+type Brut = { fait: number; posX: number | null; posY: number | null }
+
+/** Le point posé sur le plan ; un point à moitié écrit n'en est pas un. */
+function versPos(x: number | null, y: number | null): { x: number; y: number } | null {
+  return x != null && y != null && Number.isFinite(x) && Number.isFinite(y) ? { x, y } : null
+}
 export function lireFiche(placeId: number): FicheDuLieu {
   const db = getDb()
-  const scenarios = db
-    .prepare(
-      `SELECT id, place_id AS placeId, titre, info FROM lieu_scenario
-        WHERE place_id = ? ORDER BY ord, id`
-    )
-    .all(placeId) as LieuScenario[]
+  const scObjets = db.prepare(`SELECT objet_id AS id FROM lieu_scenario_objet WHERE scenario_id = ?`)
+  const scPnj = db.prepare(`SELECT character_id AS id FROM lieu_scenario_pnj WHERE scenario_id = ?`)
+  const scenarios = (
+    db
+      .prepare(
+        `SELECT id, place_id AS placeId, titre, info, fait, beat_id AS beatId, pos_x AS posX, pos_y AS posY
+           FROM lieu_scenario WHERE place_id = ? ORDER BY ord, id`
+      )
+      .all(placeId) as (Omit<LieuScenario, 'fait' | 'pos' | 'objetIds' | 'pnjIds'> & Brut)[]
+  ).map(({ posX, posY, ...r }) => ({
+    ...r,
+    fait: !!r.fait,
+    pos: versPos(posX, posY),
+    objetIds: (scObjets.all(r.id) as { id: number }[]).map((x) => x.id),
+    pnjIds: (scPnj.all(r.id) as { id: number }[]).map((x) => x.id)
+  }))
   const objets = db.prepare(`SELECT objet_id AS id FROM lieu_carte_objet WHERE carte_id = ?`)
   const pnj = db.prepare(`SELECT character_id AS id FROM lieu_carte_pnj WHERE carte_id = ?`)
   const cartes = (
     db
       .prepare(
-        `SELECT id, place_id AS placeId, sorte, titre, si, alors, fait, beat_id AS beatId
+        `SELECT id, place_id AS placeId, sorte, titre, si, alors, fait, beat_id AS beatId,
+                pos_x AS posX, pos_y AS posY
            FROM lieu_carte WHERE place_id = ? ORDER BY fait, ord, id`
       )
-      .all(placeId) as (Omit<LieuCarte, 'fait' | 'objetIds' | 'pnjIds'> & { fait: number })[]
-  ).map((r) => ({
+      .all(placeId) as (Omit<LieuCarte, 'fait' | 'pos' | 'objetIds' | 'pnjIds'> & Brut)[]
+  ).map(({ posX, posY, ...r }) => ({
     ...r,
     fait: !!r.fait,
+    pos: versPos(posX, posY),
     objetIds: (objets.all(r.id) as { id: number }[]).map((x) => x.id),
     pnjIds: (pnj.all(r.id) as { id: number }[]).map((x) => x.id)
   }))
@@ -52,15 +71,49 @@ export function ajouterScenario(placeId: number, titre = ''): LieuScenario {
   const info = db
     .prepare(`INSERT INTO lieu_scenario (place_id, ord, titre) VALUES (?, ?, ?)`)
     .run(placeId, m + 1, titre)
-  return { id: Number(info.lastInsertRowid), placeId, titre, info: '' }
+  return { id: Number(info.lastInsertRowid), placeId, titre, info: '', fait: false, pos: null, beatId: null, objetIds: [], pnjIds: [] }
 }
 
-export function majScenario(id: number, patch: { titre?: string; info?: string }): void {
+/**
+ * Poser une carte ou un scénario sur le plan, ou l'en retirer (`null`). Le
+ * point est en fractions du plan, gardé dans ses bornes.
+ */
+export function situerArticle(genre: 'carte' | 'scenario', id: number, pos: { x: number; y: number } | null): void {
+  const borne = (v: number): number => Math.min(1, Math.max(0, v))
+  const table = genre === 'carte' ? 'lieu_carte' : 'lieu_scenario'
+  getDb()
+    .prepare(`UPDATE ${table} SET pos_x = ?, pos_y = ? WHERE id = ?`)
+    .run(pos ? borne(pos.x) : null, pos ? borne(pos.y) : null, id)
+}
+
+/** Joué ou non : il garde sa place et son numéro, la liste le range avec les faits. */
+export function cocherScenario(id: number, fait: boolean): void {
+  getDb().prepare(`UPDATE lieu_scenario SET fait = ? WHERE id = ?`).run(fait ? 1 : 0, id)
+}
+
+export function majScenario(
+  id: number,
+  patch: { titre?: string; info?: string; beatId?: number | null; objetIds?: number[]; pnjIds?: number[] }
+): void {
   const db = getDb()
-  if (patch.titre !== undefined)
-    db.prepare(`UPDATE lieu_scenario SET titre = ? WHERE id = ?`).run(patch.titre, id)
-  if (patch.info !== undefined)
-    db.prepare(`UPDATE lieu_scenario SET info = ? WHERE id = ?`).run(patch.info, id)
+  db.transaction(() => {
+    if (patch.titre !== undefined)
+      db.prepare(`UPDATE lieu_scenario SET titre = ? WHERE id = ?`).run(patch.titre, id)
+    if (patch.info !== undefined)
+      db.prepare(`UPDATE lieu_scenario SET info = ? WHERE id = ?`).run(patch.info, id)
+    if (patch.beatId !== undefined)
+      db.prepare(`UPDATE lieu_scenario SET beat_id = ? WHERE id = ?`).run(patch.beatId, id)
+    if (patch.objetIds) {
+      db.prepare(`DELETE FROM lieu_scenario_objet WHERE scenario_id = ?`).run(id)
+      const ins = db.prepare(`INSERT OR IGNORE INTO lieu_scenario_objet (scenario_id, objet_id) VALUES (?, ?)`)
+      for (const o of patch.objetIds) ins.run(id, o)
+    }
+    if (patch.pnjIds) {
+      db.prepare(`DELETE FROM lieu_scenario_pnj WHERE scenario_id = ?`).run(id)
+      const ins = db.prepare(`INSERT OR IGNORE INTO lieu_scenario_pnj (scenario_id, character_id) VALUES (?, ?)`)
+      for (const p of patch.pnjIds) ins.run(id, p)
+    }
+  })()
 }
 
 /** Les numéros se refont : ce sont des places, pas des identifiants. */
@@ -288,8 +341,15 @@ export function poserFicheTexte(placeId: number, f: FicheTexte): void {
 export function copierFiche(de: number, vers: number): void {
   const db = getDb()
   const ids = (sql: string): number[] => (db.prepare(sql).all(de) as { id: number }[]).map((r) => r.id)
-  for (const s of ids(`SELECT id FROM lieu_scenario WHERE place_id = ?`))
-    copierLigne('lieu_scenario', s, { place_id: vers })
+  for (const s of ids(`SELECT id FROM lieu_scenario WHERE place_id = ?`)) {
+    const n = copierLigne('lieu_scenario', s, { place_id: vers, fait: 0 })
+    db.prepare(
+      `INSERT INTO lieu_scenario_objet (scenario_id, objet_id) SELECT ?, objet_id FROM lieu_scenario_objet WHERE scenario_id = ?`
+    ).run(n, s)
+    db.prepare(
+      `INSERT INTO lieu_scenario_pnj (scenario_id, character_id) SELECT ?, character_id FROM lieu_scenario_pnj WHERE scenario_id = ?`
+    ).run(n, s)
+  }
   for (const c of ids(`SELECT id FROM lieu_carte WHERE place_id = ?`)) {
     const n = copierLigne('lieu_carte', c, { place_id: vers, fait: 0 })
     db.prepare(
@@ -321,7 +381,20 @@ export function raccrocherFiches(
   const majLieuPnj = db.prepare(
     `UPDATE OR IGNORE lieu_pnj SET character_id = ? WHERE place_id = ? AND character_id = ?`
   )
+  const majScenBeat = db.prepare(`UPDATE lieu_scenario SET beat_id = ? WHERE id = ?`)
+  const majScenPnj = db.prepare(
+    `UPDATE OR IGNORE lieu_scenario_pnj SET character_id = ? WHERE scenario_id = ? AND character_id = ?`
+  )
   for (const placeId of lieux) {
+    for (const sc of db
+      .prepare(`SELECT id, beat_id AS beatId FROM lieu_scenario WHERE place_id = ?`)
+      .all(placeId) as { id: number; beatId: number | null }[]) {
+      if (sc.beatId != null && beats.has(sc.beatId)) majScenBeat.run(beats.get(sc.beatId)!, sc.id)
+      for (const r of db
+        .prepare(`SELECT character_id AS id FROM lieu_scenario_pnj WHERE scenario_id = ?`)
+        .all(sc.id) as { id: number }[])
+        if (pnj.has(r.id)) majScenPnj.run(pnj.get(r.id)!, sc.id, r.id)
+    }
     for (const c of db
       .prepare(`SELECT id, beat_id AS beatId FROM lieu_carte WHERE place_id = ?`)
       .all(placeId) as { id: number; beatId: number | null }[]) {

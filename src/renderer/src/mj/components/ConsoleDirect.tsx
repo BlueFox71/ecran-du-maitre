@@ -1,4 +1,7 @@
+import { useState } from 'react'
 import { useStore } from '../store'
+import { emojiDe, useSons } from '../sons'
+import { useEchap } from '../echap'
 import { Slide } from '../../shared/Slide'
 import { Valeur } from './Valeur'
 import { slideLabel } from './Monitor'
@@ -81,9 +84,7 @@ export function ConsoleDirect({
 
         <div className="cd-amb">
           <IconAudio />
-          <span className="cd-amb-nom" title={audio?.title ?? undefined}>
-            {audio?.title ?? 'Aucune ambiance'}
-          </span>
+          <ChoixAmbiance nom={audio?.title ?? null} sonId={audio?.sonId ?? null} />
           <button
             className="btn btn-sm"
             disabled={!audio?.itemId}
@@ -182,5 +183,78 @@ export function ConsoleDirect({
         </button>
       </div>
     </div>
+  )
+}
+
+/**
+ * Le nom de l'ambiance, qui s'ouvre sur toutes celles de la sonothèque : on en
+ * change à la main, quel que soit le lieu à l'écran. La nouvelle arrive en
+ * fondu enchaîné, comme d'une tuile.
+ */
+function ChoixAmbiance({ nom, sonId }: { nom: string | null; sonId: number | null }): JSX.Element {
+  const liste = useSons((x) => x.liste)
+  const [ouvert, setOuvert] = useState(false)
+  const [q, setQ] = useState('')
+  useEchap(() => setOuvert(false), ouvert)
+  const mot = q.trim().toLowerCase()
+  const ambiances = liste
+    .filter((x) => x.nature === 'ambiance' && x.fichiers.length)
+    .filter((x) => !mot || `${x.nom} ${x.planche}`.toLowerCase().includes(mot))
+    .sort((a, b) => a.planche.localeCompare(b.planche, 'fr') || a.nom.localeCompare(b.nom, 'fr'))
+
+  return (
+    <span className="cd-amb-hote">
+      <button
+        className="cd-amb-nom"
+        aria-expanded={ouvert}
+        title={nom ? `${nom} — changer d’ambiance` : 'Choisir une ambiance'}
+        onClick={() => setOuvert((o) => !o)}
+      >
+        <span className="cd-amb-txt">{nom ?? 'Aucune ambiance'}</span>
+        <span className="cd-amb-fl" aria-hidden>
+          ▾
+        </span>
+      </button>
+      {ouvert ? (
+        <>
+          <span className="cd-amb-fond" onClick={() => setOuvert(false)} />
+          <span className="spx-menu cd-amb-menu" role="menu">
+            <span className="eyebrow">Changer d’ambiance</span>
+            {liste.filter((x) => x.nature === 'ambiance').length > 8 ? (
+              <input
+                className="spx-cherche"
+                type="search"
+                autoFocus
+                placeholder="Chercher une ambiance…"
+                value={q}
+                onChange={(e) => setQ(e.target.value)}
+              />
+            ) : null}
+            <span className="cd-amb-liste">
+              {ambiances.map((x) => (
+                <button
+                  key={x.id}
+                  role="menuitem"
+                  className={x.id === sonId ? 'on' : ''}
+                  onClick={() => {
+                    setOuvert(false)
+                    void window.jdr.regieSon.ambiance(x.id)
+                  }}
+                >
+                  <span className="emo">{emojiDe(x)}</span>
+                  <span className="nm">{x.nom || 'Sans nom'}</span>
+                  {x.planche ? <small>{x.planche}</small> : null}
+                </button>
+              ))}
+              {!ambiances.length ? (
+                <span className="spx-rien">
+                  {mot ? 'Rien ne correspond.' : 'Aucune ambiance dans la sonothèque.'}
+                </span>
+              ) : null}
+            </span>
+          </span>
+        </>
+      ) : null}
+    </span>
   )
 }

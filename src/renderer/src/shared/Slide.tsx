@@ -1,4 +1,5 @@
 import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { COLLAGE_CELLS, FRAME_NEUTRE, corpsDeCase, etatDeVie } from '@shared/types'
 import { Brouillard, regardsDes, sousUnRegard } from './Brouillard'
 import { Visage } from './Visage'
@@ -43,6 +44,65 @@ export interface TraitsMj {
   sons: boolean
   /** Les objets posés en un point du plan, cachés ou trouvés. */
   objets: boolean
+  /** Ce qui peut arriver, posé sur le plan : chaque sorte a sa case. */
+  decouvertes: boolean
+  declencheurs: boolean
+  scenarios: boolean
+}
+
+/** Une découverte, un déclencheur ou un scénario posé sur le plan, pour le MJ seul. */
+export interface ArticleSurCarte {
+  cle: string
+  x: number
+  y: number
+  genre: 'decouverte' | 'declencheur' | 'scenario'
+  /** Le numéro d'un scénario dans sa fiche. */
+  num?: number
+  titre: string
+  /** Ce qu'il dit : « si… alors… » d'une carte, le texte d'un scénario. */
+  si?: string
+  alors?: string
+  info?: string
+  /** Trouvée, déclenché ou joué. */
+  fait: boolean
+  /** Survolé dans la fiche du lieu : il se montre, et ressort. */
+  vise?: boolean
+}
+
+const GENRE_ARTICLE: Record<ArticleSurCarte['genre'], string> = {
+  decouverte: 'Découverte',
+  declencheur: 'Déclencheur',
+  scenario: 'Scénario'
+}
+
+/**
+ * Ce que dit un article survolé sur la carte du MJ : sa sorte, son titre, et
+ * son texte entier. Posé dans le document, hors de l'image : l'image tourne
+ * et s'agrandit, la bulle doit rester droite et lisible.
+ */
+function BulleArticle({ a, x, y }: { a: ArticleSurCarte; x: number; y: number }): JSX.Element {
+  const etat = a.fait ? (a.genre === 'scenario' ? 'joué' : a.genre === 'decouverte' ? 'trouvée' : 'déclenché') : null
+  return createPortal(
+    <div className={`bulle-article sorte-${a.genre}`} style={{ left: x, top: y }} role="tooltip">
+      <span className="bulle-sorte">
+        {GENRE_ARTICLE[a.genre]}
+        {a.num ? ` n° ${a.num}` : ''}
+        {etat ? ` · ${etat}` : ''}
+      </span>
+      <b>{a.titre}</b>
+      {a.genre === 'scenario' ? (
+        a.info ? <p>{a.info}</p> : null
+      ) : a.si || a.alors ? (
+        <dl>
+          <dt>SI</dt>
+          <dd>{a.si || '—'}</dd>
+          <dt>ALORS</dt>
+          <dd>{a.alors || '—'}</dd>
+        </dl>
+      ) : null}
+    </div>,
+    document.body
+  )
 }
 
 /** Un objet posé sur le plan, en fractions de la carte, pour le MJ seul. */
@@ -52,6 +112,8 @@ export interface ObjetSurCarte {
   y: number
   nom: string
   etat: 'cache' | 'trouve' | 'porte'
+  /** Survolé dans la fiche du lieu : il se montre, et ressort. */
+  vise?: boolean
 }
 
 /** Un son posé, tel que la scène du MJ le dessine. */
@@ -219,6 +281,8 @@ export interface SlideExtras {
   sonsMj?: SonSurCarte[]
   /** Côté MJ : les objets posés sur le plan à l'écran. */
   objetsMj?: ObjetSurCarte[]
+  /** Côté MJ : ce qui peut arriver, posé sur le plan à l'écran. */
+  articlesMj?: ArticleSurCarte[]
   /** Texte en cours de modification dans la régie. */
   activeText?: number | null
   onPickText?: (id: number) => void
@@ -265,6 +329,7 @@ export function Slide({
   nomsPieces,
   sonsMj,
   objetsMj,
+  articlesMj,
   jour
 }: { slide: SlidePayload; animate?: boolean } & SlideExtras): JSX.Element {
   const cls = `slide sl-${slide.type}${animate ? ' slide-fade' : ''}${
@@ -582,6 +647,7 @@ export function Slide({
             nomsPieces={nomsPieces}
             sonsMj={sonsMj}
             objetsMj={objetsMj}
+            articlesMj={articlesMj}
             onRepere={setRepere}
             onFrame={onFrame ? (f) => onFrame(null, f) : undefined}
           />
@@ -656,6 +722,7 @@ export function Slide({
                   nomsPieces={cases.length === 1 ? nomsPieces : undefined}
                   sonsMj={cases.length === 1 ? sonsMj : undefined}
                   objetsMj={cases.length === 1 ? objetsMj : undefined}
+                  articlesMj={cases.length === 1 ? articlesMj : undefined}
                   onRepere={cases.length === 1 ? setRepere : undefined}
                 />
                 {/* La légende appartient à la case : elle se range dedans, en
@@ -1220,6 +1287,7 @@ export function Framed({
   nomsPieces,
   sonsMj,
   objetsMj,
+  articlesMj,
   onRepere
 }: {
   url: string
@@ -1253,11 +1321,15 @@ export function Framed({
   sonsMj?: SonSurCarte[]
   /** Les objets posés, dessinés pour le MJ seul. */
   objetsMj?: ObjetSurCarte[]
+  /** Ce qui peut arriver, posé sur le plan, dessiné pour le MJ seul. */
+  articlesMj?: ArticleSurCarte[]
   /** L'image publie son repère : c'est par là qu'on passe de l'écran à la carte. */
   onRepere?: (r: Repere | null) => void
 }): JSX.Element {
   const box = useRef<HTMLDivElement>(null)
   const [nat, setNat] = useState<{ w: number; h: number } | null>(null)
+  /* L'article survolé sur la carte du MJ, et où poser sa bulle — à l'écran. */
+  const [survolArticle, setSurvolArticle] = useState<{ a: ArticleSurCarte; x: number; y: number } | null>(null)
   /* La taille du cadre, mesurée et non devinée : l'ombre doit tomber au pixel
      sur l'image, y compris quand la fenêtre change de taille. */
   const [taille, setTaille] = useState<{ w: number; h: number } | null>(null)
@@ -1555,8 +1627,20 @@ export function Framed({
     const { murs: voirMurs, portes, fenetres, astre, pieces } = traitsMj
     const noms = pieces ? (nomsPieces ?? []) : []
     const sons = (sonsMj ?? []).filter((z) => traitsMj.sons || z.vise)
-    const objets = traitsMj.objets ? (objetsMj ?? []) : []
-    if (!voirMurs && !portes && !fenetres && !astre && !noms.length && !sons.length && !objets.length)
+    /* Ce qu'on survole dans la fiche se montre toujours, case cochée ou non. */
+    const objets = (objetsMj ?? []).filter((o) => traitsMj.objets || o.vise)
+    const SORTES = { decouverte: 'decouvertes', declencheur: 'declencheurs', scenario: 'scenarios' } as const
+    const articles = (articlesMj ?? []).filter((x) => traitsMj[SORTES[x.genre]] || x.vise)
+    if (
+      !voirMurs &&
+      !portes &&
+      !fenetres &&
+      !astre &&
+      !noms.length &&
+      !sons.length &&
+      !objets.length &&
+      !articles.length
+    )
       return null
     const w = nat.w
     const h = nat.h
@@ -1645,7 +1729,12 @@ export function Framed({
           {objets.map((o) => {
             const r = Math.max(5, w * 0.006)
             return (
-              <g key={`b${o.id}`} className={`trait-objet ${o.etat}`} transform={`translate(${o.x * w} ${o.y * h})`}>
+              <g
+                key={`b${o.id}`}
+                className={`trait-objet ${o.etat}${o.vise ? ' vise' : ''}`}
+                transform={`translate(${o.x * w} ${o.y * h})`}
+              >
+                {o.vise ? <circle className="halo-vise" r={r * 2.6} strokeWidth={ep * 1.2} /> : null}
                 <path d={`M0 ${-r}L${r} 0L0 ${r}L${-r} 0Z`} strokeWidth={ep * 0.9} />
                 <text
                   y={r * 1.4}
@@ -1655,6 +1744,54 @@ export function Framed({
                   strokeWidth={Math.max(2, w * 0.003)}
                 >
                   {o.nom}
+                </text>
+              </g>
+            )
+          })}
+          {/* Ce qui peut arriver : une pastille à la marque de sa sorte — la
+              loupe, l'éclair, le numéro du scénario —, et son titre dessous.
+              Fait, il s'efface sans disparaître. */}
+          {articles.map((x) => {
+            const r = Math.max(7, w * 0.008)
+            return (
+              <g
+                key={`a${x.cle}`}
+                className={`trait-article sorte-${x.genre}${x.fait ? ' fait' : ''}${x.vise ? ' vise' : ''}`}
+                transform={`translate(${x.x * w} ${x.y * h})`}
+                onMouseEnter={(e) => {
+                  const b = e.currentTarget.getBoundingClientRect()
+                  setSurvolArticle({ a: x, x: b.left + b.width / 2, y: b.bottom + 6 })
+                }}
+                onMouseLeave={() => setSurvolArticle(null)}
+              >
+                {x.vise ? <circle className="halo-vise" r={r * 2.4} strokeWidth={ep * 1.2} /> : null}
+                <rect x={-r} y={-r} width={r * 2} height={r * 2} rx={r * 0.35} strokeWidth={ep * 0.8} />
+                {/* Les marques de la fiche, tracées et non en émoji : l'émoji
+                    change de dessin et de couleur d'un système à l'autre. */}
+                {x.genre === 'scenario' ? (
+                  <text className="marque" textAnchor="middle" dominantBaseline="central" fontSize={r * 1.1}>
+                    {x.num ?? '?'}
+                  </text>
+                ) : (
+                  <g className="marque" transform={`translate(${-r * 0.65} ${-r * 0.65}) scale(${(r * 1.3) / 16})`}>
+                    {x.genre === 'decouverte' ? (
+                      <>
+                        <circle cx="7" cy="7" r="4.5" />
+                        <path d="M10.4 10.4 14 14" />
+                      </>
+                    ) : (
+                      <path d="M9.2 1 3 9h4l-1.2 6L13 7H9l.2-6z" />
+                    )}
+                  </g>
+                )}
+                <text
+                  y={r * 1.35}
+                  textAnchor="middle"
+                  dominantBaseline="hanging"
+                  fontSize={Math.max(9, w * 0.011)}
+                  strokeWidth={Math.max(2, w * 0.003)}
+                >
+                  {x.titre}
                 </text>
               </g>
             )
@@ -1826,6 +1963,10 @@ export function Framed({
           pas. C'est le genre de détail qui ne se trouve qu'à l'écran. */}
       {ombre}
       {traits}
+      {/* La case décochée, l'article parti : sa bulle part avec lui. */}
+      {survolArticle && traitsMj && articlesMj?.some((a) => a.cle === survolArticle.a.cle) ? (
+        <BulleArticle a={survolArticle.a} x={survolArticle.x} y={survolArticle.y} />
+      ) : null}
       {halo}
     </div>
   )

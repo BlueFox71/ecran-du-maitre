@@ -10,6 +10,7 @@ import {
 } from '../components/Icons'
 import { SelecteurHeure } from '../components/SelecteurHeure'
 import { TexteEnPlace } from '../components/TexteEnPlace'
+import { ChoixDansArbre } from '../components/ChoixDansArbre'
 import { SousMenuPreparation } from '../components/SousMenuPreparation'
 import type { UiItem } from '../../../../preload/index'
 import type { Beat, Place } from '@shared/types'
@@ -197,13 +198,13 @@ function BeatReading({ beat }: { beat: Beat }): JSX.Element {
   const [enEdition, setEnEdition] = useState<number | null>(null)
   const place = s.places.find((p) => p.id === beat.placeId)
   const docs = useMemo(() => beat.items.filter((i) => i.kind === 'doc'), [beat])
-  /* Les images du moment, prises dans la Bibliothèque : sous la main, prêtes
-     à partir à l'écran si la scène le demande. */
+  /* Les images et vidéos du moment, prises dans la Bibliothèque : sous la
+     main, prêtes à partir à l'écran si la scène le demande. */
   const images = beat.items
-    .filter((i) => i.kind === 'image')
+    .filter((i) => i.kind === 'image' || i.kind === 'video')
     .map((i) => s.allItems.find((u) => u.id === i.id))
     .filter((u): u is UiItem => !!u)
-  const autres = beat.items.filter((i) => i.kind !== 'doc' && i.kind !== 'image')
+  const autres = beat.items.filter((i) => i.kind !== 'doc' && i.kind !== 'image' && i.kind !== 'video')
   const [choixImage, setChoixImage] = useState(false)
 
   const attache = async (itemId: number): Promise<void> => {
@@ -358,17 +359,20 @@ function BeatReading({ beat }: { beat: Beat }): JSX.Element {
             </div>
           ) : null}
           <div className="field images-moment">
-            <span>Images</span>
+            <span>Images et vidéos</span>
             <div className="im-rangee">
               {images.map((im) => (
                 /* On la rattache ici ; on la montre depuis le Paravent. */
                 <figure key={im.id} className="im-vignette">
-                  <img src={im.poster ?? im.url ?? ''} alt="" draggable={false} />
+                  <span className="im-media">
+                    <img src={im.poster ?? (im.kind === 'image' ? im.url : null) ?? ''} alt="" draggable={false} />
+                    {im.kind === 'video' ? <span className="pu-play" /> : null}
+                  </span>
                   <div className="im-gestes">
                     <figcaption title={im.relPath ?? im.title}>{im.title}</figcaption>
                     <button
                       className="btn btn-ghost btn-sm btn-ico"
-                      title="Détacher du moment (l’image reste dans la Bibliothèque)"
+                      title={`Détacher du moment (${im.kind === 'video' ? 'la vidéo' : 'l’image'} reste dans la Bibliothèque)`}
                       onClick={async () => {
                         await window.jdr.timeline.detach(beat.id, im.id)
                         await s.refreshTimeline()
@@ -381,9 +385,25 @@ function BeatReading({ beat }: { beat: Beat }): JSX.Element {
               ))}
               <button className="im-ajout" onClick={() => setChoixImage(true)}>
                 <IconPlus />
-                Image
+                Image ou vidéo
               </button>
             </div>
+          </div>
+          {/* Le tour de table : au Paravent, les portraits des joueurs rejoignent
+              ce qu'il y a à montrer, et un clic en présente un à l'écran. */}
+          <div className="field">
+            <span>Joueurs</span>
+            <label className="coche" title="Au Paravent, les portraits des joueurs : un clic présente le joueur à l’écran">
+              <input
+                type="checkbox"
+                checked={beat.presenterJoueurs}
+                onChange={async (e) => {
+                  await window.jdr.timeline.setPresenterJoueurs(beat.id, e.target.checked)
+                  await s.refreshTimeline()
+                }}
+              />
+              <span>Présenter les joueurs</span>
+            </label>
           </div>
         </div>
       </div>
@@ -453,12 +473,20 @@ function BeatReading({ beat }: { beat: Beat }): JSX.Element {
       </div>
 
       {choixImage ? (
-        <ChoixImage
-          exclure={images.map((i) => i.id)}
+        /* L'arborescence plutôt qu'une grille : c'est le rangement qui dit
+           où trouver l'image de la scène. */
+        <ChoixDansArbre
+          titre="Ajouter une image ou une vidéo au moment"
+          icone={<IconImage />}
+          kinds={['image', 'video']}
+          rendu="vignettes"
+          courant={null}
+          deja={images.map((i) => i.id)}
           onClose={() => setChoixImage(false)}
-          onPick={async (it) => {
-            await attache(it.id)
+          plusieurs={async (ids) => {
             setChoixImage(false)
+            for (const id of ids) await window.jdr.timeline.attach(beat.id, id)
+            await s.refreshTimeline()
           }}
         />
       ) : null}

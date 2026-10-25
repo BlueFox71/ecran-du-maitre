@@ -249,6 +249,8 @@ const api = {
     renameOnglet: (id: number, name: string) => call<UiPochette>('pochette:renameOnglet', id, name),
     removeOnglet: (id: number) => call<UiPochette>('pochette:removeOnglet', id),
     reorderOnglets: (ids: number[]) => call<UiPochette>('pochette:reorderOnglets', ids),
+    /** Ranger les documents dans cet ordre — ceux qu'on voit ; les autres gardent leur place. */
+    reorderDocs: (ids: number[]) => call<UiPochette>('pochette:reorderDocs', ids),
 
     /** Un joueur vient d'ouvrir un document sur son téléphone. */
     onChanged: (cb: () => void) => {
@@ -379,6 +381,19 @@ const api = {
     /** Copie un lieu et tout ce qu'il tient dans la séance en cours ; rend l'id de la copie. */
     duplicate: (id: number) => call<number>('places:duplicate', id),
     get: (id: number) => call<Place | null>('places:get', id),
+    /** Une autre apparence de la carte : la nuit, l'incendie. Rend le lieu qui porte le plan. */
+    ajouterApparence: (placeId: number, itemId: number, nom: string) =>
+      call<Place | null>('places:ajouterApparence', placeId, itemId, nom),
+    /** Une image ou une vidéo à montrer dans ce lieu ; elle peut servir à d'autres. */
+    attacherImage: (placeId: number, itemId: number) =>
+      call<void>('places:attacherImage', placeId, itemId),
+    detacherImage: (placeId: number, itemId: number) =>
+      call<void>('places:detacherImage', placeId, itemId),
+    renommerApparence: (id: number, nom: string) => call<void>('places:renommerApparence', id, nom),
+    retirerApparence: (id: number) => call<void>('places:retirerApparence', id),
+    /** L'apparence montrée ; `null`, la carte elle-même. */
+    choisirApparence: (placeId: number, apparenceId: number | null) =>
+      call<Place | null>('places:choisirApparence', placeId, apparenceId),
     upsert: (input: Partial<Place> & { name: string }) => call<Place>('places:upsert', input),
     /**
      * Changer l'image d'un plan sans déformer murs, portes, lumières, pions et
@@ -448,6 +463,9 @@ const api = {
     /** Ce lieu n'est qu'une pièce : ses murs le referment, il ne se découpe pas. */
     pieceUnique: (id: number, unique: boolean) =>
       call<Place | null>('places:pieceUnique', id, unique),
+    /** Ce qui peut arriver dans ce bâtiment se montre aussi sur tous ses lieux. */
+    epingleArrivees: (id: number, oui: boolean) =>
+      call<Place | null>('places:epingleArrivees', id, oui),
     /** Le soleil ou la lune, et d'où vient sa lumière ; `null`, aucun. */
     astre: (id: number, astre: Astre | null) => call<Place | null>('places:astre', id, astre),
     cielEspace: (id: number, astre: Astre | null) =>
@@ -506,6 +524,8 @@ const api = {
         unique?: boolean
         qte?: number
         poids?: string | null
+        places?: number
+        bonusSac?: number
         /** Un nombre seulement : l'unité appartient à la campagne. */
         valeur?: number | null
         prix?: Record<string, number> | null
@@ -591,7 +611,7 @@ const api = {
     /** Un inventaire partagé — le camion, la malle. Il naît fermé. */
     inventaireAdd: (nom: string) => call<Inventaire>('objets:inventaireAdd', nom),
     /** Le renommer, ou l'ouvrir et le fermer aux téléphones. */
-    inventaireUpdate: (id: number, patch: { nom?: string; ouvert?: boolean }) =>
+    inventaireUpdate: (id: number, patch: { nom?: string; ouvert?: boolean; enPochette?: boolean }) =>
       call<Inventaire | null>('objets:inventaireUpdate', id, patch),
     /** Le supprimer : son contenu retourne à la réserve. */
     inventaireRemove: (id: number) => call<void>('objets:inventaireRemove', id),
@@ -819,7 +839,9 @@ const api = {
     adopterTextes: () => call<number>('timeline:adopterTextes'),
     detach: (beatId: number, itemId: number) => call<void>('timeline:detach', beatId, itemId),
     /** Les PNJ que ce moment met en scène, donnés en entier. */
-    setPnjs: (beatId: number, ids: number[]) => call<void>('timeline:setPnjs', beatId, ids)
+    setPnjs: (beatId: number, ids: number[]) => call<void>('timeline:setPnjs', beatId, ids),
+    setPresenterJoueurs: (beatId: number, on: boolean) =>
+      call<void>('timeline:setPresenterJoueurs', beatId, on)
   },
 
   /** La trame de la séance en cours : préparée, puis cochée au Paravent. */
@@ -843,7 +865,10 @@ const api = {
     lire: (placeId: number) => call<FicheDuLieu>('fiche:lire', placeId),
     ajouterScenario: (placeId: number, titre?: string) =>
       call<LieuScenario>('fiche:ajouterScenario', placeId, titre),
-    majScenario: (id: number, patch: { titre?: string; info?: string }) =>
+    majScenario: (
+      id: number,
+      patch: { titre?: string; info?: string; beatId?: number | null; objetIds?: number[]; pnjIds?: number[] }
+    ) =>
       call<void>('fiche:majScenario', id, patch),
     supprimerScenario: (id: number) => call<void>('fiche:supprimerScenario', id),
     /** Les numéros suivent l'ordre donné. */
@@ -855,6 +880,11 @@ const api = {
     majCarte: (id: number, c: ContenuCarte) => call<void>('fiche:majCarte', id, c),
     /** Cochée, elle descend en bas ; décochée, elle remonte en haut. */
     cocherCarte: (id: number, fait: boolean) => call<void>('fiche:cocherCarte', id, fait),
+    /** Joué ou non : il se range avec les faits, sans perdre son numéro. */
+    cocherScenario: (id: number, fait: boolean) => call<void>('fiche:cocherScenario', id, fait),
+    /** Poser une carte ou un scénario sur le plan ; `null`, l'en retirer. */
+    situer: (genre: 'carte' | 'scenario', id: number, pos: { x: number; y: number } | null) =>
+      call<void>('fiche:situer', genre, id, pos),
     supprimerCarte: (id: number) => call<void>('fiche:supprimerCarte', id),
     ajouterPnj: (placeId: number, characterId: number) =>
       call<void>('fiche:ajouterPnj', placeId, characterId),

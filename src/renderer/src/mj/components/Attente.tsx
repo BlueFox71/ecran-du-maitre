@@ -15,6 +15,7 @@ import { nomDuMj } from '@shared/reglages'
 import { urlPortraitMj } from '../../shared/avatarsMj'
 import type { SlidePayload } from '@shared/types'
 import { useEchap } from '../echap'
+import { emojiDe, useSons } from '../sons'
 
 interface ReglagesAttente {
   titre: string
@@ -27,6 +28,8 @@ interface ReglagesAttente {
   mj: boolean
   /** Les trois lueurs qui dérivent au fond. */
   lueurs: [string, string, string]
+  /** L'ambiance de la sonothèque qui tourne en boucle pendant l'attente ; null, le silence. */
+  musique: number | null
 }
 
 /**
@@ -50,7 +53,8 @@ const DEFAUT: ReglagesAttente = {
   minutes: 10,
   joueurs: true,
   mj: true,
-  lueurs: AMBIANCES[0].lueurs
+  lueurs: AMBIANCES[0].lueurs,
+  musique: null
 }
 
 const MINUTES_MAX = 180
@@ -72,7 +76,8 @@ function lire(brut: string | undefined): ReglagesAttente {
         r.lueurs.length === 3 &&
         r.lueurs.every((c: unknown) => typeof c === 'string' && HEX.test(c))
           ? (r.lueurs as [string, string, string])
-          : DEFAUT.lueurs
+          : DEFAUT.lueurs,
+      musique: Number.isInteger(r.musique) ? r.musique : DEFAUT.musique
     }
   } catch {
     return DEFAUT
@@ -112,6 +117,31 @@ function FenetreAttente({ onClose }: { onClose: () => void }): JSX.Element {
   const [r, setR] = useState<ReglagesAttente>(() => lire(s.reglagesBrut['attente']))
   const pose = (patch: Partial<ReglagesAttente>): void => setR((x) => ({ ...x, ...patch }))
   const portrait = urlPortraitMj(s.poste.mjImage)
+  const ambiances = useSons((x) => x.liste).filter((son) => son.nature === 'ambiance')
+  /* Un son retiré de la sonothèque depuis : on retombe sur le silence. */
+  const musique = ambiances.some((son) => son.id === r.musique) ? r.musique : null
+
+  /* Un même fichier importé deux fois ne se propose qu'une fois ; deux
+     fichiers du même nom, rangés dans deux dossiers, se disent leur dossier. */
+  const choix: { ids: number[]; fichier: number | null; nom: string; dossier: string }[] = []
+  for (const son of ambiances) {
+    const fichier = son.fichiers[0]?.itemId ?? null
+    const deja = fichier == null ? null : choix.find((c) => c.fichier === fichier)
+    if (deja) {
+      deja.ids.push(son.id)
+      continue
+    }
+    const chemin = itemById(s.allItems, fichier)?.relPath ?? ''
+    choix.push({
+      ids: [son.id],
+      fichier,
+      nom: `${emojiDe(son)} ${son.nom}`,
+      dossier: chemin.split('/').slice(0, -1).join(' / ')
+    })
+  }
+  const libelle = (c: (typeof choix)[number]): string =>
+    c.dossier && choix.some((x) => x !== c && x.nom === c.nom) ? `${c.nom} (${c.dossier})` : c.nom
+  const choisi = choix.find((c) => musique != null && c.ids.includes(musique))
 
   /* Le profil se modifie dans les paramètres : on garde ce qui est déjà
      réglé ici, on ferme, et la fenêtre des paramètres s'ouvre à sa place. */
@@ -161,8 +191,10 @@ function FenetreAttente({ onClose }: { onClose: () => void }): JSX.Element {
       debut: maintenant,
       fin: r.minutes > 0 ? maintenant + r.minutes * 60000 : null,
       lueurs: r.lueurs,
+      musique,
       joueurs: autourDeLaTable()
     })
+    if (musique != null) await window.jdr.regieSon.ambiance(musique)
     onClose()
   }
 
@@ -264,6 +296,26 @@ function FenetreAttente({ onClose }: { onClose: () => void }): JSX.Element {
             <p className="aide">
               Trois lueurs qui dérivent lentement dans le ciel. Préfère des teintes sombres : le
               titre reste lisible.
+            </p>
+          </div>
+          <div className="field">
+            <label htmlFor="att-musique">Musique d’attente</label>
+            <select
+              id="att-musique"
+              value={choisi?.ids[0] ?? ''}
+              onChange={(e) => pose({ musique: e.target.value ? Number(e.target.value) : null })}
+            >
+              <option value="">Aucune</option>
+              {choix.map((c) => (
+                <option key={c.ids[0]} value={c.ids[0]}>
+                  {libelle(c)}
+                </option>
+              ))}
+            </select>
+            <p className="aide">
+              {ambiances.length
+                ? 'Elle tourne en boucle, et s’éteint en fondu quand l’attente quitte l’écran.'
+                : 'Aucune ambiance dans la sonothèque : ajoutes-y un son de nature « ambiance ».'}
             </p>
           </div>
           <ChampEmojis

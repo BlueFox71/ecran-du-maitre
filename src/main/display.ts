@@ -5,6 +5,8 @@ import { getPion, initialsOf, listPionsVus, pionSize } from './db/repos/pions'
 import { listJoueurs, listTemplates } from './db/repos/characters'
 import { getItem } from './db/repos/library'
 import { getPlace } from './db/repos/places'
+import { getSon } from './db/repos/sons'
+import { planDe } from './db/repos/echelle'
 import { mediaUrl } from './vault'
 import { COLLAGE_CELLS, ENCART_NEUF, jaugeSanite } from '@shared/types'
 import type {
@@ -202,6 +204,41 @@ function garderTextes(neuf: SlidePayload, avant: SlidePayload): SlidePayload {
   return avant.texts?.length ? { ...neuf, texts: avant.texts } : neuf
 }
 
+/**
+ * La carte du lieu, sous l'apparence qu'il montre : la nuit, l'incendie.
+ *
+ * Seule l'adresse de l'image change. `itemId` reste celui de la carte, et
+ * c'est lui qui dit aux écrans où poser pions, murs et brouillard — une autre
+ * apparence n'est pas une autre image, c'est la même pièce sous un autre jour.
+ */
+function habiller(slide: SlidePayload, placeId: number | null): SlidePayload {
+  if (slide.type !== 'image') return slide
+  const plan = placeId != null ? getPlace(planDe(placeId)) : null
+  const montree =
+    plan && plan.mapItemId === slide.itemId
+      ? plan.apparences.find((a) => a.id === plan.apparenceId)
+      : undefined
+  const url = montree ? mediaUrl(getItem(montree.itemId)?.relPath ?? null) : null
+  if (montree && url) return { ...slide, url, apparence: montree.id }
+  if (slide.apparence == null) return slide
+  /* Elle portait une apparence qui n'a plus cours : la carte revient. */
+  const carte = mediaUrl(getItem(slide.itemId)?.relPath ?? null)
+  const { apparence: _, ...nue } = slide
+  return carte ? { ...nue, url: carte } : nue
+}
+
+/** Le lieu de chaque emplacement : celui en scène au direct, celui qu'on prépare à côté. */
+const lieuDe = (slot: 0 | 1): number | null =>
+  slot === state.liveSlot ? state.placeId : (state.pendingPlaceId ?? state.placeId)
+
+/** Une apparence choisie, retirée, renommée : les deux emplacements la suivent. */
+export function rehabiller(): DisplayState {
+  for (const i of [0, 1] as const) state.slots[i] = habiller(state.slots[i], lieuDe(i))
+  if (!state.frozen) sync()
+  broadcast()
+  return state
+}
+
 /** Envoie tout de suite à l'écran, sans passer par la préparation. */
 export function show(slide: SlidePayload): DisplayState {
   if (state.frozen) return state
@@ -209,7 +246,10 @@ export function show(slide: SlidePayload): DisplayState {
      la première : c'est là qu'« Arrêter » doit ramener. */
   const enchaine = ECRANS_A_PART.has(slide.type) && ECRANS_A_PART.has(state.slide.type)
   if (slide.type !== 'black' && !enchaine) state.previous = state.slide
-  state.slots[state.liveSlot] = garderTextes(slide, state.slots[state.liveSlot])
+  state.slots[state.liveSlot] = garderTextes(
+    habiller(slide, state.placeId),
+    state.slots[state.liveSlot]
+  )
   sync()
   broadcast()
   return state
@@ -234,7 +274,7 @@ export function arreterPresentation(): DisplayState {
 
 /** Charge l'emplacement en préparation : rien ne bouge pour les joueurs. */
 export function prepare(slide: SlidePayload): DisplayState {
-  state.slots[idle()] = garderTextes(slide, state.slots[idle()])
+  state.slots[idle()] = garderTextes(habiller(slide, lieuDe(idle())), state.slots[idle()])
   broadcast()
   return state
 }
@@ -585,7 +625,7 @@ export function refreshJoueurs(): DisplayState {
 }
 
 export function setAudio(patch: Partial<AudioState>): DisplayState {
-  state.audio = { ...state.audio, ...patch }
+  state.audio = { ...state.audio, extinction: undefined, ...patch }
   broadcast()
   return state
 }
@@ -728,7 +768,22 @@ export function versMj(canal: string, charge: unknown): void {
   if (mjWindow && !mjWindow.isDestroyed()) mjWindow.webContents.send(canal, charge)
 }
 
+/**
+ * La musique d'attente part avec l'attente, quel que soit le geste qui la
+ * retire : « Arrêter l'attente », une image envoyée par-dessus, une bascule.
+ * Si le MJ a lancé une autre ambiance entre-temps, on n'y touche pas.
+ */
+let musiqueAttente: number | null = null
+function suivreMusiqueAttente(): void {
+  const m = state.slide.type === 'attente' ? state.slide.musique ?? null : null
+  const a = state.audio
+  if (musiqueAttente != null && m !== musiqueAttente && a.sonId === musiqueAttente && a.playing)
+    state.audio = { ...a, playing: false, extinction: getSon(musiqueAttente)?.fonduSortie ?? 2 }
+  musiqueAttente = m
+}
+
 export function broadcast(): void {
+  suivreMusiqueAttente()
   state.tour = calculTour?.() ?? null
   const payload = JSON.parse(JSON.stringify(state)) as DisplayState
   /*

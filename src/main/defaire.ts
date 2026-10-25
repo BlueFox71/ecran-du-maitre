@@ -79,6 +79,7 @@ const CANAUX_HORS = new Set([
   'trame:cocher',
   'trame:toutDecocher',
   'places:seen',
+  'places:choisirApparence',
   'characters:adjust',
   'characters:setState',
   'characters:log',

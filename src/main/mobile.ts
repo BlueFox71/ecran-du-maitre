@@ -32,7 +32,7 @@ import * as players from './db/repos/players'
 import * as rolls from './db/repos/rolls'
 import { listPionsVus, movePion, tournerPion } from './db/repos/pions'
 import { calqueDe } from './db/repos/murs'
-import { echelleDe } from './db/repos/echelle'
+import { echelleDe, planDe } from './db/repos/echelle'
 import { barrieres, pasContraint, type Pt } from '@shared/murs'
 import type { PointMur } from '@shared/types'
 import * as poche from './db/repos/pochette'
@@ -40,6 +40,7 @@ import * as objets from './db/repos/objets'
 import * as carnet from './carnet'
 import { lireCampagne, lirePoste, type ReglagesPoste } from '@shared/reglages'
 import { monnaiesActives } from '@shared/monnaies'
+import { refusSac } from '@shared/sac'
 import { modificateur, naturel } from '@shared/jet'
 import * as reglagesCampagne from './db/repos/reglages'
 import * as display from './display'
@@ -446,6 +447,7 @@ function etatJoueur(playerId: number) {
   /* Le téléphone est un écran de joueur : il ne reçoit que les pions vus. */
   const pions = placeId != null ? listPionsVus(placeId) : []
 
+  const nomsObjets = nomsDesObjets()
   return {
     campagne: nomCampagne(),
     joueur: joueur
@@ -509,7 +511,9 @@ function etatJoueur(playerId: number) {
       onglets: poche.listOnglets().map((o) => ({ id: o.id, nom: o.name })),
       docs: poche.pochetteDe(playerId).map((x) => ({
         id: x.id,
-        titre: x.item.title,
+        /* L'image d'un objet se nomme comme lui : « Spirit box », pas le
+           nom du fichier. Les autres documents gardent leur titre. */
+        titre: nomsObjets.get(x.item.id) ?? x.item.title,
         genre: x.item.kind,
         url: httpMedia(x.item.relPath),
         /*
@@ -538,6 +542,8 @@ function etatJoueur(playerId: number) {
      * le sac du voisin.
      */
     objets: perso ? objets.objetsDe(perso.id) : [],
+    /* Ce que tient son sac, pour qu'il sache avant de piocher s'il a la place. */
+    sac: perso ? sacDe(perso.id) : null,
     /* Les inventaires que le MJ a ouverts à la table, et ce qu'ils contiennent :
        chacun y pioche. Fermés, ils n'existent pas pour le téléphone. */
     inventaires: perso
@@ -629,6 +635,20 @@ function nomCampagne(): string {
  * que les pions s'y détachent. Un petit écran tenu dans une pièce sombre ne
  * supporte pas deux choses qui réclament l'œil en même temps.
  */
+/**
+ * Le nom de l'objet dont chaque image est le portrait. Deux objets qui
+ * partagent la même image : le premier de la réserve donne son nom.
+ */
+function nomsDesObjets(): Map<number, string> {
+  const rows = getDb()
+    .prepare(
+      `SELECT image_item_id AS i, nom FROM objet
+        WHERE campaign_id = ? AND image_item_id IS NOT NULL ORDER BY ord DESC, id DESC`
+    )
+    .all(activeCampaignId()) as { i: number; nom: string }[]
+  return new Map(rows.map((r) => [r.i, r.nom]))
+}
+
 function lieuVu(id: number): {
   id: number
   nom: string
@@ -639,11 +659,16 @@ function lieuVu(id: number): {
 } {
   const r = getDb()
     .prepare(
-      `SELECT p.name, i.rel_path AS plan, i.width AS w, i.height AS h
+      `SELECT p.name, COALESCE(ai.rel_path, i.rel_path) AS plan, i.width AS w, i.height AS h
          FROM place p LEFT JOIN item i ON i.id = p.map_item_id
+         /* L'apparence que montre le plan — celle de l'étage, pour une pièce.
+            Les dimensions restent celles de la carte : c'est le repère des murs. */
+         LEFT JOIN place porteur ON porteur.id = ? AND porteur.map_item_id = p.map_item_id
+         LEFT JOIN place_apparence a ON a.id = porteur.apparence_id
+         LEFT JOIN item ai ON ai.id = a.item_id
         WHERE p.id = ?`
     )
-    .get(id) as { name: string; plan: string | null; w: number | null; h: number | null } | undefined
+    .get(planDe(id), id) as { name: string; plan: string | null; w: number | null; h: number | null } | undefined
   /*
    * La taille du plan, telle que le graveur l'a mesurée.
    *
@@ -1116,8 +1141,12 @@ function equiper(res: ServerResponse, url: URL, corps: any): void {
   if (emplacement !== null && !EMPLACEMENTS_OBJET.some((e) => e.cle === emplacement))
     return json(res, 400, { erreur: 'Endroit du corps inconnu.' })
 
-  if (emplacement === null) objets.desequiper(placementId)
-  else objets.equiper({ characterId: perso.id, emplacement, objetId: objetDuPlacement(placementId) })
+  try {
+    if (emplacement === null) objets.desequiper(placementId)
+    else objets.equiper({ characterId: perso.id, emplacement, objetId: objetDuPlacement(placementId) })
+  } catch (e) {
+    return refuse(res, e)
+  }
   /* Une lampe prise en main, ou rangée : la table relit sa lumière. */
   display.calqueABouge()
 
@@ -1173,7 +1202,12 @@ function prendre(res: ServerResponse, url: URL, corps: any): void {
   const inv = inventaireOuvert(objets.inventaireDe(placementId))
   if (!inv) return json(res, 409, { erreur: 'Cet objet n’est plus disponible.' })
 
-  const nom = objets.prendre(placementId, perso.id)
+  let nom: string | null
+  try {
+    nom = objets.prendre(placementId, perso.id)
+  } catch (e) {
+    return refuse(res, e)
+  }
   if (!nom) return json(res, 409, { erreur: 'Cet objet n’est plus disponible.' })
   const texte = `${perso.name} a pris ${nom}`
   objets.noter(inv.id, texte)
@@ -1197,13 +1231,33 @@ function remettre(res: ServerResponse, url: URL, corps: any): void {
   const inv = inventaireOuvert(Number(corps.inventaireId))
   if (!inv) return json(res, 409, { erreur: 'Cet inventaire est fermé.' })
 
-  const nom = objets.remettre(placementId, inv.id)
+  let nom: string | null
+  try {
+    nom = objets.remettre(placementId, inv.id)
+  } catch (e) {
+    return refuse(res, e)
+  }
   if (!nom) return json(res, 409, { erreur: 'Objet inconnu.' })
   const texte = `${perso.name} a remis ${nom}`
   objets.noter(inv.id, texte)
   versMj('objets:changes', `${texte} dans ${inv.nom}`)
   broadcast()
   json(res, 200, { ok: true })
+}
+
+/** Ce que tient le sac d'un personnage ; un sac vide n'a pas de ligne, il a quand même un fond. */
+function sacDe(characterId: number): { charge: number; capacite: number | null } {
+  const s = objets.sacs().get(characterId)
+  if (s) return { charge: s.charge, capacite: s.capacite }
+  const base = objets.capaciteSac()
+  return { charge: 0, capacite: base > 0 ? base : null }
+}
+
+/** Un sac plein se dit au joueur tel quel ; le reste est une vraie panne. */
+function refuse(res: ServerResponse, e: unknown): void {
+  const msg = refusSac(e)
+  if (msg === null) throw e
+  json(res, 409, { erreur: msg })
 }
 
 /** L'objet d'un exemplaire — pour équiper, il faut dire lequel on pose. */

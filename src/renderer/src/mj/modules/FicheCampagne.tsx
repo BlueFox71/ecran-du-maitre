@@ -57,16 +57,26 @@ const GENRE: Record<Partie, CatalogueEntry['kind']> = {
   gauges: 'gauge'
 }
 
-/** Les couleurs qu'une jauge peut porter, dans l'ordre où on les propose. */
-const COULEURS: GaugeSpec['color'][] = ['blood', 'iris', 'moss', 'brass', 'neutral']
-
+/** Les couleurs qu'une jauge peut porter, dans l'ordre où on les propose : le tour du cercle des teintes. */
 const DIT: Record<GaugeSpec['color'], string> = {
   blood: 'sang',
-  iris: 'iris',
-  moss: 'mousse',
+  orange: 'orange',
+  argile: 'argile',
   brass: 'laiton',
+  olive: 'olive',
+  moss: 'mousse',
+  fougere: 'fougère',
+  jade: 'jade',
+  azur: 'azur',
+  ardoise: 'ardoise',
+  outremer: 'outremer',
+  iris: 'iris',
+  amethyste: 'améthyste',
+  prune: 'prune',
+  bruyere: 'bruyère',
   neutral: 'neutre'
 }
+const COULEURS = Object.keys(DIT) as GaugeSpec['color'][]
 
 export function FicheCampagne({ onClose }: { onClose: () => void }): JSX.Element {
   const s = useStore()
@@ -803,20 +813,56 @@ function Teinte({
   couleur: GaugeSpec['color']
   onChange: (c: GaugeSpec['color']) => void
 }): JSX.Element {
+  /* La grille s'ouvre sous la pastille, en position fixe : la liste qui la
+     porte défile, et la couperait. */
+  const [ouverte, setOuverte] = useState<{ x: number; y: number } | null>(null)
+  const grille = useRef<HTMLDivElement>(null)
+  useEchap(() => setOuverte(null), !!ouverte)
+  useEffect(() => {
+    if (!ouverte) return
+    const h = (e: MouseEvent): void => {
+      if (!grille.current?.contains(e.target as Node)) setOuverte(null)
+    }
+    document.addEventListener('mousedown', h)
+    return () => document.removeEventListener('mousedown', h)
+  }, [ouverte])
   return (
     <span className="fc-teintes">
-      <select
-        value={couleur}
-        onChange={(e) => onChange(e.target.value as GaugeSpec['color'])}
-        aria-label="Couleur de la jauge"
-      >
-        {COULEURS.map((c) => (
-          <option key={c} value={c}>
-            {DIT[c]}
-          </option>
-        ))}
-      </select>
-      <span className={`fc-pastille g-${couleur}`} aria-hidden="true" />
+      <button
+        className={`fc-pastille g-${couleur}`}
+        aria-label={`Couleur de la jauge : ${DIT[couleur]}`}
+        aria-expanded={!!ouverte}
+        title={DIT[couleur]}
+        onMouseDown={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect()
+          setOuverte(ouverte ? null : { x: r.left, y: r.bottom + 4 })
+        }}
+      />
+      {ouverte ? (
+        <div
+          ref={grille}
+          className="fc-grille-teintes"
+          role="radiogroup"
+          aria-label="Couleur de la jauge"
+          style={{ left: ouverte.x, top: ouverte.y }}
+        >
+          {COULEURS.map((c) => (
+            <button
+              key={c}
+              role="radio"
+              aria-checked={c === couleur}
+              aria-label={DIT[c]}
+              title={DIT[c]}
+              className={`fc-pastille g-${c}`}
+              onClick={() => {
+                onChange(c)
+                setOuverte(null)
+              }}
+            />
+          ))}
+        </div>
+      ) : null}
     </span>
   )
 }

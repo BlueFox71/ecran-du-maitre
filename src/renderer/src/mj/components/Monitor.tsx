@@ -5,7 +5,7 @@ import { Pings, usePings } from '../../shared/Pings'
 import { BandeauTour } from '../../shared/BandeauTour'
 import { montreLaCarte } from '@shared/scene'
 import { IconEyeOff, IconExpand, IconQr } from './Icons'
-import type { CalqueBrouillard, CollageCell } from '@shared/types'
+import type { CalqueBrouillard, CollageCell, Pointer } from '@shared/types'
 
 /**
  * Moniteur de l'écran joueurs, en haut à gauche et visible depuis tous les modules.
@@ -28,6 +28,10 @@ export function Monitor(): JSX.Element {
   const ondes = usePings()
   const poserOnde = ondes.ajouter
   useEffect(() => window.jdr.display.onPing(poserOnde), [poserOnde])
+
+  /* Le doigt du MJ sur le visuel, tel que les joueurs le voient bouger. */
+  const [pointer, setPointer] = useState<Pointer | null>(null)
+  useEffect(() => window.jdr.display.onPointer(setPointer), [])
 
   const frozen = display?.frozen ?? false
   /*
@@ -97,6 +101,8 @@ export function Monitor(): JSX.Element {
             joueurs={display?.joueurs}
             encart={display?.encart}
             fenetres={display?.fenetres}
+            /* Gelé, les joueurs ne le voient pas : le moniteur non plus. */
+            pointer={frozen ? null : pointer}
           />
           {/* Pendant un gel, rien ne part vers les joueurs : une onde n'aurait
               pas lieu d'apparaître sur ce qu'ils voient encore. */}

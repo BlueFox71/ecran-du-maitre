@@ -11,6 +11,7 @@ import {
 } from '@shared/reglages'
 import type { UiFolder, UiItem } from '../../../preload/index'
 import { dansLApp } from '@shared/dossierDeLApp'
+import { refusSac } from '@shared/sac'
 import type {
   Beat,
   CampaignPlayer,
@@ -445,6 +446,16 @@ export const useStore = create<State>((set, get) => ({
       void get().refreshObjets()
       /* Un joueur a pioché dans un inventaire, ou y a remis quelque chose. */
       if (geste) get().toast(geste)
+    })
+    /* Un sac plein refuse le geste, où qu'on l'ait fait : la plupart des
+       gestes sur les objets n'attendent pas d'échec, le refus remonterait
+       sans rien dire. On le dit ici, une fois pour toutes. */
+    window.addEventListener('unhandledrejection', (e) => {
+      const msg = refusSac(e.reason)
+      if (msg === null) return
+      e.preventDefault()
+      get().toast(msg, true)
+      void get().refreshObjets()
     })
 
     await Promise.all([

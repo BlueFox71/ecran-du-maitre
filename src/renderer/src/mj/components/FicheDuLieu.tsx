@@ -18,6 +18,7 @@
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import {
+  IconCheck,
   IconDonner,
   IconImage,
   IconSearch,
@@ -29,6 +30,7 @@ import {
 import { MenuDonner } from './MenuDonner'
 import { usePnjEnReserve } from './ReservePnj'
 import type { UiItem } from '../../../../preload/index'
+import { ApparencesDuPlan, ImagesDuLieu, imageMontree } from './Apparences'
 import { ChoixDansArbre } from './ChoixDansArbre'
 import { TexteCourt } from './TexteCourt'
 import type {
@@ -38,12 +40,14 @@ import type {
   LieuScenario,
   Objet,
   ObjetPlacement,
+  Pion,
   Place,
   SorteCarte
 } from '@shared/types'
 import { TIER_LABEL } from '@shared/types'
 import { formesDesMurs } from '@shared/pieces'
 import { useEchap } from '../echap'
+import { survolCarte, viserCarte } from '../viseCarte'
 
 /** L'éclair des déclencheurs. */
 function IconEclair(): JSX.Element {
@@ -228,6 +232,7 @@ export function FicheDuLieu({
           pnjsSeance={pnjsSeance}
           relire={relire}
           onVoir={voir}
+          onChanger={onChanger}
         />
         <PanneauQuiQuoi
           p={p}
@@ -251,11 +256,14 @@ export function FicheDuLieu({
 export function QuiQuoiDuLieu({
   p,
   surPlan,
-  ouvrir
+  ouvrir,
+  pionsPnj
 }: {
   p: Place
   /** Les objets se glissent sur le plan d'à côté. */
   surPlan?: boolean
+  /** Les pions de PNJ déjà posés sur ce plan : chaque PNJ dit s'il y est. */
+  pionsPnj?: Pion[]
   /** Déplier cette rangée — un objet cliqué sur le plan. `n` relance le même. */
   ouvrir?: { cle: string; n: number } | null
 }): JSX.Element {
@@ -303,12 +311,91 @@ export function QuiQuoiDuLieu({
       onDeplier={setDeplie}
       nu
       surPlan={surPlan}
+      pionsPnj={pionsPnj}
     />
   )
 }
 
 /** Le type du glisser d'un exemplaire, de la liste vers le plan : son id. */
 export const GLISSE_OBJET = 'application/x-jdr-placement'
+
+/** Le type du glisser d'un PNJ vers le plan : l'id de son personnage. */
+export const GLISSE_PNJ = 'application/x-jdr-pnj'
+
+/** Un pion de PNJ posé, montré, caché ou retiré depuis le volet : le plan se relit. */
+export const PIONS_POSES = 'jdr:pions-poses'
+
+/** Le type du glisser d'une carte ou d'un scénario vers le plan : `c12@75`, `s4@75` — l'article, et son lieu. */
+export const GLISSE_ARTICLE = 'application/x-jdr-article'
+
+/**
+ * Un article posé, déplacé ou retiré du plan : la liste du volet et le calque
+ * du plan se relisent, chacun tenant sa propre copie des fiches.
+ */
+export const ARTICLES_SITUES = 'jdr:articles-situes'
+
+/** Poser un article sur le plan, ou l'en retirer, et le faire savoir. */
+export async function situerArticle(cle: string, pos: { x: number; y: number } | null): Promise<void> {
+  const id = Number(cle.slice(1))
+  await window.jdr.fiche.situer(cle[0] === 's' ? 'scenario' : 'carte', id, pos)
+  window.dispatchEvent(new Event(ARTICLES_SITUES))
+}
+
+/**
+ * « Ce qui peut arriver ici » d'un lieu, seul : l'onglet du volet de
+ * l'éditeur de plan. Le même panneau que la fiche ; ses articles se glissent
+ * sur le plan d'à côté.
+ */
+export function ArriveesDuLieu({
+  p,
+  ouvrir
+}: {
+  p: Place
+  /** Déplier cet article — une pastille cliquée sur le plan. `n` relance le même. */
+  ouvrir?: { cle: string; n: number } | null
+}): JSX.Element {
+  const s = useStore()
+  const [fiche, setFiche] = useState<Fiche | null>(null)
+  const relire = async (): Promise<void> => setFiche(await window.jdr.fiche.lire(p.id))
+  useEffect(() => {
+    setFiche(null)
+    void relire()
+    const h = (): void => void relire()
+    window.addEventListener('jdr:defait', h)
+    window.addEventListener(ARTICLES_SITUES, h)
+    const lache = window.jdr.fiche.onRelue(h)
+    return () => {
+      window.removeEventListener('jdr:defait', h)
+      window.removeEventListener(ARTICLES_SITUES, h)
+      lache()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [p.id])
+  const pnjsSeance = useMemo(() => s.characters.filter((c) => c.kind === 'pnj'), [s.characters])
+  const pnjsIci = useMemo(
+    () =>
+      (fiche?.pnjIds ?? [])
+        .map((id) => pnjsSeance.find((c) => c.id === id))
+        .filter((c): c is Character => !!c),
+    [fiche, pnjsSeance]
+  )
+  return (
+    <PanneauArrivees
+      p={p}
+      fiche={fiche}
+      pnjsIci={pnjsIci}
+      pnjsSeance={pnjsSeance}
+      relire={async () => {
+        await relire()
+        window.dispatchEvent(new Event(ARTICLES_SITUES))
+      }}
+      onVoir={() => undefined}
+      onChanger={() => undefined}
+      surPlan
+      ouvrir={ouvrir}
+    />
+  )
+}
 
 /** Les exemplaires d'objets du lieu : posés ici, ou portés par l'un de ses PNJ. */
 function exemplairesIci(objets: Objet[], placeId: number, pnjsIci: Character[]): Exemplaire[] {
@@ -394,7 +481,8 @@ function PanneauLieu({
   /* Une pièce découpée montre le plan de son étage, sa zone en évidence. */
   const piece = !!p.zone && !!niveau?.mapItemId
   const porteur = piece ? niveau! : p
-  const carte = s.allItems.find((i) => i.id === porteur.mapItemId)
+  /* Le plan sous l'apparence qu'il montre : la nuit, si c'est la nuit. */
+  const carte = imageMontree(porteur, s.allItems)
   const soeurs = piece
     ? s.places.filter((q) => q.parentId === niveau!.id && q.zone && q.id !== p.id)
     : s.places.filter((q) => q.parentId === p.id && q.zone)
@@ -488,6 +576,8 @@ function PanneauLieu({
             </button>
           </div>
         )}
+        {carte?.url ? <ApparencesDuPlan porteur={porteur} /> : null}
+        <ImagesDuLieu lieu={p} />
 
         {/* Descendre dans l'un des lieux qu'il tient ; on remonte par le chemin, en haut. */}
         {enfants.length ? (
@@ -599,10 +689,121 @@ const GENRES: { cle: Genre; label: string; pluriel: string }[] = [
   { cle: 'scenario', label: 'Scénario', pluriel: 'Scénarios' }
 ]
 
-/** Un article de la liste : une carte, ou un scénario avec son numéro. */
-type Article = { cle: string; genre: SorteCarte; c: LieuCarte } | { cle: string; genre: 'scenario'; sc: LieuScenario; num: number }
+/**
+ * Un article de la liste : une carte, ou un scénario avec son numéro. `de`,
+ * c'est le bâtiment qui l'a épinglé à ce lieu ; absent, l'article est d'ici.
+ */
+type Article = ({ cle: string; genre: SorteCarte; c: LieuCarte } | { cle: string; genre: 'scenario'; sc: LieuScenario; num: number }) & {
+  de?: Place
+}
 
-function MarqueGenre({ genre, num }: { genre: Genre; num?: number }): JSX.Element {
+/**
+ * Les bâtiments au-dessus de ce lieu qui lui épinglent ce qui peut y arriver,
+ * du plus proche au plus lointain.
+ */
+function batimentsQuiEpinglent(p: Place, tous: Place[]): Place[] {
+  const out: Place[] = []
+  const vus = new Set<number>([p.id])
+  let q = tous.find((x) => x.id === p.parentId)
+  while (q && !vus.has(q.id)) {
+    vus.add(q.id)
+    if (q.epingleArrivees && sorteDu(q, tous).nom === 'Bâtiment') out.push(q)
+    const id = q.parentId
+    q = tous.find((x) => x.id === id)
+  }
+  return out
+}
+
+/**
+ * Ce que les bâtiments au-dessus épinglent ici : leurs fiches, relues avec
+ * celle du lieu. `masques`, le MJ ne veut voir que ce qui est propre au lieu :
+ * `epingles` revient vide, `sources` dit qu'il y en a quand même.
+ */
+function useEpingles(p: Place): {
+  epingles: { de: Place; fiche: Fiche }[]
+  sources: Place[]
+  masques: boolean
+  basculerMasques: () => void
+  relire: () => Promise<void>
+} {
+  const s = useStore()
+  const sources = batimentsQuiEpinglent(p, s.places)
+  const cleSources = sources.map((q) => q.id).join(',')
+  const [epingles, setEpingles] = useState<{ de: Place; fiche: Fiche }[]>([])
+  const [masques, setMasques] = useState(() => {
+    try {
+      return localStorage.getItem('fiche.masquerBatiment') === '1'
+    } catch {
+      return false
+    }
+  })
+  const basculerMasques = (): void =>
+    setMasques((v) => {
+      try {
+        localStorage.setItem('fiche.masquerBatiment', v ? '0' : '1')
+      } catch {
+        /* sans stockage, le choix ne dure que la visite */
+      }
+      return !v
+    })
+  const relire = async (): Promise<void> => {
+    if (!sources.length) return
+    const fiches = await Promise.all(sources.map((q) => window.jdr.fiche.lire(q.id)))
+    setEpingles(sources.map((de, i) => ({ de, fiche: fiches[i] })))
+  }
+  useEffect(() => {
+    setEpingles([])
+    if (!sources.length) return
+    void relire()
+    const h = (): void => void relire()
+    window.addEventListener('jdr:defait', h)
+    const lache = window.jdr.fiche.onRelue(h)
+    return () => {
+      window.removeEventListener('jdr:defait', h)
+      lache()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cleSources])
+  return { epingles: masques ? [] : epingles, sources, masques, basculerMasques, relire }
+}
+
+/** La coche d'un lieu qui reçoit des articles épinglés : les cacher, pour ne voir que les siens. */
+function CocheMasquerBatiment({
+  sources,
+  masques,
+  onBasculer
+}: {
+  sources: Place[]
+  masques: boolean
+  onBasculer: () => void
+}): JSX.Element | null {
+  if (!sources.length) return null
+  const noms = sources.map((q) => `« ${q.name} »`).join(', ')
+  return (
+    <label className="coche fdl-epingle" title={`Cacher ce qu’épingle ${noms}, pour ne voir que ce qui est propre à ce lieu`}>
+      <input type="checkbox" checked={masques} onChange={onBasculer} />
+      <span>Masquer ceux du bâtiment</span>
+    </label>
+  )
+}
+
+/** Le nom du bâtiment qui épingle un article : une étiquette qui mène à sa fiche. */
+function TagBatiment({ de, onOuvrir }: { de: Place; onOuvrir: (id: number) => void }): JSX.Element {
+  return (
+    <button
+      className="fdl-tag-batiment"
+      title={`Épinglé par le bâtiment « ${de.name} » — ouvrir sa fiche`}
+      onClick={(e) => {
+        e.stopPropagation()
+        onOuvrir(de.id)
+      }}
+    >
+      {de.name}
+    </button>
+  )
+}
+
+export function MarqueGenre({ genre, num }: { genre: Genre; num?: number }): JSX.Element {
   return (
     <span className={`fdl-sorte ${genre}`} title={GENRES.find((g) => g.cle === genre)!.label}>
       {genre === 'decouverte' ? <IconDecouverte /> : genre === 'declencheur' ? <IconEclair /> : <span className="num">{num ?? 'n°'}</span>}
@@ -615,8 +816,11 @@ function PanneauArrivees({
   fiche,
   pnjsIci,
   pnjsSeance,
-  relire,
-  onVoir
+  relire: relireIci,
+  onVoir,
+  onChanger,
+  surPlan = false,
+  ouvrir = null
 }: {
   p: Place
   fiche: Fiche | null
@@ -624,8 +828,24 @@ function PanneauArrivees({
   pnjsSeance: Character[]
   relire: () => Promise<void>
   onVoir: (cle: string) => void
+  /** Ouvrir la fiche du bâtiment d'où vient un article épinglé. */
+  onChanger: (id: number) => void
+  /** Dans le volet du plan : les articles du lieu se glissent sur le plan. */
+  surPlan?: boolean
+  /** Déplier cet article — une pastille cliquée sur le plan. */
+  ouvrir?: { cle: string; n: number } | null
 }): JSX.Element {
   const s = useStore()
+  const batiment = sorteDu(p, s.places).nom === 'Bâtiment'
+  const tenus = useEpingles(p)
+  /* Sur le plan, seulement ce qui est propre au lieu : ce qu'épingle un
+     bâtiment se pose sur le plan du bâtiment. */
+  const epingles = surPlan ? [] : tenus.epingles
+  const sources = surPlan ? [] : tenus.sources
+  const { masques, basculerMasques, relire: relireEpingles } = tenus
+  const relire = async (): Promise<void> => {
+    await Promise.all([relireIci(), relireEpingles()])
+  }
   const [filtre, setFiltre] = useState<Genre | 'tout'>('tout')
   const [genre, setGenre] = useState<Genre>('decouverte')
   const [titre, setTitre] = useState('')
@@ -647,6 +867,22 @@ function PanneauArrivees({
     setLu(null)
   }, [p.id])
 
+  /* Une pastille cliquée sur le plan : l'article se déplie, et vient sous les yeux. */
+  useEffect(() => {
+    if (!ouvrir) return
+    setFiltre('tout')
+    setLu(ouvrir.cle)
+    /* Un article fait dort dans le bloc replié du bas : on le rouvre. */
+    const fait =
+      !!fiche?.cartes.some((c) => `c${c.id}` === ouvrir.cle && c.fait) ||
+      !!fiche?.scenarios.some((sc) => `s${sc.id}` === ouvrir.cle && sc.fait)
+    if (fait && faitsReplies) setFaitsReplies(false)
+    window.requestAnimationFrame(() =>
+      liste.current?.querySelector(`[data-art="${ouvrir.cle}"]`)?.scrollIntoView({ block: 'nearest' })
+    )
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ouvrir])
+
   /* L'article ouvert se referme d'un clic ailleurs — pas dans un menu qu'il a ouvert. */
   useEffect(() => {
     if (!ouvert) return
@@ -661,14 +897,27 @@ function PanneauArrivees({
 
   const cartes = fiche?.cartes ?? []
   const scenarios = fiche?.scenarios ?? []
-  const aVenir: Article[] = [
-    ...cartes.filter((c) => !c.fait).map((c): Article => ({ cle: `c${c.id}`, genre: c.sorte, c })),
-    ...scenarios.map((sc, i): Article => ({ cle: `s${sc.id}`, genre: 'scenario', sc, num: i + 1 }))
+  /* Les articles d'ici d'abord, puis ceux qu'épinglent les bâtiments, chacun
+     avec les scénarios de sa fiche pour les numéroter. */
+  const fiches: { de?: Place; cartes: LieuCarte[]; scenarios: LieuScenario[] }[] = [
+    { cartes, scenarios },
+    ...epingles.map((e) => ({ de: e.de, cartes: e.fiche.cartes, scenarios: e.fiche.scenarios }))
   ]
-  const faits: Article[] = cartes.filter((c) => c.fait).map((c) => ({ cle: `c${c.id}`, genre: c.sorte, c }))
+  /* Un scénario garde son numéro, joué ou non : c'est son rang dans sa fiche. */
+  const articles = (fait: boolean): Article[] =>
+    fiches.flatMap(({ de, cartes, scenarios }) => [
+      ...cartes.filter((c) => c.fait === fait).map((c): Article => ({ cle: `c${c.id}`, genre: c.sorte, c, de })),
+      ...scenarios
+        .map((sc, i): Article & { genre: 'scenario' } => ({ cle: `s${sc.id}`, genre: 'scenario', sc, num: i + 1, de }))
+        .filter((a) => a.sc.fait === fait)
+    ])
+  const aVenir = articles(false)
+  const faits = articles(true)
+  const scenariosDe = (a: Article): LieuScenario[] =>
+    a.de ? (epingles.find((e) => e.de.id === a.de!.id)?.fiche.scenarios ?? []) : scenarios
   const garde = (a: Article): boolean => filtre === 'tout' || a.genre === filtre
-  const compte = (g: Genre | 'tout'): number =>
-    g === 'tout' ? cartes.length + scenarios.length : g === 'scenario' ? scenarios.length : cartes.filter((c) => c.sorte === g).length
+  const tous = [...aVenir, ...faits]
+  const compte = (g: Genre | 'tout'): number => tous.filter((a) => g === 'tout' || a.genre === g).length
 
   const creer = async (): Promise<void> => {
     const t = titre.trim()
@@ -706,8 +955,10 @@ function PanneauArrivees({
           key={a.cle}
           sc={a.sc}
           num={a.num}
-          p={p}
-          scenarios={scenarios}
+          p={a.de ?? p}
+          scenarios={scenariosDe(a)}
+          pnjsIci={pnjsIci}
+          pnjsSeance={pnjsSeance}
           relire={relire}
           onFermer={() => setOuvert(null)}
           onRouvrir={setOuvert}
@@ -716,7 +967,7 @@ function PanneauArrivees({
         <EditionCarte
           key={a.cle}
           c={a.c}
-          p={p}
+          p={a.de ?? p}
           pnjsIci={pnjsIci}
           pnjsSeance={pnjsSeance}
           relire={relire}
@@ -736,9 +987,16 @@ function PanneauArrivees({
           setOuvert(a.cle)
         }}
         onVoir={onVoir}
+        onBatiment={onChanger}
+        surPlan={surPlan}
         onCocher={async (c, fait) => {
-          await cocherEtSuivre(c, fait, p.id, s.objets)
+          /* Les objets révélés sont ceux du lieu de la carte : le bâtiment, si elle en vient. */
+          await cocherEtSuivre(c, fait, c.placeId, s.objets)
           await Promise.all([relire(), s.refreshObjets()])
+        }}
+        onJouer={async (sc, fait) => {
+          await window.jdr.fiche.cocherScenario(sc.id, fait)
+          await relire()
         }}
       />
     )
@@ -747,7 +1005,7 @@ function PanneauArrivees({
   const faitsVus = faits.filter(garde)
 
   return (
-    <section className="fdl-pane fdl-arrivees">
+    <section className={`fdl-pane fdl-arrivees${surPlan ? ' sur-plan' : ''}`}>
       <div className="fdl-tete">
         <h3>Ce qui peut arriver ici</h3>
         <span className="fdl-compte">{aVenir.length ? `${aVenir.length} à venir` : ''}</span>
@@ -760,6 +1018,24 @@ function PanneauArrivees({
             </button>
           ))}
         </div>
+        {batiment ? (
+          <label
+            className="coche fdl-epingle"
+            title="Ses découvertes, déclencheurs et scénarios se montrent aussi sur la fiche de chacun de ses niveaux et de ses pièces, marqués du nom du bâtiment"
+          >
+            <input
+              type="checkbox"
+              checked={p.epingleArrivees}
+              onChange={async (e) => {
+                await window.jdr.places.epingleArrivees(p.id, e.target.checked)
+                await s.refreshPlaces()
+              }}
+            />
+            <span>Épingler à tous les lieux du bâtiment</span>
+          </label>
+        ) : (
+          <CocheMasquerBatiment sources={sources} masques={masques} onBasculer={basculerMasques} />
+        )}
       </div>
       <div className="fdl-corps" ref={liste}>
         <div className="fdl-nouveau">
@@ -797,7 +1073,7 @@ function PanneauArrivees({
           />
         </div>
 
-        {fiche && cartes.length === 0 && scenarios.length === 0 ? (
+        {fiche && tous.length === 0 ? (
           <div className="fdl-amorces">
             <b>Rien de prévu ici pour l’instant</b>
             <span>Commence par une de ces questions — Entrée crée, et le champ reste ouvert pour la suivante.</span>
@@ -831,7 +1107,7 @@ function PanneauArrivees({
           <>
             <button className="fdl-faits" aria-expanded={!faitsReplies} onClick={basculerFaits}>
               <span className="eyebrow">
-                {faitsReplies ? '▸' : '▾'} Trouvé ou déclenché · {faitsVus.length}
+                {faitsReplies ? '▸' : '▾'} Trouvé, déclenché ou joué · {faitsVus.length}
               </span>
             </button>
             {faitsReplies ? null : faitsVus.map(rendre)}
@@ -853,7 +1129,10 @@ function LigneArticle({
   onLire,
   onModifier,
   onVoir,
-  onCocher
+  onBatiment,
+  onCocher,
+  onJouer,
+  surPlan = false
 }: {
   a: Article
   pnjsSeance: Character[]
@@ -861,9 +1140,49 @@ function LigneArticle({
   onLire: () => void
   onModifier: () => void
   onVoir: (cle: string) => void
+  onBatiment: (id: number) => void
   onCocher: (c: LieuCarte, fait: boolean) => void
+  onJouer: (sc: LieuScenario, fait: boolean) => void
+  /** Dans le volet du plan : l'article se glisse sur le plan. */
+  surPlan?: boolean
 }): JSX.Element {
   const s = useStore()
+  /* Un article épinglé par un bâtiment se pose sur le plan du bâtiment, pas ici. */
+  const glissable = surPlan && !a.de
+  const pos = a.genre === 'scenario' ? a.sc.pos : a.c.pos
+  const glisse = glissable
+    ? {
+        draggable: true,
+        title: pos ? 'Glisse-le ailleurs sur le plan' : 'Glisse-le sur le plan',
+        'data-art': a.cle,
+        onDragStart: (ev: React.DragEvent) => {
+          /* Le lieu suit l'article : le plan refuse une pièce qui n'est pas la sienne. */
+          ev.dataTransfer.setData(GLISSE_ARTICLE, `${a.cle}@${a.genre === 'scenario' ? a.sc.placeId : a.c.placeId}`)
+          ev.dataTransfer.effectAllowed = 'move'
+        }
+      }
+    : { 'data-art': a.cle }
+  /* Posé : un repère, qui le retire du plan. Pas encore : on dit comment faire. */
+  const repere = glissable ? (
+    pos ? (
+      <button
+        className="fdl-sur-plan"
+        title="Il est posé sur le plan — clic pour l’en retirer"
+        onClick={(e) => {
+          e.stopPropagation()
+          void situerArticle(a.cle, null)
+        }}
+      >
+        sur le plan ×
+      </button>
+    ) : (
+      <span className="fdl-sur-plan vide" title="Glisse la ligne sur le plan pour l’y poser">
+        à poser
+      </span>
+    )
+  ) : null
+  /* Épinglé par un bâtiment : son nom, qui mène à sa fiche. */
+  const tag = a.de ? <TagBatiment de={a.de} onOuvrir={onBatiment} /> : null
   const crayon = lu ? (
     <button
       className="fdl-icone"
@@ -879,25 +1198,43 @@ function LigneArticle({
   ) : null
   if (a.genre === 'scenario')
     return (
-      <article className={`fdl-art${lu ? ' lu' : ''}`} onClick={onLire} aria-expanded={lu}>
+      <article
+        className={`fdl-art${a.sc.fait ? ' fait' : ''}${lu ? ' lu' : ''}${glissable ? ' glissable' : ''}`}
+        onClick={onLire}
+        aria-expanded={lu}
+        {...glisse}
+      >
         <div className="fdl-art-ligne">
           <MarqueGenre genre="scenario" num={a.num} />
           <span className="fdl-art-titre">{a.sc.titre || 'Sans titre'}</span>
-          <span className="fdl-art-actions">{crayon}</span>
+          {tag}
+          <span className="fdl-art-actions">
+            {repere}
+            <label className={`fdl-coche${a.sc.fait ? ' fait' : ''}`} title="Pendant la partie" onClick={(e) => e.stopPropagation()}>
+              <input type="checkbox" checked={a.sc.fait} onChange={(e) => onJouer(a.sc, e.target.checked)} />
+              joué
+            </label>
+            {crayon}
+          </span>
         </div>
         {a.sc.info ? <p className="fdl-art-resume">{a.sc.info}</p> : null}
+        <PucesLiens l={a.sc} pnjsSeance={pnjsSeance} onVoir={onVoir} />
       </article>
     )
   const c = a.c
-  const objets = c.objetIds.map((id) => s.objets.find((o) => o.id === id)).filter((o): o is Objet => !!o)
-  const pnjs = c.pnjIds.map((id) => pnjsSeance.find((x) => x.id === id)).filter((x): x is Character => !!x)
-  const moment = c.beatId != null ? s.beats.find((b) => b.id === c.beatId) : null
   return (
-    <article className={`fdl-art${c.fait ? ' fait' : ''}${lu ? ' lu' : ''}`} onClick={onLire} aria-expanded={lu}>
+    <article
+      className={`fdl-art${c.fait ? ' fait' : ''}${lu ? ' lu' : ''}${glissable ? ' glissable' : ''}`}
+      onClick={onLire}
+      aria-expanded={lu}
+      {...glisse}
+    >
       <div className="fdl-art-ligne">
         <MarqueGenre genre={c.sorte} />
         <span className="fdl-art-titre">{c.titre}</span>
+        {tag}
         <span className="fdl-art-actions">
+          {repere}
           <label className={`fdl-coche${c.fait ? ' fait' : ''}`} title="Pendant la partie" onClick={(e) => e.stopPropagation()}>
             <input type="checkbox" checked={c.fait} onChange={(e) => onCocher(c, e.target.checked)} />
             {c.sorte === 'decouverte' ? 'trouvée' : 'déclenché'}
@@ -917,29 +1254,50 @@ function LigneArticle({
           <em>SI</em> {c.si || '—'} <em>ALORS</em> {c.alors || '—'}
         </p>
       )}
-      {objets.length || pnjs.length || moment ? (
-        <div className="fdl-liens" onClick={(e) => e.stopPropagation()}>
-          {objets.map((o) => (
-            <PuceObjet key={o.id} o={o} onClick={() => onVoir(`objet-${o.id}`)} />
-          ))}
-          {pnjs.map((x) => (
-            <PucePnj key={x.id} c={x} onClick={() => onVoir(`pnj-${x.id}`)} />
-          ))}
-          {moment ? (
-            <button
-              className="fdl-puce moment"
-              title="Ouvrir ce moment dans la Chronologie"
-              onClick={() => {
-                s.setActiveBeat(moment.id)
-                s.setView('timeline')
-              }}
-            >
-              → moment « {moment.title} »
-            </button>
-          ) : null}
-        </div>
-      ) : null}
+      <PucesLiens l={c} pnjsSeance={pnjsSeance} onVoir={onVoir} />
     </article>
+  )
+}
+
+/**
+ * Ce qu'une carte ou un scénario lie, en puces : un objet ou un PNJ s'éclaire
+ * dans la fiche, un moment s'ouvre dans la Chronologie.
+ */
+function PucesLiens({
+  l,
+  pnjsSeance,
+  onVoir
+}: {
+  l: Liens
+  pnjsSeance: Character[]
+  onVoir: (cle: string) => void
+}): JSX.Element | null {
+  const s = useStore()
+  const objets = l.objetIds.map((id) => s.objets.find((o) => o.id === id)).filter((o): o is Objet => !!o)
+  const pnjs = l.pnjIds.map((id) => pnjsSeance.find((x) => x.id === id)).filter((x): x is Character => !!x)
+  const moment = l.beatId != null ? s.beats.find((b) => b.id === l.beatId) : null
+  if (!objets.length && !pnjs.length && !moment) return null
+  return (
+    <div className="fdl-liens" onClick={(e) => e.stopPropagation()}>
+      {objets.map((o) => (
+        <PuceObjet key={o.id} o={o} onClick={() => onVoir(`objet-${o.id}`)} />
+      ))}
+      {pnjs.map((x) => (
+        <PucePnj key={x.id} c={x} onClick={() => onVoir(`pnj-${x.id}`)} />
+      ))}
+      {moment ? (
+        <button
+          className="fdl-puce moment"
+          title="Ouvrir ce moment dans la Chronologie"
+          onClick={() => {
+            s.setActiveBeat(moment.id)
+            s.setView('timeline')
+          }}
+        >
+          → moment « {moment.title} »
+        </button>
+      ) : null}
+    </div>
   )
 }
 
@@ -1036,7 +1394,13 @@ function EditionCarte({
     if (g !== 'scenario') return set({ sorte: g, beatId: g === 'declencheur' ? b.beatId : null })
     const sc = await window.jdr.fiche.ajouterScenario(p.id, b.titre.trim() || 'Sans titre')
     const info = [b.si ? `Si : ${b.si}` : '', b.alors].filter(Boolean).join('\n')
-    if (info) await window.jdr.fiche.majScenario(sc.id, { info })
+    /* Le scénario garde ce que la carte liait. */
+    await window.jdr.fiche.majScenario(sc.id, {
+      info,
+      beatId: b.beatId,
+      objetIds: b.objetIds,
+      pnjIds: b.pnjIds
+    })
     await window.jdr.fiche.supprimerCarte(c.id)
     await relire()
     onRouvrir(`s${sc.id}`)
@@ -1079,10 +1443,17 @@ function EditionCarte({
         </label>
         <div className="fdl-champ">
           <span className="eyebrow">Liés</span>
-          <ChoixLiens b={b} p={p} pnjsIci={pnjsIci} pnjsSeance={pnjsSeance} onChange={set} />
+          <ChoixLiens
+            b={b}
+            p={p}
+            pnjsIci={pnjsIci}
+            pnjsSeance={pnjsSeance}
+            avecMoment={b.sorte === 'declencheur'}
+            onChange={set}
+          />
         </div>
         <div className="fdl-pied">
-          <span className="fdl-astuce">Enregistré au fil de la frappe · Échap ou clic ailleurs pour refermer</span>
+          <span className="fdl-astuce">Enregistré au fil de la frappe · Échap pour refermer</span>
           <div className="spacer" />
           <ChoixGenre genre={b.sorte} onGenre={(g) => void changerGenre(g)} />
           <button
@@ -1097,6 +1468,11 @@ function EditionCarte({
             <IconTrash />
             Supprimer
           </button>
+          {/* Tout est déjà enregistré : valider referme, et envoie la dernière frappe. */}
+          <button className="btn btn-sm btn-brass" onClick={onFermer}>
+            <IconCheck />
+            Valider
+          </button>
         </div>
       </div>
     </article>
@@ -1108,6 +1484,8 @@ function EditionScenario({
   num,
   p,
   scenarios,
+  pnjsIci,
+  pnjsSeance,
   relire,
   onFermer,
   onRouvrir
@@ -1116,6 +1494,8 @@ function EditionScenario({
   num: number
   p: Place
   scenarios: LieuScenario[]
+  pnjsIci: Character[]
+  pnjsSeance: Character[]
   relire: () => Promise<void>
   onFermer: () => void
   onRouvrir: (cle: string) => void
@@ -1123,12 +1503,23 @@ function EditionScenario({
   const s = useStore()
   const [titre, setTitre] = useState(sc.titre)
   const [info, setInfo] = useState(sc.info)
+  const [liens, setLiens] = useState<Liens>({
+    beatId: sc.beatId,
+    objetIds: [...sc.objetIds],
+    pnjIds: [...sc.pnjIds]
+  })
   const champ = useRef<HTMLInputElement>(null)
   useEffect(() => champ.current?.focus(), [])
   const envoyer = useEnvoiDiffere(async (v: { titre: string; info: string }) => {
     await window.jdr.fiche.majScenario(sc.id, v)
     await relire()
   })
+  /* Un lien posé ou retiré s'enregistre tout de suite : c'est un clic, pas une frappe. */
+  const lier = async (patch: Partial<Liens>): Promise<void> => {
+    setLiens((l) => ({ ...l, ...patch }))
+    await window.jdr.fiche.majScenario(sc.id, patch)
+    await relire()
+  }
   const i = scenarios.findIndex((x) => x.id === sc.id)
   const deplacer = async (sens: -1 | 1): Promise<void> => {
     const ids = scenarios.map((x) => x.id)
@@ -1145,9 +1536,10 @@ function EditionScenario({
       titre: titre.trim() || 'Sans titre',
       si: '',
       alors: info,
-      beatId: null,
-      objetIds: [],
-      pnjIds: []
+      /* La carte garde ce que le scénario liait ; une découverte ne mène nulle part. */
+      beatId: g === 'declencheur' ? liens.beatId : null,
+      objetIds: liens.objetIds,
+      pnjIds: liens.pnjIds
     })
     await window.jdr.fiche.supprimerScenario(sc.id)
     await relire()
@@ -1191,6 +1583,17 @@ function EditionScenario({
             }}
           />
         </label>
+        <div className="fdl-champ">
+          <span className="eyebrow">Liés</span>
+          <ChoixLiens
+            b={liens}
+            p={p}
+            pnjsIci={pnjsIci}
+            pnjsSeance={pnjsSeance}
+            avecMoment
+            onChange={(patch) => void lier(patch)}
+          />
+        </div>
         <div className="fdl-pied">
           <button className="btn btn-sm btn-ghost" disabled={i <= 0} onClick={() => void deplacer(-1)} title="Monter d’un rang">
             ↑
@@ -1218,6 +1621,10 @@ function EditionScenario({
             <IconTrash />
             Supprimer
           </button>
+          <button className="btn btn-sm btn-brass" onClick={onFermer}>
+            <IconCheck />
+            Valider
+          </button>
         </div>
       </div>
     </article>
@@ -1225,18 +1632,24 @@ function EditionScenario({
 }
 
 /** Lier une carte à des objets, des PNJ et — pour un déclencheur — un moment. */
+/** Ce qu'une carte ou un scénario lie : objets, PNJ, et le moment où il mène. */
+type Liens = Pick<Brouillon, 'beatId' | 'objetIds' | 'pnjIds'>
+
 function ChoixLiens({
   b,
   p,
   pnjsIci,
   pnjsSeance,
+  avecMoment,
   onChange
 }: {
-  b: Brouillon
+  b: Liens
   p: Place
   pnjsIci: Character[]
   pnjsSeance: Character[]
-  onChange: (patch: Partial<Brouillon>) => void
+  /** Une découverte ne mène nulle part ; un déclencheur ou un scénario, si. */
+  avecMoment: boolean
+  onChange: (patch: Partial<Liens>) => void
 }): JSX.Element {
   const s = useStore()
   const ce = sorteDu(p, s.places).ce
@@ -1289,7 +1702,7 @@ function ChoixLiens({
         ) : null}
         {lier('objet', 'Objet')}
         {lier('pnj', 'PNJ')}
-        {b.sorte === 'declencheur' ? lier('moment', 'Moment') : null}
+        {avecMoment ? lier('moment', 'Moment') : null}
       </div>
 
       {choix ? (
@@ -1413,7 +1826,8 @@ function PanneauQuiQuoi({
   deplie,
   onDeplier,
   nu = false,
-  surPlan = false
+  surPlan = false,
+  pionsPnj = []
 }: {
   p: Place
   cartes: LieuCarte[]
@@ -1427,9 +1841,16 @@ function PanneauQuiQuoi({
   nu?: boolean
   /** Dans l'éditeur de plan : un objet posé se glisse sur le plan. */
   surPlan?: boolean
+  /** Dans l'éditeur de plan : les pions de PNJ déjà posés. */
+  pionsPnj?: Pion[]
 }): JSX.Element {
   const s = useStore()
   const [cherche, setCherche] = useState('')
+  /* Un geste sur un pion de PNJ : le plan d'à côté se relit. */
+  const pion = async (geste: Promise<unknown>): Promise<void> => {
+    await geste
+    window.dispatchEvent(new Event(PIONS_POSES))
+  }
   const [menu, setMenu] = useState(false)
   const hote = useRef<HTMLDivElement>(null)
 
@@ -1559,13 +1980,29 @@ function PanneauQuiQuoi({
           const ouvert = deplie === cle
           const img = s.allItems.find((i) => i.id === c.portraitItemId)
           const tenus = objetsIci.filter((e) => e.x.port === 'pnj' && e.x.characterId === c.id)
+          /* Sur le plan : son pion, posé d'avance, caché tant que la scène ne l'amène pas. */
+          const pose = surPlan ? pionsPnj.find((x) => x.characterId === c.id) : undefined
+          const sous = surPlan
+            ? [c.occupation, pose ? (pose.cache ? 'posé · caché' : 'posé · visible') : 'à poser'].filter(Boolean).join(' · ')
+            : (c.occupation ?? '')
           return (
             <Fragment key={c.id}>
-              <div className={`fdl-rangee${ouvert ? ' ouvert' : ''}`} data-fdl={cle} onClick={() => onDeplier(ouvert ? null : cle)}>
+              <div
+                className={`fdl-rangee${ouvert ? ' ouvert' : ''}${surPlan ? ' glissable' : ''}`}
+                data-fdl={cle}
+                onClick={() => onDeplier(ouvert ? null : cle)}
+                draggable={surPlan}
+                title={surPlan ? (pose ? 'Glisse-le ailleurs sur le plan' : 'Glisse-le sur le plan : son pion y attendra, caché') : undefined}
+                onDragStart={(ev) => {
+                  if (!surPlan) return
+                  ev.dataTransfer.setData(GLISSE_PNJ, String(c.id))
+                  ev.dataTransfer.effectAllowed = 'move'
+                }}
+              >
                 {img?.url ? <img className="fdl-rvig pnj" src={img.poster ?? img.url} alt="" /> : <span className="fdl-rvig pnj">{initiales(c.name)}</span>}
                 <span className="fdl-rnom">
                   <b>{c.name}</b>
-                  <span>{c.occupation ?? ''}</span>
+                  <span>{sous}</span>
                 </span>
                 {tenus.length ? <span className="fdl-compte">{tenus.length} objet{tenus.length > 1 ? 's' : ''}</span> : null}
               </div>
@@ -1594,6 +2031,24 @@ function PanneauQuiQuoi({
                         <IconScreen />
                         Portrait à l’écran
                       </button>
+                    ) : null}
+                    {pose ? (
+                      <>
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          title={pose.cache ? 'Les joueurs verront son pion dès que le lieu sera montré' : 'Les joueurs ne verront plus son pion'}
+                          onClick={() => void pion(window.jdr.pions.hide(pose.id, !pose.cache))}
+                        >
+                          {pose.cache ? 'Le montrer' : 'Le cacher'}
+                        </button>
+                        <button
+                          className="btn btn-sm btn-ghost"
+                          title="Ôter son pion du plan ; il reste dans ce lieu"
+                          onClick={() => void pion(window.jdr.pions.remove(pose.id))}
+                        >
+                          Ôter du plan
+                        </button>
+                      </>
                     ) : null}
                     <div className="spacer" />
                     <button
@@ -1909,6 +2364,8 @@ function PucePnj({
 
 function CarteLue({
   c,
+  de,
+  onBatiment,
   deplie,
   pnjsSeance,
   onDeplier,
@@ -1916,6 +2373,9 @@ function CarteLue({
   onModifier
 }: {
   c: LieuCarte
+  /** Le bâtiment qui l'épingle ici, si elle vient de lui. */
+  de?: Place
+  onBatiment?: (id: number) => void
   deplie: boolean
   pnjsSeance: Character[]
   onDeplier: () => void
@@ -1936,7 +2396,15 @@ function CarteLue({
       <span className={`fdl-sorte ${c.sorte}`} title={c.sorte === 'decouverte' ? 'Découverte' : 'Déclencheur'}>
         {c.sorte === 'decouverte' ? <IconDecouverte /> : <IconEclair />}
       </span>
-      <span className="fdl-titre">{c.titre}</span>
+      <span className="fdl-titre">
+        {c.titre}
+        {de && onBatiment ? (
+          <>
+            {' '}
+            <TagBatiment de={de} onOuvrir={onBatiment} />
+          </>
+        ) : null}
+      </span>
       <span className="fdl-actions">
         <label className="fdl-coche">
           <input type="checkbox" checked={c.fait} onChange={(e) => onCocher(e.target.checked)} />
@@ -2095,6 +2563,9 @@ export function FicheCompacte({
   })
 
   const relire = async (): Promise<void> => setFiche(await window.jdr.fiche.lire(p.id))
+  /* Une autre fiche, ou plus de fiche : la ligne survolée ne l'est plus, sa
+     marque sur la carte non plus. */
+  useEffect(() => () => viserCarte(null), [p.id])
   useEffect(() => {
     setFiche(null)
     setDeplies(new Set())
@@ -2128,9 +2599,31 @@ export function FicheCompacte({
       .map((x) => ({ o, x }))
   )
   const cartes = fiche?.cartes ?? []
-  const faites = cartes.filter((c) => c.fait).length
-  const vues = cartes.filter((c) => !(masquer && c.fait))
-  const premiereFaite = vues.findIndex((c) => c.fait)
+  /* Les cartes d'ici, puis celles qu'épinglent les bâtiments ; les faites en bas. */
+  const { epingles, sources, masques, basculerMasques, relire: relireEpingles } = useEpingles(p)
+  const lues: { c: LieuCarte; de?: Place }[] = [
+    ...cartes.map((c) => ({ c })),
+    ...epingles.flatMap((e) => e.fiche.cartes.map((c) => ({ c, de: e.de })))
+  ].sort((a, b) => Number(a.c.fait) - Number(b.c.fait))
+  /* Les scénarios joués descendent, et se masquent avec les cartes faites. */
+  const scenariosLus: { sc: LieuScenario; num: number; de?: Place }[] = [
+    ...(fiche?.scenarios ?? []).map((sc, i) => ({ sc, num: i + 1 })),
+    ...epingles.flatMap((e) => e.fiche.scenarios.map((sc, i) => ({ sc, num: i + 1, de: e.de })))
+  ].sort((a, b) => Number(a.sc.fait) - Number(b.sc.fait))
+  const joues = scenariosLus.filter((l) => l.sc.fait).length
+  const scenariosVus = scenariosLus.filter((l) => !(masquer && l.sc.fait))
+  const basculerMasquer = (): void =>
+    setMasquer((v) => {
+      try {
+        localStorage.setItem('fiche.masquerFaits', v ? '0' : '1')
+      } catch {
+        /* sans stockage, le choix ne dure que la visite */
+      }
+      return !v
+    })
+  const faites = lues.filter((l) => l.c.fait).length
+  const vues = lues.filter((l) => !(masquer && l.c.fait))
+  const premiereFaite = vues.findIndex((l) => l.c.fait)
   const caches = objets.filter((e) => e.x.port === 'lieu' && e.x.etat === 'cache').length
 
   const parent = s.places.find((q) => q.id === p.parentId) ?? null
@@ -2173,7 +2666,12 @@ export function FicheCompacte({
             /* Parti d'ici : on dit où il est maintenant. */
             const parti = x.origineLieuId === p.id && !(x.port === 'lieu' && x.placeId === p.id)
             return (
-              <div key={x.id} className={`fdc-ligne${parti ? ' parti' : ''}`} data-fdl={`objet-${o.id}`}>
+              <div
+                key={x.id}
+                className={`fdc-ligne${parti ? ' parti' : ''}`}
+                data-fdl={`objet-${o.id}`}
+                {...survolCarte({ objet: x.id })}
+              >
                 {img?.url ? (
                   <button
                     className="fdc-vig"
@@ -2309,41 +2807,33 @@ export function FicheCompacte({
       <Rubrique
         cle="cartes"
         titre="Découvertes et déclencheurs"
-        compte={cartes.length ? `${cartes.length - faites} à venir` : undefined}
+        compte={lues.length ? `${lues.length - faites} à venir` : undefined}
         outils={
-          faites ? (
-            <button
-              className="fdl-masquer"
-              aria-pressed={masquer}
-              onClick={() =>
-                setMasquer((v) => {
-                  try {
-                    localStorage.setItem('fiche.masquerFaits', v ? '0' : '1')
-                  } catch {
-                    /* sans stockage, le choix ne dure que la visite */
-                  }
-                  return !v
-                })
-              }
-            >
-              Masquer les faits ({faites})
-            </button>
-          ) : null
+          <>
+            <CocheMasquerBatiment sources={sources} masques={masques} onBasculer={basculerMasques} />
+            {faites ? (
+              <button className="fdl-masquer" aria-pressed={masquer} onClick={basculerMasquer}>
+                Masquer les faits ({faites})
+              </button>
+            ) : null}
+          </>
         }
       >
-        {fiche && cartes.length === 0 ? (
+        {fiche && lues.length === 0 ? (
           <p className="fdl-vide">Rien de prévu ici — ça s’écrit dans la fiche du lieu.</p>
         ) : null}
-        {cartes.length > 0 && vues.length === 0 ? (
+        {lues.length > 0 && vues.length === 0 ? (
           <p className="fdl-vide">Tout a été trouvé ou déclenché.</p>
         ) : null}
-        {vues.map((c, k) => (
-          <div key={c.id} className="fdl-cartes-ligne">
+        {vues.map(({ c, de }, k) => (
+          <div key={c.id} className="fdl-cartes-ligne" {...survolCarte({ article: `c${c.id}` })}>
             {k === premiereFaite ? (
               <div className="fdl-groupe eyebrow">Trouvées et déclenchés · {faites}</div>
             ) : null}
             <CarteLue
               c={c}
+              de={de}
+              onBatiment={onChanger}
               deplie={deplies.has(c.id)}
               pnjsSeance={pnjsSeance}
               onDeplier={() =>
@@ -2354,37 +2844,72 @@ export function FicheCompacte({
                 })
               }
               onCocher={async (fait) => {
-                await cocherEtSuivre(c, fait, p.id, s.objets)
-                await Promise.all([relire(), s.refreshObjets()])
+                await cocherEtSuivre(c, fait, c.placeId, s.objets)
+                await Promise.all([relire(), relireEpingles(), s.refreshObjets()])
+                window.dispatchEvent(new Event(ARTICLES_SITUES))
               }}
             />
           </div>
         ))}
       </Rubrique>
 
-      {fiche?.scenarios.length ? (
-        <Rubrique cle="scenarios" titre="Scénarios" compte={String(fiche.scenarios.length)}>
-          {fiche.scenarios.map((sc, i) => {
+      {scenariosLus.length ? (
+        <Rubrique
+          cle="scenarios"
+          titre="Scénarios"
+          compte={joues ? `${scenariosLus.length - joues} à jouer` : String(scenariosLus.length)}
+          outils={
+            joues ? (
+              <button className="fdl-masquer" aria-pressed={masquer} onClick={basculerMasquer}>
+                Masquer les joués ({joues})
+              </button>
+            ) : null
+          }
+        >
+          {scenariosVus.length === 0 ? <p className="fdl-vide">Tous les scénarios ont été joués.</p> : null}
+          {scenariosVus.map(({ sc, num, de }) => {
             const ouvert = ouverts.has(sc.id)
             return (
-              <button
-                key={sc.id}
-                className={`fdc-scen${ouvert ? ' ouvert' : ''}`}
-                aria-expanded={ouvert}
-                onClick={() =>
-                  setOuverts((o) => {
-                    const n = new Set(o)
-                    n.has(sc.id) ? n.delete(sc.id) : n.add(sc.id)
-                    return n
-                  })
-                }
-              >
-                <span className="fdl-num num">{i + 1}</span>
-                <span className="fdc-scen-t">
-                  <b>{sc.titre || 'Sans titre'}</b>
-                  {sc.info ? <span className="fdc-scen-info">{sc.info}</span> : null}
-                </span>
-              </button>
+              <Fragment key={sc.id}>
+                <div className={`fdc-scen-ligne${sc.fait ? ' fait' : ''}`} {...survolCarte({ article: `s${sc.id}` })}>
+                <label className={`fdl-coche${sc.fait ? ' fait' : ''}`} title="Pendant la partie">
+                  <input
+                    type="checkbox"
+                    checked={sc.fait}
+                    onChange={async (e) => {
+                      await window.jdr.fiche.cocherScenario(sc.id, e.target.checked)
+                      await Promise.all([relire(), relireEpingles()])
+                      window.dispatchEvent(new Event(ARTICLES_SITUES))
+                    }}
+                  />
+                  joué
+                </label>
+                <button
+                  className={`fdc-scen${ouvert ? ' ouvert' : ''}`}
+                  aria-expanded={ouvert}
+                  onClick={() =>
+                    setOuverts((o) => {
+                      const n = new Set(o)
+                      n.has(sc.id) ? n.delete(sc.id) : n.add(sc.id)
+                      return n
+                    })
+                  }
+                >
+                  <span className="fdl-num num">{num}</span>
+                  <span className="fdc-scen-t">
+                    <b>{sc.titre || 'Sans titre'}</b>
+                    {sc.info ? <span className="fdc-scen-info">{sc.info}</span> : null}
+                  </span>
+                </button>
+                </div>
+                {de ? (
+                  <div className="fdl-liens">
+                    <TagBatiment de={de} onOuvrir={onChanger} />
+                  </div>
+                ) : null}
+                {/* Hors du bouton : une puce est un bouton, et ne s'imbrique pas. */}
+                <PucesLiens l={sc} pnjsSeance={pnjsSeance} onVoir={eclairer} />
+              </Fragment>
             )
           })}
         </Rubrique>

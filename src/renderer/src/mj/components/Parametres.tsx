@@ -504,6 +504,28 @@ function Table(): JSX.Element {
         />
       </Ligne>
 
+      <Ligne
+        nom="Capacité du sac"
+        aide="Les places de chaque personnage, avant sac à dos. Un objet en prend 1 d’ordinaire ; ce qu’il porte ne compte pas. Sac plein, on ne peut plus rien y mettre."
+      >
+        <Curseur
+          label="Capacité du sac"
+          valeur={s.reglages.sacCapacite || 10}
+          min={1}
+          max={60}
+          desactive={s.reglages.sacCapacite === 0}
+          texte={(v) => (s.reglages.sacCapacite === 0 ? '∞' : `${v} places`)}
+          onPoser={(v) => void s.poserReglage('sac.capacite', v)}
+        />
+        <button
+          className={`btn btn-sm${s.reglages.sacCapacite === 0 ? ' btn-on' : ' btn-ghost'}`}
+          title="Un sac sans fond : on y met ce qu’on veut"
+          onClick={() => void s.poserReglage('sac.capacite', s.reglages.sacCapacite === 0 ? 10 : 0)}
+        >
+          {s.reglages.sacCapacite === 0 ? 'Sans limite' : 'Retirer la limite'}
+        </button>
+      </Ligne>
+
       {/* Les monnaies ont remplacé l'unité de valeur : elles se règlent dans
           la fiche de campagne, à côté des jauges. On les rappelle ici. */}
       <Ligne

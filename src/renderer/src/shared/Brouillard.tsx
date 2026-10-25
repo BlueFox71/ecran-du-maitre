@@ -403,9 +403,12 @@ export function Brouillard({
     [lumGarde, carreaux, connu]
   )
 
-  /* Personne sur la carte : elle se montre entière. Poser un plan sans y avoir
-     encore mis les joueurs ne doit pas donner un écran noir. */
-  if (!regards.length || w <= 0 || h <= 0) return null
+  /* Personne sur la carte : personne ne regarde, on n'y voit donc rien — la
+     nuit, comme ailleurs hors des regards. Montrer le plan entier tant qu'on
+     n'y avait pas posé de pion donnait aux joueurs ce qu'un pion leur aurait
+     caché. (Une carte sans murs n'a pas de brouillard du tout : elle reste
+     entière.) */
+  if (w <= 0 || h <= 0) return null
 
   /**
    * Les portes, dessinées dans le champ de vision.
@@ -541,13 +544,14 @@ export function Brouillard({
       ) : null}
 
       {/* Ce qu'on ne voit pas à cet instant : sombre si on l'a déjà vu, noir
-          plein sinon. Sans mémoire, il n'y a qu'un seul noir. */}
+          plein sinon. Sans mémoire, il n'y a qu'un seul noir — et tant que
+          rien n'a été vu, rien n'est « déjà vu » : tout est noir. */}
       <rect
         x="0"
         y="0"
         width={w}
         height={h}
-        className={lumGarde ? 'br-vu' : 'br-noir'}
+        className={lumGarde && connu.size ? 'br-vu' : 'br-noir'}
         mask={`url(#${id}-vu)`}
       />
       {inconnu ? (

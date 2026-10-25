@@ -1,4 +1,4 @@
-import { activeCampaignId, getDb } from '../index'
+import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { getItem } from './library'
 import type { Item, PochetteDoc, PochetteOnglet } from '@shared/types'
 
@@ -131,13 +131,13 @@ const SELECT = `
 
 /**
  * Toute la pochette, rangée comme elle s'affiche : onglet par onglet, et dans
- * chacun le dernier donné en tête — on cherche plus souvent ce qu'on vient de
- * remettre que ce qu'on a remis il y a deux séances.
+ * chacun dans l'ordre du MJ. Un document neuf entre en tête — on cherche plus
+ * souvent ce qu'on vient de remettre — et le MJ le déplace s'il veut.
  */
 export function listPochette(): PochetteDoc[] {
   const db = getDb()
   const rows = db
-    .prepare(`${SELECT} ORDER BY COALESCE(o.ord, -1), d.given_at DESC, d.id DESC`)
+    .prepare(`${SELECT} ORDER BY COALESCE(o.ord, -1), d.ord, d.id DESC`)
     .all(activeCampaignId()) as Ligne[]
 
   const lus = db
@@ -200,14 +200,26 @@ export function addDoc(itemId: number, playerId: number | null, ongletId: number
   const onglets = listOnglets()
   const ou = onglets.length === 0 ? null : (onglets.find((o) => o.id === ongletId)?.id ?? onglets[0].id)
 
-  const max = db
-    .prepare(`SELECT COALESCE(MAX(ord), -1) AS m FROM pochette WHERE campaign_id = ?`)
+  /* En tête : sous le premier de la pile. */
+  const min = db
+    .prepare(`SELECT COALESCE(MIN(ord), 0) AS m FROM pochette WHERE campaign_id = ?`)
     .get(c) as { m: number }
 
   db.prepare(
     `INSERT OR IGNORE INTO pochette (campaign_id, item_id, player_id, player_key, onglet_id, ord, visible)
      VALUES (?, ?, ?, ?, ?, ?, 0)`
-  ).run(c, itemId, playerId, playerId ?? -1, ou, max.m + 1)
+  ).run(c, itemId, playerId, playerId ?? -1, ou, min.m - 1)
+}
+
+/**
+ * Ranger les documents dans l'ordre donné — ceux qu'on voit, dans l'onglet
+ * ouvert ou dans « Tout ». Les autres gardent leur place.
+ */
+export function reorderDocs(ids: number[]): void {
+  const db = getDb()
+  const c = activeCampaignId()
+  const pose = db.prepare(`UPDATE pochette SET ord = ? WHERE id = ? AND campaign_id = ?`)
+  db.transaction(() => ids.forEach((id, i) => pose.run(i, id, c)))()
 }
 
 /** Le reprendre. Il disparaît des téléphones à la seconde. */
@@ -306,4 +318,114 @@ export function marquerLu(pochetteId: number, playerId: number): void {
   if (!ok) return
   db.prepare(`INSERT OR IGNORE INTO pochette_lu (pochette_id, player_id) VALUES (?, ?)`)
     .run(pochetteId, playerId)
+}
+
+/* ============================================================
+   Les inventaires passés à la Pochette
+   ============================================================ */
+
+/**
+ * Un inventaire supprimé : ses images partent avec lui (la base y veille), et
+ * son onglet aussi, s'il ne range plus rien. À appeler avant de le supprimer.
+ */
+export function oublierInventaire(inventaireId: number): () => void {
+  const r = getDb()
+    .prepare(`SELECT pochette_onglet_id AS o FROM inventaire WHERE id = ?`)
+    .get(inventaireId) as { o: number | null } | undefined
+  return () => {
+    if (r?.o == null) return
+    const reste = getDb().prepare(`SELECT 1 FROM pochette WHERE onglet_id = ? LIMIT 1`).get(r.o)
+    if (!reste) removeOnglet(r.o)
+  }
+}
+
+/**
+ * Remet la Pochette d'accord avec les inventaires qui y sont passés.
+ *
+ * Un inventaire « en Pochette » y tient un onglet à son nom, avec l'image de
+ * chaque objet qu'il range dans la séance, montrée à toute la table. Un objet
+ * qui y entre y fait entrer son image ; un objet qui en sort, ou l'inventaire
+ * qui repasse au Sac ou se ferme, la reprend. On ne touche qu'aux lignes que
+ * l'inventaire a lui-même versées : une image que le MJ avait déjà donnée à la
+ * table reste à lui. L'onglet s'en va avec la dernière image, s'il n'a rien
+ * d'autre à ranger.
+ *
+ * Rend vrai si la Pochette a changé.
+ */
+export function suivreInventaires(): boolean {
+  const db = getDb()
+  const c = activeCampaignId()
+  const sid = activeSessionId()
+  let change = false
+  const inventaires = db
+    .prepare(
+      `SELECT id, nom, en_pochette AS p, pochette_onglet_id AS o FROM inventaire WHERE campaign_id = ?`
+    )
+    .all(c) as { id: number; nom: string; p: number; o: number | null }[]
+
+  db.transaction(() => {
+    for (const inv of inventaires) {
+      const voulues = inv.p
+        ? (
+            db
+              .prepare(
+                `SELECT DISTINCT o.image_item_id AS i
+                   FROM objet_placement pl JOIN objet o ON o.id = pl.objet_id
+                  WHERE pl.inventaire_id = ? AND (pl.session_id = ? OR pl.session_id IS NULL)
+                    AND o.image_item_id IS NOT NULL`
+              )
+              .all(inv.id, sid) as { i: number }[]
+          ).map((r) => r.i)
+        : []
+      const tenues = db
+        .prepare(`SELECT id, item_id AS i FROM pochette WHERE inventaire_id = ?`)
+        .all(inv.id) as { id: number; i: number }[]
+
+      for (const t of tenues)
+        if (!voulues.includes(t.i)) {
+          db.prepare(`DELETE FROM pochette WHERE id = ?`).run(t.id)
+          change = true
+        }
+
+      let onglet = inv.o != null && listOnglets().some((x) => x.id === inv.o) ? inv.o : null
+      const manquent = voulues.filter((i) => !tenues.some((t) => t.i === i))
+      if (manquent.length) {
+        if (onglet == null) {
+          /* Le premier onglet ramasse la pile : ce qui y traîne déjà reçoit
+             d'abord le sien, pour ne pas se retrouver parmi les objets. */
+          const pile = db
+            .prepare(`SELECT 1 FROM pochette WHERE campaign_id = ? LIMIT 1`)
+            .get(c)
+          if (listOnglets().length === 0 && pile) createOnglet('Documents')
+          const crees = createOnglet(inv.nom)
+          onglet = crees.reduce((m, x) => (x.id > m ? x.id : m), 0)
+          db.prepare(`UPDATE inventaire SET pochette_onglet_id = ? WHERE id = ?`).run(onglet, inv.id)
+        }
+        const max = db
+          .prepare(`SELECT COALESCE(MAX(ord), -1) AS m FROM pochette WHERE campaign_id = ?`)
+          .get(c) as { m: number }
+        manquent.forEach((i, n) => {
+          const r = db
+            .prepare(
+              `INSERT OR IGNORE INTO pochette
+                 (campaign_id, item_id, player_id, player_key, onglet_id, ord, visible, inventaire_id)
+               VALUES (?, ?, NULL, -1, ?, ?, 1, ?)`
+            )
+            .run(c, i, onglet, max.m + 1 + n, inv.id)
+          if (r.changes) change = true
+        })
+      }
+
+      /* Plus rien à montrer : l'onglet part, s'il ne range rien d'autre. */
+      if (!voulues.length && onglet != null) {
+        const reste = db.prepare(`SELECT 1 FROM pochette WHERE onglet_id = ? LIMIT 1`).get(onglet)
+        if (!reste) {
+          removeOnglet(onglet)
+          change = true
+        }
+        db.prepare(`UPDATE inventaire SET pochette_onglet_id = NULL WHERE id = ?`).run(inv.id)
+      }
+    }
+  })()
+  return change
 }

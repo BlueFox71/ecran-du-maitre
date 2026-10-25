@@ -234,7 +234,7 @@ export function listBeats(sessionId?: number): Beat[] {
   const rows = getDb()
     .prepare(
       `SELECT id, session_id AS sessionId, ord, at_time AS atTime, title, note, done,
-              place_id AS placeId
+              place_id AS placeId, presenter_joueurs AS presenterJoueurs
          FROM beat WHERE session_id = ? ORDER BY ord, id`
     )
     .all(sid) as any[]
@@ -242,6 +242,7 @@ export function listBeats(sessionId?: number): Beat[] {
   return rows.map((r) => ({
     ...r,
     done: !!r.done,
+    presenterJoueurs: !!r.presenterJoueurs,
     items: beatItems(r.id),
     pnjIds: (pnj.all(r.id) as { id: number }[]).map((x) => x.id)
   }))
@@ -258,6 +259,10 @@ export function setBeatPnjs(beatId: number, ids: number[]): void {
     )
     for (const id of ids) ins.run(beatId, id)
   })()
+}
+
+export function setBeatPresenterJoueurs(beatId: number, on: boolean): void {
+  getDb().prepare(`UPDATE beat SET presenter_joueurs = ? WHERE id = ?`).run(on ? 1 : 0, beatId)
 }
 
 export function upsertBeat(input: {

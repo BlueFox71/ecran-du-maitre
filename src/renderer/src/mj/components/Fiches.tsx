@@ -762,6 +762,7 @@ export function Fenetre({
   titre,
   icone,
   large,
+  classe,
   onClose,
   pied,
   children
@@ -769,6 +770,8 @@ export function Fenetre({
   titre: string
   icone: JSX.Element
   large?: boolean
+  /** Une classe de plus sur la fenêtre, pour celle qui veut une autre taille. */
+  classe?: string
   onClose: () => void
   /** Les boutons du pied, à la place de « Terminé ». */
   pied?: React.ReactNode
@@ -779,7 +782,7 @@ export function Fenetre({
   return (
     <div className="scrim" onClick={onClose}>
       <div
-        className={`modal fiche-projet${large ? ' large' : ''}`}
+        className={`modal fiche-projet${large ? ' large' : ''}${classe ? ` ${classe}` : ''}`}
         role="dialog"
         aria-modal="true"
         aria-label={titre}

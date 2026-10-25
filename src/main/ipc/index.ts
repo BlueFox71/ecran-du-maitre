@@ -100,6 +100,8 @@ export function registerIpc(): void {
     if (libelle) {
       display.refreshJoueurs()
       display.calqueABouge()
+      /* Une apparence rendue ou reprise : la carte à l'écran la suit. */
+      display.rehabiller()
     }
     return libelle
   }
@@ -196,8 +198,8 @@ export function registerIpc(): void {
        quelque chose tout de suite, sinon il faudrait rouvrir la campagne. */
     if (cle === 'sortie.ecran') display.setOutput(lus.sortieEcran)
     if (cle === 'murs.angle') display.calqueABouge()
-    /* Les téléphones lisent la bourse dans ces monnaies. */
-    if (cle === 'monnaies') mobile.broadcast()
+    /* Les téléphones lisent la bourse dans ces monnaies, et le fond de leur sac. */
+    if (cle === 'monnaies' || cle === 'sac.capacite') mobile.broadcast()
     return brut
   })
   on('reglages:poste', () => carnet.reglagesPoste())
@@ -435,6 +437,7 @@ export function registerIpc(): void {
   )
   on('places:lumGarde', (id: number, garde: boolean) => places.setLumGarde(id, garde))
   on('places:pieceUnique', (id: number, unique: boolean) => places.setPieceUnique(id, unique))
+  on('places:epingleArrivees', (id: number, oui: boolean) => places.setEpingleArrivees(id, oui))
   /* Le soleil ou la lune change ce que les joueurs voient : on le leur dit. */
   on('places:astre', (id: number, astre: Astre | null) => {
     const p = places.setAstre(id, astre)
@@ -457,6 +460,23 @@ export function registerIpc(): void {
     places.setOuvLargeur(id, largeur)
   )
   on('places:seen', (id: number, seen: boolean) => places.setSeen(id, seen))
+  /* Les apparences de la carte : l'écran suit tout de suite, au direct comme
+     en préparation, et les téléphones avec lui. */
+  on('places:ajouterApparence', (placeId: number, itemId: number, nom: string) =>
+    places.ajouterApparence(placeId, itemId, nom)
+  )
+  on('places:attacherImage', (placeId: number, itemId: number) => places.attacherImage(placeId, itemId))
+  on('places:detacherImage', (placeId: number, itemId: number) => places.detacherImage(placeId, itemId))
+  on('places:renommerApparence', (id: number, nom: string) => places.renommerApparence(id, nom))
+  on('places:retirerApparence', (id: number) => {
+    places.retirerApparence(id)
+    display.rehabiller()
+  })
+  on('places:choisirApparence', (placeId: number, apparenceId: number | null) => {
+    const p = places.choisirApparence(placeId, apparenceId)
+    display.rehabiller()
+    return p
+  })
 
   /* ---------------- annotations d'un lieu ---------------- */
   /* Aucun de ces canaux ne touche `display` : c'est ce qui garantit que les
@@ -479,6 +499,9 @@ export function registerIpc(): void {
   /* Ce que le MJ range ou donne, les téléphones le voient : un joueur qui
      reçoit un objet doit le trouver dans son sac sans rien toucher. */
   const remue = <T>(v: T): T => {
+    /* Un inventaire passé à la Pochette y montre ce qu'il tient : ce qui vient
+       d'y entrer ou d'en sortir y entre ou en sort aussi. */
+    if (pochette.suivreInventaires()) display.versMj('pochette:changee', null)
     mobile.broadcast()
     return v
   }
@@ -533,10 +556,16 @@ export function registerIpc(): void {
   /* Les inventaires partagés : ce qu'on y range, ouvre ou ferme, les
      téléphones le voient tout de suite. */
   on('objets:inventaireAdd', (nom: string) => objets.addInventaire(nom))
-  on('objets:inventaireUpdate', (id: number, patch: { nom?: string; ouvert?: boolean }) =>
+  on('objets:inventaireUpdate', (id: number, patch: { nom?: string; ouvert?: boolean; enPochette?: boolean }) =>
     remue(objets.updateInventaire(id, patch))
   )
-  on('objets:inventaireRemove', (id: number) => remue(objets.removeInventaire(id)))
+  on('objets:inventaireRemove', (id: number) => {
+    const ensuite = pochette.oublierInventaire(id)
+    objets.removeInventaire(id)
+    ensuite()
+    display.versMj('pochette:changee', null)
+    return remue(undefined)
+  })
   on('objets:remplir', (inventaireId: number, objetIds: number[]) =>
     remue(objets.remplir(inventaireId, objetIds))
   )
@@ -691,6 +720,8 @@ export function registerIpc(): void {
   const entrerDansLaSeance = (id: number): void => {
     chars.preparerSeance(id)
     objets.reporterInventaires(id)
+    /* Les inventaires ne tiennent pas la même chose d'une séance à l'autre. */
+    if (pochette.suivreInventaires()) display.versMj('pochette:changee', null)
     /* Un combat ne passe pas d'une séance à l'autre. */
     tours.fin()
     display.refreshJoueurs()
@@ -770,6 +801,9 @@ export function registerIpc(): void {
     return n
   })
   on('timeline:setPnjs', (beatId: number, ids: number[]) => timeline.setBeatPnjs(beatId, ids))
+  on('timeline:setPresenterJoueurs', (beatId: number, on: boolean) =>
+    timeline.setBeatPresenterJoueurs(beatId, on)
+  )
 
   /* ---------------- la trame de la séance ---------------- */
 
@@ -799,6 +833,10 @@ export function registerIpc(): void {
   on('fiche:ajouterCarte', (placeId: number, c: any) => fiche.ajouterCarte(placeId, c))
   on('fiche:majCarte', (id: number, c: any) => fiche.majCarte(id, c))
   on('fiche:cocherCarte', (id: number, fait: boolean) => fiche.cocherCarte(id, fait))
+  on('fiche:cocherScenario', (id: number, fait: boolean) => fiche.cocherScenario(id, fait))
+  on('fiche:situer', (genre: 'carte' | 'scenario', id: number, pos: { x: number; y: number } | null) =>
+    fiche.situerArticle(genre, id, pos)
+  )
   on('fiche:supprimerCarte', (id: number) => fiche.supprimerCarte(id))
   on('fiche:ajouterPnj', (placeId: number, characterId: number) =>
     fiche.ajouterPnj(placeId, characterId)
@@ -859,6 +897,10 @@ export function registerIpc(): void {
   })
   on('pochette:removeOnglet', (id: number) => {
     pochette.removeOnglet(id)
+    return pocheEtPousse()
+  })
+  on('pochette:reorderDocs', (ids: number[]) => {
+    pochette.reorderDocs(ids)
     return pocheEtPousse()
   })
   on('pochette:reorderOnglets', (ids: number[]) => {

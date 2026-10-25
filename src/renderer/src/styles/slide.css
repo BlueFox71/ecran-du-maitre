@@ -2122,6 +2122,138 @@ text.trait-son.repos.fait {
   stroke-linejoin: round;
   font-weight: 600;
 }
+/* Ce qui peut arriver, sur la scène du MJ : une pastille aux couleurs de la
+   fiche — azur la découverte, laiton le déclencheur, iris le scénario —,
+   estompée une fois faite. */
+.trait-article rect {
+  fill: rgba(10, 16, 19, 0.82);
+  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.8));
+}
+.trait-article.sorte-decouverte rect {
+  stroke: #5aa9c9;
+}
+.trait-article.sorte-declencheur rect {
+  stroke: #d8a94a;
+}
+.trait-article.sorte-scenario rect {
+  stroke: #8f7fc9;
+}
+.trait-article text.marque {
+  font-family: 'IBM Plex Mono', monospace;
+  font-weight: 600;
+  fill: #8f7fc9;
+}
+/* La loupe en trait, l'éclair plein : les marques de la fiche. */
+.trait-article.sorte-decouverte g.marque {
+  fill: none;
+  stroke: #5aa9c9;
+  stroke-width: 1.8;
+  stroke-linecap: round;
+}
+.trait-article.sorte-declencheur g.marque {
+  fill: #d8a94a;
+  stroke: none;
+}
+.trait-article text:not(.marque) {
+  fill: #f0e8d6;
+  stroke: rgba(10, 16, 19, 0.85);
+  paint-order: stroke;
+  stroke-linejoin: round;
+  font-weight: 600;
+}
+.trait-article.fait {
+  opacity: 0.45;
+}
+/* Survolé dans la fiche du lieu : un anneau qui bat autour, et la marque
+   pleine — même trouvée, même cachée par « Affichage », on doit la voir. */
+.halo-vise {
+  fill: rgba(216, 169, 74, 0.18);
+  stroke: #f0e8d6;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: halo-vise 0.9s ease-in-out infinite alternate;
+}
+.trait-article.vise,
+.trait-objet.vise {
+  opacity: 1;
+}
+@keyframes halo-vise {
+  from {
+    transform: scale(0.85);
+    opacity: 0.6;
+  }
+  to {
+    transform: scale(1.1);
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .halo-vise {
+    animation: none;
+  }
+}
+/* Le calque laisse passer la souris ; la pastille seule la retient, pour
+   dire au survol ce qu'elle cache. */
+.traits-mj .trait-article {
+  pointer-events: auto;
+  cursor: help;
+}
+/* Sa bulle : posée dans le document, sous la pastille, droite quoi que
+   fasse l'image. Les sortes se disent `sorte-*` : `.decouverte` est déjà
+   l'interrupteur « vu » des lieux, qui l'aurait mise en ligne. */
+.bulle-article {
+  position: fixed;
+  z-index: 200;
+  transform: translateX(-50%);
+  width: max-content;
+  max-width: 340px;
+  pointer-events: none;
+  display: grid;
+  gap: 4px;
+  padding: 9px 11px;
+  border-radius: 7px;
+  border: 1px solid #2b383d;
+  border-top: 3px solid #8f7fc9;
+  background: #1e292e;
+  box-shadow: 0 10px 30px -10px rgba(0, 0, 0, 0.8);
+  color: #e7e2d4;
+  font-size: 12.5px;
+  line-height: 1.45;
+}
+.bulle-article.sorte-decouverte {
+  border-top-color: #5aa9c9;
+}
+.bulle-article.sorte-declencheur {
+  border-top-color: #d8a94a;
+}
+.bulle-article .bulle-sorte {
+  font: 500 9.5px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: #9a8a63;
+}
+.bulle-article b {
+  font-size: 13.5px;
+}
+.bulle-article p {
+  margin: 0;
+  white-space: pre-wrap;
+}
+.bulle-article dl {
+  margin: 0;
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr);
+  gap: 3px 8px;
+}
+.bulle-article dt {
+  font: 500 10px 'IBM Plex Mono', monospace;
+  color: #d8a94a;
+  padding-top: 2px;
+}
+.bulle-article dd {
+  margin: 0;
+  white-space: pre-wrap;
+}
 @media (prefers-reduced-motion: reduce) {
   .trait-son.attente circle {
     animation: none;

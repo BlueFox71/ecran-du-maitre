@@ -12,7 +12,10 @@ const TRAITS_NEUFS: TraitsMj = {
   fenetres: false,
   murs: false,
   sons: true,
-  objets: true
+  objets: true,
+  decouvertes: true,
+  declencheurs: true,
+  scenarios: true
 }
 const CLE = 'paravent.traits'
 
@@ -84,7 +87,10 @@ export function BoutonAffichage({ className = '' }: { className?: string }): JSX
     ['fenetres', 'Fenêtres', 'Les vitres posées sur les murs'],
     ['murs', 'Murs', 'Les traits qui arrêtent le regard ; les rideaux en pointillé'],
     ['sons', 'Sons', 'Les sons posés sur le plan : armés, joués, ou qui attendent ton feu vert'],
-    ['objets', 'Objets', 'Les objets posés sur le plan : pleins trouvés, creux encore cachés']
+    ['objets', 'Objets', 'Les objets posés sur le plan : pleins trouvés, creux encore cachés'],
+    ['decouvertes', 'Découvertes', 'Les découvertes posées sur le plan : estompées une fois trouvées'],
+    ['declencheurs', 'Déclencheurs', 'Les déclencheurs posés sur le plan : estompés une fois déclenchés'],
+    ['scenarios', 'Scénarios', 'Les scénarios posés sur le plan, à leur numéro : estompés une fois joués']
   ]
 
   return (

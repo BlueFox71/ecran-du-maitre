@@ -17,6 +17,7 @@ import {
   kindIcon
 } from '../components/Icons'
 import { ChoixDansArbre } from '../components/ChoixDansArbre'
+import { Fenetre } from '../components/Fiches'
 import { ReprendreDUneSeance } from '../components/ReprendreDUneSeance'
 import { jaugeSanite, jaugesDe } from '@shared/types'
 import type { CharacterKind, Sexe } from '@shared/types'
@@ -40,6 +41,7 @@ import type {
   SheetTemplate
 } from '@shared/types'
 import { useEchap } from '../echap'
+import { ageDit, presenterLeJoueur } from '../presentation'
 
 /** États rapides proposés par défaut. Les gabarits pourront les redéfinir plus tard. */
 const STATES: { key: string; label: string; color?: 'iris' }[] = [
@@ -574,18 +576,7 @@ function SheetBody({
             ) : ch.kind !== 'pnj' ? (
               <button
                 className="btn btn-sm presenter"
-                onClick={() =>
-                  void window.jdr.display.show({
-                    type: 'presentation',
-                    characterId: ch.id,
-                    name: ch.name,
-                    occupation: [ch.occupation, ageDit(ch.age)].filter(Boolean).join(' · ') || undefined,
-                    player: playerOf(s, ch.id)?.name ?? ch.player ?? undefined,
-                    url: portrait?.url ?? null,
-                    color: ch.color,
-                    emojis: ch.emojis
-                  })
-                }
+                onClick={() => presenterLeJoueur(ch)}
                 title="Montrer son portrait, son nom et ses émojis sur l’écran des joueurs, en direct"
               >
                 <IconScreen />
@@ -1031,12 +1022,14 @@ function NotesPnj({ ch }: { ch: Character }): JSX.Element {
 }
 
 /**
- * L'histoire d'un personnage joueur, écrite sur place comme les notes d'un
- * PNJ : la frappe part en base quand la main s'arrête.
+ * L'histoire d'un personnage joueur. Sur la fiche, un aperçu : un clic l'ouvre
+ * en grand, où elle se lit d'un bloc et s'écrit — la frappe part en base
+ * quand la main s'arrête, comme les notes d'un PNJ.
  */
 function Biographie({ ch }: { ch: Character }): JSX.Element {
   const s = useStore()
   const [texte, setTexte] = useState(ch.biographie ?? '')
+  const [grande, setGrande] = useState(false)
   const frappe = useRef<ReturnType<typeof setTimeout> | null>(null)
   /* Recalé quand on change de personnage ou que le formulaire l'a réécrite ;
      pas sur le retour de sa propre frappe, rognée en base. */
@@ -1060,13 +1053,37 @@ function Biographie({ ch }: { ch: Character }): JSX.Element {
     <div className="bloc pnj-notes">
       <div className="bloc-tete">
         <span className="eyebrow">Biographie</span>
+        <button
+          className="btn btn-sm btn-ghost bio-ouvrir"
+          title="La lire et l’écrire en grand"
+          onClick={() => setGrande(true)}
+        >
+          <IconExpand />
+        </button>
       </div>
+      {/* L'aperçu ne s'écrit pas : le clic ouvre la grande fenêtre. */}
       <textarea
+        className="bio-apercu"
+        readOnly
         value={texte}
-        onChange={(e) => tape(e.target.value)}
         placeholder="Ce qui l’a mené jusqu’ici."
-        aria-label={`Biographie de ${ch.name}`}
+        aria-label={`Biographie de ${ch.name} — ouvrir en grand`}
+        title="Clic pour la lire et l’écrire en grand"
+        onClick={() => setGrande(true)}
+        onKeyDown={(e) => e.key === 'Enter' && setGrande(true)}
       />
+      {grande ? (
+        <Fenetre titre={`Biographie de ${ch.name}`} icone={<IconPeople />} large classe="bio-fenetre" onClose={() => setGrande(false)}>
+          <textarea
+            className="bio-pleine"
+            value={texte}
+            autoFocus
+            onChange={(e) => tape(e.target.value)}
+            placeholder="Ce qui l’a mené jusqu’ici."
+            aria-label={`Biographie de ${ch.name}`}
+          />
+        </Fenetre>
+      ) : null}
     </div>
   )
 }
@@ -1892,13 +1909,6 @@ function origineDite(ch: Character): string {
   ]
     .filter(Boolean)
     .join(' · ')
-}
-
-/** « 34 » se lit « 34 ans ». Une fiche d'avant qui portait déjà le mot le garde. */
-function ageDit(age: string | null): string {
-  const a = age?.trim()
-  if (!a) return ''
-  return /^\d+$/.test(a) ? `${a} ans` : a
 }
 
 function shortLabel(label: string): string {

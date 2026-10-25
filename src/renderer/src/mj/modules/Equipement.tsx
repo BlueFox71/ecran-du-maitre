@@ -22,6 +22,7 @@ import { EMPLACEMENTS_OBJET, ditEmplacements, emplacementsDe, nomEmplacement } f
 import type { Character, Objet, ObjetPlacement } from '@shared/types'
 import { Pop } from '../components/Pop'
 import { MenuDonner } from '../components/MenuDonner'
+import { ditSac, etatSac, sacPlein } from '@shared/sac'
 
 /** Un objet posé sur le personnage : l'objet, et l'exemplaire qui est à lui. */
 interface SurLui {
@@ -67,8 +68,11 @@ export function Equipement({ ch }: { ch: Character }): JSX.Element {
      On les reporte, on ne les applique pas — un jet reste jeté par la table. */
   const effets = [...porte.values()].flatMap((x) => x.o.effets.map((e) => ({ ...e, de: x.o.nom })))
 
-  const poidsPorte = [...porte.values(), ...sac].reduce((n, x) => n + poidsDe(x.o) * x.p.qte, 0)
-  const chiffre = poidsPorte > 0
+  /* Le fond du sac : le serveur refuse ce qui le ferait déborder, la poupée le montre. */
+  const fond = etatSac(
+    surLui.map((x) => ({ places: x.o.places, bonusSac: x.o.bonusSac, qte: x.p.qte, emplacement: x.p.emplacement })),
+    s.reglages.sacCapacite
+  )
 
   return (
     <div className="equip">
@@ -131,8 +135,13 @@ export function Equipement({ ch }: { ch: Character }): JSX.Element {
           <div className="bloc-tete">
             <span className="eyebrow">Ce qu’il traîne</span>
             <div className="spacer" />
-            {chiffre ? (
-              <span className="sys num">{poidsPorte.toFixed(1).replace('.', ',')} de port</span>
+            {fond.capacite !== null ? (
+              <span
+                className={`sys num eq-fond${sacPlein(fond) ? ' plein' : ''}`}
+                title={sacPlein(fond) ? 'Son sac déborde : il ne peut plus rien y mettre' : 'Les places prises dans son sac'}
+              >
+                {ditSac(fond)}
+              </span>
             ) : null}
           </div>
           {sac.length === 0 ? (
@@ -378,17 +387,4 @@ function ChoixPourLeSac({
       )}
     </>
   )
-}
-
-/**
- * Le poids d'un objet, lu dans ce que le MJ a écrit : « 1,2 kg » vaut 1,2.
- *
- * Tant que le poids est un texte libre — la question n'est pas tranchée —, on
- * ne fait pas semblant d'avoir un chiffre : on prend celui qui est écrit quand
- * il y en a un, et rien sinon. Aucun plafond n'est calculé.
- */
-function poidsDe(o: Objet): number {
-  if (!o.poids) return 0
-  const m = o.poids.replace(',', '.').match(/-?\d+(\.\d+)?/)
-  return m ? Number(m[0]) : 0
 }

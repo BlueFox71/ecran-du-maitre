@@ -23,6 +23,15 @@ import type { UiFolder, UiItem } from '../../../../preload/index'
 import type { ItemKind } from '@shared/types'
 import { useEchap } from '../echap'
 
+const NATURES: Record<ItemKind, string> = {
+  image: 'Images',
+  video: 'Vidéos',
+  audio: 'Sons',
+  doc: 'Textes',
+  pdf: 'PDF',
+  other: 'Autres'
+}
+
 /** `vignettes` : des lignes et un volet d'aperçu à droite ; `lignes` : des lignes seules. */
 type Rendu = 'vignettes' | 'lignes'
 
@@ -34,6 +43,8 @@ export function ChoixDansArbre({
   courant,
   sansLibelle,
   detacher,
+  plusieurs,
+  deja = [],
   onPick,
   onClose
 }: {
@@ -47,7 +58,14 @@ export function ChoixDansArbre({
   sansLibelle?: string
   /** Si vrai, un bouton de détachement en pied de fenêtre. */
   detacher?: boolean
-  onPick: (id: number | null) => void
+  /**
+   * Choisir plusieurs fichiers d'un coup : chaque clic coche ou décoche, et
+   * « Ajouter » les rend tous, dans l'ordre où on les a cochés.
+   */
+  plusieurs?: (ids: number[]) => void
+  /** Ceux qui sont déjà là : marqués comme tels, on ne les coche pas. */
+  deja?: number[]
+  onPick?: (id: number | null) => void
   onClose: () => void
 }): JSX.Element {
   const s = useStore()
@@ -56,6 +74,10 @@ export function ChoixDansArbre({
   const apercu = rendu === 'vignettes'
   /** La ligne qu'on regarde dans le volet d'aperçu, pas encore choisie. */
   const [vu, setVu] = useState<number | null>(courant)
+  /** Ce qu'on a coché, quand on en choisit plusieurs. */
+  const [coches, setCoches] = useState<number[]>([])
+  const cocher = (id: number): void =>
+    setCoches((c) => (c.includes(id) ? c.filter((x) => x !== id) : [...c, id]))
   /* Deux dossiers ouverts d'emblée : celui du fichier déjà attaché — on voit
      son choix actuel —, et celui de la séance, où l'on range ce qu'on prépare
      pour elle. */
@@ -74,19 +96,23 @@ export function ChoixDansArbre({
     return chemins
   })
 
+  /* Plusieurs natures proposées : on peut n'en garder qu'une. null, toutes. */
+  const [filtre, setFiltre] = useState<ItemKind | null>(null)
+  const natures = filtre ? [filtre] : kinds
+
   const mot = q.trim().toLowerCase()
   const retenu = (i: UiItem): boolean =>
-    kinds.includes(i.kind) &&
+    natures.includes(i.kind) &&
     (mot === '' || `${i.title} ${i.relPath ?? ''}`.toLowerCase().includes(mot))
 
   /** Un dossier ne se montre que s'il a quelque chose à proposer, lui ou l'un des siens. */
   const porte = (f: UiFolder): boolean =>
     f.items.some(retenu) || f.children.some(porte)
 
-  const racine = useMemo(() => s.orphans.filter(retenu), [s.orphans, mot, kinds.join()])
+  const racine = useMemo(() => s.orphans.filter(retenu), [s.orphans, mot, natures.join()])
   const total = useMemo(
     () => s.fichiers.filter(retenu).length,
-    [s.fichiers, mot, kinds.join()]
+    [s.fichiers, mot, natures.join()]
   )
 
   const basculer = (rel: string): void =>
@@ -98,22 +124,47 @@ export function ChoixDansArbre({
 
   /* ---------------- les fichiers ---------------- */
 
-  const ligne = (i: UiItem): JSX.Element => (
-    <button
-      key={i.id}
-      className={`doc-row${(apercu ? vu : courant) === i.id ? ' on' : ''}`}
-      onClick={() => (apercu ? setVu(i.id) : onPick(i.id))}
-      onDoubleClick={apercu ? () => onPick(i.id) : undefined}
-      title={i.relPath ?? i.title}
-    >
-      {kindIcon(i.kind, 'ico')}
-      <span className="t">
-        <span className="ttl">{apercu ? nomDeFichier(i) : i.title}</span>
-        {mot ? <span className="sub">{dossierDe(i)}</span> : null}
-      </span>
-      {apercu && courant === i.id ? <span className="cda-actuel">actuelle</span> : null}
-    </button>
-  )
+  const ligne = (i: UiItem): JSX.Element => {
+    const la = deja.includes(i.id)
+    return (
+      <button
+        key={i.id}
+        className={`doc-row${(apercu ? vu : courant) === i.id ? ' on' : ''}${
+          plusieurs && coches.includes(i.id) ? ' coche' : ''
+        }`}
+        onClick={() => {
+          if (plusieurs) {
+            setVu(i.id)
+            if (!la) cocher(i.id)
+          } else if (apercu) setVu(i.id)
+          else onPick?.(i.id)
+        }}
+        onDoubleClick={apercu && !plusieurs ? () => onPick?.(i.id) : undefined}
+        title={i.relPath ?? i.title}
+      >
+        {plusieurs ? (
+          <input
+            type="checkbox"
+            className="cda-case"
+            checked={la || coches.includes(i.id)}
+            disabled={la}
+            readOnly
+            tabIndex={-1}
+          />
+        ) : null}
+        {kindIcon(i.kind, 'ico')}
+        <span className="t">
+          <span className="ttl">{apercu ? nomDeFichier(i) : i.title}</span>
+          {mot ? <span className="sub">{dossierDe(i)}</span> : null}
+        </span>
+        {la ? (
+          <span className="cda-actuel">déjà là</span>
+        ) : apercu && courant === i.id ? (
+          <span className="cda-actuel">actuelle</span>
+        ) : null}
+      </button>
+    )
+  }
 
   const fichiers = (liste: UiItem[]): JSX.Element => (
     <div className="lignes">{liste.map(ligne)}</div>
@@ -226,13 +277,26 @@ export function ChoixDansArbre({
             />
           </label>
 
+          {kinds.length > 1 ? (
+            <div className="tagbar" role="group" aria-label="Ne montrer que">
+              <button className="chip" aria-pressed={filtre === null} onClick={() => setFiltre(null)}>
+                Tout
+              </button>
+              {kinds.map((k) => (
+                <button key={k} className="chip" aria-pressed={filtre === k} onClick={() => setFiltre(k)}>
+                  {NATURES[k]}
+                </button>
+              ))}
+            </div>
+          ) : null}
+
           <div className={apercu ? 'cda' : undefined}>
             <div className="arbre">
               {sansLibelle && !aplati ? (
                 <div className="lignes">
                   <button
                     className={`doc-row${courant === null ? ' on' : ''}`}
-                    onClick={() => onPick(null)}
+                    onClick={() => onPick?.(null)}
                     title={sansLibelle}
                   >
                     <IconClose />
@@ -259,18 +323,26 @@ export function ChoixDansArbre({
 
         <footer>
           {detacher && courant !== null ? (
-            <button className="btn btn-ghost" onClick={() => onPick(null)}>
+            <button className="btn btn-ghost" onClick={() => onPick?.(null)}>
               Détacher
             </button>
           ) : null}
           <button className="btn btn-ghost" onClick={onClose}>
             Annuler
           </button>
-          {apercu ? (
+          {plusieurs ? (
+            <button
+              className="btn btn-primary"
+              disabled={coches.length === 0}
+              onClick={() => plusieurs(coches)}
+            >
+              {coches.length > 1 ? `Ajouter les ${coches.length}` : 'Ajouter'}
+            </button>
+          ) : apercu ? (
             <button
               className="btn btn-primary"
               disabled={regarde === null}
-              onClick={() => regarde && onPick(regarde.id)}
+              onClick={() => regarde && onPick?.(regarde.id)}
             >
               Choisir
             </button>

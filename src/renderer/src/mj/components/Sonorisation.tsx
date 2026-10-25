@@ -86,7 +86,7 @@ export function Sonorisation(): JSX.Element | null {
         fondre(el, cible, el.volume < cible * 0.9 ? Math.max(0.4, fondu) : 0.15)
       } else fondre(el, cible, 0.25)
     } else if (!el.paused) {
-      fondre(el, 0, 0.6, () => el.pause())
+      fondre(el, 0, audio.extinction ?? 0.6, () => el.pause())
     }
     if (!audio.url && a.url) {
       fondre(el, 0, 0.6, () => el.pause())

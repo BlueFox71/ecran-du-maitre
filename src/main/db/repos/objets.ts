@@ -14,6 +14,10 @@
 import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { copierLigne } from '../copie'
 import { UNITE_VALEUR_PAR_DEFAUT, eclaire, lisCadreCarre } from '@shared/types'
+import { lireCampagne } from '@shared/reglages'
+import { EPSILON_SAC, REFUS_SAC, ditPlaces, etatSac, sacPlein } from '@shared/sac'
+import type { EtatSac, LigneSac } from '@shared/sac'
+import * as reglages from './reglages'
 import type {
   CadreCarre,
   EffetObjet,
@@ -163,7 +167,7 @@ export function masquerFamille(id: number, masquee: boolean): ObjetFamille | nul
 
 const SELECT_OBJET = `
   SELECT id, nom, famille_id AS familleId, image_item_id AS imageItemId, image_cadre AS imageCadre,
-         unique_piece AS uniquePiece, qte, poids, valeur, prix, vu, su,
+         unique_piece AS uniquePiece, qte, poids, places, bonus_sac AS bonusSac, valeur, prix, vu, su,
          equipable, emplacements, charge_nom AS chargeNom, charge_max AS chargeMax, effets
     FROM objet`
 
@@ -220,6 +224,8 @@ function toObjet(r: any, ex: Exemplaires | undefined): Objet {
     unique: !!r.uniquePiece,
     qte: r.qte ?? 1,
     poids: r.poids,
+    places: r.places == null ? 1 : Number(r.places),
+    bonusSac: r.bonusSac == null ? 0 : Number(r.bonusSac),
     valeur: r.valeur == null ? null : Number(r.valeur),
     prix: lirePrix(r.prix),
     vu: r.vu ?? '',
@@ -349,6 +355,8 @@ export interface ObjetPatch {
   unique?: boolean
   qte?: number
   poids?: string | null
+  places?: number
+  bonusSac?: number
   valeur?: number | null
   prix?: Record<string, number> | null
   vu?: string
@@ -373,8 +381,9 @@ export function addObjet(input: { nom: string; familleId?: number | null }): Obj
       -1) + 1
   const info = db
     .prepare(
-      `INSERT INTO objet (campaign_id, famille_id, nom, unique_piece, qte, vu, su, effets, ord)
-       VALUES (?, ?, ?, 1, 1, '', '', '[]', ?)`
+      `INSERT INTO objet (campaign_id, famille_id, nom, unique_piece, qte, vu, su, effets, ord,
+                          equipable, emplacements)
+       VALUES (?, ?, ?, 1, 1, '', '', '[]', ?, 1, '["main-g","main-d"]')`
     )
     .run(cid, input.familleId ?? null, input.nom.trim() || 'Objet sans nom', ord)
   return getObjet(Number(info.lastInsertRowid))!
@@ -389,7 +398,8 @@ export function updateObjet(id: number, patch: ObjetPatch): Objet | null {
       `UPDATE objet SET
          nom = @nom, famille_id = @familleId, image_item_id = @imageItemId,
          image_cadre = @imageCadre,
-         unique_piece = @unique, qte = @qte, poids = @poids, valeur = @valeur, prix = @prix,
+         unique_piece = @unique, qte = @qte, poids = @poids, places = @places,
+         bonus_sac = @bonusSac, valeur = @valeur, prix = @prix,
          vu = @vu, su = @su, equipable = @equipable, emplacements = @emplacements,
          charge_nom = @chargeNom, charge_max = @chargeMax, effets = @effets
        WHERE id = @id`
@@ -412,6 +422,9 @@ export function updateObjet(id: number, patch: ObjetPatch): Objet | null {
          paient plus tard, à la pose. */
       qte: v.unique ? 1 : Math.max(1, Math.round(v.qte || 1)),
       poids: v.poids,
+      /* Au centième : une place se compte, elle ne se mesure pas au micron. */
+      places: Math.max(0, Math.round((Number(v.places) || 0) * 100) / 100),
+      bonusSac: Math.max(0, Math.round((Number(v.bonusSac) || 0) * 100) / 100),
       valeur: v.valeur,
       /* Les zéros ne se gardent pas : un prix sans rien n'est pas un prix. */
       prix: (() => {
@@ -420,10 +433,9 @@ export function updateObjet(id: number, patch: ObjetPatch): Objet | null {
       })(),
       vu: v.vu,
       su: v.su,
-      equipable: v.equipable ? 1 : 0,
-      /* Ce qui ne se porte pas n'a pas d'endroit du corps : on ne garde pas une
-         liste qui ne veut plus rien dire. */
-      emplacements: JSON.stringify(v.equipable ? v.emplacements : []),
+      /* Tout se porte : il se porte là où on l'a dit, nulle part si rien n'est coché. */
+      equipable: v.emplacements.length ? 1 : 0,
+      emplacements: JSON.stringify(v.emplacements),
       chargeNom: v.chargeNom,
       chargeMax: v.chargeMax,
       effets: JSON.stringify(v.effets)
@@ -442,6 +454,8 @@ export function copyObjet(id: number): Objet | null {
     unique: src.unique,
     qte: src.qte,
     poids: src.poids,
+    places: src.places,
+    bonusSac: src.bonusSac,
     valeur: src.valeur,
     prix: src.prix ? { ...src.prix } : null,
     vu: src.vu,
@@ -464,7 +478,7 @@ export function removeObjet(id: number): void {
  * Pose un exemplaire. Dans un lieu il commence **caché** — les joueurs ne l'ont
  * pas encore trouvé ; sur quelqu'un il est **porté**, puisqu'il l'a sur lui.
  */
-export function poser(input: {
+function poserLibre(input: {
   objetId: number
   port: PortObjet
   placeId?: number | null
@@ -516,7 +530,7 @@ export function poser(input: {
  *
  * `objetId` nul vide la case : ce qui s'y trouvait retombe dans le sac.
  */
-export function equiper(input: {
+function equiperLibre(input: {
   characterId: number
   emplacement: string
   objetId: number | null
@@ -678,7 +692,7 @@ function detacher(placementId: number, qte?: number): number {
   return copierLigne('objet_placement', placementId, { qte: n })
 }
 
-export function donner(
+function donnerLibre(
   placementId: number,
   cible: { port: PortObjet; placeId?: number | null; characterId?: number | null },
   /** Combien en donner ; absent, tout l'exemplaire part. */
@@ -709,7 +723,7 @@ export function donner(
 }
 
 /** Le retirer du corps sans le lui prendre : il retombe dans son sac. */
-export function desequiper(placementId: number): Objet | null {
+function desequiperLibre(placementId: number): Objet | null {
   const db = getDb()
   const cur = db
     .prepare(`SELECT objet_id AS objetId FROM objet_placement WHERE id = ?`)
@@ -728,7 +742,7 @@ export function desequiper(placementId: number): Objet | null {
  * On ne porte qu'un exemplaire à la fois : de trois dagues au sac, une seule
  * passe à la ceinture, les deux autres restent où elles étaient.
  */
-export function porter(placementId: number, emplacement: string | null): Objet | null {
+function porterLibre(placementId: number, emplacement: string | null): Objet | null {
   const db = getDb()
   const cur = db
     .prepare(`SELECT objet_id AS objetId, character_id AS characterId FROM objet_placement WHERE id = ?`)
@@ -747,7 +761,7 @@ export function porter(placementId: number, emplacement: string | null): Objet |
   return getObjet(cur.objetId)
 }
 
-export function majPlacement(
+function majPlacementLibre(
   id: number,
   patch: { qte?: number; etat?: ObjetPlacement['etat']; precision?: string | null }
 ): Objet | null {
@@ -807,7 +821,7 @@ export function situer(
   return getObjet(cur.objetId)
 }
 
-export function reprendre(id: number): Objet | null {
+function reprendreLibre(id: number): Objet | null {
   const db = getDb()
   const cur = db.prepare(`SELECT objet_id AS objetId FROM objet_placement WHERE id = ?`).get(id) as
     { objetId: number } | undefined
@@ -838,19 +852,30 @@ export function noter(inventaireId: number, texte: string): void {
 }
 
 function toInventaire(r: any): Inventaire {
-  return { id: r.id, nom: r.nom, ouvert: !!r.ouvert, journal: journaux.get(r.id) ?? [] }
+  return {
+    id: r.id,
+    nom: r.nom,
+    ouvert: !!r.ouvert,
+    enPochette: !!r.enPochette,
+    journal: journaux.get(r.id) ?? []
+  }
 }
 
 export function listInventaires(): Inventaire[] {
   return (
     getDb()
-      .prepare(`SELECT id, nom, ouvert FROM inventaire WHERE campaign_id = ? ORDER BY ord, id`)
+      .prepare(
+        `SELECT id, nom, ouvert, en_pochette AS enPochette FROM inventaire
+          WHERE campaign_id = ? ORDER BY ord, id`
+      )
       .all(activeCampaignId()) as any[]
   ).map(toInventaire)
 }
 
 function unInventaire(id: number): Inventaire | null {
-  const r = getDb().prepare(`SELECT id, nom, ouvert FROM inventaire WHERE id = ?`).get(id)
+  const r = getDb()
+    .prepare(`SELECT id, nom, ouvert, en_pochette AS enPochette FROM inventaire WHERE id = ?`)
+    .get(id)
   return r ? toInventaire(r) : null
 }
 
@@ -869,16 +894,22 @@ export function addInventaire(nom: string): Inventaire {
 
 export function updateInventaire(
   id: number,
-  patch: { nom?: string; ouvert?: boolean }
+  patch: { nom?: string; ouvert?: boolean; enPochette?: boolean }
 ): Inventaire | null {
   const cur = unInventaire(id)
   if (!cur) return null
   const nom = patch.nom !== undefined ? patch.nom.trim() || cur.nom : cur.nom
-  const ouvert = patch.ouvert ?? cur.ouvert
+  /* Le Sac ou la Pochette, l'un ou l'autre : ouvrir l'un ferme l'autre. */
+  let ouvert = patch.ouvert ?? cur.ouvert
+  let enPochette = patch.enPochette ?? cur.enPochette
+  if (patch.ouvert) enPochette = false
+  if (patch.enPochette) ouvert = false
   getDb()
-    .prepare(`UPDATE inventaire SET nom = ?, ouvert = ? WHERE id = ?`)
-    .run(nom, ouvert ? 1 : 0, id)
+    .prepare(`UPDATE inventaire SET nom = ?, ouvert = ?, en_pochette = ? WHERE id = ?`)
+    .run(nom, ouvert ? 1 : 0, enPochette ? 1 : 0, id)
   if (ouvert !== cur.ouvert) noter(id, ouvert ? 'Ouvert aux joueurs' : 'Fermé aux joueurs')
+  if (enPochette !== cur.enPochette)
+    noter(id, enPochette ? 'Passé à la Pochette' : 'Retiré de la Pochette')
   return unInventaire(id)
 }
 
@@ -978,7 +1009,7 @@ export function inventaireDe(placementId: number): number | null {
  * plusieurs, on n'en prend qu'un — les autres restent dans l'inventaire. Rend
  * le nom de l'objet pris.
  */
-export function prendre(placementId: number, characterId: number): string | null {
+function prendreLibre(placementId: number, characterId: number): string | null {
   const db = getDb()
   const p = db
     .prepare(
@@ -1023,7 +1054,7 @@ export function prendre(placementId: number, characterId: number): string | null
  * seulement. S'il y en a déjà de ce même objet, les deux se rejoignent. Rend
  * le nom de l'objet.
  */
-export function remettre(placementId: number, inventaireId: number, qte?: number): string | null {
+function remettreLibre(placementId: number, inventaireId: number, qte?: number): string | null {
   const db = getDb()
   if (!db.prepare(`SELECT 1 FROM objet_placement WHERE id = ?`).get(placementId)) return null
   placementId = detacher(placementId, qte)
@@ -1148,7 +1179,7 @@ function oublierCorbeille(objetId: number): void {
  * Jeter un exemplaire : il quitte le sac, le lieu, l'inventaire, et attend à
  * la corbeille. Il garde son emplacement initial — on peut encore l'y ranger.
  */
-export function jeter(placementId: number): Objet | null {
+function jeterLibre(placementId: number): Objet | null {
   const db = getDb()
   const cur = db
     .prepare(`SELECT objet_id AS objetId FROM objet_placement WHERE id = ?`)
@@ -1170,7 +1201,7 @@ export function jeter(placementId: number): Objet | null {
  * son sac. Un exemplaire dont l'emplacement initial est perdu ne bouge pas.
  * Rend le nombre d'exemplaires rangés.
  */
-export function ranger(placementIds: number[]): number {
+function rangerLibre(placementIds: number[]): number {
   if (placementIds.length === 0) return 0
   const db = getDb()
   const objetIds = (
@@ -1191,7 +1222,7 @@ export function ranger(placementIds: number[]): number {
       const ini = p.initial
       if (!ini || !p.deplace) continue
       if (ini.port === 'inventaire' && ini.inventaireId != null) {
-        remettre(p.id, ini.inventaireId)
+        remettreLibre(p.id, ini.inventaireId)
       } else if (ini.port === 'lieu') {
         db.prepare(
           `UPDATE objet_placement
@@ -1241,3 +1272,90 @@ export function viderCorbeille(): void {
     )
     .run(activeSessionId(), activeCampaignId())
 }
+
+/* ---------------- la garde du sac ---------------- */
+
+/** Les places du sac de base, réglées pour la campagne ; 0, sans limite. */
+export function capaciteSac(): number {
+  return lireCampagne(reglages.tous()).sacCapacite
+}
+
+/** Le sac de chacun de ceux qui ont quelque chose sur eux, dans la séance ouverte. */
+export function sacs(): Map<number, EtatSac & { nom: string }> {
+  const rows = getDb()
+    .prepare(
+      `SELECT p.character_id AS characterId, c.name AS nom, p.emplacement, p.qte,
+              o.places, o.bonus_sac AS bonusSac
+         FROM objet_placement p
+         JOIN objet o     ON o.id = p.objet_id
+         JOIN character c ON c.id = p.character_id
+        WHERE p.character_id IS NOT NULL AND (p.session_id = ? OR p.session_id IS NULL)`
+    )
+    .all(activeSessionId()) as any[]
+  const par = new Map<number, { nom: string; lignes: LigneSac[] }>()
+  for (const r of rows) {
+    let x = par.get(r.characterId)
+    if (!x) par.set(r.characterId, (x = { nom: r.nom, lignes: [] }))
+    x.lignes.push({
+      places: r.places ?? 1,
+      bonusSac: r.bonusSac ?? 0,
+      qte: r.qte ?? 1,
+      emplacement: r.emplacement ?? null
+    })
+  }
+  const base = capaciteSac()
+  return new Map([...par].map(([id, x]) => [id, { nom: x.nom, ...etatSac(x.lignes, base) }]))
+}
+
+/**
+ * Faire un geste sans qu'aucun sac ne déborde par sa faute.
+ *
+ * On compare les sacs avant et après, dans la même transaction : un sac qui
+ * finit au-delà de ce qu'il tient **et** que le geste a alourdi — ou privé de
+ * place, en lui ôtant son sac à dos — annule tout. Un sac qui débordait déjà
+ * (le MJ a baissé la capacité en cours de route) n'empêche que ce qui
+ * l'alourdit : on peut toujours le vider.
+ *
+ * Le refus est une exception marquée de `REFUS_SAC` : elle traverse l'IPC et
+ * l'interface en montre le texte.
+ */
+function gardeSac<T>(geste: () => T): T {
+  const db = getDb()
+  return db.transaction(() => {
+    if (capaciteSac() <= 0) return geste()
+    const avant = sacs()
+    const r = geste()
+    for (const [id, apres] of sacs()) {
+      if (!sacPlein(apres)) continue
+      const a = avant.get(id)
+      const alourdi = !a || apres.charge > a.charge + EPSILON_SAC
+      const retreci = !!a && a.capacite !== null && apres.capacite! < a.capacite - EPSILON_SAC
+      if (retreci)
+        throw new Error(
+          `${REFUS_SAC}Le sac de ${apres.nom} ne tiendrait plus : ${ditPlaces(apres.charge)} places pour ${ditPlaces(apres.capacite!)}. Qu’il se déleste d’abord.`
+        )
+      if (alourdi)
+        throw new Error(
+          `${REFUS_SAC}Le sac de ${apres.nom} est plein : ${ditPlaces(a?.charge ?? 0)} / ${ditPlaces(apres.capacite!)} places, il en faudrait ${ditPlaces(apres.charge - (a?.charge ?? 0))} de plus.`
+        )
+    }
+    return r
+  })()
+}
+
+/* Les gestes qui remplissent un sac, ou lui ôtent de la place, passent par la garde. */
+export const poser = (...a: Parameters<typeof poserLibre>) => gardeSac(() => poserLibre(...a))
+export const equiper = (...a: Parameters<typeof equiperLibre>) => gardeSac(() => equiperLibre(...a))
+export const donner = (...a: Parameters<typeof donnerLibre>) => gardeSac(() => donnerLibre(...a))
+export const desequiper = (...a: Parameters<typeof desequiperLibre>) =>
+  gardeSac(() => desequiperLibre(...a))
+export const porter = (...a: Parameters<typeof porterLibre>) => gardeSac(() => porterLibre(...a))
+export const majPlacement = (...a: Parameters<typeof majPlacementLibre>) =>
+  gardeSac(() => majPlacementLibre(...a))
+export const prendre = (...a: Parameters<typeof prendreLibre>) => gardeSac(() => prendreLibre(...a))
+export const remettre = (...a: Parameters<typeof remettreLibre>) =>
+  gardeSac(() => remettreLibre(...a))
+export const ranger = (...a: Parameters<typeof rangerLibre>) => gardeSac(() => rangerLibre(...a))
+export const jeter = (...a: Parameters<typeof jeterLibre>) => gardeSac(() => jeterLibre(...a))
+export const reprendre = (...a: Parameters<typeof reprendreLibre>) =>
+  gardeSac(() => reprendreLibre(...a))

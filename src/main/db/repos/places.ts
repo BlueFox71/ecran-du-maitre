@@ -7,6 +7,7 @@ import { lireCampagne } from '@shared/reglages'
 import { planDe } from './echelle'
 import {
   PARENT_TIERS,
+  type Apparence,
   type Astre,
   type CielDuLieu,
   type Place,
@@ -20,9 +21,9 @@ const SELECT = `
          p.ambience_item_id AS ambienceItemId,
          p.zone_pts AS zonePts, p.ancre_x AS ancreX, p.ancre_y AS ancreY,
          p.seen, p.ouv_largeur AS ouvLargeur, p.lum_garde AS lumGarde,
-         p.piece_unique AS pieceUnique,
+         p.piece_unique AS pieceUnique, p.epingle_arrivees AS epingleArrivees,
          p.regard_portee AS regardPortee, p.astre, p.astre_cap AS astreCap,
-         p.nord, p.ciel, p.ciel_cap AS cielCap,
+         p.nord, p.ciel, p.ciel_cap AS cielCap, p.apparence_id AS apparenceId,
          (SELECT COUNT(*) FROM item i WHERE i.place_id = p.id) AS docCount
     FROM place p`
 
@@ -77,13 +78,57 @@ function toPlace(r: any): Place {
       r.ouvLargeur === null || r.ouvLargeur === undefined ? null : Number(r.ouvLargeur),
     lumGarde: !!r.lumGarde,
     pieceUnique: !!r.pieceUnique,
+    epingleArrivees: !!r.epingleArrivees,
     regardPortee:
       r.regardPortee === null || r.regardPortee === undefined ? null : Number(r.regardPortee),
     astre: versAstre(r.astre, r.astreCap),
     nord: degres(Number(r.nord)),
     ciel: r.tier === 'espace' ? versAstre(r.ciel, r.cielCap) : null,
+    apparences: [],
+    apparenceId: r.apparenceId ?? null,
+    imageIds: [],
     docCount: r.docCount
   }
+}
+
+/** Les apparences de ces lieux, chacun les siennes, dans leur ordre. */
+function apparencesDe(ids: number[]): Map<number, Apparence[]> {
+  const out = new Map<number, Apparence[]>()
+  if (!ids.length) return out
+  const rows = getDb()
+    .prepare(
+      `SELECT id, place_id AS placeId, item_id AS itemId, nom, ord FROM place_apparence
+        WHERE place_id IN (${ids.map(() => '?').join(',')}) ORDER BY ord, id`
+    )
+    .all(...ids) as Apparence[]
+  for (const a of rows) out.set(a.placeId, [...(out.get(a.placeId) ?? []), a])
+  return out
+}
+
+/** Les images à montrer de ces lieux, chacun les siennes, dans leur ordre. */
+function imagesDe(ids: number[]): Map<number, number[]> {
+  const out = new Map<number, number[]>()
+  if (!ids.length) return out
+  const rows = getDb()
+    .prepare(
+      `SELECT place_id AS p, item_id AS i FROM place_image
+        WHERE place_id IN (${ids.map(() => '?').join(',')}) ORDER BY ord, rowid`
+    )
+    .all(...ids) as { p: number; i: number }[]
+  for (const r of rows) out.set(r.p, [...(out.get(r.p) ?? []), r.i])
+  return out
+}
+
+/** Ce qu'un lieu tient dans d'autres tables : ses apparences, ses images. */
+function avecApparences(lieux: Place[]): Place[] {
+  const ids = lieux.map((p) => p.id)
+  const a = apparencesDe(ids)
+  const im = imagesDe(ids)
+  for (const p of lieux) {
+    p.apparences = a.get(p.id) ?? []
+    p.imageIds = im.get(p.id) ?? []
+  }
+  return lieux
 }
 
 /**
@@ -106,6 +151,7 @@ export function listPlaces(sessionId: number = activeSessionId()): Place[] {
       )
       .all(activeCampaignId(), sessionId) as any[]
   ).map(toPlace)
+  avecApparences(plat)
 
   const enfants = (pid: number | null, tier: PlaceTier): Place[] =>
     plat.filter((p) => p.tier === tier && p.parentId === pid)
@@ -159,7 +205,65 @@ export function descendants(id: number): Place[] {
 
 export function getPlace(id: number): Place | null {
   const r = getDb().prepare(`${SELECT} WHERE p.id = ?`).get(id)
-  return r ? toPlace(r) : null
+  return r ? avecApparences([toPlace(r)])[0] : null
+}
+
+/* ---------------- les apparences de la carte ----------------
+
+   Elles vivent sur le lieu qui porte le plan : on peut nommer une pièce, ses
+   apparences sont celles de son étage. */
+
+export function ajouterApparence(placeId: number, itemId: number, nom: string): Place | null {
+  const plan = planDe(placeId)
+  const db = getDb()
+  const ord = (
+    db.prepare(`SELECT COALESCE(MAX(ord), -1) + 1 AS n FROM place_apparence WHERE place_id = ?`).get(plan) as {
+      n: number
+    }
+  ).n
+  db.prepare(`INSERT INTO place_apparence (place_id, item_id, nom, ord) VALUES (?, ?, ?, ?)`).run(
+    plan,
+    itemId,
+    nom.trim() || 'Apparence',
+    ord
+  )
+  return getPlace(plan)
+}
+
+export function renommerApparence(id: number, nom: string): void {
+  if (nom.trim()) getDb().prepare(`UPDATE place_apparence SET nom = ? WHERE id = ?`).run(nom.trim(), id)
+}
+
+/** L'image reste dans la Bibliothèque ; si c'était celle montrée, la carte revient. */
+export function retirerApparence(id: number): void {
+  getDb().prepare(`DELETE FROM place_apparence WHERE id = ?`).run(id)
+}
+
+/* ---------------- les images à montrer ---------------- */
+
+export function attacherImage(placeId: number, itemId: number): void {
+  getDb()
+    .prepare(
+      `INSERT OR IGNORE INTO place_image (place_id, item_id, ord)
+       SELECT ?, ?, COALESCE(MAX(ord), -1) + 1 FROM place_image WHERE place_id = ?`
+    )
+    .run(placeId, itemId, placeId)
+}
+
+/** Le fichier reste dans la Bibliothèque, et dans les autres lieux qui le montrent. */
+export function detacherImage(placeId: number, itemId: number): void {
+  getDb().prepare(`DELETE FROM place_image WHERE place_id = ? AND item_id = ?`).run(placeId, itemId)
+}
+
+/** Montrer une apparence ; `null`, la carte elle-même. */
+export function choisirApparence(placeId: number, apparenceId: number | null): Place | null {
+  const plan = planDe(placeId)
+  const db = getDb()
+  const ok =
+    apparenceId == null ||
+    !!db.prepare(`SELECT 1 FROM place_apparence WHERE id = ? AND place_id = ?`).get(apparenceId, plan)
+  if (ok) db.prepare(`UPDATE place SET apparence_id = ? WHERE id = ?`).run(apparenceId, plan)
+  return getPlace(plan)
 }
 
 /** Le rang libre au bout d'une fratrie : on crée toujours à la suite. */
@@ -382,6 +486,12 @@ export function setPieceUnique(id: number, unique: boolean): Place | null {
   return getPlace(id)
 }
 
+/** Ce qui peut arriver dans ce bâtiment se montre-t-il aussi sur tous ses lieux ? */
+export function setEpingleArrivees(id: number, oui: boolean): Place | null {
+  getDb().prepare(`UPDATE place SET epingle_arrivees = ? WHERE id = ?`).run(oui ? 1 : 0, id)
+  return getPlace(id)
+}
+
 /**
  * La largeur des prochaines ouvertures de cette carte.
  *
@@ -589,9 +699,26 @@ export function copierLieu(
       seen: 0,
       map_item_id: fichier(brut.m),
       ambience_item_id: fichier(brut.a),
+      /* Elle désigne une apparence de l'original : on la raccroche plus bas. */
+      apparence_id: null,
       ...(p.id === id && racine.ord !== undefined ? { ord: racine.ord } : {})
     })
     nouveau.set(p.id, neuf)
+
+    /* Ses apparences, et celle qu'il montrait. */
+    const montree = db.prepare(`SELECT apparence_id AS a FROM place WHERE id = ?`).get(p.id) as {
+      a: number | null
+    }
+    for (const a of p.apparences) {
+      const copie = copierLigne('place_apparence', a.id, { place_id: neuf, item_id: fichier(a.itemId) })
+      if (montree.a === a.id) db.prepare(`UPDATE place SET apparence_id = ? WHERE id = ?`).run(copie, neuf)
+    }
+    /* Ses images à montrer. */
+    p.imageIds.forEach((i, ord) =>
+      db
+        .prepare(`INSERT OR IGNORE INTO place_image (place_id, item_id, ord) VALUES (?, ?, ?)`)
+        .run(neuf, fichier(i), ord)
+    )
 
     for (const m of ids(`SELECT id FROM mur WHERE place_id = ?`, p.id)) {
       const mur = copierLigne('mur', m, { place_id: neuf })
@@ -847,6 +974,7 @@ function descendantsDe(id: number): Place[] {
     const enfants = (
       getDb().prepare(`${SELECT} WHERE p.parent_id = ? ORDER BY p.ord, p.id`).all(pile.shift()!) as any[]
     ).map(toPlace)
+    avecApparences(enfants)
     out.push(...enfants)
     pile.push(...enfants.map((e) => e.id))
   }

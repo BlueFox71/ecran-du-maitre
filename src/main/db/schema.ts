@@ -1768,5 +1768,138 @@ export const MIGRATIONS: { id: number; sql: string }[] = [
     ALTER TABLE ouverture ADD COLUMN nom TEXT;
     ALTER TABLE lumiere ADD COLUMN nom TEXT;
     `
+  },
+  {
+    id: 74,
+    sql: `
+    /* Le moment où l'on présente les joueurs : le Paravent montre alors leurs
+       portraits, et un clic en présente un à l'écran. */
+    ALTER TABLE beat ADD COLUMN presenter_joueurs INTEGER NOT NULL DEFAULT 0;
+    `
+  },
+  {
+    id: 75,
+    sql: `
+    /* Les autres apparences d'une carte : la même pièce de nuit, en flammes,
+       effondrée. Elles appartiennent au lieu qui porte le plan ; ses pièces
+       les suivent. Seule l'image change, au même cadrage. */
+    CREATE TABLE place_apparence (
+      id       INTEGER PRIMARY KEY AUTOINCREMENT,
+      place_id INTEGER NOT NULL REFERENCES place(id) ON DELETE CASCADE,
+      item_id  INTEGER NOT NULL REFERENCES item(id)  ON DELETE CASCADE,
+      nom      TEXT NOT NULL,
+      ord      INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX idx_place_apparence ON place_apparence(place_id, ord);
+    /* Celle qu'on montre ; NULL, la carte elle-même. */
+    ALTER TABLE place ADD COLUMN apparence_id INTEGER
+      REFERENCES place_apparence(id) ON DELETE SET NULL;
+    `
+  },
+  {
+    id: 76,
+    sql: `
+    /* Les images et vidéos à montrer dans un lieu : le Paravent les range dans
+       « À montrer » quand le moment s'y passe. Une même image peut servir à
+       plusieurs lieux — c'est une liste, pas le rattachement d'un fichier. */
+    CREATE TABLE place_image (
+      place_id INTEGER NOT NULL REFERENCES place(id) ON DELETE CASCADE,
+      item_id  INTEGER NOT NULL REFERENCES item(id)  ON DELETE CASCADE,
+      ord      INTEGER NOT NULL DEFAULT 0,
+      PRIMARY KEY (place_id, item_id)
+    );
+    `
+  },
+  {
+    id: 77,
+    sql: `
+    /* Un inventaire passé à la Pochette : les joueurs n'y piochent pas, ils
+       voient les images de ce qu'il tient, dans un onglet à son nom. Chaque
+       image versée retient l'inventaire d'où elle vient : c'est ce qui permet
+       de la reprendre sans toucher à ce que le MJ a donné par ailleurs. */
+    ALTER TABLE inventaire ADD COLUMN en_pochette INTEGER NOT NULL DEFAULT 0;
+    ALTER TABLE inventaire ADD COLUMN pochette_onglet_id INTEGER
+      REFERENCES pochette_onglet(id) ON DELETE SET NULL;
+    ALTER TABLE pochette ADD COLUMN inventaire_id INTEGER
+      REFERENCES inventaire(id) ON DELETE CASCADE;
+    `
+  },
+  {
+    id: 78,
+    sql: `
+    /* L'ordre de la pochette, posé par le MJ. Jusqu'ici le dernier donné
+       passait en tête, d'après sa date ; on numérote dans cet ordre-là, pour
+       que rien ne bouge — et le MJ range ensuite comme il l'entend. */
+    UPDATE pochette SET ord = (
+      SELECT COUNT(*) FROM pochette p2
+       WHERE p2.campaign_id = pochette.campaign_id
+         AND (p2.given_at > pochette.given_at
+              OR (p2.given_at = pochette.given_at AND p2.id > pochette.id))
+    );
+    `
+  },
+  {
+    id: 79,
+    sql: `
+    /* Un scénario se lie, comme une découverte : aux objets qu'il met en jeu,
+       aux PNJ qu'il fait intervenir, au moment où il mène. */
+    ALTER TABLE lieu_scenario ADD COLUMN beat_id INTEGER REFERENCES beat(id) ON DELETE SET NULL;
+    CREATE TABLE lieu_scenario_objet (
+      scenario_id INTEGER NOT NULL REFERENCES lieu_scenario(id) ON DELETE CASCADE,
+      objet_id    INTEGER NOT NULL REFERENCES objet(id) ON DELETE CASCADE,
+      PRIMARY KEY (scenario_id, objet_id)
+    );
+    CREATE TABLE lieu_scenario_pnj (
+      scenario_id  INTEGER NOT NULL REFERENCES lieu_scenario(id) ON DELETE CASCADE,
+      character_id INTEGER NOT NULL REFERENCES character(id) ON DELETE CASCADE,
+      PRIMARY KEY (scenario_id, character_id)
+    );
+    `
+  },
+  {
+    id: 80,
+    sql: `
+    /* Ce qui peut arriver dans un bâtiment, épinglé à tous ses lieux : ses
+       découvertes, déclencheurs et scénarios se montrent aussi sur la fiche
+       de chacun de ses niveaux et de ses pièces. */
+    ALTER TABLE place ADD COLUMN epingle_arrivees INTEGER NOT NULL DEFAULT 0;
+    `
+  },
+  {
+    id: 81,
+    sql: `
+    /* Un scénario joué se coche, comme une découverte trouvée : il se range
+       avec les faits, et se masque avec eux. */
+    ALTER TABLE lieu_scenario ADD COLUMN fait INTEGER NOT NULL DEFAULT 0;
+    `
+  },
+  {
+    id: 82,
+    sql: `
+    /* Ce qui peut arriver ici, posé sur le plan comme un objet : le point où
+       ça se passe, en fractions du plan de l'étage. NULL : pas posé. */
+    ALTER TABLE lieu_carte ADD COLUMN pos_x REAL;
+    ALTER TABLE lieu_carte ADD COLUMN pos_y REAL;
+    ALTER TABLE lieu_scenario ADD COLUMN pos_x REAL;
+    ALTER TABLE lieu_scenario ADD COLUMN pos_y REAL;
+    `
+  },
+  {
+    id: 83,
+    sql: `
+    /* Le sac a un fond : chaque objet y occupe des places (une par défaut,
+       une demie pour une boîte de cachets) ; un sac à dos porté en ajoute. */
+    ALTER TABLE objet ADD COLUMN places REAL NOT NULL DEFAULT 1;
+    ALTER TABLE objet ADD COLUMN bonus_sac REAL NOT NULL DEFAULT 0;
+    `
+  },
+  {
+    id: 84,
+    sql: `
+    /* Tout se porte : ce qui n'avait aucun endroit du corps se prend en main. */
+    UPDATE objet SET emplacements = '["main-g","main-d"]'
+     WHERE emplacements IS NULL OR emplacements IN ('', '[]');
+    UPDATE objet SET equipable = 1;
+    `
   }
 ]

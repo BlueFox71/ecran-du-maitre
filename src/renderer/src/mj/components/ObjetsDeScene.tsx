@@ -43,8 +43,8 @@ export function compteObjetsDeScene(objets: Objet[], places: Place[], placeId: n
   return lieuxDeScene(places, placeId).reduce((n, l) => n + posesDans(objets, l.id).length, 0)
 }
 
-/** Ce que la colonne de gauche montre : la scène, les objets, ou rien. */
-export type PanneauScene = 'scene' | 'objets' | null
+/** Ce que la colonne de gauche montre : la scène, les objets, les sons, ou rien. */
+export type PanneauScene = 'scene' | 'objets' | 'sons' | null
 
 /**
  * La colonne de gauche, retenue d'une ouverture à l'autre — un confort de
@@ -54,18 +54,18 @@ export type PanneauScene = 'scene' | 'objets' | null
 export function usePanneauScene(
   cle: string,
   defaut: () => PanneauScene
-): [PanneauScene, (quoi: 'scene' | 'objets') => void] {
+): [PanneauScene, (quoi: Exclude<PanneauScene, null>) => void] {
   const [panneau, setPanneau] = useState<PanneauScene>(() => {
     try {
       const v = localStorage.getItem(cle)
-      if (v === 'scene' || v === 'objets') return v
+      if (v === 'scene' || v === 'objets' || v === 'sons') return v
       if (v === 'rien') return null
     } catch {
       /* sans stockage, on part du défaut */
     }
     return defaut()
   })
-  const basculer = (quoi: 'scene' | 'objets'): void =>
+  const basculer = (quoi: Exclude<PanneauScene, null>): void =>
     setPanneau((v) => {
       const suite = v === quoi ? null : quoi
       try {

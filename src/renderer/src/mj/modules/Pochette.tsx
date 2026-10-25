@@ -220,6 +220,14 @@ export function Pochette(): JSX.Element {
               onMenu={(quoi) => setMenu(quoi ? { id: d.id, quoi } : null)}
               onglets={onglets}
               onPoser={poser}
+              onDeposeSur={async (pris) => {
+                /* Le document glissé prend la place de celui qu'on vise, qui
+                   recule d'un cran. */
+                if (pris === d.id) return
+                const ids = vus.map((x) => x.id).filter((x) => x !== pris)
+                ids.splice(ids.indexOf(d.id), 0, pris)
+                poser(await window.jdr.pochette.reorderDocs(ids))
+              }}
               onPage={async (page) => {
                 await window.jdr.items.thumbPage(d.itemId, page)
                 /* Le graveur travaille en arrière-plan et annonce son résultat
@@ -406,6 +414,7 @@ function Carte({
   menu,
   onMenu,
   onPoser,
+  onDeposeSur,
   onPage
 }: {
   doc: PochetteDoc
@@ -415,6 +424,8 @@ function Carte({
   menu: 'qui' | 'ou' | null
   onMenu: (quoi: 'qui' | 'ou' | null) => void
   onPoser: (p: { onglets: PochetteOnglet[]; docs: PochetteDoc[] }) => void
+  /** Un autre document lâché sur celui-ci : il vient se mettre devant. */
+  onDeposeSur: (id: number) => void
   /** Changer la page dont on tire l'aperçu d'un PDF. */
   onPage: (page: number) => void
 }): JSX.Element {
@@ -422,14 +433,32 @@ function Carte({
      document remis à la table les a toutes. */
   const yeux = doc.playerId === null ? joueurs : joueurs.filter((p) => p.id === doc.playerId)
   const lus = yeux.filter((p) => doc.luPar.includes(p.id)).length
+  /* Un document survolé par un autre qu'on glisse : un trait dit où il tombera. */
+  const [vise, setVise] = useState(false)
 
   return (
     <div
-      className={`doc${doc.visible ? '' : ' en-reserve'}`}
+      className={`doc${doc.visible ? '' : ' en-reserve'}${vise ? ' vise' : ''}`}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData('text/pochette', String(doc.id))
         e.dataTransfer.effectAllowed = 'move'
+      }}
+      onDragOver={(e) => {
+        if (!e.dataTransfer.types.includes('text/pochette')) return
+        e.preventDefault()
+        e.dataTransfer.dropEffect = 'move'
+        if (!vise) setVise(true)
+      }}
+      onDragLeave={(e) => {
+        if (!e.currentTarget.contains(e.relatedTarget as Node)) setVise(false)
+      }}
+      onDrop={(e) => {
+        setVise(false)
+        const id = Number(e.dataTransfer.getData('text/pochette'))
+        if (!Number.isFinite(id) || !id) return
+        e.preventDefault()
+        onDeposeSur(id)
       }}
     >
       <div className="vig">

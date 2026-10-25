@@ -7,7 +7,9 @@ import { TailleEchelle } from '../components/TailleEchelle'
 import { DetailPion } from '../components/DetailPion'
 import { BoutonAffichage, useTraitsMj } from '../components/Affichage'
 import { MenuImage, type CibleImage } from '../components/MenuImage'
-import { FicheCompacte } from '../components/FicheDuLieu'
+import { ARTICLES_SITUES, FicheCompacte } from '../components/FicheDuLieu'
+import { useViseCarte } from '../viseCarte'
+import type { ArticleSurCarte } from '../../shared/Slide'
 import { Slide } from '../../shared/Slide'
 import { BoutonTours, Tours, pionEnJeu } from '../components/Tours'
 import { TrameEnJeu } from '../components/PlanTrame'
@@ -74,6 +76,9 @@ import {
   kindIcon
 } from '../components/Icons'
 import { useEchap } from '../echap'
+import { ChoixDansArbre } from '../components/ChoixDansArbre'
+import { SelecteurApparence, porteurDe } from '../components/Apparences'
+import { estPresente, presenterLeJoueur } from '../presentation'
 import { montreLaCarte } from '@shared/scene'
 import { PanneauSons, useSonsSurCarte, useTouchesSon } from '../components/PanneauSons'
 
@@ -284,6 +289,23 @@ export function Pupitre(): JSX.Element {
   const textes = useTextesEcran(slide, onLive)
   /* Une bougie qu'on allume, une lanterne qu'on pose : un clic dans la pièce. */
   const lampe = usePoseLumiere(editPlaceId, calque)
+  /* Un joueur pose l'un de ses objets dans le lieu : armé depuis le détail du
+     pion, il attend un clic sur le plan. Changer de lieu le désarme. */
+  const [objetAPoser, setObjetAPoser] = useState<number | null>(null)
+  useEffect(() => setObjetAPoser(null), [editPlaceId])
+  useEchap(() => setObjetAPoser(null), objetAPoser != null)
+  const poserObjet =
+    objetAPoser != null && editPlaceId != null
+      ? (x: number, y: number): void => {
+          const id = objetAPoser
+          setObjetAPoser(null)
+          void (async () => {
+            await window.jdr.objets.donner(id, { port: 'lieu', placeId: editPlaceId })
+            await window.jdr.objets.situer(id, { x, y })
+            await s.refreshObjets()
+          })()
+        }
+      : undefined
   /* Les sons posés sur ce lieu, pour la carte du MJ (case « Sons » d'Affichage). */
   const sonsScene = useSonsSurCarte(editPlaceId)
   /* Les objets posés en un point du plan : dans l'étage même, ou l'une de
@@ -305,6 +327,27 @@ export function Pupitre(): JSX.Element {
         }))
     )
   }, [s.objets, s.places, editPlaceId])
+  /* Ce qui peut arriver, posé sur le plan : de l'étage même, ou de l'une de
+     ses pièces (cases « Découvertes », « Déclencheurs », « Scénarios »
+     d'Affichage). Relu quand un article bouge, se coche ou s'écrit. */
+  const articlesPoses = useArticlesSurCarte(
+    editPlaceId,
+    s.places.filter((p) => p.id === editPlaceId || p.parentId === editPlaceId).map((p) => p.id)
+  )
+  /* Ce que la main survole dans la fiche du lieu ressort sur la carte. */
+  const viseCarte = useViseCarte()
+  const articlesScene = useMemo(
+    () =>
+      articlesPoses.map((a) =>
+        viseCarte && 'article' in viseCarte && viseCarte.article === a.cle ? { ...a, vise: true } : a
+      ),
+    [articlesPoses, viseCarte]
+  )
+  const objetsVises = useMemo(
+    () =>
+      objetsScene.map((o) => (viseCarte && 'objet' in viseCarte && viseCarte.objet === o.id ? { ...o, vise: true } : o)),
+    [objetsScene, viseCarte]
+  )
   const iCase = caseDuCollage(slide, activeCell)
 
   /** Le lieu mis en scène, et sa carte — c'est elle qui porte les repères. */
@@ -405,6 +448,21 @@ export function Pupitre(): JSX.Element {
   const vise = cadreVise()
   const pivotable = vise !== null
   const lum = Math.round((vise?.frame.lum ?? 1) * 100)
+
+  /* La carte à l'écran a-t-elle d'autres apparences ? Le lieu de ce visuel :
+     celui en scène au direct, celui qu'on prépare à côté. */
+  const lieuDuVisuel = onLive
+    ? (display?.placeId ?? null)
+    : (display?.pendingPlaceId ?? display?.placeId ?? null)
+  const lieuDuVisuelVu = s.places.find((p) => p.id === lieuDuVisuel)
+  const porteurVu = lieuDuVisuelVu ? porteurDe(lieuDuVisuelVu, s.places) : null
+  const avecApparences =
+    porteurVu &&
+    porteurVu.apparences.length &&
+    slide.type === 'image' &&
+    slide.itemId === porteurVu.mapItemId
+      ? porteurVu
+      : null
 
   /* Le décalage repart de zéro : une image couchée n'entre plus dans son cadre
      de la même façon, et un ancien décalage y laisserait voir du vide.
@@ -668,10 +726,55 @@ export function Pupitre(): JSX.Element {
   }, [beat, s.allItems])
 
   const visuels = useMemo(() => matiere.filter((i) => A_L_ECRAN.has(i.kind)), [matiere])
+
+  /* Une image ou une vidéo de l'étagère, celle du moment comme celle du lieu :
+     un clic la prépare, ou l'ouvre en fenêtre ; glissée sur la scène, un pion. */
+  const vignetteVisuel = (it: UiItem): JSX.Element => (
+    <button
+      key={it.id}
+      className="pu-vig"
+      draggable
+      onDragStart={(e) => {
+        e.dataTransfer.setData('text/media-item', String(it.id))
+        e.dataTransfer.setData('text/pion-item', String(it.id))
+        e.dataTransfer.effectAllowed = 'copy'
+      }}
+      onClick={(e) =>
+        it.kind === 'image'
+          ? setCibleImage({ item: it, titre: it.title, x: e.clientX, y: e.clientY })
+          : void poser(it)
+      }
+      title={
+        it.kind === 'image'
+          ? `${it.title} — clic : visuel libre ou fenêtre sur le direct ; glisser sur la scène : un pion`
+          : `Préparer ${it.title} — ou le glisser sur la scène pour en faire un pion`
+      }
+    >
+      {it.poster || (it.kind === 'image' && it.url) ? (
+        <img src={it.poster ?? it.url!} alt="" />
+      ) : null}
+      {it.kind === 'video' ? <span className="pu-play" /> : null}
+      {/* Le triangle dit déjà que c'est une vidéo ; la place sert
+          mieux à dire combien de temps elle dure. */}
+      <span className="pu-kind">
+        {it.kind === 'video' ? (duree(it.duration) ?? 'vidéo') : 'image'}
+      </span>
+      <span className="pu-nom">{it.title}</span>
+    </button>
+  )
   const sons = useMemo(() => matiere.filter((i) => i.kind === 'audio'), [matiere])
   const docs = useMemo(() => matiere.filter((i) => i.kind === 'doc'), [matiere])
   /* Les PNJ que la Chronologie a mis en scène : leur portrait se prépare d'un
      clic, leur pion se glisse sur la scène. */
+  /* Le moment où l'on présente les joueurs : ceux de la séance, présents et
+     encore en jeu, comme sur l'écran d'attente. */
+  const joueursAPresenter = useMemo(
+    () =>
+      beat?.presenterJoueurs
+        ? s.characters.filter((c) => c.kind !== 'pnj' && c.present && !c.horsJeu)
+        : [],
+    [s.characters, beat]
+  )
   const pnjsEnScene = useMemo(
     () => s.characters.filter((c) => c.kind === 'pnj' && (beat?.pnjIds ?? []).includes(c.id)),
     [s.characters, beat]
@@ -708,6 +811,12 @@ export function Pupitre(): JSX.Element {
   /* Le lieu qu'on lit : celui qu'on a choisi, sinon celui du moment. */
   const lieuLu =
     s.places.find((p) => p.id === lieuVu) ?? lieu ?? lieuxEnArbre[0]?.p ?? null
+  /* Ses images à montrer, et celles de son étage pour une pièce. */
+  const imagesLieuLu = lieuLu
+    ? [...new Set([...lieuLu.imageIds, ...porteurDe(lieuLu, s.places).imageIds])]
+        .map((id) => s.allItems.find((i) => i.id === id))
+        .filter((i): i is UiItem => !!i && A_L_ECRAN.has(i.kind))
+    : []
   /* Taire les pièces ; celle qu'on lit reste, sa ligne allumée dit où l'on est. */
   const [montrerPieces, basculerPieces] = useMontrerPieces('paravent.montrerPieces')
   const sansPieces = !montrerPieces
@@ -1025,6 +1134,16 @@ export function Pupitre(): JSX.Element {
                       Afficher dans le visuel
                     </button>
                   </header>
+                  {/* Ses images à montrer — et celles de son étage, pour une pièce. */}
+                  {imagesLieuLu.length ? (
+                    <div className="pu-montrer">
+                      <div className="pu-sect">
+                        <span className="eyebrow">À montrer</span>
+                        <span className="pu-line" />
+                      </div>
+                      <div className="pu-etagere">{imagesLieuLu.map(vignetteVisuel)}</div>
+                    </div>
+                  ) : null}
                   <div className="lect-body lect-lieu">
                     {/* La fiche du lieu, simplifiée : on y coche et on y montre ;
                         on l'écrit dans Lieux. */}
@@ -1143,39 +1262,7 @@ export function Pupitre(): JSX.Element {
                       </button>
                     ) : null}
 
-                    {visuels.map((it) => (
-                      <button
-                        key={it.id}
-                        className="pu-vig"
-                        draggable
-                        onDragStart={(e) => {
-                          e.dataTransfer.setData('text/media-item', String(it.id))
-                          e.dataTransfer.setData('text/pion-item', String(it.id))
-                          e.dataTransfer.effectAllowed = 'copy'
-                        }}
-                        onClick={(e) =>
-                          it.kind === 'image'
-                            ? setCibleImage({ item: it, titre: it.title, x: e.clientX, y: e.clientY })
-                            : void poser(it)
-                        }
-                        title={
-                          it.kind === 'image'
-                            ? `${it.title} — clic : visuel libre ou fenêtre sur le direct ; glisser sur la scène : un pion`
-                            : `Préparer ${it.title} — ou le glisser sur la scène pour en faire un pion`
-                        }
-                      >
-                        {it.poster || (it.kind === 'image' && it.url) ? (
-                          <img src={it.poster ?? it.url!} alt="" />
-                        ) : null}
-                        {it.kind === 'video' ? <span className="pu-play" /> : null}
-                        {/* Le triangle dit déjà que c'est une vidéo ; la place sert
-                            mieux à dire combien de temps elle dure. */}
-                        <span className="pu-kind">
-                          {it.kind === 'video' ? (duree(it.duration) ?? 'vidéo') : 'image'}
-                        </span>
-                        <span className="pu-nom">{it.title}</span>
-                      </button>
-                    ))}
+                    {visuels.map(vignetteVisuel)}
 
                     {pnjsEnScene.map((c) => {
                       const photo = s.allItems.find((i) => i.id === c.portraitItemId)
@@ -1216,6 +1303,34 @@ export function Pupitre(): JSX.Element {
                       )
                     })}
 
+                    {joueursAPresenter.map((c) => {
+                      const photo = s.allItems.find((i) => i.id === c.portraitItemId)
+                      const presente = estPresente(c.id)
+                      return (
+                        <button
+                          key={c.id}
+                          className={`pu-vig pu-pnj${presente ? ' on' : ''}`}
+                          aria-pressed={presente}
+                          onClick={() =>
+                            presente ? void window.jdr.display.arreterPresentation() : presenterLeJoueur(c)
+                          }
+                          title={
+                            presente
+                              ? `Arrêter la présentation de ${c.name} : l’écran revient à ce qu’il montrait avant`
+                              : `Présenter ${c.name} à l’écran : son portrait, son nom et ses émojis, en direct`
+                          }
+                        >
+                          {photo?.url ? (
+                            <img src={photo.url} alt="" draggable={false} />
+                          ) : (
+                            <span className="pu-initiales">{initials(c.name)}</span>
+                          )}
+                          <span className="pu-kind">{presente ? 'à l’écran' : 'joueur'}</span>
+                          <span className="pu-nom">{c.name}</span>
+                        </button>
+                      )
+                    })}
+
                     {sons.length ? (
                       <div className="pu-sons">
                         {sons.map((it) => (
@@ -1232,7 +1347,11 @@ export function Pupitre(): JSX.Element {
                       </div>
                     ) : null}
 
-                    {!lieu && visuels.length === 0 && pnjsEnScene.length === 0 && sons.length === 0 ? (
+                    {!lieu &&
+                    visuels.length === 0 &&
+                    pnjsEnScene.length === 0 &&
+                    joueursAPresenter.length === 0 &&
+                    sons.length === 0 ? (
                       <p className="pu-vide">
                         Rien à montrer pour ce moment — prépare-le dans la Chronologie, ou prends dans la bibliothèque.
                       </p>
@@ -1321,6 +1440,21 @@ export function Pupitre(): JSX.Element {
               placeId={editPlaceId}
               onClick={() => basculerPanneau('objets')}
             />
+            {/* Les sons sous la main sans quitter le fil : le même panneau que
+                l'onglet Sons, en tiroir sur la carte. */}
+            <button
+              className={`btn btn-sm${panneau === 'sons' ? ' btn-on' : ''}`}
+              onClick={() => basculerPanneau('sons')}
+              aria-pressed={panneau === 'sons'}
+              title={
+                panneau === 'sons'
+                  ? 'Refermer les sons — Échap'
+                  : 'Ouvrir par-dessus la carte ce qui joue, les sons du lieu et ceux de la séance'
+              }
+            >
+              <IconNote />
+              Sons
+            </button>
             <BoutonTours />
             <button
               className={`btn btn-sm${trameOuverte ? ' btn-on' : ''}`}
@@ -1392,6 +1526,8 @@ export function Pupitre(): JSX.Element {
               </button>
             </label>
 
+            {avecApparences ? <SelecteurApparence porteur={avecApparences} /> : null}
+
             {/* Comme en Régie : ouvrir l'écran des joueurs sans quitter la scène. */}
             <div className="spacer" />
             {/* Sans libellé : la barre passait à la ligne dès qu'on lui
@@ -1415,8 +1551,8 @@ export function Pupitre(): JSX.Element {
           {trameOuverte ? <TrameEnJeu onClose={() => setTrameOuverte(false)} /> : null}
 
           {/* ---- la grande scène : celle qu'on arrange ---- */}
-          {/* Le tableau de scène ou les objets, en tiroir sur le bord gauche de
-              la carte : la carte garde toute sa largeur, ouvert ou fermé. */}
+          {/* Le tableau de scène, les objets ou les sons, en volet à gauche de
+              la carte : elle leur cède la place plutôt que d'être recouverte. */}
           <div className="big-avec-tableau pu-avec-tableau">
             {voirScene && calque?.murs.length ? (
               <TableauDeScene
@@ -1433,6 +1569,11 @@ export function Pupitre(): JSX.Element {
                 onSurvol={setSurvol}
                 onMontrer={(item, titre, x, y) => setCibleImage({ item, titre, x, y })}
               />
+            ) : null}
+            {panneau === 'sons' ? (
+              <aside className="tableau sons-scene">
+                <PanneauSons />
+              </aside>
             ) : null}
           <div
             className={`big-frame${onLive ? ' live' : ''}`}
@@ -1498,7 +1639,7 @@ export function Pupitre(): JSX.Element {
                   onMoveText={textes.bouge}
                   activeText={textes.over?.id ?? null}
                   onPickText={textes.choisit}
-                  onPoserSurCarte={lampe.poser}
+                  onPoserSurCarte={lampe.poser ?? poserObjet}
                   lumieresMJ
                   traitsMj={traits}
                   /* Les pièces de l'étage qu'on arrange, là où on les a nommées. */
@@ -1506,7 +1647,8 @@ export function Pupitre(): JSX.Element {
                     .filter((p) => p.parentId === editPlaceId && p.ancre)
                     .map((p) => ({ nom: p.name, x: p.ancre![0], y: p.ancre![1] }))}
                   sonsMj={sonsScene}
-                  objetsMj={objetsScene}
+                  objetsMj={objetsVises}
+                  articlesMj={articlesScene}
                 />
                 {/* Par-dessus la scène, jamais dedans : le calque du MJ ne fait
                     pas partie de la diapositive, donc il ne part nulle part.
@@ -1748,6 +1890,7 @@ export function Pupitre(): JSX.Element {
                   await refreshPresence()
                   await refreshEdit()
                 }}
+                pose={editPlaceId != null ? { arme: objetAPoser, armer: setObjetAPoser } : undefined}
               />
             </div>
           ) : null}
@@ -1757,11 +1900,18 @@ export function Pupitre(): JSX.Element {
       </div>
 
       {choix ? (
-        <ChoixMedia
+        /* Ce que le moment n'a pas sous la main, cherché dans l'arborescence. */
+        <ChoixDansArbre
+          titre="Prendre dans la bibliothèque"
+          icone={<IconSearch />}
+          kinds={['image', 'video', 'audio']}
+          rendu="vignettes"
+          courant={null}
           onClose={() => setChoix(false)}
-          onPick={async (it) => {
-            await poser(it)
+          onPick={async (id) => {
             setChoix(false)
+            const it = id == null ? null : s.allItems.find((i) => i.id === id)
+            if (it) await poser(it)
           }}
         />
       ) : null}
@@ -1849,81 +1999,6 @@ const COTES = [
   { id: 'sons', nom: 'Sons', aide: 'ambiance, nappes, bruitages et sons posés sur le plan', Icone: IconNote }
 ] as const
 
-/* ============================================================
-   Prendre dans la bibliothèque ce que le moment n'a pas sous la main
-   ============================================================ */
-
-function ChoixMedia({
-  onPick,
-  onClose
-}: {
-  onPick: (it: UiItem) => void
-  onClose: () => void
-}): JSX.Element {
-  const s = useStore()
-  useEchap(onClose)
-  const [q, setQ] = useState('')
-
-  const dossierDe = (it: UiItem): string => {
-    const p = it.relPath ?? ''
-    const i = p.lastIndexOf('/')
-    return i < 0 ? 'racine' : p.slice(0, i)
-  }
-
-  const mot = q.trim().toLowerCase()
-  const liste = s.fichiers
-    .filter((i) => A_L_ECRAN.has(i.kind) || i.kind === 'audio')
-    .filter((i) => !mot || `${i.title} ${i.relPath ?? ''}`.toLowerCase().includes(mot))
-    .slice(0, 200)
-
-  return (
-    <div className="scrim" onClick={onClose}>
-      <div className="modal" onClick={(e) => e.stopPropagation()}>
-        <header>
-          <IconSearch />
-          <h3>Prendre dans la bibliothèque</h3>
-        </header>
-
-        <div className="body">
-          <label className="cherche">
-            <IconSearch />
-            <input
-              type="text"
-              autoFocus
-              value={q}
-              placeholder="Chercher une image, une vidéo, un son"
-              onChange={(e) => setQ(e.target.value)}
-            />
-          </label>
-
-          <div className="liste-docs">
-            {liste.map((it) => (
-              <button key={it.id} className="doc-row" onClick={() => onPick(it)}>
-                {kindIcon(it.kind)}
-                <span className="t">
-                  <span className="ttl">{it.title}</span>
-                  <span className="sub">{dossierDe(it)}</span>
-                </span>
-              </button>
-            ))}
-            {liste.length === 0 ? (
-              <p className="vide">
-                {mot ? 'Rien de diffusable ne correspond.' : 'Aucun média dans la campagne.'}
-              </p>
-            ) : null}
-          </div>
-        </div>
-
-        <footer>
-          <button className="btn btn-ghost" onClick={onClose}>
-            Annuler
-          </button>
-        </footer>
-      </div>
-    </div>
-  )
-}
-
 /**
  * Le texte d'un lieu, tel qu'on l'a tapé ou écrit dans son fichier : une ligne
  * vide sépare deux paragraphes, un retour simple reste un retour.
@@ -1942,4 +2017,72 @@ function TexteDeLieu({ texte }: { texte: string | null }): JSX.Element {
       ))}
     </TexteCourt>
   )
+}
+
+/**
+ * Les découvertes, déclencheurs et scénarios posés sur le plan du lieu en
+ * scène et de ses pièces, en fractions de la carte. Chaque fiche se lit à
+ * part ; on relit tout quand un article est posé, coché ou réécrit.
+ */
+function useArticlesSurCarte(placeId: number | null, lieux: number[]): ArticleSurCarte[] {
+  const [articles, setArticles] = useState<ArticleSurCarte[]>([])
+  const cle = lieux.join(',')
+  useEffect(() => {
+    setArticles([])
+    if (placeId == null || !lieux.length) return
+    let vivant = true
+    const relire = async (): Promise<void> => {
+      const fiches = await Promise.all(lieux.map((id) => window.jdr.fiche.lire(id)))
+      if (!vivant) return
+      setArticles(
+        fiches.flatMap((f): ArticleSurCarte[] => [
+          ...f.cartes.flatMap((c): ArticleSurCarte[] =>
+            c.pos
+              ? [
+                  {
+                    cle: `c${c.id}`,
+                    x: c.pos.x,
+                    y: c.pos.y,
+                    genre: c.sorte,
+                    titre: c.titre,
+                    si: c.si,
+                    alors: c.alors,
+                    fait: c.fait
+                  }
+                ]
+              : []
+          ),
+          ...f.scenarios.flatMap((sc, i): ArticleSurCarte[] =>
+            sc.pos
+              ? [
+                  {
+                    cle: `s${sc.id}`,
+                    x: sc.pos.x,
+                    y: sc.pos.y,
+                    genre: 'scenario',
+                    num: i + 1,
+                    titre: sc.titre || 'Sans titre',
+                    info: sc.info,
+                    fait: sc.fait
+                  }
+                ]
+              : []
+          )
+        ])
+      )
+    }
+    void relire()
+    const h = (): void => void relire()
+    window.addEventListener(ARTICLES_SITUES, h)
+    window.addEventListener('jdr:defait', h)
+    const lache = window.jdr.fiche.onRelue(h)
+    return () => {
+      vivant = false
+      window.removeEventListener(ARTICLES_SITUES, h)
+      window.removeEventListener('jdr:defait', h)
+      lache()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [placeId, cle])
+  return articles
 }

@@ -1132,6 +1132,9 @@ input[type='range']::-webkit-slider-thumb {
   align-items: center;
   gap: 8px;
   flex: none;
+  /* Elle partage son nom avec les lampes du plan, que la souris traverse :
+     sans ceci, le curseur et ses boutons ne recevaient aucun clic. */
+  pointer-events: auto;
 }
 .stage-bar .lum.off {
   opacity: 0.45;
@@ -4647,6 +4650,39 @@ input[type='range']::-webkit-slider-thumb {
 .g-neutral i {
   background: var(--text-faint);
 }
+.g-orange i {
+  background: var(--orange);
+}
+.g-argile i {
+  background: var(--argile);
+}
+.g-olive i {
+  background: var(--olive);
+}
+.g-fougere i {
+  background: var(--fougere);
+}
+.g-jade i {
+  background: var(--jade);
+}
+.g-azur i {
+  background: var(--azur);
+}
+.g-ardoise i {
+  background: var(--ardoise);
+}
+.g-outremer i {
+  background: var(--outremer);
+}
+.g-amethyste i {
+  background: var(--amethyste);
+}
+.g-prune i {
+  background: var(--prune);
+}
+.g-bruyere i {
+  background: var(--bruyere);
+}
 .stepper {
   display: flex;
   gap: 4px;
@@ -6954,6 +6990,15 @@ input[type='range']::-webkit-slider-thumb {
   background: var(--raised);
   border-color: var(--line);
 }
+.cda-case {
+  flex: none;
+  margin: 0 2px 0 0;
+  accent-color: var(--brass);
+  pointer-events: none;
+}
+.doc-row.coche .ttl {
+  color: var(--brass);
+}
 .cda-actuel {
   margin-left: auto;
   flex: none;
@@ -8340,29 +8385,62 @@ input[type='range']::-webkit-slider-thumb {
   align-items: center;
   flex: none;
 }
-.fc-teintes select {
-  width: 52px;
-  background: var(--sunk);
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  padding: 3px 2px 3px 16px;
-  font-size: 10.5px;
-  color: var(--text-dim);
-}
+/* La couleur d'une jauge : une pastille, qui ouvre la grille des teintes. */
 .fc-pastille {
-  position: absolute;
-  left: 5px;
-  width: 9px;
-  height: 9px;
+  flex: none;
+  width: 16px;
+  height: 16px;
+  padding: 0;
   border-radius: 50%;
-  pointer-events: none;
   border: 1px solid rgba(255, 255, 255, 0.14);
+  cursor: pointer;
+}
+.fc-teintes > .fc-pastille {
+  box-shadow: 0 0 0 2px var(--sunk), 0 0 0 3px var(--line);
+}
+.fc-teintes > .fc-pastille:hover,
+.fc-teintes > .fc-pastille[aria-expanded='true'] {
+  box-shadow: 0 0 0 2px var(--sunk), 0 0 0 3px var(--brass);
+}
+.fc-grille-teintes {
+  position: fixed;
+  z-index: 60;
+  display: grid;
+  grid-template-columns: repeat(4, 22px);
+  gap: 7px;
+  padding: 9px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+  box-shadow: var(--shadow);
+}
+.fc-grille-teintes .fc-pastille {
+  width: 22px;
+  height: 22px;
+}
+.fc-grille-teintes .fc-pastille:hover {
+  transform: scale(1.12);
+}
+/* La teinte de la jauge : cerclée, pour qu'on la retrouve. */
+.fc-grille-teintes .fc-pastille[aria-checked='true'] {
+  box-shadow: 0 0 0 2px var(--raised), 0 0 0 4px var(--text);
 }
 .fc-pastille.g-blood { background: var(--blood); }
 .fc-pastille.g-iris { background: var(--iris); }
 .fc-pastille.g-moss { background: var(--moss); }
 .fc-pastille.g-brass { background: var(--brass); }
 .fc-pastille.g-neutral { background: var(--text-faint); }
+.fc-pastille.g-orange { background: var(--orange); }
+.fc-pastille.g-argile { background: var(--argile); }
+.fc-pastille.g-olive { background: var(--olive); }
+.fc-pastille.g-fougere { background: var(--fougere); }
+.fc-pastille.g-jade { background: var(--jade); }
+.fc-pastille.g-azur { background: var(--azur); }
+.fc-pastille.g-ardoise { background: var(--ardoise); }
+.fc-pastille.g-outremer { background: var(--outremer); }
+.fc-pastille.g-amethyste { background: var(--amethyste); }
+.fc-pastille.g-prune { background: var(--prune); }
+.fc-pastille.g-bruyere { background: var(--bruyere); }
 
 .fc-vide {
   border: 1px dashed var(--line);
@@ -9155,6 +9233,11 @@ input[type='range']::-webkit-slider-thumb {
 .pu-vig:hover {
   border-color: var(--brass-line);
 }
+/* Un joueur présenté en ce moment à l'écran. */
+.pu-vig[aria-pressed='true'] {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 1px var(--brass);
+}
 .pu-vig img {
   width: 100%;
   height: 100%;
@@ -9636,6 +9719,42 @@ input[type='range']::-webkit-slider-thumb {
 .dp-barre.c-neutral i {
   background: var(--text-faint);
 }
+.dp-barre.c-brass i {
+  background: var(--brass);
+}
+.dp-barre.c-orange i {
+  background: var(--orange);
+}
+.dp-barre.c-argile i {
+  background: var(--argile);
+}
+.dp-barre.c-olive i {
+  background: var(--olive);
+}
+.dp-barre.c-fougere i {
+  background: var(--fougere);
+}
+.dp-barre.c-jade i {
+  background: var(--jade);
+}
+.dp-barre.c-azur i {
+  background: var(--azur);
+}
+.dp-barre.c-ardoise i {
+  background: var(--ardoise);
+}
+.dp-barre.c-outremer i {
+  background: var(--outremer);
+}
+.dp-barre.c-amethyste i {
+  background: var(--amethyste);
+}
+.dp-barre.c-prune i {
+  background: var(--prune);
+}
+.dp-barre.c-bruyere i {
+  background: var(--bruyere);
+}
 .dp-coups {
   display: flex;
   gap: 4px;
@@ -9758,6 +9877,28 @@ input[type='range']::-webkit-slider-thumb {
   cursor: pointer;
 }
 .dp-objets .dp-lampe.on {
+  color: var(--brass-ink);
+  border-color: var(--brass);
+  background: var(--brass-wash);
+}
+/* Poser au sol : même pastille que la lampe, au bout de la ligne. */
+.dp-objets .dp-poser {
+  flex: none;
+  margin-left: auto;
+  padding: 1px 7px;
+  font: 500 9.5px 'IBM Plex Mono', monospace;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  cursor: pointer;
+}
+.dp-objets .dp-lampe + .dp-poser,
+.dp-objets .q + .dp-poser {
+  margin-left: 6px;
+}
+.dp-objets .dp-poser.on {
   color: var(--brass-ink);
   border-color: var(--brass);
   background: var(--brass-wash);
@@ -10309,6 +10450,45 @@ input[type='range']::-webkit-slider-thumb {
 .pnj-notes textarea::placeholder {
   color: var(--text-faint);
 }
+/* La biographie : un aperçu sur la fiche, qui s'ouvre en grand au clic. */
+.pnj-notes .bio-ouvrir {
+  margin-left: auto;
+  padding: 2px 5px;
+}
+.pnj-notes textarea.bio-apercu {
+  cursor: pointer;
+  resize: none;
+}
+.pnj-notes textarea.bio-apercu:hover {
+  border-color: var(--brass-line);
+}
+/* Ouverte en grand, elle prend les quatre cinquièmes de la fenêtre : le
+   texte remplit tout ce qui reste entre l'en-tête et le pied. */
+.modal.bio-fenetre {
+  height: 80vh;
+}
+.bio-fenetre .body {
+  flex: 1;
+  grid-template-rows: 1fr;
+}
+.bio-pleine {
+  width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  min-height: 0;
+  resize: none;
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  padding: 12px 14px;
+  font-size: 14px;
+  line-height: 1.6;
+  color: var(--text);
+}
+.bio-pleine:focus {
+  border-color: var(--brass-line);
+  outline: none;
+}
 
 /* ---- ce qu'on lui prend quand il tombe ---- */
 /* Même fond que les notes, même promesse : une antisèche qu'on consulte du
@@ -10701,6 +10881,17 @@ input[type='range']::-webkit-slider-thumb {
 }
 .doc:hover {
   border-color: var(--brass-line);
+}
+/* Un autre document lâché ici viendra devant : un trait doré à sa gauche. */
+.doc.vise::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: -8px;
+  width: 3px;
+  border-radius: 2px;
+  background: var(--brass);
 }
 .doc .vig {
   position: relative;
@@ -12248,6 +12439,41 @@ input[type='range']::-webkit-slider-thumb {
 .lb-nom-champ input:first-child {
   padding-left: 7px;
 }
+/* Les portes et les lumières à nommer à la suite, dans le volet : une cible
+   pour la retrouver sur le plan, puis le champ sur toute la largeur. */
+.murs-noms {
+  display: grid;
+  gap: 3px;
+  margin-bottom: 6px;
+}
+.murs-noms .nm {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.murs-noms .nm .murs-reglage.lb-reglage {
+  flex: 1;
+  width: auto;
+  display: block;
+}
+.murs-noms .nm-voir {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: var(--text-faint);
+}
+.murs-noms .nm-voir:hover {
+  background: var(--tint);
+  color: var(--brass-ink);
+}
+.murs-noms .nm-voir svg {
+  width: 12px;
+  height: 12px;
+  stroke: currentColor;
+}
 .murs-reglage b {
   color: var(--text-dim);
   font-weight: 500;
@@ -12418,6 +12644,31 @@ input[type='range']::-webkit-slider-thumb {
 }
 .piece.visee .nom {
   fill: #fff;
+}
+/* La porte ou la lampe qu'on nomme dans la liste : un anneau qui bat autour,
+   parce qu'un trait de porte ou une pastille se perdent dans le plan. */
+.visee-halo {
+  fill: color-mix(in oklab, var(--brass) 22%, transparent);
+  stroke: var(--brass-ink);
+  stroke-width: 2.5;
+  pointer-events: none;
+  transform-box: fill-box;
+  transform-origin: center;
+  animation: visee-bat 1.1s ease-in-out infinite alternate;
+}
+.ouv.visee .marque {
+  stroke-width: 7;
+  filter: drop-shadow(0 0 3px var(--c));
+}
+@keyframes visee-bat {
+  from {
+    transform: scale(0.88);
+    opacity: 0.75;
+  }
+  to {
+    transform: scale(1.08);
+    opacity: 1;
+  }
 }
 
 /* La clé des couleurs : sans elle, une pastille verte ne veut rien dire. */
@@ -13911,6 +14162,12 @@ button.ou-etat:hover {
 .eq-volet .sys {
   font-size: 10.5px;
   color: var(--text-faint);
+}
+.eq-volet .sys.eq-fond {
+  margin-left: 10px;
+}
+.eq-volet .sys.eq-fond.plein {
+  color: var(--blood);
 }
 .rien-eq {
   margin: 0;
@@ -15561,6 +15818,10 @@ ul[data-type='taskList'] li[data-checked='true'] > div {
   border-radius: 5px;
   background: var(--raised);
 }
+.im-media {
+  position: relative;
+  display: block;
+}
 .im-vignette img {
   width: 100%;
   aspect-ratio: 16 / 10;
@@ -16458,6 +16719,108 @@ ul[data-type='taskList'] li[data-checked='true'] > div {
   justify-content: center;
 }
 
+/* ---- les minuteries, sous l'horloge : le générateur qui tient 40 min ---- */
+.hs-minuteries {
+  display: grid;
+  gap: 4px;
+  margin-top: 2px;
+}
+.hs-min {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'nom temps' 'gestes gestes';
+  align-items: baseline;
+  gap: 1px 6px;
+  padding: 4px 6px;
+  border: 1px solid var(--line-soft);
+  border-radius: 5px;
+}
+.hs-min-nom {
+  grid-area: nom;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hs-min-temps {
+  grid-area: temps;
+  font-size: 15px;
+  color: var(--text);
+}
+.hs-min.arretee .hs-min-temps {
+  color: var(--text-faint);
+}
+.hs-min.finie {
+  border-color: var(--blood);
+}
+.hs-min.finie .hs-min-temps {
+  color: var(--blood);
+}
+/* Elle clignote tant que l'alerte n'a pas été vue. */
+.hs-min.sonne {
+  animation: hs-sonne 1s ease-in-out infinite;
+}
+@keyframes hs-sonne {
+  50% {
+    background: color-mix(in oklab, var(--blood) 22%, transparent);
+  }
+}
+.hs-min-gestes {
+  grid-area: gestes;
+  display: flex;
+  gap: 2px;
+  justify-content: flex-end;
+}
+.hs-min-gestes .btn {
+  padding: 1px 6px;
+  font-size: 11px;
+}
+.hs-min-ajout {
+  display: grid;
+  gap: 5px;
+}
+.hs-min-ajout input[type='text'] {
+  width: 100%;
+}
+.hs-min-durees {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 3px;
+}
+.hs-min-durees .btn {
+  padding: 2px 6px;
+}
+.hs-min-durees input[type='number'] {
+  width: 52px;
+}
+.hs-min-durees .unite {
+  font-size: 11px;
+  color: var(--text-faint);
+}
+/* L'alerte de fin : en haut de la fenêtre, par-dessus tout, jusqu'au « Vu ». */
+.hs-alerte {
+  position: fixed;
+  top: 14px;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 200;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 14px;
+  border: 1px solid var(--blood);
+  border-radius: 8px;
+  background: var(--raised);
+  box-shadow: 0 8px 28px rgba(0, 0, 0, 0.45);
+  animation: hs-sonne 1s ease-in-out infinite;
+}
+.hs-alerte-titre {
+  font-size: 14px;
+  color: var(--text);
+}
+
 /* ------------------------------------------------------------
    L'objet croisé en plusieurs lieux
    ------------------------------------------------------------ */
@@ -16700,6 +17063,30 @@ input.valeur-saisie:disabled {
 .inv-bascule[aria-pressed='true'] .rail::after {
   transform: translateX(12px);
   background: var(--moss);
+}
+
+/* Fermé, dans le Sac, dans la Pochette : un seul des trois. */
+.inv-mode {
+  display: inline-flex;
+  flex: none;
+  border: 1px solid var(--line);
+  border-radius: 99px;
+  overflow: hidden;
+  background: var(--raised);
+}
+.inv-mode button {
+  padding: 3px 11px;
+  font-size: 12px;
+  color: var(--text-dim);
+  border: none;
+  background: none;
+}
+.inv-mode button + button {
+  border-left: 1px solid var(--line);
+}
+.inv-mode button[aria-checked='true'] {
+  color: var(--text);
+  background: var(--moss-wash);
 }
 
 .objview .inv-corps {
@@ -17810,6 +18197,134 @@ input.valeur-saisie:disabled {
 .fdl-rangee.glissable {
   cursor: grab;
 }
+/* Les PNJ posés d'avance : un rond au portrait, en pointillé tant que les
+   joueurs ne le voient pas. */
+.pe-pnjs {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 6;
+}
+.pe-pnj {
+  position: absolute;
+  width: 32px;
+  height: 32px;
+  transform: translate(-50%, -50%);
+  border-radius: 50%;
+  border: 2px solid var(--iris);
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.55);
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  font: 600 11px 'IBM Plex Mono', monospace;
+  color: var(--text);
+}
+.pe-pnj.cache {
+  border-style: dashed;
+  opacity: 0.75;
+}
+.pe-pnj img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.pe-pnjs.actif .pe-pnj {
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+.pe-pnj.tire {
+  cursor: grabbing;
+  z-index: 1;
+  opacity: 1;
+}
+/* Ce qui peut arriver, posé sur le plan : une pastille à la marque de sa
+   sorte, comme les objets — au-dessus d'eux, c'est ce qu'on vient y chercher. */
+.pe-arrivees {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 7;
+}
+.pe-article {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  border-radius: 6px;
+  padding: 2px;
+  background: var(--surface);
+  box-shadow: 0 1px 4px rgb(0 0 0 / 0.55);
+}
+.pe-article.fait {
+  opacity: 0.5;
+}
+.pe-arrivees.actif .pe-article {
+  pointer-events: auto;
+  cursor: grab;
+  touch-action: none;
+}
+.pe-article.tire {
+  cursor: grabbing;
+  z-index: 1;
+  opacity: 1;
+}
+/* Dans le volet du plan : le panneau de la fiche, sans son cadre. Il prend
+   sa hauteur entière — c'est le volet qui défile, pas lui —, sans quoi il se
+   tasse et ce qui le suit passe par-dessus ses derniers articles. */
+.fdl-arrivees.sur-plan {
+  flex: none;
+  min-height: auto;
+  border: 0;
+  background: none;
+}
+/* Un article ouvert tient dans la largeur étroite du volet : la colonne du
+   formulaire ne s'élargit plus sur son contenu, et le pied passe à la ligne. */
+.fdl-arrivees.sur-plan .fdl-art-edition {
+  grid-template-columns: minmax(0, 1fr);
+  margin-left: 0;
+}
+.fdl-arrivees.sur-plan .fdl-art-edition .fdl-champ {
+  grid-template-columns: minmax(0, 1fr);
+  gap: 3px;
+}
+.fdl-arrivees.sur-plan .fdl-pied {
+  flex-wrap: wrap;
+}
+.fdl-arrivees.sur-plan .fdl-pied .fdl-astuce {
+  flex-basis: 100%;
+}
+.fdl-arrivees.sur-plan > .fdl-tete {
+  padding: 0 0 8px;
+}
+.fdl-arrivees.sur-plan > .fdl-corps {
+  overflow: visible;
+  padding: 8px 0 0;
+}
+.fdl-art.glissable {
+  cursor: grab;
+}
+/* Posé sur le plan, ou à poser : un mot, qui retire l'article du plan. */
+.fdl-sur-plan {
+  font-size: 10.5px;
+  white-space: nowrap;
+  border-radius: 999px;
+  padding: 0 7px;
+  line-height: 17px;
+  border: 1px solid var(--brass-line);
+  color: var(--brass-ink);
+  background: var(--brass-wash);
+}
+button.fdl-sur-plan:hover {
+  border-color: var(--blood);
+  color: var(--blood);
+  background: var(--blood-wash);
+}
+.fdl-sur-plan.vide {
+  border-style: dashed;
+  border-color: var(--line);
+  color: var(--text-faint);
+  background: none;
+}
 /* « Objets et PNJ » d'un étage découpé : la pièce où l'on range. */
 .pe-qq-pieces {
   flex: none;
@@ -18193,6 +18708,10 @@ input.valeur-saisie:disabled {
   border-radius: 5px;
   display: grid;
   place-items: center;
+  /* `.decouverte` est aussi l'interrupteur « vu » des lieux : sans ceci, sa
+     marge et son cadre serrent la case, et la loupe en déborde. */
+  padding: 0;
+  border: 0;
 }
 .fdl-sorte .ico {
   width: 13px;
@@ -18641,6 +19160,119 @@ textarea.fdl-saisie {
 }
 
 /* ---- monter au niveau, descendre dans ses lieux ---- */
+/* ---- les apparences du plan : la même carte, sous un autre jour ---- */
+.fdl-apparences,
+.fdl-images {
+  display: grid;
+  gap: 4px;
+  margin-top: 6px;
+}
+.app-rangee {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.app-case {
+  position: relative;
+  display: grid;
+}
+.app-vig {
+  position: relative;
+  width: 92px;
+  display: grid;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--raised);
+  text-align: left;
+}
+.app-vig:hover {
+  border-color: var(--brass-line);
+}
+.app-vig[aria-pressed='true'] {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 1px var(--brass);
+}
+.app-vig img,
+.app-vide {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+  border-radius: 3px;
+  background: var(--sunk);
+}
+.app-nom {
+  font-size: 10.5px;
+  color: var(--text-dim);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.app-vig[aria-pressed='true'] .app-nom {
+  color: var(--brass);
+}
+/* Des proportions qui ne sont pas celles de la carte : murs et pions décalés. */
+.app-travers {
+  position: absolute;
+  top: 5px;
+  left: 6px;
+  font-size: 12px;
+  color: var(--blood);
+  text-shadow: 0 0 3px rgba(0, 0, 0, 0.8);
+}
+.app-renom {
+  width: 92px;
+  font-size: 11px;
+}
+.app-retirer {
+  position: absolute;
+  top: 1px;
+  right: 1px;
+  width: 18px;
+  height: 18px;
+  display: grid;
+  place-items: center;
+  border: none;
+  border-radius: 4px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #e7e2d4;
+  font-size: 13px;
+  line-height: 1;
+  opacity: 0;
+}
+.app-case:hover .app-retirer,
+.app-retirer:focus-visible {
+  opacity: 1;
+}
+.app-ajout {
+  width: 92px;
+  min-height: 58px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  border: 1px dashed var(--line);
+  border-radius: 5px;
+  color: var(--text-faint);
+  font-size: 11.5px;
+}
+.app-ajout:hover {
+  border-color: var(--brass-line);
+  color: var(--text-dim);
+}
+/* Dans la barre de scène du Paravent, à côté de la luminosité. */
+.app-select {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  flex: none;
+}
+.app-select select {
+  max-width: 140px;
+}
+
 .fdl-voisins {
   display: flex;
   flex-direction: column;
@@ -19000,6 +19632,32 @@ button.fdl-plan:focus-visible .fdl-agrandir {
 .fdl-art.ouvert .fdl-art-ligne {
   grid-template-columns: 22px minmax(0, 1fr);
 }
+/* Un article épinglé par un bâtiment : son nom, en étiquette avant les actions. */
+.fdl-art-ligne:has(.fdl-tag-batiment) {
+  grid-template-columns: 22px minmax(0, 1fr) auto auto;
+}
+.fdl-tag-batiment {
+  max-width: 140px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: 1px solid var(--brass-line);
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+  border-radius: 999px;
+  padding: 0 8px;
+  font-size: 11px;
+  line-height: 18px;
+}
+.fdl-tag-batiment:hover {
+  background: color-mix(in oklab, var(--brass) 30%, transparent);
+}
+/* La coche du bâtiment, à droite de la tête, sous les filtres si la place manque. */
+.fdl-epingle {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--text-dim);
+}
 .fdl-art-titre {
   font-weight: 600;
   font-size: 13px;
@@ -19088,11 +19746,19 @@ input.fdl-art-titre {
 }
 .fdl-liens-edition {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 6px;
   min-width: 0;
 }
+/* Pas la place qu'elle prend dans une carte repliée (`grid-column: 2 / 4`) :
+   ici, elle ouvrait deux colonnes de trop, et la liste de choix se tassait
+   dans la première. */
 .fdl-liens-edition .fdl-liens {
+  grid-column: auto;
   margin: 0;
+}
+.fdl-liens-edition .fdl-choix-liste {
+  max-height: min(48vh, 380px);
 }
 .fdl-coche.fait {
   color: var(--moss);
@@ -19372,6 +20038,27 @@ span.fdl-rvig {
 }
 .fdc-scen:hover {
   border-color: var(--brass-line);
+}
+/* Un scénario et sa coche « joué », à droite comme celle des découvertes. */
+.fdc-scen-ligne {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.fdc-scen-ligne .fdc-scen {
+  flex: 1;
+  min-width: 0;
+}
+.fdc-scen-ligne .fdl-coche {
+  order: 1;
+  flex: none;
+}
+.fdc-scen-ligne.fait .fdc-scen {
+  opacity: 0.62;
+}
+.fdc-scen-ligne.fait .fdc-scen-t b {
+  text-decoration: line-through;
+  text-decoration-color: var(--text-faint);
 }
 .fdc-scen-t {
   display: flex;
@@ -21367,6 +22054,10 @@ button.fdc-vig:hover {
   flex: 1;
   min-width: 0;
 }
+/* La recherche par nom, juste au-dessus du menu qu'elle resserre. */
+.snd-volet .field > .snd-cherche {
+  margin-bottom: 4px;
+}
 .snd-usages {
   display: grid;
   gap: 3px;
@@ -22685,12 +23376,80 @@ button.fdc-vig:hover {
 .cd-amb > svg {
   flex: none;
 }
-.cd-amb-nom {
+.cd-amb-hote {
+  position: relative;
   min-width: 0;
-  max-width: 180px;
+  display: flex;
+}
+/* Le nom de l'ambiance s'ouvre sur toutes celles de la sonothèque. */
+.cd-amb-nom {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+  max-width: 200px;
+  padding: 2px 6px;
+  border: 1px solid transparent;
+  border-radius: 5px;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.cd-amb-nom:hover,
+.cd-amb-nom[aria-expanded='true'] {
+  border-color: var(--line);
+  background: var(--raised);
+  color: var(--text);
+}
+.cd-amb-txt {
+  min-width: 0;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+.cd-amb-fl {
+  flex: none;
+  font-size: 10px;
+  color: var(--text-faint);
+}
+.cd-amb-fond {
+  position: fixed;
+  inset: 0;
+  z-index: 29;
+}
+/* La console est au pied de la page : le menu s'ouvre vers le haut. */
+.spx-menu.cd-amb-menu {
+  top: auto;
+  bottom: calc(100% + 6px);
+  left: 0;
+  right: auto;
+  width: 260px;
+}
+.cd-amb-liste {
+  display: grid;
+  gap: 2px;
+  max-height: min(340px, 50vh);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.cd-amb-menu .cd-amb-liste button {
+  display: grid;
+  grid-template-columns: 20px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 6px;
+}
+.cd-amb-menu .cd-amb-liste button.on {
+  background: var(--brass-wash);
+  color: var(--brass);
+}
+.cd-amb-menu .nm {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.cd-amb-menu small {
+  color: var(--text-faint);
+  font-size: 11px;
 }
 .cd-amb input[type='range'] {
   width: 80px;
@@ -22796,7 +23555,7 @@ button.fdc-vig:hover {
 }
 /* Très étroit : l'ambiance ne garde que son curseur. */
 @container cd (max-width: 640px) {
-  .cd-amb-nom,
+  .cd-amb-txt,
   .cd-amb .val {
     display: none;
   }
@@ -22848,24 +23607,23 @@ button.fdc-vig:hover {
   background: var(--line);
 }
 
-/* ---- les tiroirs de la scène du Paravent : portes et lumières, objets ----
-   Ils s'ouvrent par-dessus le bord gauche de la carte au lieu de la pousser
-   (17 octobre 2026) : la carte garde sa taille, ouvert ou fermé. */
-.pupitre .pu-avec-tableau {
-  position: relative;
-}
+/* ---- les volets de la scène du Paravent : portes et lumières, objets, sons ----
+   Ils se rangent à gauche de la carte, qui leur cède la place (25 octobre
+   2026). Posés par-dessus son bord, ils cachaient la partie du plan qu'on
+   voulait justement regarder en manœuvrant une porte ou un objet. */
 .pupitre .pu-avec-tableau > .tableau {
-  position: absolute;
-  z-index: 4;
-  left: 0;
-  top: 0;
-  bottom: 0;
-  width: min(300px, 55%);
-  contain: none;
-  background: color-mix(in srgb, var(--rail) 97%, transparent);
-  border-right: 1px solid var(--line);
-  border-radius: 7px 0 0 7px;
-  box-shadow: 12px 0 30px -14px rgba(0, 0, 0, 0.85);
+  width: min(300px, 40%);
+  background: var(--rail);
+  border: 1px solid var(--line);
+  border-radius: 7px;
+}
+/* Les sons en tiroir : le panneau de l'onglet Sons, un peu plus large que
+   les listes voisines pour garder deux tuiles par rangée. */
+.pupitre .pu-avec-tableau > .tableau.sons-scene {
+  width: min(340px, 45%);
+  padding: 0;
+  gap: 0;
+  overflow: hidden;
 }
 
 /* ============================================================
@@ -23162,4 +23920,17 @@ button.fdc-vig:hover {
 .prp-val small {
   font-size: 10.5px;
   color: var(--text-dim);
+}
+
+/* L'image d'un objet en grand : elle tient dans la fenêtre sans jamais être
+   agrandie au-delà de sa taille, et un clic n'importe où la referme. */
+.scrim.image-en-grand {
+  cursor: zoom-out;
+}
+.image-en-grand img {
+  max-width: 92vw;
+  max-height: 92vh;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: var(--shadow-lift);
 }

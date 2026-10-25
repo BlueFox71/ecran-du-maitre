@@ -15,6 +15,7 @@ import { TYPE_EXEMPLAIRE } from './BandeJoueurs'
 import { Pop } from './Pop'
 import { nomEmplacement } from '@shared/types'
 import type { EmplacementInitial, Objet, ObjetPlacement, PortObjet } from '@shared/types'
+import { refusSac } from '@shared/sac'
 import { useEchap } from '../echap'
 
 /* ---------------- dire où ---------------- */
@@ -384,7 +385,7 @@ async function rangerEtRelire(ids: number[]): Promise<void> {
         true
       )
   } catch (err) {
-    s.toast('Le rangement a échoué.', true)
+    s.toast(refusSac(err) ?? 'Le rangement a échoué.', true)
     console.error('[ranger]', err)
   }
 }
