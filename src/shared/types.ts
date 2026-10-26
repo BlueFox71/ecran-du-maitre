@@ -2381,6 +2381,29 @@ export interface PochetteDoc {
   luPar: number[]
 }
 
+/**
+ * Un mot secret : ce que le MJ glisse à un seul joueur, sur son téléphone.
+ * Gardé tant que `envoyeA` est nul — il attend son moment.
+ */
+export interface MotSecret {
+  id: number
+  /** Les exemplaires d'un même mot, écrit pour plusieurs joueurs, partagent leur lot. */
+  lot: string
+  beatId: number | null
+  playerId: number
+  /** Le nom de la personne, et celui de son personnage : le MJ pense aux deux. */
+  playerName: string
+  characterName: string | null
+  playerColor: string | null
+  texte: string
+  createdAt: string
+  envoyeA: string | null
+  /** Le premier regard du joueur ; nul tant qu'il ne l'a pas ouvert. */
+  luA: string | null
+  /** Faire vibrer le téléphone à l'arrivée, ou le laisser arriver en silence. */
+  vibre: boolean
+}
+
 /** Un jet arrivé d'un téléphone, annoncé au maître du jeu. */
 export interface MobileRoll {
   playerName: string

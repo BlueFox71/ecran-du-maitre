@@ -113,6 +113,16 @@ interface DocPoche {
   lu: boolean
 }
 
+/** Un mot que le MJ lui a glissé, à lui seul. */
+interface MotTel {
+  id: number
+  texte: string
+  envoyeA: string
+  lu: boolean
+  /** Faux : le MJ l'a voulu silencieux. Absent d'un serveur plus ancien. */
+  vibre?: boolean
+}
+
 /** Une de ses affaires, telle que le téléphone la reçoit. */
 interface ObjetTel {
   placementId: number
@@ -157,6 +167,8 @@ interface Etat {
   } | null
   /** Ce qu'on lui a mis en main. Jamais ce qu'un autre a reçu. */
   pochette: { onglets: { id: number; nom: string }[]; docs: DocPoche[] }
+  /** Les mots du MJ, le plus récent d'abord. Absents d'un serveur plus ancien. */
+  mots?: MotTel[]
   /** Ses affaires à lui, et les endroits du corps où les mettre. */
   objets: ObjetTel[]
   emplacements: { cle: string; nom: string }[]
@@ -284,6 +296,19 @@ export function Mobile(): JSX.Element {
     document.addEventListener('pointerdown', leve, { once: true })
     return () => document.removeEventListener('pointerdown', leve)
   }, [vibreBloque])
+  /*
+   * Un mot du MJ se sent dans la main : le téléphone vibre une fois par mot
+   * qui arrive, et non à chaque état poussé tant qu'il n'est pas lu — sauf
+   * si le MJ l'a voulu silencieux, auquel cas seul le bandeau le dit.
+   */
+  const motsSentis = useRef<Set<number>>(new Set())
+  useEffect(() => {
+    const neufs = (etat?.mots ?? []).filter((m) => !m.lu && !motsSentis.current.has(m.id))
+    if (!neufs.length) return
+    neufs.forEach((m) => motsSentis.current.add(m.id))
+    if (neufs.some((m) => m.vibre !== false)) vibrer([180, 90, 180])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [etat?.mots])
   const [convives, setConvives] = useState<Convive[] | null>(null)
   const [ferme, setFerme] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
@@ -641,6 +666,21 @@ function Table({
   onPreparer: (() => void) | null
   onOublier: () => void
 }): JSX.Element {
+  const mots = etat.mots ?? []
+  const [motOuvert, setMotOuvert] = useState<number | null>(null)
+  const mot = mots.find((m) => m.id === motOuvert) ?? null
+  /* Le plus ancien qui attend : s'il y en a plusieurs, on les lit dans l'ordre. */
+  const enAttente = mots.filter((m) => !m.lu)
+  const ouvrirMot = (m: MotTel): void => {
+    setMotOuvert(m.id)
+    if (!m.lu) {
+      void fetch(`${API}/api/mot/lu?t=${encodeURIComponent(jeton)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: m.id })
+      }).catch(() => undefined)
+    }
+  }
   return (
     <div className="m-app">
       <header className="m-tete" style={teinte(etat.joueur?.couleur ?? null)}>
@@ -655,6 +695,16 @@ function Table({
       </header>
 
       {etat.tour ? <BandeauTour tour={etat.tour} /> : null}
+      {/* Le bandeau ne dit rien du contenu : le voisin peut voir l'écran. */}
+      {enAttente.length ? (
+        <button className="m-mot-rappel" onClick={() => ouvrirMot(enAttente[enAttente.length - 1])}>
+          <span className="ic" aria-hidden="true">✉</span>
+          {enAttente.length > 1
+            ? `Le MJ t’a passé ${enAttente.length} mots`
+            : 'Le MJ t’a passé un mot'}
+          <span className="lire">lire ›</span>
+        </button>
+      ) : null}
       {onPreparer ? (
         <button className="m-prp-rappel" onClick={onPreparer}>
           {etat.preparation?.mien.valide
@@ -670,8 +720,10 @@ function Table({
         {onglet === 'jet' && <Jet etat={etat} jeton={jeton} />}
         {onglet === 'pion' && <Plan etat={etat} jeton={jeton} ondes={ondes} />}
         {onglet === 'sac' && <Sac etat={etat} jeton={jeton} />}
-        {onglet === 'poche' && <Poche etat={etat} jeton={jeton} />}
+        {onglet === 'poche' && <Poche etat={etat} jeton={jeton} onMot={ouvrirMot} />}
       </main>
+
+      {mot ? <LireMot mot={mot} onClose={() => setMotOuvert(null)} /> : null}
 
       <nav className="m-onglets" role="tablist">
         {(['fiche', 'jet', 'pion', 'sac', 'poche'] as Onglet[]).map((o) => (
@@ -682,7 +734,7 @@ function Table({
             {{ fiche: 'Fiche', jet: 'Jet', pion: 'Pion', sac: 'Sac', poche: 'Pochette' }[o]}
             {/* Un point, pas un compte : à la table on veut savoir qu'il s'est
                 passé quelque chose, pas combien de fois. */}
-            {o === 'poche' && etat.pochette.docs.some((d) => !d.lu) ? (
+            {o === 'poche' && (etat.pochette.docs.some((d) => !d.lu) || enAttente.length > 0) ? (
               <span className="m-neuf" aria-label="du nouveau" />
             ) : null}
             {/* Un inventaire ouvert : il y a de quoi piocher dans le Sac. */}
@@ -1434,8 +1486,17 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
  * part. Un document tapoté s'ouvre par-dessus tout le reste — une lettre se
  * lit, elle ne se consulte pas du coin de l'œil.
  */
-function Poche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
+function Poche({
+  etat,
+  jeton,
+  onMot
+}: {
+  etat: Etat
+  jeton: string
+  onMot: (m: MotTel) => void
+}): JSX.Element {
   const { onglets, docs } = etat.pochette
+  const mots = etat.mots ?? []
   const [rang, setRang] = useState<number | 'tout'>('tout')
   const [ouvert, setOuvert] = useState<number | null>(null)
 
@@ -1478,6 +1539,24 @@ function Poche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
 
   return (
     <div className="m-vue">
+      {/* Les mots du MJ d'abord : ils sont à lui seul, et on les relit. */}
+      {mots.length ? (
+        <>
+          <span className="m-eyebrow">Les mots du MJ</span>
+          <div className="m-mots">
+            {mots.map((m) => (
+              <button key={m.id} className={`m-mot${m.lu ? '' : ' neuf'}`} onClick={() => onMot(m)}>
+                <span className="ic" aria-hidden="true">✉</span>
+                {/* Lu, il montre son début ; pas lu, rien : on ne le lit pas par-dessus l'épaule. */}
+                <span className="t">{m.lu ? m.texte : 'Un mot à ouvrir'}</span>
+                {!m.lu ? <span className="point" /> : null}
+                <span className="h">{heureLocale(m.envoyeA)}</span>
+              </button>
+            ))}
+          </div>
+        </>
+      ) : null}
+
       <span className="m-eyebrow">
         La pochette — {docs.length} document{docs.length > 1 ? 's' : ''}
       </span>
@@ -1580,6 +1659,27 @@ function Poche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
           onClose={() => setOuvert(null)}
         />
       ) : null}
+    </div>
+  )
+}
+
+/**
+ * Un mot du MJ, déplié par-dessus tout le reste — le même cadre qu'un
+ * document, du texte au lieu d'une image.
+ */
+function LireMot({ mot, onClose }: { mot: MotTel; onClose: () => void }): JSX.Element {
+  return (
+    <div className="m-lire">
+      <div className="m-lire-tete">
+        <span className="t">Un mot du MJ</span>
+        <button onClick={onClose}>fermer</button>
+      </div>
+      <div className="m-lire-corps m-mot-corps">
+        <p>{mot.texte}</p>
+      </div>
+      <div className="m-lire-pied">
+        <span className="dit">Envoyé à {heureLocale(mot.envoyeA)} — garde-le pour toi.</span>
+      </div>
     </div>
   )
 }

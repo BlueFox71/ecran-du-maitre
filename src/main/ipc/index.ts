@@ -18,6 +18,7 @@ import * as mobile from '../mobile'
 import * as projet from '../project'
 import * as annexes from '../db/repos/annexes'
 import * as pochette from '../db/repos/pochette'
+import * as mots from '../db/repos/mots'
 import * as annotations from '../db/repos/annotations'
 import * as objets from '../db/repos/objets'
 import * as murs from '../db/repos/murs'
@@ -53,6 +54,7 @@ import type {
   Frame,
   Item,
   ItemFilter,
+  MotSecret,
   ProjectInfo,
   SlidePayload,
   PointMur,
@@ -914,6 +916,36 @@ export function registerIpc(): void {
   on('pochette:reorderOnglets', (ids: number[]) => {
     pochette.reorderOnglets(ids)
     return pocheEtPousse()
+  })
+
+  /* ---------------- les mots secrets ---------------- */
+
+  /* Comme la pochette : chaque geste repousse aux téléphones et rend la liste
+     entière. Un mot qui part sans que le téléphone l'apprenne n'est pas parti. */
+  const motsEtPousse = (): MotSecret[] => {
+    mobile.broadcast()
+    return mots.listMots()
+  }
+  on('mots:list', () => mots.listMots())
+  on(
+    'mots:ecrire',
+    (playerIds: number[], texte: string, beatId: number | null, envoyer: boolean, vibre: boolean) => {
+      mots.ecrire(playerIds, texte, beatId, envoyer, vibre !== false)
+      return motsEtPousse()
+    }
+  )
+  /* Un mot se manie par lot : tous ses exemplaires d'un seul geste. */
+  on('mots:reecrire', (lot: string, texte: string, playerIds: number[], vibre: boolean) => {
+    mots.reecrire(lot, texte, playerIds, vibre !== false)
+    return mots.listMots()
+  })
+  on('mots:envoyer', (lot: string) => {
+    mots.envoyer(lot)
+    return motsEtPousse()
+  })
+  on('mots:effacer', (lot: string) => {
+    mots.effacer(lot)
+    return motsEtPousse()
   })
 
   /* ---------------- fiches ---------------- */

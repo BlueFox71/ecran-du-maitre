@@ -2298,3 +2298,110 @@ body.m-frisson .m-app {
 .m-sac-compte.plein {
   color: var(--blood);
 }
+
+/* ============================================================
+   Les mots du MJ
+   ============================================================ */
+
+/* Un mot arrivé : le bandeau sous l'en-tête, sur tous les onglets. Il ne dit
+   rien du contenu — le voisin voit l'écran. */
+.m-mot-rappel {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 15px;
+  border: 0;
+  border-bottom: 1px solid var(--brass);
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  text-align: left;
+  animation: m-mot-arrive 1.6s ease-in-out 2;
+}
+.m-mot-rappel .ic {
+  font-size: 18px;
+}
+.m-mot-rappel .lire {
+  margin-left: auto;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+@keyframes m-mot-arrive {
+  50% {
+    background: var(--brass-line);
+  }
+}
+
+/* La liste, en tête de la pochette : une ligne par mot. */
+.m-mots {
+  display: grid;
+  gap: 6px;
+  margin-bottom: 16px;
+}
+.m-mot {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  min-height: 44px;
+  padding: 9px 12px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+}
+.m-mot.neuf {
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
+.m-mot .ic {
+  flex: none;
+  color: var(--brass);
+}
+.m-mot .t {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13.5px;
+}
+.m-mot .point {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  background: var(--brass);
+  flex: none;
+}
+.m-mot .h {
+  flex: none;
+  font-family: ui-monospace, monospace;
+  font-size: 11px;
+  color: var(--text-faint);
+}
+
+/* Le mot déplié : un billet, lisible d'un coup d'œil, pas un écran d'image. */
+.m-mot-corps {
+  place-items: start stretch;
+  padding: 22px 20px;
+}
+.m-mot-corps p {
+  margin: 0;
+  padding: 18px 18px 20px;
+  border: 1px solid var(--brass-line);
+  border-radius: 10px;
+  background: var(--surface);
+  font-size: 18px;
+  line-height: 1.5;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}

@@ -25,6 +25,7 @@ import { TableauDeScene, type Surbrillance } from '../components/Tableau'
 import { BoutonObjets, ObjetsDeScene, usePanneauScene } from '../components/ObjetsDeScene'
 import { IconPhone, Portables } from '../components/Portables'
 import { TexteCourt } from '../components/TexteCourt'
+import { MotsSecrets } from '../components/MotsSecrets'
 import { ConsoleDirect } from '../components/ConsoleDirect'
 import {
   BoutonPoserLumiere,
@@ -981,7 +982,12 @@ export function Pupitre(): JSX.Element {
             {/* Les sons tiennent la hauteur en trois étages : seul le dernier défile. */}
             <div className={`pane-body${cote === 'sons' ? ' spx-corps' : ''}`}>
               {cote === 'portables' ? (
-                <Portables />
+                <>
+                  <Portables />
+                  {/* Les mots partent vers les téléphones : on les écrit aussi
+                      d'ici, rattachés au moment en cours. */}
+                  <MotsSecrets key={beat?.id ?? 0} beatId={beat?.id ?? null} />
+                </>
               ) : cote === 'sons' ? (
                 <PanneauSons />
               ) : cote === 'dossier' ? (
@@ -1358,6 +1364,10 @@ export function Pupitre(): JSX.Element {
                     ) : null}
                   </div>
                 </div>
+
+                {/* Ce que le moment a à dire en secret : gardé pour lui, ou
+                    écrit sur le moment, pour un seul téléphone. */}
+                <MotsSecrets key={beat.id} beatId={beat.id} />
 
                 <div className="lect-body">
                   {beat.note ? <p className="mine">{beat.note}</p> : null}

@@ -1901,5 +1901,50 @@ export const MIGRATIONS: { id: number; sql: string }[] = [
      WHERE emplacements IS NULL OR emplacements IN ('', '[]');
     UPDATE objet SET equipable = 1;
     `
+  },
+  {
+    id: 85,
+    sql: `
+    /* Les mots secrets : ce que le MJ glisse à un seul joueur, sur son
+       téléphone, sans que la table le sache.
+
+       Un mot naît **gardé** (envoye_at nul) ou part tout de suite. Gardé, il
+       attend sur le moment où il doit partir (beat_id) ; parti, il dit encore
+       à quel moment il appartient. lu_at : le premier regard du joueur, la
+       seule chose que le MJ ne peut pas voir en se penchant sur la table.
+
+       Un seul sens, du MJ vers le joueur : il n'y a pas de réponse à ranger. */
+    CREATE TABLE mot (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL REFERENCES campaign(id) ON DELETE CASCADE,
+      beat_id     INTEGER REFERENCES beat(id) ON DELETE SET NULL,
+      player_id   INTEGER NOT NULL REFERENCES player(id) ON DELETE CASCADE,
+      texte       TEXT NOT NULL,
+      created_at  TEXT NOT NULL DEFAULT (datetime('now')),
+      envoye_at   TEXT,
+      lu_at       TEXT
+    );
+    CREATE INDEX idx_mot_campagne ON mot(campaign_id, beat_id);
+    CREATE INDEX idx_mot_joueur ON mot(player_id, envoye_at);
+    `
+  },
+  {
+    id: 86,
+    sql: `
+    /* Un mot fait vibrer le téléphone, ou arrive en silence : une vibration
+       s'entend parfois à toute la table, et c'est au MJ d'en juger. */
+    ALTER TABLE mot ADD COLUMN vibre INTEGER NOT NULL DEFAULT 1;
+    `
+  },
+  {
+    id: 87,
+    sql: `
+    /* Un mot pour plusieurs joueurs : un exemplaire chacun — chacun le lit à
+       son heure —, réunis par le même lot. Le MJ, lui, n'en voit qu'un. Les
+       mots d'avant étaient seuls de leur lot. */
+    ALTER TABLE mot ADD COLUMN lot TEXT;
+    UPDATE mot SET lot = 'm' || id WHERE lot IS NULL;
+    CREATE INDEX idx_mot_lot ON mot(campaign_id, lot);
+    `
   }
 ]

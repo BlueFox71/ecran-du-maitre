@@ -35,6 +35,7 @@ import { echelleDe, planDe } from './db/repos/echelle'
 import { barrieres, pasContraint, type Pt } from '@shared/murs'
 import type { PointMur } from '@shared/types'
 import * as poche from './db/repos/pochette'
+import * as motsRepo from './db/repos/mots'
 import * as objets from './db/repos/objets'
 import * as carnet from './carnet'
 import { lireCampagne, lirePoste, type ReglagesPoste } from '@shared/reglages'
@@ -538,6 +539,19 @@ function etatJoueur(playerId: number) {
       }))
     },
     /*
+     * Les mots que le MJ lui a glissés — à lui seul, et seulement ceux qui sont
+     * partis : `motsDe` ne laisse passer ni le mot du voisin, ni celui que le
+     * MJ garde encore pour plus tard.
+     */
+    mots: motsRepo.motsDe(playerId).map((m) => ({
+      id: m.id,
+      texte: m.texte,
+      envoyeA: m.envoyeA,
+      lu: m.luA !== null,
+      /* Le MJ a pu le vouloir silencieux : une vibration s'entend à la table. */
+      vibre: m.vibre
+    })),
+    /*
      * Ses affaires, et les endroits du corps où il peut les mettre.
      *
      * Ce sont **ses** exemplaires, personne d'autre : la requête part de son
@@ -774,6 +788,7 @@ function router(req: IncomingMessage, res: ServerResponse): void {
     if (chemin === '/api/ping') return void lireJson(req, res, (b) => ping(res, url, b))
     if (chemin === '/api/couleur') return void lireJson(req, res, (b) => couleur(res, url, b))
     if (chemin === '/api/pochette/lu') return void lireJson(req, res, (b) => pocheLu(res, url, b))
+    if (chemin === '/api/mot/lu') return void lireJson(req, res, (b) => motLu(res, url, b))
     if (chemin === '/api/equiper') return void lireJson(req, res, (b) => equiper(res, url, b))
     if (chemin === '/api/allumer') return void lireJson(req, res, (b) => allumer(res, url, b))
     if (chemin === '/api/prendre') return void lireJson(req, res, (b) => prendre(res, url, b))
@@ -1065,6 +1080,23 @@ function pocheLu(res: ServerResponse, url: URL, corps: any): void {
   poche.marquerLu(id, ap.playerId)
   /* Le MJ regarde la pochette pendant que ça se lit : sa page doit bouger. */
   versMj('pochette:changee', null)
+  json(res, 200, { lu: true })
+}
+
+/**
+ * Il a ouvert le mot du MJ. Même garde que pour la pochette : le dépôt vérifie
+ * que ce mot lui était bien envoyé avant d'en prendre note.
+ */
+function motLu(res: ServerResponse, url: URL, corps: any): void {
+  const ap = exige(res, url)
+  if (!ap) return
+  const id = Number(corps.id)
+  if (!Number.isFinite(id)) return json(res, 400, { erreur: 'Mot illisible.' })
+  if (motsRepo.marquerLu(id, ap.playerId)) {
+    versMj('mots:changes', null)
+    /* Ses autres appareils éteignent leur bandeau eux aussi. */
+    broadcast()
+  }
   json(res, 200, { lu: true })
 }
 

@@ -71,6 +71,7 @@ import type {
   MobileNudge,
   MobilePing,
   MobileRoll,
+  MotSecret,
   ScreenInfo,
   Sexe,
   SheetModel,
@@ -258,6 +259,28 @@ const api = {
       const h = (): void => cb()
       ipcRenderer.on('pochette:changee', h)
       return () => void ipcRenderer.removeListener('pochette:changee', h)
+    }
+  },
+
+  /**
+   * Les mots secrets : un texte pour un seul joueur, sur son téléphone.
+   * Chaque appel rend la liste entière, comme la pochette.
+   */
+  mots: {
+    list: () => call<MotSecret[]>('mots:list'),
+    /** `envoyer` faux : le mot est gardé sur le moment `beatId`. `vibre` : faire vibrer le téléphone. */
+    ecrire: (playerIds: number[], texte: string, beatId: number | null, envoyer: boolean, vibre: boolean) =>
+      call<MotSecret[]>('mots:ecrire', playerIds, texte, beatId, envoyer, vibre),
+    /** Retoucher un mot gardé — un mot parti ne se réécrit pas. Tout se joue par lot. */
+    reecrire: (lot: string, texte: string, playerIds: number[], vibre: boolean) =>
+      call<MotSecret[]>('mots:reecrire', lot, texte, playerIds, vibre),
+    envoyer: (lot: string) => call<MotSecret[]>('mots:envoyer', lot),
+    effacer: (lot: string) => call<MotSecret[]>('mots:effacer', lot),
+    /** Un joueur vient d'ouvrir un mot sur son téléphone. */
+    onChanged: (cb: () => void) => {
+      const h = (): void => cb()
+      ipcRenderer.on('mots:changes', h)
+      return () => void ipcRenderer.removeListener('mots:changes', h)
     }
   },
 

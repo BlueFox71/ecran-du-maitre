@@ -24,6 +24,7 @@ import type {
   LibraryRoot,
   MobileInfo,
   MobileNudge,
+  MotSecret,
   Objet,
   ObjetFamille,
   Place,
@@ -159,6 +160,9 @@ interface State {
   pochette: PochetteDoc[]
   pochetteOnglets: PochetteOnglet[]
 
+  /** Les mots secrets, gardés et partis. Un téléphone qui en ouvre un fait bouger la page. */
+  mots: MotSecret[]
+
   /** Le serveur des portables, ses appareils, et qui remue son pion. */
   mobile: MobileInfo | null
   mobileNudges: MobileNudge[]
@@ -217,6 +221,8 @@ interface State {
   refreshAnnexes: () => Promise<void>
   refreshPochette: () => Promise<void>
   setPochette: (p: { onglets: PochetteOnglet[]; docs: PochetteDoc[] }) => void
+  refreshMots: () => Promise<void>
+  setMots: (m: MotSecret[]) => void
   refreshCharacters: () => Promise<void>
   refreshPlayers: () => Promise<void>
   refreshMobile: () => Promise<void>
@@ -307,6 +313,8 @@ export const useStore = create<State>((set, get) => ({
 
   pochette: [],
   pochetteOnglets: [],
+
+  mots: [],
 
   mobile: null,
   mobileNudges: [],
@@ -437,6 +445,8 @@ export const useStore = create<State>((set, get) => ({
     })
     /* Un joueur vient d'ouvrir un document sur son téléphone. */
     api.pochette.onChanged(() => void get().refreshPochette())
+    /* Un joueur vient d'ouvrir un mot secret. */
+    api.mots.onChanged(() => void get().refreshMots())
     /* Un joueur vient de ranger une de ses affaires depuis son téléphone : la
        réserve du MJ et sa poupée d'équipement doivent le montrer tout de suite. */
     /* Garde-fou : le pont n'expose `onChanged` que depuis la réserve d'objets,
@@ -469,6 +479,7 @@ export const useStore = create<State>((set, get) => ({
       get().refreshRecents(),
       get().refreshAnnexes(),
       get().refreshPochette(),
+      get().refreshMots(),
       get().refreshRolls()
     ])
     set({ ready: true })
@@ -518,6 +529,9 @@ export const useStore = create<State>((set, get) => ({
   /* Chaque geste de la pochette rend la pochette entière : on la repose telle
      quelle plutôt que d'aller recoudre une ligne dans un tableau. */
   setPochette: (p) => set({ pochette: p.docs, pochetteOnglets: p.onglets }),
+
+  refreshMots: async () => set({ mots: await window.jdr.mots.list() }),
+  setMots: (m) => set({ mots: m }),
 
   refreshSeance: async () => {
     await get().refreshTimeline()
