@@ -24297,6 +24297,22 @@ button.fdc-vig:hover {
 .sm-groupe {
   margin: 9px 0 2px;
 }
+/* La recherche reste en haut quand le barème défile. */
+.sm-chercher {
+  position: sticky;
+  top: -7px;
+  z-index: 1;
+  width: 100%;
+  margin: 0 0 8px;
+  box-shadow: 0 -7px 0 7px var(--surface);
+  background: var(--ground);
+  color: var(--text);
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  padding: 4px 6px;
+  font-family: inherit;
+  font-size: 12px;
+}
 .sm-chocs {
   display: grid;
   grid-template-columns: 1fr 1fr;

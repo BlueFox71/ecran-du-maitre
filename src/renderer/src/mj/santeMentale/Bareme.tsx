@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import type { Choc, EvenementSm, Prix, Recup, ReglageSm } from '@shared/santeMentale'
+import { normaliser } from '../components/parametres/chercher'
 
 /**
  * La colonne gauche de la vue SM : ce qui peut arriver. Un clic déclare
@@ -48,24 +49,64 @@ interface Props {
   onNuit: () => void
 }
 
+/**
+ * Chaque mot tapé doit commencer un mot du texte, accents et casse oubliés :
+ * « yeux », « ouija », « spirit » trouvent sans le libellé exact.
+ */
+function correspond(requete: string[], ...textes: (string | null | undefined)[]): boolean {
+  const mots = textes.flatMap((t) => (t ? normaliser(t) : []))
+  return requete.every((q) => mots.some((m) => m.startsWith(q)))
+}
+
 export function Bareme(p: Props): JSX.Element {
   const [deplie, setDeplie] = useState(false)
-  const evts = deplie ? p.evenements : p.evenements.slice(0, VISIBLES)
-  const caches = p.evenements.length - VISIBLES
+  const [q, setQ] = useState('')
+  const requete = normaliser(q)
+  const cherche = requete.length > 0
+
+  const evenements = cherche ? p.evenements.filter((e) => correspond(requete, e.nom, e.note)) : p.evenements
+  const prix = cherche ? p.r.prix.filter((x) => correspond(requete, x.nom)) : p.r.prix
+  const recups = cherche ? p.r.recups.filter((x) => correspond(requete, x.nom)) : p.r.recups
+  /* Une recherche montre tout ce qu'elle trouve : pas de « N autres… » à déplier. */
+  const evts = deplie || cherche ? evenements : evenements.slice(0, VISIBLES)
+  const caches = cherche ? 0 : evenements.length - VISIBLES
 
   return (
     <div className="sm-bareme">
-      <span className="eyebrow">Choc (jet de Volonté)</span>
-      <div className="sm-chocs">
-        {p.r.chocs.map((c) => (
-          <button key={c.id} type="button" className="btn btn-sm btn-c" onClick={() => p.onChoc(c)}>
-            {c.nom} {moins(c.perte)}
-          </button>
-        ))}
-      </div>
+      <input
+        type="search"
+        className="sm-chercher"
+        placeholder="Chercher un événement, un prix…"
+        aria-label="Chercher dans le barème"
+        value={q}
+        onChange={(e) => setQ(e.target.value)}
+        onKeyDown={(e) => {
+          /* Échap vide la recherche ; vide, il laisse faire (fermer un panneau, etc.). */
+          if (e.key === 'Escape' && q) {
+            e.stopPropagation()
+            setQ('')
+          }
+        }}
+      />
+      {cherche && !evenements.length && !prix.length && !recups.length ? (
+        <p className="sm-vide">Rien pour « {q} ».</p>
+      ) : null}
 
-      <span className="eyebrow sm-groupe">Événements de la séance</span>
-      {p.evenements.length === 0 ? <p className="sm-vide">Aucun événement pour cette séance.</p> : null}
+      {cherche ? null : (
+        <>
+          <span className="eyebrow">Choc (jet de Volonté)</span>
+          <div className="sm-chocs">
+            {p.r.chocs.map((c) => (
+              <button key={c.id} type="button" className="btn btn-sm btn-c" onClick={() => p.onChoc(c)}>
+                {c.nom} {moins(c.perte)}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
+
+      {cherche && !evenements.length ? null : <span className="eyebrow sm-groupe">Événements de la séance</span>}
+      {!cherche && p.evenements.length === 0 ? <p className="sm-vide">Aucun événement pour cette séance.</p> : null}
       {evts.map((e) => (
         <button
           key={e.id}
@@ -90,8 +131,8 @@ export function Bareme(p: Props): JSX.Element {
         </button>
       ) : null}
 
-      <span className="eyebrow sm-groupe">Prix (sans jet)</span>
-      {p.r.prix.map((x) => (
+      {cherche && !prix.length ? null : <span className="eyebrow sm-groupe">Prix (sans jet)</span>}
+      {prix.map((x) => (
         <button
           key={x.id}
           type="button"
@@ -110,9 +151,9 @@ export function Bareme(p: Props): JSX.Element {
         </button>
       ))}
 
-      <span className="eyebrow sm-groupe">Récupérer</span>
+      {cherche && !recups.length ? null : <span className="eyebrow sm-groupe">Récupérer</span>}
       <div className="sm-recups">
-        {p.r.recups.map((rec) => {
+        {recups.map((rec) => {
           const faits = p.recupsFaites[rec.id] ?? []
           /* Une fois par scène ou par nuit, et déjà pris par tous ceux que viserait le clic. */
           const epuise = !!rec.limite && p.vises.length > 0 && p.vises.every((id) => faits.includes(id))
