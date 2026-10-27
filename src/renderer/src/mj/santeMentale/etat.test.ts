@@ -414,6 +414,13 @@ describe('useSm', () => {
     expect(sm().alertes.map((a) => a.genre)).toEqual(['palier'])
   })
 
+  it('une perte déclarée par le MJ ne s’annonce pas', async () => {
+    const respect = SM_DEFAUT.prix.find((p) => p.intervalleMin === null)!
+    await sm().declarerPrix(respect, [LEA])
+    expect(deltasSm()).toEqual([-respect.perte])
+    expect(useStore.getState().toasts.filter((t) => !t.error)).toEqual([])
+  })
+
   it('un chrono en pause ne retire rien, et repart avec ce qu’il lui restait', async () => {
     const prix = SM_DEFAUT.prix.find((p) => p.id === 'seul-noir')!
     await sm().declarerPrix(prix, [TOM])

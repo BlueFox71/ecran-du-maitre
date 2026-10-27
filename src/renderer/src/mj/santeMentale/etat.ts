@@ -72,8 +72,11 @@ export interface EtatSm {
   /** Note le jet au journal ; il revient par `sm:jet` et c'est là qu'il est servi. */
   saisirJet(attenteId: string, characterId: number, die: number): Promise<void>
   annulerAttente(id: string): void
-  /** Le seul chemin d'écriture de la SM. */
-  appliquer(characterId: number, delta: number, raison: string): Promise<void>
+  /**
+   * Le seul chemin d'écriture de la SM. `auto` : la perte vient d'un chrono,
+   * pas d'un clic du MJ — elle s'annonce, puisqu'il ne l'a pas vue venir.
+   */
+  appliquer(characterId: number, delta: number, raison: string, auto?: boolean): Promise<void>
   /** Le MJ corrige la valeur à la main : le palier suit, sans folie ni annonce. */
   rectifier(characterId: number, valeur: number): Promise<void>
   recuperer(r: Recup, cible: Cible): Promise<void>
@@ -131,7 +134,10 @@ function vises(cible: Cible): number[] {
 
 const prevenir = (msg: string): void => useStore.getState().toast(msg, true)
 
-/** Une perte s'annonce en bas de l'écran, même vue SM fermée — un chrono à chaque retrait. */
+/**
+ * Une perte automatique (un chrono qui mord) s'annonce en bas de l'écran,
+ * même vue SM fermée. Celles que le MJ déclare lui-même, non : il les a sous les yeux.
+ */
 function signalerPerte(characterId: number, perte: number, raison: string, sm: number): void {
   useStore.getState().annoncer(`${nomDe(characterId)} perd ${perte} SM — ${raison} → ${sm}`)
 }
@@ -373,7 +379,7 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
         }
       }),
 
-    appliquer: (characterId, delta, raison) =>
+    appliquer: (characterId, delta, raison, auto = false) =>
       enFile(async () => {
         const { r, cle } = contexte()
         if (!cle || delta === 0) return
@@ -393,7 +399,7 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
         /* Le main a borné : on raisonne sur ce qui est vraiment écrit. */
         const apres = character.data.gauges[cle]?.value ?? avant
         const perteReelle = avant - apres
-        if (perteReelle > 0) signalerPerte(characterId, perteReelle, raison, apres)
+        if (auto && perteReelle > 0) signalerPerte(characterId, perteReelle, raison, apres)
         if (delta < 0 && estFolie(perteReelle, r)) ouvrirAttente(`Folie passagère — ${raison}`, perteReelle, 'folie', [characterId])
         try {
           await accorderPalier(character, avant)
@@ -533,7 +539,7 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
       }
 
       /* `appliquer` dit lui-même ses échecs : une perte ratée n'arrête pas les suivantes. */
-      for (const d of dus) await get().appliquer(d.id, -d.prix.perte, d.prix.nom)
+      for (const d of dus) await get().appliquer(d.id, -d.prix.perte, d.prix.nom, true)
 
       /* La passe d'accord : malus de palier et compte des hallucinations, rattrapés. */
       if (!cleSm) return
