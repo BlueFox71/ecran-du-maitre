@@ -346,10 +346,10 @@ function Jet(): JSX.Element {
           {caracs.some((c) => c.key === sm.carac) ? null : <option value={sm.carac}>{sm.carac}</option>}
         </select>
       </Champ>
-      <Champ label="Seuil">
-        <Num v={sm.seuil} label="Seuil de réussite" onCommit={(v) => void poserSm({ seuil: v ?? 0 })} />
+      <Champ label="Réussi à partir de">
+        <Num v={sm.seuil} label="Total à atteindre pour réussir le jet" onCommit={(v) => void poserSm({ seuil: v ?? 0 })} />
       </Champ>
-      <Champ label="Gain sur 20">
+      <Champ label="Un 20 naturel rend (points)">
         <Num v={sm.gain20} label="Gain sur un 20 naturel" onCommit={(v) => void poserSm({ gain20: v ?? 0 })} />
       </Champ>
       <Champ label="Si réussi, on perd">
@@ -363,7 +363,7 @@ function Jet(): JSX.Element {
           <option value="rien">rien</option>
         </select>
       </Champ>
-      <Champ label="Surcoût sur 1">
+      <Champ label="Un 1 naturel fait perdre en plus">
         <Num v={sm.surcout1} label="Surcoût sur un 1 naturel" onCommit={(v) => void poserSm({ surcout1: v ?? 0 })} />
       </Champ>
     </div>
@@ -587,7 +587,7 @@ export const reglages: Reglage[] = [
     rubrique: 'sante',
     visible: actif,
     nom: 'Le jet',
-    aide: 'Le jet qui adoucit une perte : la caractéristique, le seuil, ce que valent un 20 et un 1 naturels.',
+    aide: 'Le jet qui adoucit une perte. Exemple, un choc à −5 : un total de 12 ou plus, il perd la moitié (−3) ; en dessous, tout (−5) ; un 20 au dé, il ne perd rien et regagne 2 ; un 1 au dé, il perd tout plus 5 (−10).',
     mots: ['volonté', 'jet', 'seuil', 'réussite', 'critique', 'vlt', '20 naturel'],
     pleine: true,
     Cmd: Jet
