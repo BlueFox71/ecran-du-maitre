@@ -11,3 +11,5 @@ dist/
 # Miettes de système.
 .DS_Store
 Thumbs.db
+
+.superpowers/
