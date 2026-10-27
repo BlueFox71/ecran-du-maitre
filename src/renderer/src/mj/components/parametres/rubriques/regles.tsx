@@ -13,7 +13,7 @@ import type { Reglage } from '../registre'
    ============================================================ */
 
 /** La fiche de campagne, et de quoi en changer une règle. */
-function useFiche(): {
+export function useFiche(): {
   spec: TemplateSpec | null
   poserFiche: (patch: Partial<TemplateSpec>) => Promise<void>
 } {
@@ -30,7 +30,7 @@ function useFiche(): {
 }
 
 /** Ce que montre une règle de la fiche tant que celle-ci n'est pas là. */
-const sansFiche = <span className="aide">La fiche de campagne n’est pas encore chargée.</span>
+export const sansFiche = <span className="aide">La fiche de campagne n’est pas encore chargée.</span>
 
 /** Le brouillon des monnaies. Il est tenu par la fenêtre des Paramètres, pas
  *  par la ligne : changer de rubrique ou chercher démonte la ligne, et le
@@ -59,6 +59,33 @@ export function useBrouillonMonnaies(): Brouillon {
     setArgent(useStore.getState().reglages.monnaies)
   }, [campagne])
   return { argent, setArgent, sale: suivi !== JSON.stringify(argent) }
+}
+
+/** La jauge de santé mentale : la même ligne dans « Règles du jeu » et dans « Santé mentale ». */
+export function SanteMentale(): JSX.Element {
+  const { spec, poserFiche } = useFiche()
+  if (!spec) return sansFiche
+  const sanite = jaugeSanite(spec, spec.gauges)
+  return (
+    <select
+      /* Ni posée ni devinée, ou une jauge retirée depuis : « aucune ».
+         Sans cela le menu montrerait la première jauge sans qu'elle soit
+         choisie, et la choisir ne déclencherait rien. */
+      value={sanite?.key ?? '__aucune'}
+      onChange={(e) =>
+        void poserFiche({
+          sanityGauge: e.target.value === '__aucune' ? null : e.target.value
+        })
+      }
+    >
+      {spec.gauges.map((g) => (
+        <option key={g.key} value={g.key}>
+          {g.label}
+        </option>
+      ))}
+      <option value="__aucune">— aucune —</option>
+    </select>
+  )
 }
 
 export const reglages: Reglage[] = [
@@ -149,31 +176,7 @@ export const reglages: Reglage[] = [
     nom: 'La santé mentale, c’est',
     aide: 'Celle que l’encart des joueurs montre à côté de la vie. Une jauge ajoutée dans la fiche de campagne apparaît ici une fois appliquée.',
     mots: ['sanité', 'folie', 'jauge', 'raison', 'encart'],
-    Cmd: function SanteMentale() {
-      const { spec, poserFiche } = useFiche()
-      if (!spec) return sansFiche
-      const sanite = jaugeSanite(spec, spec.gauges)
-      return (
-        <select
-          /* Ni posée ni devinée, ou une jauge retirée depuis : « aucune ».
-             Sans cela le menu montrerait la première jauge sans qu'elle soit
-             choisie, et la choisir ne déclencherait rien. */
-          value={sanite?.key ?? '__aucune'}
-          onChange={(e) =>
-            void poserFiche({
-              sanityGauge: e.target.value === '__aucune' ? null : e.target.value
-            })
-          }
-        >
-          {spec.gauges.map((g) => (
-            <option key={g.key} value={g.key}>
-              {g.label}
-            </option>
-          ))}
-          <option value="__aucune">— aucune —</option>
-        </select>
-      )
-    }
+    Cmd: SanteMentale
   },
   {
     id: 'pnj.fiche',

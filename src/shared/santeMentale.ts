@@ -205,6 +205,13 @@ export const EVENEMENTS_DEFAUT: Omit<EvenementSm, 'id' | 'sessionId' | 'ord'>[] 
 ]
 
 const tableau = <T>(v: unknown, defaut: T[]): T[] => (Array.isArray(v) ? (v as T[]) : defaut)
+const nonVide = (v: unknown, champs: Record<string, 'number' | 'string'>): boolean =>
+  Array.isArray(v) &&
+  v.length > 0 &&
+  v.every((x) => x && typeof x === 'object' && Object.entries(champs).every(([k, t]) => typeof x[k] === t))
+/** Une liste d'objets aux champs requis, sinon le défaut : un réglage abîmé ne casse pas l'écran. */
+const liste = <T>(v: unknown, defaut: T[], champs: Record<string, 'number' | 'string'>): T[] =>
+  nonVide(v, champs) ? (v as T[]) : defaut
 const objet = (v: unknown): Record<string, unknown> =>
   v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : {}
 const nombre = (v: unknown, defaut: number): number => (typeof v === 'number' && Number.isFinite(v) ? v : defaut)
@@ -230,16 +237,16 @@ export function lireSm(json: string | undefined): ReglageSm {
     gain20: nombre(brut.gain20, d.gain20),
     partReussite: part === 'moitie' || part === 'tout' || part === 'rien' ? part : d.partReussite,
     surcout1: nombre(brut.surcout1, d.surcout1),
-    chocs: tableau(brut.chocs, d.chocs),
-    paliers: [...tableau<Palier>(brut.paliers, d.paliers)].sort((a, b) => b.min - a.min),
+    chocs: liste(brut.chocs, d.chocs, { nom: 'string', perte: 'number' }),
+    paliers: [...liste<Palier>(brut.paliers, d.paliers, { min: 'number', nom: 'string' })].sort((a, b) => b.min - a.min),
     folie: {
       seuil: nombre(folie.seuil, d.folie.seuil),
       minutes: nombre(folie.minutes, d.folie.minutes),
       table: tableau(folie.table, d.folie.table)
     },
     hallucinations: tableau(brut.hallucinations, d.hallucinations),
-    prix: tableau(brut.prix, d.prix),
-    recups: tableau(brut.recups, d.recups),
+    prix: liste(brut.prix, d.prix, { nom: 'string', perte: 'number' }),
+    recups: liste(brut.recups, d.recups, { nom: 'string' }),
     jaugePilules:
       brut.jaugePilules === null || typeof brut.jaugePilules === 'string' ? brut.jaugePilules : d.jaugePilules,
     nausee: {

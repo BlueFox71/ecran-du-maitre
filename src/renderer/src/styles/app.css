@@ -24166,3 +24166,58 @@ button.fdc-vig:hover {
   border-radius: 6px;
   box-shadow: var(--shadow-lift);
 }
+
+/* Santé mentale : des listes éditables en place, un rang par entrée. */
+.sm-liste {
+  display: grid;
+  gap: 8px;
+}
+.sm-rang {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line, rgba(255, 255, 255, 0.1));
+  border-radius: 8px;
+}
+.sm-champs {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+  align-items: flex-end;
+}
+.sm-champ {
+  display: grid;
+  gap: 3px;
+  font-size: 11px;
+}
+.sm-champ > span {
+  opacity: 0.7;
+}
+.sm-champ input[type='text'].sm-large {
+  width: min(520px, 62vw);
+}
+.sm-champ input[type='text'] {
+  min-width: 130px;
+}
+.sm-num {
+  width: 74px;
+}
+.sm-outils {
+  display: flex;
+  gap: 2px;
+  flex: none;
+}
+.sm-malus {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  align-items: center;
+}
+.sm-malus-un {
+  display: inline-flex;
+  gap: 4px;
+  align-items: center;
+}

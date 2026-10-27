@@ -3,6 +3,7 @@ import {
   IconClavier,
   IconDie,
   IconDoc,
+  IconEye,
   IconFolder,
   IconMurs,
   IconPeople,
@@ -15,6 +16,7 @@ import { useStore } from '../../store'
 import type { Cherchable } from './chercher'
 import * as campagne from './rubriques/campagne'
 import * as regles from './rubriques/regles'
+import * as sante from './rubriques/sante'
 import * as ecran from './rubriques/ecran'
 import * as attente from './rubriques/attente'
 import * as murs from './rubriques/murs'
@@ -35,6 +37,7 @@ import * as touches from './rubriques/touches'
 export type Rubrique =
   | 'campagne'
   | 'regles'
+  | 'sante'
   | 'ecran'
   | 'attente'
   | 'murs'
@@ -68,6 +71,8 @@ export interface Reglage {
   /** Mots proches, pour la recherche : jamais vide pour un vrai réglage. */
   mots: string[]
   pleine?: boolean
+  /** Montrée seulement quand cette condition tient (sinon la ligne n'existe pas). */
+  visible?: (s: ReturnType<typeof useStore.getState>) => boolean
   /** « En direct » : tenu en mémoire, perdu au redémarrage. */
   direct?: boolean
   /** Les commandes de la ligne (ou le bloc entier si `pleine`). */
@@ -87,6 +92,12 @@ export const RUBRIQUES: InfoRubrique[] = [
     nom: 'Règles du jeu',
     icone: <IconDie />,
     quoi: 'Les règles que la campagne suit. Les premières étaient rangées dans un coin d’en-tête de la fiche : on ne les trouvait qu’en cherchant.'
+  },
+  {
+    id: 'sante',
+    nom: 'Santé mentale',
+    icone: <IconEye />,
+    quoi: 'L’assistance du Paravent pour la santé mentale : le jet, les paliers et ce qu’ils changent, la folie, les hallucinations, les pertes et les remèdes.'
   },
   {
     id: 'ecran',
@@ -155,6 +166,7 @@ export const RUBRIQUES: InfoRubrique[] = [
 export const REGLAGES: Reglage[] = [
   ...campagne.reglages,
   ...regles.reglages,
+  ...sante.reglages,
   ...ecran.reglages,
   ...attente.reglages,
   ...murs.reglages,

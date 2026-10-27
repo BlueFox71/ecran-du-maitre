@@ -39,6 +39,8 @@ const CHERCHABLES = REGLAGES.map((r) => ({ ...r, chemin: cheminDe(r) }))
 function LigneReglage({ r }: { r: Reglage }): JSX.Element {
   const campagne = useStore((s) => s.campaign)
   const poste = RUBRIQUES.find((x) => x.id === r.rubrique)?.poste
+  const montre = useStore((s) => (r.visible ? r.visible(s) : true))
+  if (!montre) return <></>
   return (
     <Ligne id={r.id} nom={r.nom} aide={r.aide} pleine={r.pleine}>
       {campagne || poste ? <r.Cmd /> : <span className="aide">Ouvre une campagne pour régler ceci.</span>}

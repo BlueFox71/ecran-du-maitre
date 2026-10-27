@@ -1,5 +1,6 @@
 import { expect, it } from 'vitest'
 import type { Modif } from './modifs'
+import { lireCampagne } from './reglages'
 import {
   EVENEMENTS_DEFAUT,
   SM_DEFAUT,
@@ -70,4 +71,14 @@ it('les défauts sont ceux de l’annexe', () => {
   expect(r.folie.table).toHaveLength(6)
   expect(r.hallucinations).toHaveLength(8)
   expect(EVENEMENTS_DEFAUT).toHaveLength(15)
+})
+
+it('la campagne porte le réglage de SM', () => {
+  expect(lireCampagne({}).sm).toEqual(SM_DEFAUT)
+  expect(lireCampagne({ sm: JSON.stringify({ actif: true }) }).sm.actif).toBe(true)
+})
+it('des paliers abîmés reprennent ceux de l’annexe', () => {
+  expect(lireSm(JSON.stringify({ paliers: [] })).paliers).toEqual(SM_DEFAUT.paliers)
+  expect(lireSm(JSON.stringify({ paliers: [1] })).paliers).toEqual(SM_DEFAUT.paliers)
+  expect(lireSm(JSON.stringify({ chocs: [null], prix: [{}], recups: ['x'] })).chocs).toEqual(SM_DEFAUT.chocs)
 })

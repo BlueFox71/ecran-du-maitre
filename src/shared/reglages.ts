@@ -20,6 +20,7 @@
 import { OUVERTURE_REGARD } from '@shared/types'
 import { LARGEUR_DEFAUT } from '@shared/ouvertures'
 import type { Transition } from '@shared/types'
+import { lireSm, SM_DEFAUT, type ReglageSm } from '@shared/santeMentale'
 import { lireMonnaies, monnaiesParDefaut, type ReglageMonnaies } from '@shared/monnaies'
 
 /** Ce que la base rend : des chaînes, et rien d'autre. */
@@ -50,6 +51,8 @@ export interface ReglagesCampagne {
   monnaies: ReglageMonnaies
   /** Les places du sac d'un personnage, avant sac à dos ; 0, sans limite. */
   sacCapacite: number
+  /** L'assistant de santé mentale — voir `@shared/santeMentale`. */
+  sm: ReglageSm
 }
 
 export const CAMPAGNE_DEFAUT: ReglagesCampagne = {
@@ -68,7 +71,8 @@ export const CAMPAGNE_DEFAUT: ReglagesCampagne = {
   monnaies: monnaiesParDefaut(null, false),
   /* Sans limite : une campagne déjà commencée ne voit pas ses sacs se fermer
      tant que le MJ n'a rien réglé. */
-  sacCapacite: 0
+  sacCapacite: 0,
+  sm: SM_DEFAUT
 }
 
 export function lireCampagne(b: Brut): ReglagesCampagne {
@@ -86,7 +90,8 @@ export function lireCampagne(b: Brut): ReglagesCampagne {
     /* Jamais réglées, elles prennent le nom de l'ancienne unité de valeur des
        objets : c'est dans cette monnaie que leurs prix ont été repris. */
     monnaies: lireMonnaies(b['monnaies'], b['objets.unite']),
-    sacCapacite: Math.round(nombre(b, 'sac.capacite', CAMPAGNE_DEFAUT.sacCapacite, 0, 999))
+    sacCapacite: Math.round(nombre(b, 'sac.capacite', CAMPAGNE_DEFAUT.sacCapacite, 0, 999)),
+    sm: lireSm(b['sm'])
   }
 }
 
