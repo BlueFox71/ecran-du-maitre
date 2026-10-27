@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from 'react'
 import { useStore } from '../../../store'
 import type { EvenementSm } from '@shared/santeMentale'
-import { Champ, Num, Txt } from './sante'
+import { Champ, Num, Txt } from './smChamps'
 
 /* ============================================================
    Santé mentale : les événements, séance par séance
