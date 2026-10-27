@@ -147,6 +147,26 @@ const oui = <T,>(k: keyof T & string, label: string): ChampListe<T> => ({
   )
 })
 /** Un choix parmi des valeurs fixes ; `null` s'écrit en chaîne vide. */
+/* Une teinte se choisit à l'œil : des pastilles, comme celles des monnaies,
+   plutôt qu'un menu de noms qu'il faut traduire en couleur. */
+const teinte = <T,>(k: keyof T & string, label: string, options: [string, string][]): ChampListe<T> => ({
+  label,
+  rendu: (it, maj) => (
+    <span className="mc-teintes" role="group" aria-label={label}>
+      {options.map(([o, nom]) => (
+        <button
+          key={o}
+          type="button"
+          aria-pressed={it[k] === o}
+          aria-label={nom}
+          title={nom}
+          style={{ ['--t' as string]: `var(--${o})` }}
+          onClick={() => maj({ [k]: o } as Partial<T>)}
+        />
+      ))}
+    </span>
+  )
+})
 const choix = <T,>(k: keyof T & string, label: string, options: [string | null, string][]): ChampListe<T> => ({
   label,
   rendu: (it, maj) => (
@@ -467,7 +487,7 @@ const Paliers = liste<Palier>(
   [
     txt('nom', 'Nom'),
     num('min', 'À partir de'),
-    choix('couleur', 'Teinte', COULEURS),
+    teinte('couleur', 'Teinte', COULEURS),
     num('hallucinations', 'Hallucination (min)', true),
     txt('texte', 'Ce que ça change', true),
     { label: 'Malus', rendu: (it, maj) => <Malus it={it} maj={maj} /> }
