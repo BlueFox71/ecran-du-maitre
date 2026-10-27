@@ -375,7 +375,7 @@ export function Lignes({ r, joueurs, cible, nomCarac, maintenant }: PropsLignes)
                         aria-label={enPause ? 'Reprendre ce chrono' : 'Mettre ce chrono en pause'}
                         onClick={() => basculerPause(j.id, c.prixId)}
                       >
-                        {enPause ? '▶' : '⏸'}
+                        {enPause ? '▶' : '❚❚'}
                       </button>
                       <button
                         type="button"
