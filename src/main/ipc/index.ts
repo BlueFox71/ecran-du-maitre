@@ -1109,6 +1109,12 @@ export function registerIpc(): void {
     mobile.broadcast()
     return c
   })
+  /* Les mêmes, posés par le jeu (malus de palier, nausée) : hors du Ctrl+Z, voir `CANAUX_HORS`. */
+  on('characters:setModifsJeu', (id: number, modifs: Modif[]) => {
+    const c = chars.setModifs(id, modifs)
+    mobile.broadcast()
+    return c
+  })
   on('characters:setStat', (id: number, key: string, v: number) => {
     const c = chars.setStat(id, key, v)
     mobile.broadcast()

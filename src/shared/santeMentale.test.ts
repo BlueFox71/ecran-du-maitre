@@ -10,6 +10,7 @@ import {
   lireSm,
   modifsDuPalier,
   palierDe,
+  palierPose,
   perteApresJet,
   tirerGain
 } from './santeMentale'
@@ -81,4 +82,22 @@ it('des paliers abîmés reprennent ceux de l’annexe', () => {
   expect(lireSm(JSON.stringify({ paliers: [] })).paliers).toEqual(SM_DEFAUT.paliers)
   expect(lireSm(JSON.stringify({ paliers: [1] })).paliers).toEqual(SM_DEFAUT.paliers)
   expect(lireSm(JSON.stringify({ chocs: [null], prix: [{}], recups: ['x'] })).chocs).toEqual(SM_DEFAUT.chocs)
+})
+it('un malus de palier retouché dans les Paramètres se réécrit sur la fiche', () => {
+  const halluc = palierDe(40, r.paliers)
+  const poses = modifsDuPalier([], halluc)
+  const retouche = { ...halluc, malus: [{ valeur: -3, caracKey: 'per' }] }
+  expect(modifsDuPalier(poses, retouche)).toEqual([expect.objectContaining({ valeur: -3, caracKey: 'per' })])
+  const autreCarac = { ...halluc, malus: [{ valeur: -2, caracKey: 'dex' }] }
+  expect(modifsDuPalier(poses, autreCarac)).toEqual([expect.objectContaining({ valeur: -2, caracKey: 'dex' })])
+})
+it('reconnaît le palier dont la fiche porte les malus', () => {
+  const main = { id: 'x', valeur: 2, raison: 'Béni', caracKey: null, duree: { genre: 'retrait' } } as Modif
+  expect(palierPose([main], r.paliers)).toBeNull()
+  expect(palierPose(undefined, r.paliers)).toBeNull()
+  expect(palierPose(modifsDuPalier([main], palierDe(40, r.paliers)), r.paliers)?.id).toBe('hallucinations')
+  expect(palierPose(modifsDuPalier([], palierDe(10, r.paliers)), r.paliers)?.id).toBe('terreur')
+})
+it('le climax laisse décocher le possédé', () => {
+  expect(EVENEMENTS_DEFAUT.find((e) => e.nom.startsWith('Climax'))).toMatchObject({ tous: false, note: 'Tous sauf le possédé' })
 })

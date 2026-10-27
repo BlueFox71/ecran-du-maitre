@@ -85,7 +85,9 @@ const CANAUX_HORS = new Set([
   'characters:setState',
   'characters:log',
   'characters:present',
-  'characters:horsJeu'
+  'characters:horsJeu',
+  /* Les malus que la santé mentale pose et retire en jouant, comme la jauge qui les cause. */
+  'characters:setModifsJeu'
 ])
 
 /**

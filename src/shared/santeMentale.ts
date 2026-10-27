@@ -198,7 +198,8 @@ export const EVENEMENTS_DEFAUT: Omit<EvenementSm, 'id' | 'sessionId' | 'ord'>[] 
   { nom: 'Silhouette à la caméra thermique', note: null, perte: 5, jet: true, tous: false },
   { nom: 'Photo au flash du Démon', note: null, perte: 10, jet: true, tous: false },
   { nom: 'Corde refusée qui se dénoue', note: 'Tous', perte: 3, jet: true, tous: true },
-  { nom: 'Climax : 8 s de noir, un ami possédé', note: 'Tous sauf le possédé', perte: 15, jet: true, tous: true },
+  /* Pas « tous » : le meneur coche les joueurs, le possédé ne l'est pas. */
+  { nom: 'Climax : 8 s de noir, un ami possédé', note: 'Tous sauf le possédé', perte: 15, jet: true, tous: false },
   { nom: 'Le Démon saute sur un deuxième joueur', note: null, perte: 15, jet: false, tous: false },
   { nom: 'Fin d’une possession', note: null, perte: 20, jet: false, tous: false },
   { nom: 'Fin malheureuse', note: 'Tous', perte: 10, jet: false, tous: true }
@@ -278,24 +279,38 @@ export function palierDe(sm: number, paliers: Palier[]): Palier {
 
 const PREFIXE = 'sm-palier-'
 
-/** Retire les malus posés par le module et pose ceux du palier ; ceux du même palier, déjà là, ne se cumulent pas. */
+/**
+ * Retire les malus posés par le module et pose ceux du palier ; ceux du même
+ * palier, déjà là et tels que réglés, ne se cumulent pas. Rend la liste même
+ * (`modifs`, ou un `[]` neuf s'il manque) quand rien n'est à changer.
+ */
 export function modifsDuPalier(modifs: Modif[] | undefined, palier: Palier): Modif[] {
   const liste = modifs ?? []
   const miens = liste.filter((m) => m.id.startsWith(PREFIXE))
   const ceux = `${PREFIXE}${palier.id}-`
-  if (miens.length === palier.malus.length && miens.every((m) => m.id.startsWith(ceux))) return liste
-  return [
-    ...liste.filter((m) => !m.id.startsWith(PREFIXE)),
-    ...palier.malus.map(
-      (b, i): Modif => ({
-        id: `${ceux}${i}`,
-        valeur: b.valeur,
-        raison: `SM — ${palier.nom}`,
-        caracKey: b.caracKey,
-        duree: { genre: 'retrait' }
-      })
-    )
-  ]
+  const voulus = palier.malus.map(
+    (b, i): Modif => ({
+      id: `${ceux}${i}`,
+      valeur: b.valeur,
+      raison: `SM — ${palier.nom}`,
+      caracKey: b.caracKey,
+      duree: { genre: 'retrait' }
+    })
+  )
+  const memes =
+    miens.length === voulus.length &&
+    voulus.every((v) => miens.some((m) => m.id === v.id && m.valeur === v.valeur && m.caracKey === v.caracKey))
+  if (memes) return liste
+  return [...liste.filter((m) => !m.id.startsWith(PREFIXE)), ...voulus]
+}
+
+/** Le palier dont la fiche porte les malus posés par le module ; `null` s'il n'y en a aucun (ou d'un palier disparu). */
+export function palierPose(modifs: Modif[] | undefined, paliers: Palier[]): Palier | null {
+  const miens = (modifs ?? []).filter((m) => m.id.startsWith(PREFIXE))
+  if (!miens.length) return null
+  /* L'id le plus long d'abord : « a-b » ne se prend pas pour « a ». */
+  const parLongueur = [...paliers].sort((a, b) => b.id.length - a.id.length)
+  return parLongueur.find((p) => miens.some((m) => m.id.startsWith(`${PREFIXE}${p.id}-`))) ?? null
 }
 
 /** Une perte réellement retirée d'un coup qui déclenche le second jet de folie. */

@@ -1083,6 +1083,8 @@ const api = {
       call<Character>('characters:setState', id, key, on),
     /** Ses bonus et malus au jet, remplacés d'un bloc. */
     setModifs: (id: number, modifs: Modif[]) => call<Character>('characters:setModifs', id, modifs),
+    /** Les mêmes, écrits par le jeu (santé mentale) : le Ctrl+Z ne les défait pas. */
+    setModifsJeu: (id: number, modifs: Modif[]) => call<Character>('characters:setModifsJeu', id, modifs),
     log: (id: number) => call<CharacterLogEntry[]>('characters:log', id),
     /** Ajouter ou retirer de sa bourse, monnaie par monnaie ; chaque écart est journalisé. */
     bourse: (id: number, ecarts: Record<string, number>, reason?: string | null) =>

@@ -4,7 +4,7 @@ import { SM_DEFAUT } from '@shared/santeMentale'
 import type { Character, SheetTemplate } from '@shared/types'
 import type { Modif } from '@shared/modifs'
 import { useStore } from '../store'
-import { monde, useSm } from './etat'
+import { monde, suivreCampagne, useSm } from './etat'
 
 const LEA = 1
 const TOM = 2
@@ -18,6 +18,7 @@ let jdr: {
   characters: {
     adjust: ReturnType<typeof vi.fn>
     setModifs: ReturnType<typeof vi.fn>
+    setModifsJeu: ReturnType<typeof vi.fn>
     get: ReturnType<typeof vi.fn>
   }
   rolls: { record: ReturnType<typeof vi.fn> }
@@ -77,6 +78,10 @@ beforeEach(() => {
         fiches.get(id)!.data.modifs = modifs
         return copie(id)
       }),
+      setModifsJeu: vi.fn(async (id: number, modifs: Modif[]) => {
+        fiches.get(id)!.data.modifs = modifs
+        return copie(id)
+      }),
       get: vi.fn(async (id: number) => copie(id))
     },
     rolls: { record: vi.fn(async () => ({})) },
@@ -88,7 +93,8 @@ beforeEach(() => {
     characters: [copie(LEA), copie(TOM)],
     players: [{ id: 10, uid: 'u', name: 'Julie', color: null, characterId: LEA }],
     sheet,
-    reglages: { ...CAMPAGNE_DEFAUT, sm: { ...structuredClone(SM_DEFAUT), actif: true } }
+    reglages: { ...CAMPAGNE_DEFAUT, sm: { ...structuredClone(SM_DEFAUT), actif: true } },
+    toasts: []
   })
   useSm.setState({
     attentes: [],
@@ -146,7 +152,7 @@ describe('useSm', () => {
     const alerte = sm().alertes.find((a) => a.genre === 'palier')
     expect(alerte).toMatchObject({ genre: 'palier', characterId: TOM, sm: 49, montee: false })
     expect(alerte && alerte.genre === 'palier' && alerte.palier.id).toBe('hallucinations')
-    const modifs = jdr.characters.setModifs.mock.calls.at(-1)![1] as Modif[]
+    const modifs = jdr.characters.setModifsJeu.mock.calls.at(-1)![1] as Modif[]
     expect(modifs).toContainEqual(expect.objectContaining({ id: 'beni' }))
     expect(modifs).toContainEqual(
       expect.objectContaining({ id: expect.stringMatching(/^sm-palier-/), valeur: -2, caracKey: 'per' })
@@ -158,7 +164,7 @@ describe('useSm', () => {
     await sm().recevoirJet({ characterId: LEA, caracKey: 'vlt', die: 5, total: 6 })
     const ebranle = sm().alertes.find((a) => a.genre === 'palier' && a.characterId === LEA)
     expect(ebranle && ebranle.genre === 'palier' && ebranle.palier.nom).toBe('Ébranlé')
-    expect(jdr.characters.setModifs).toHaveBeenLastCalledWith(LEA, [
+    expect(jdr.characters.setModifsJeu).toHaveBeenLastCalledWith(LEA, [
       expect.objectContaining({ id: expect.stringMatching(/^sm-palier-/), valeur: -1, caracKey: 'dex' })
     ])
   })
@@ -199,7 +205,7 @@ describe('useSm', () => {
     monde.maintenant = () => T0 + 10 * 60_000
     await sm().recuperer(pilule, [LEA])
     expect(sm().alertes).toContainEqual(expect.objectContaining({ genre: 'nausee', characterId: LEA }))
-    expect(jdr.characters.setModifs).toHaveBeenLastCalledWith(
+    expect(jdr.characters.setModifsJeu).toHaveBeenLastCalledWith(
       LEA,
       expect.arrayContaining([expect.objectContaining({ id: 'sm-nausee', valeur: -2, caracKey: null })])
     )
@@ -266,5 +272,134 @@ describe('useSm', () => {
     sm().nouvelleNuit()
     await sm().recuperer(chapelle, [LEA])
     expect(deltasSm()).toEqual([5, 5, 5, 5])
+  })
+
+  it('une entrée « tous » vaut pour tous les présents, cochés ou non', async () => {
+    const tous = { id: 1, sessionId: 1, ord: 0, nom: 'Corde refusée', note: 'Tous', perte: 3, jet: true, tous: true }
+    await sm().declarerPrix(tous, [LEA])
+    expect(sm().attentes[0].joueurs.map((j) => j.characterId)).toEqual([LEA, TOM])
+    const respect = SM_DEFAUT.prix.find((p) => p.id === 'manque-respect')!
+    await sm().declarerPrix(respect, [LEA])
+    expect(jdr.characters.adjust.mock.calls.map((c) => c[0])).toEqual([LEA, TOM])
+    /* Sans « tous », la coche décide. */
+    const climax = { ...tous, id: 2, nom: 'Climax', tous: false }
+    await sm().declarerPrix(climax, [TOM])
+    expect(sm().attentes[1].joueurs.map((j) => j.characterId)).toEqual([TOM])
+  })
+
+  it('une jauge changée hors du module : le palier se rattrape au tick suivant', async () => {
+    fiches.get(TOM)!.data.gauges.sm.value = 40
+    useStore.setState({ characters: [copie(LEA), copie(TOM)] })
+    await sm().tick(T0)
+    const modifs = fiches.get(TOM)!.data.modifs ?? []
+    expect(modifs).toContainEqual(expect.objectContaining({ id: 'beni' }))
+    expect(modifs).toContainEqual(
+      expect.objectContaining({ id: expect.stringMatching(/^sm-palier-hallucinations-/), valeur: -2, caracKey: 'per' })
+    )
+    expect(jdr.characters.setModifs).not.toHaveBeenCalled()
+    expect(sm().halluA[TOM]).toBe(T0 + 15 * 60_000)
+    expect(sm().alertes).toContainEqual(expect.objectContaining({ genre: 'palier', characterId: TOM, montee: false }))
+    /* Léa, à 80, est Stable : rien à poser, rien à dire. */
+    expect(sm().alertes.filter((a) => a.characterId === LEA)).toEqual([])
+    /* Déjà d'accord : un second tick n'écrit rien. */
+    const n = jdr.characters.setModifsJeu.mock.calls.length
+    await sm().tick(T0 + 1000)
+    expect(jdr.characters.setModifsJeu.mock.calls.length).toBe(n)
+    expect(sm().alertes.filter((a) => a.genre === 'palier')).toHaveLength(1)
+  })
+
+  it('un malus de palier retiré par un défaire revient à la perte suivante', async () => {
+    await sm().appliquer(TOM, -3, 'Pas au-dessus')
+    /* Le défaire a rendu à Tom ses anciennes modifs, sans malus de palier. */
+    fiches.get(TOM)!.data.modifs = [{ id: 'beni', valeur: 2, raison: 'Béni', caracKey: null, duree: { genre: 'retrait' } }]
+    useStore.setState({ characters: [copie(LEA), copie(TOM)] })
+    await sm().appliquer(TOM, -1, 'Ombres')
+    expect(fiches.get(TOM)!.data.modifs).toContainEqual(expect.objectContaining({ id: 'sm-palier-hallucinations-0' }))
+  })
+
+  it('module éteint : le tick ne fait rien', async () => {
+    const prix = SM_DEFAUT.prix.find((p) => p.id === 'seul-noir')!
+    await sm().declarerPrix(prix, [TOM])
+    useSm.setState({ halluA: { [LEA]: T0 } })
+    useStore.setState((s) => ({ reglages: { ...s.reglages, sm: { ...s.reglages.sm, actif: false } } }))
+    await sm().tick(T0 + 5 * 60_000)
+    expect(jdr.characters.adjust).not.toHaveBeenCalled()
+    expect(jdr.characters.get).not.toHaveBeenCalled()
+    expect(sm().alertes).toEqual([])
+  })
+
+  it('le module éteint lâche ce qui court ; une autre campagne repart de rien', () => {
+    useStore.setState({ campaign: { id: 1, name: 'A', system: null } })
+    const fin = suivreCampagne()
+    try {
+      useSm.setState({
+        chronos: { [TOM]: [{ prixId: 'seul-noir', prochainA: T0 }] },
+        halluA: { [TOM]: T0 },
+        pilules: { [LEA]: [T0] }
+      })
+      sm().declarerChoc('Ombres', 5, [LEA])
+      useStore.setState((s) => ({ reglages: { ...s.reglages, sm: { ...s.reglages.sm, actif: false } } }))
+      expect(sm()).toMatchObject({ chronos: {}, halluA: {}, attentes: [], alertes: [] })
+      expect(sm().pilules[LEA]).toEqual([T0])
+      useStore.setState({ campaign: { id: 2, name: 'B', system: null } })
+      expect(sm().pilules).toEqual({})
+    } finally {
+      fin()
+    }
+  })
+
+  it('un chrono ne court pas sur un absent', async () => {
+    const prix = SM_DEFAUT.prix.find((p) => p.id === 'seul-noir')!
+    await sm().declarerPrix(prix, [TOM])
+    useStore.setState((s) => ({ characters: s.characters.map((c) => (c.id === TOM ? { ...c, present: false } : c)) }))
+    await sm().tick(T0 + 60_000)
+    expect(jdr.characters.adjust).not.toHaveBeenCalled()
+    expect(sm().chronos[TOM] ?? []).toEqual([])
+  })
+
+  it('après une veille, un chrono ne rattrape qu’un intervalle', async () => {
+    const prix = SM_DEFAUT.prix.find((p) => p.id === 'seul-noir')!
+    await sm().declarerPrix(prix, [TOM])
+    await sm().tick(T0 + 10 * 60_000)
+    expect(deltasSm()).toEqual([-2])
+    await sm().tick(T0 + 10 * 60_000 + 1000)
+    expect(deltasSm()).toEqual([-2])
+    expect(sm().chronos[TOM][0].prochainA).toBe(T0 + 11 * 60_000)
+    await sm().tick(T0 + 11 * 60_000)
+    expect(deltasSm()).toEqual([-2, -2])
+  })
+
+  it('une écriture ratée prévient le MJ et ne bloque pas la suivante', async () => {
+    jdr.characters.adjust.mockRejectedValueOnce(new Error('base occupée'))
+    await sm().appliquer(LEA, -3, 'Ombres')
+    expect(useStore.getState().toasts).toContainEqual(
+      expect.objectContaining({ msg: 'Santé mentale : la perte de Léa n’a pas pu s’écrire.', error: true })
+    )
+    await sm().appliquer(TOM, -1, 'Ombres')
+    expect(fiches.get(TOM)!.data.gauges.sm.value).toBe(51)
+    /* Dans une déclaration de groupe, l'échec de l'un n'arrête pas les autres. */
+    jdr.characters.adjust.mockRejectedValueOnce(new Error('base occupée'))
+    await sm().declarerPrix(SM_DEFAUT.prix.find((p) => p.id === 'manque-respect')!, [])
+    expect(fiches.get(TOM)!.data.gauges.sm.value).toBe(46)
+  })
+
+  it('un personnage sans jauge de SM n’est jamais visé', () => {
+    const sansJauge = { ...copie(LEA), id: 3, name: 'Chien' }
+    sansJauge.data = { ...sansJauge.data, gauges: { pilules: { value: 1, max: 5 } } }
+    useStore.setState((s) => ({ characters: [...s.characters, sansJauge] }))
+    sm().declarerChoc('Ombres', 5, [])
+    expect(sm().attentes[0].joueurs.map((j) => j.characterId)).toEqual([LEA, TOM])
+  })
+
+  it('saisir un jet sur une carac absente de la fiche : le MJ est prévenu', async () => {
+    sm().declarerChoc('Ombres', 5, [LEA])
+    await sm().saisirJet(sm().attentes[0].id, LEA, 12)
+    expect(jdr.rolls.record).not.toHaveBeenCalled()
+    expect(useStore.getState().toasts.some((t) => t.error && t.msg.includes('vlt'))).toBe(true)
+    useStore.setState({
+      sheet: { ...sheet, spec: { ...sheet.spec, stats: [{ key: 'vlt', label: 'Volonté', code: 'VLT' }] } } as SheetTemplate
+    })
+    await sm().saisirJet(sm().attentes[0].id, LEA, 12)
+    expect(jdr.rolls.record).toHaveBeenCalled()
   })
 })

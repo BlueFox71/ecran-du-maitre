@@ -2,7 +2,6 @@ import { create, type StoreApi, type UseBoundStore } from 'zustand'
 import type { Modif } from '@shared/modifs'
 import {
   estFolie,
-  modifsDuPalier,
   palierDe,
   perteApresJet,
   tirerGain,
@@ -14,6 +13,7 @@ import {
 } from '@shared/santeMentale'
 import { jaugeSanite, type Character, type JetSm } from '@shared/types'
 import { useStore } from '../store'
+import { aAccorder, bilanPalier } from './reconcilier'
 
 /**
  * L'état de la partie pour la santé mentale : les jets attendus, les alertes,
@@ -21,7 +21,8 @@ import { useStore } from '../store'
  *
  * Rien n'y est rangé en base : c'est la séance en train de se jouer. Ce qui
  * reste — la jauge SM, les malus — s'écrit sur la fiche par les chemins de
- * l'app (`characters.adjust`, `setModifs`), et le « défaire » s'y applique.
+ * l'app (`characters.adjust`, `setModifsJeu`) : du jeu, que le Ctrl+Z de
+ * préparation ne défait pas, comme une jauge bougée à la main.
  */
 
 /** Des ids de personnages ; vide : tous les joueurs présents. */
@@ -104,11 +105,20 @@ function contexte(): Contexte {
   return { r: s.reglages.sm, cle: jauge?.key ?? null, characters: s.characters }
 }
 
-/** Les joueurs visés : des PJ présents et en jeu ; une cible vide les prend tous. */
+/** Les PJ présents, en jeu, et qui ont une jauge de SM. */
+function enJeu(): Character[] {
+  const { cle, characters } = contexte()
+  return characters.filter((c) => c.kind === 'pj' && c.present && !c.horsJeu && !!cle && !!c.data.gauges[cle])
+}
+
+/** Les joueurs visés parmi ceux en jeu ; une cible vide les prend tous. */
 function vises(cible: Cible): number[] {
-  const pjs = contexte().characters.filter((c) => c.kind === 'pj' && c.present && !c.horsJeu)
+  const pjs = enJeu()
   return (cible.length ? pjs.filter((c) => cible.includes(c.id)) : pjs).map((c) => c.id)
 }
+
+const prevenir = (msg: string): void => useStore.getState().toast(msg, true)
+const nomDe = (id: number): string => fiche(id)?.name ?? 'ce personnage'
 
 const fiche = (id: number): Character | undefined => contexte().characters.find((c) => c.id === id)
 
@@ -163,8 +173,60 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
     set((s) => ({ attentes: [...s.attentes, a] }))
   }
 
+  /** Les malus du module sont du jeu : le canal ne passe pas par le Ctrl+Z. */
   const ecrireModifs = async (id: number, modifs: Modif[]): Promise<void> => {
-    poser(await window.jdr.characters.setModifs(id, modifs))
+    poser(await window.jdr.characters.setModifsJeu(id, modifs))
+  }
+
+  /**
+   * Met la fiche `c`, telle que le main vient de la rendre, d'accord avec son
+   * palier : les malus du module, l'alerte si le palier change, le compte des
+   * hallucinations. Dans la file. `avant` : la SM relue avant l'écriture qui
+   * vient de passer ; `null` hors d'une écriture (la passe d'accord).
+   */
+  const accorderPalier = async (c: Character, avant: number | null): Promise<void> => {
+    const { r, cle } = contexte()
+    const b = cle ? bilanPalier(c, avant, r, cle) : null
+    if (!b) return
+    const { id } = c
+    if (b.modifs) await ecrireModifs(id, b.modifs)
+    if (b.change) {
+      const { montee } = b.change
+      /* À la descente dans un palier qui hallucine, l'alerte en propose une. */
+      const texte = !montee && b.palier.hallucinations != null ? auHasard(r.hallucinations) : null
+      const alerte: Alerte = { id: nouvelId('al'), genre: 'palier', characterId: id, palier: b.palier, sm: b.sm, montee }
+      set((s) => ({ alertes: [...s.alertes, texte ? { ...alerte, texte } : alerte] }))
+    }
+    if (b.palier.hallucinations == null) {
+      if (get().halluA[id] !== undefined) set((s) => ({ halluA: sansCle(s.halluA, id) }))
+    } else if (get().halluA[id] === undefined) {
+      const enCours = get().alertes.some((a) => a.genre === 'hallucination' && a.characterId === id)
+      if (!enCours) rearmer(id)
+    }
+  }
+
+  /** Ceux dont la passe d'accord est en file, et ceux dont l'échec a déjà été dit. */
+  const enAccord = new Set<number>()
+  const accordRate = new Set<number>()
+  /** La passe d'accord, pour un joueur : relu du main, dans la file. */
+  const accorder = (id: number): Promise<void> => {
+    if (enAccord.has(id)) return Promise.resolve()
+    enAccord.add(id)
+    return enFile(async () => {
+      try {
+        const c = await window.jdr.characters.get(id)
+        if (!c) return
+        poser(c)
+        await accorderPalier(c, null)
+        accordRate.delete(id)
+      } catch {
+        /* Une fois par panne, pas à chaque seconde. */
+        if (!accordRate.has(id)) prevenir(`Santé mentale : les malus de palier de ${nomDe(id)} n’ont pas pu s’écrire.`)
+        accordRate.add(id)
+      } finally {
+        enAccord.delete(id)
+      }
+    })
   }
 
   /**
@@ -189,7 +251,9 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
 
     declarerChoc: (titre, perte, cible) => ouvrirAttente(titre, perte, 'choc', vises(cible)),
 
-    declarerPrix: async (p, cible) => {
+    declarerPrix: async (p, choisis) => {
+      /* « Tous » : tous les joueurs présents, quoi qu'on ait coché. */
+      const cible = p.tous ? [] : choisis
       if ('jet' in p && p.jet) return get().declarerChoc(p.nom, p.perte, cible)
       const ids = vises(cible)
       const intervalle = 'intervalleMin' in p ? p.intervalleMin : null
@@ -250,6 +314,12 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
       const a = get().attentes.find((x) => x.id === attenteId)
       if (!a) return
       const { r } = contexte()
+      /* Sans cette carac sur la fiche, le main noterait le dé sans le renvoyer : l'attente resterait muette. */
+      const stats = useStore.getState().sheet?.spec.stats ?? []
+      if (!stats.some((st) => st.key === r.carac))
+        return prevenir(
+          `Santé mentale : la fiche n’a pas de carac « ${r.carac} » pour le jet. Choisis-la dans Paramètres › Santé mentale › Le jet.`
+        )
       await window.jdr.rolls.record({
         characterId,
         caracKey: r.carac,
@@ -265,42 +335,29 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
     appliquer: (characterId, delta, raison) =>
       enFile(async () => {
         const { r, cle } = contexte()
-        const c = fiche(characterId)
-        const avant = cle ? c?.data.gauges[cle]?.value : undefined
-        if (!c || !cle || avant === undefined || delta === 0) return
-        const { character } = await window.jdr.characters.adjust(characterId, cle, delta, raison)
-        poser(character)
+        if (!cle || delta === 0) return
+        let character: Character
+        let avant: number
+        try {
+          /* Relue du main, pas de la copie : un défaire ou une retouche à la main l'ont peut-être bougée. */
+          const lu = await window.jdr.characters.get(characterId)
+          const v = lu?.data.gauges[cle]?.value
+          if (v === undefined) return
+          avant = v
+          character = (await window.jdr.characters.adjust(characterId, cle, delta, raison)).character
+          poser(character)
+        } catch {
+          return prevenir(`Santé mentale : ${delta < 0 ? 'la perte' : 'le gain'} de ${nomDe(characterId)} n’a pas pu s’écrire.`)
+        }
         /* Le main a borné : on raisonne sur ce qui est vraiment écrit. */
         const apres = character.data.gauges[cle]?.value ?? avant
-        const ancien = palierDe(avant, r.paliers)
-        const nouveau = palierDe(apres, r.paliers)
-        if (ancien.id !== nouveau.id) {
-          await ecrireModifs(characterId, modifsDuPalier(character.data.modifs, nouveau))
-          const montee = apres > avant
-          /* À la descente dans un palier qui hallucine, l'alerte en propose une. */
-          const texte = !montee && nouveau.hallucinations != null ? auHasard(r.hallucinations) : null
-          set((s) => ({
-            alertes: [
-              ...s.alertes,
-              {
-                id: nouvelId('al'),
-                genre: 'palier',
-                characterId,
-                palier: nouveau,
-                sm: apres,
-                montee,
-                ...(texte ? { texte } : {})
-              }
-            ]
-          }))
-          if (nouveau.hallucinations == null) set((s) => ({ halluA: sansCle(s.halluA, characterId) }))
-          else if (ancien.hallucinations == null || get().halluA[characterId] === undefined) {
-            const enCours = get().alertes.some((a) => a.genre === 'hallucination' && a.characterId === characterId)
-            if (!enCours) rearmer(characterId)
-          }
-        }
         const perteReelle = avant - apres
         if (delta < 0 && estFolie(perteReelle, r)) ouvrirAttente(`Folie passagère — ${raison}`, perteReelle, 'folie', [characterId])
+        try {
+          await accorderPalier(character, avant)
+        } catch {
+          prevenir(`Santé mentale : les malus de palier de ${nomDe(characterId)} n’ont pas pu s’écrire.`)
+        }
       }),
 
     recuperer: async (rec, cible) => {
@@ -315,7 +372,12 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
               useStore.getState().toast(`${c?.name ?? 'Ce joueur'} n’a plus de pilules.`, true)
               continue
             }
-            poser((await window.jdr.characters.adjust(id, r.jaugePilules, -1, rec.nom)).character)
+            try {
+              poser((await window.jdr.characters.adjust(id, r.jaugePilules, -1, rec.nom)).character)
+            } catch {
+              prevenir(`Santé mentale : la pilule de ${c?.name ?? 'ce joueur'} n’a pas pu s’écrire.`)
+              continue
+            }
           }
           const maintenant = monde.maintenant()
           const derniere = get().pilules[id]?.at(-1)
@@ -328,7 +390,9 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
               caracKey: null,
               duree: { genre: 'retrait' }
             }
-            await retoucherModifs(id, (modifs) => [...modifs.filter((m) => m.id !== NAUSEE), modif])
+            await retoucherModifs(id, (modifs) => [...modifs.filter((m) => m.id !== NAUSEE), modif]).catch(() =>
+              prevenir(`Santé mentale : la nausée de ${nomDe(id)} n’a pas pu s’écrire.`)
+            )
             set((s) => ({
               nausees: { ...s.nausees, [id]: maintenant + r.nausee.dureeMin * MINUTE },
               alertes: [...s.alertes, { id: nouvelId('al'), genre: 'nausee', characterId: id }]
@@ -355,21 +419,37 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
       })),
 
     tick: async (maintenant) => {
-      const { r } = contexte()
+      const { r, cle: cleSm } = contexte()
+      /* Module éteint : rien ne court, rien ne s'écrit. */
+      if (!r.actif) return
+      const presents = new Set(enJeu().map((c) => c.id))
       /* Les chronos échus : l'échéance avance avant l'écriture, un tick suivant ne la rejoue pas. */
       const dus: { id: number; prix: Prix }[] = []
       const chronos: EtatSm['chronos'] = {}
+      let bouge = false
       for (const [cle, liste] of Object.entries(get().chronos)) {
         const id = Number(cle)
+        /* Absent ou hors jeu : son chrono tombe, il ne se vide pas sans qu'on le voie. */
+        if (!presents.has(id)) {
+          bouge ||= liste.length > 0
+          continue
+        }
         chronos[id] = liste.flatMap((c) => {
           const prix = r.prix.find((p) => p.id === c.prixId)
-          if (!prix || !prix.intervalleMin) return []
+          if (!prix || !prix.intervalleMin) {
+            bouge = true
+            return []
+          }
           if (c.prochainA > maintenant) return [c]
           dus.push({ id, prix })
-          return [{ ...c, prochainA: c.prochainA + prix.intervalleMin * MINUTE }]
+          bouge = true
+          /* Après une veille, un seul intervalle se paie : l'échéance repart de maintenant. */
+          const intervalle = prix.intervalleMin * MINUTE
+          const suivant = c.prochainA + intervalle
+          return [{ ...c, prochainA: suivant > maintenant ? suivant : maintenant + intervalle }]
         })
       }
-      if (dus.length) set({ chronos })
+      if (bouge) set({ chronos })
 
       /* Les hallucinations dues : une alerte, jamais un envoi. */
       for (const [cle, a] of Object.entries(get().halluA)) {
@@ -391,10 +471,19 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
         if (fin > maintenant) continue
         const id = Number(cle)
         set((s) => ({ nausees: sansCle(s.nausees, id) }))
-        await retoucherModifs(id, (modifs) => modifs.filter((m) => m.id !== NAUSEE))
+        await retoucherModifs(id, (modifs) => modifs.filter((m) => m.id !== NAUSEE)).catch(() =>
+          prevenir(`Santé mentale : la fin de la nausée de ${nomDe(id)} n’a pas pu s’écrire.`)
+        )
       }
 
+      /* `appliquer` dit lui-même ses échecs : une perte ratée n'arrête pas les suivantes. */
       for (const d of dus) await get().appliquer(d.id, -d.prix.perte, d.prix.nom)
+
+      /* La passe d'accord : malus de palier et compte des hallucinations, rattrapés. */
+      if (!cleSm) return
+      const enHallucination = new Set(get().alertes.flatMap((a) => (a.genre === 'hallucination' ? [a.characterId] : [])))
+      const ids = aAccorder({ r, cle: cleSm, joueurs: enJeu(), halluA: get().halluA, enHallucination })
+      await Promise.all(ids.map(accorder))
     },
 
     envoyerHallucination: async (alerteId) => {
@@ -437,6 +526,24 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
   }
 })
 
+/**
+ * Le module éteint lâche ce qui court (chronos, comptes, jets attendus,
+ * alertes) ; une autre campagne repart de rien : l'état est rangé par id de
+ * personnage. Rend le désabonnement.
+ */
+export function suivreCampagne(): () => void {
+  let actif = useStore.getState().reglages.sm.actif
+  let campagne = useStore.getState().campaign?.id ?? null
+  return useStore.subscribe((s) => {
+    const id = s.campaign?.id ?? null
+    if (id !== campagne)
+      useSm.setState({ attentes: [], alertes: [], chronos: {}, halluA: {}, folies: {}, pilules: {}, recupsFaites: {}, nausees: {} })
+    else if (actif && !s.reglages.sm.actif) useSm.setState({ attentes: [], alertes: [], chronos: {}, halluA: {} })
+    campagne = id
+    actif = s.reglages.sm.actif
+  })
+}
+
 let demarre = false
 
 /** Pose une seule fois l'écoute des jets et l'horloge des chronos ; appelé au montage du MJ. */
@@ -444,5 +551,6 @@ export function demarrerSm(): void {
   if (demarre) return
   demarre = true
   window.jdr.sm.onJet((j) => void useSm.getState().recevoirJet(j))
+  suivreCampagne()
   setInterval(() => void useSm.getState().tick(monde.maintenant()), 1000)
 }
