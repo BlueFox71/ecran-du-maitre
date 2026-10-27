@@ -6590,17 +6590,20 @@ input[type='range']::-webkit-slider-thumb {
 .toast.err .dot {
   background: var(--blood);
 }
-/* Les annonces de partie : empilées en bas à droite, une croix chacune. */
+/* Les annonces de partie : empilées en bas, au centre, une croix chacune.
+   Un raté (`.toast`) qui tombe en même temps passe par-dessus : il dure peu. */
 .annonces {
   position: fixed;
-  right: 18px;
+  left: 50%;
   bottom: 18px;
-  z-index: 80;
+  transform: translateX(-50%);
+  z-index: 79;
   display: flex;
   flex-direction: column;
-  align-items: flex-end;
+  align-items: center;
   gap: 6px;
-  max-width: min(420px, 60vw);
+  width: max-content;
+  max-width: min(520px, 74vw);
 }
 .annonce {
   display: flex;
