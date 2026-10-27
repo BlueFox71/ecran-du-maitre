@@ -94,6 +94,8 @@ export interface EtatSm {
   nouvelleScene(): void
   /** Toutes les limites tombent : scène et nuit. */
   nouvelleNuit(): void
+  /** La séance repart de zéro : rien ne court, rien n'attend, rien n'a été pris. */
+  remettreAZero(): void
 }
 
 /** Le hasard et l'heure : remplaçables dans les tests. */
@@ -579,6 +581,9 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
     },
 
     nouvelleNuit: () => set({ recupsFaites: {} }),
+
+    remettreAZero: () =>
+      set({ attentes: [], alertes: [], chronos: {}, halluA: {}, folies: {}, pilules: {}, recupsFaites: {}, nausees: {} }),
 
     fermerAlerte: (id) => {
       const a = get().alertes.find((x) => x.id === id)

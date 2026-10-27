@@ -1120,6 +1120,22 @@ export interface Roll {
   level: RollLevel
 }
 
+/** Ce que « Réinitialiser la séance » remet à son départ : une case chacun. */
+export interface ChoixReinit {
+  /** Chaque exemplaire déplacé retourne à son emplacement initial. */
+  objets: boolean
+  jaugesPj: boolean
+  jaugesPnj: boolean
+  /** Les bonus et malus posés sur les fiches des joueurs. */
+  modifs: boolean
+  /** L'historique des jauges (et le journal SM qui le lit). */
+  journalJauges: boolean
+  /** Les jets de la séance active. */
+  journalJets: boolean
+  /** Chronos, jets attendus, alertes, remèdes déjà pris — rien en base, côté MJ. */
+  etatSm: boolean
+}
+
 /** Un jet de personnage noté : ce que la santé mentale lit pour réagir. */
 export interface JetSm {
   characterId: number

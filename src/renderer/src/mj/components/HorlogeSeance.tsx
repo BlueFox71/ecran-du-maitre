@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { Minuteries, useMinuteries } from './Minuteries'
 import { ChronosHorloge } from '../santeMentale/ChronosHorloge'
+import { ReinitSeance } from './ReinitSeance'
+import { IconRecommencer } from './Icons'
 
 /**
  * L'horloge de la séance, au pied du rail : on la commence en début de soirée,
@@ -68,6 +70,7 @@ export function HorlogeSeance(): JSX.Element | null {
   const [evs, setEvs] = useState<Evenement[]>([])
   const [maintenant, setMaintenant] = useState(Date.now())
   const minuteries = useMinuteries(sessionId)
+  const [reinit, setReinit] = useState(false)
 
   // La séance change : on relit sa liste.
   useEffect(() => {
@@ -123,6 +126,15 @@ export function HorlogeSeance(): JSX.Element | null {
             {etat === 'en-cours' ? 'en cours' : etat === 'pause' ? 'en pause' : 'terminée'}
           </span>
         ) : null}
+        <button
+          type="button"
+          className="hs-reinit"
+          title="Réinitialiser la séance — objets, jauges, journaux…"
+          aria-label="Réinitialiser la séance"
+          onClick={() => setReinit(true)}
+        >
+          <IconRecommencer />
+        </button>
       </div>
 
       {etat === 'avant' ? (
@@ -182,6 +194,7 @@ export function HorlogeSeance(): JSX.Element | null {
 
       <ChronosHorloge />
       <Minuteries m={minuteries} />
+      {reinit ? <ReinitSeance onFerme={() => setReinit(false)} /> : null}
     </div>
   )
 }

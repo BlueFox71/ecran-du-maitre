@@ -61,6 +61,7 @@ const MODULES: Record<string, string> = {
   characters: 'Fiches',
   annexes: 'Annexes',
   sm: 'Santé mentale',
+  seance: 'Réinitialisation de la séance',
   trame: 'Arborescence',
   templates: 'Fiche de campagne',
   sheet: 'Fiche de campagne',

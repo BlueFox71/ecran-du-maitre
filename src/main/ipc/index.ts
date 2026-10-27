@@ -42,6 +42,8 @@ import { lireCampagne, type Brut } from '@shared/reglages'
 import { monnaiesActives } from '@shared/monnaies'
 import { apresLeCombat, apresUnTour, type Modif } from '@shared/modifs'
 import { noterJet } from '../jetDuPerso'
+import { reinitialiser } from '../reinitialiser'
+import type { ChoixReinit } from '@shared/types'
 
 /** Des bonus ont vieilli tout seuls : la fiche du MJ et les téléphones relisent. */
 function modifsVieillis(): void {
@@ -1152,6 +1154,16 @@ export function registerIpc(): void {
   on('rolls:trashList', () => rolls.listTrash())
   on('rolls:emptyTrash', () => rolls.emptyTrash())
   on('rolls:clear', () => rolls.clearSessionRolls())
+
+  /* Remettre la séance à son départ : suivi par le défaire, un Ctrl+Z la rend. */
+  on('seance:reinitialiser', (choix: ChoixReinit) => {
+    const r = reinitialiser(choix)
+    display.refreshJoueurs()
+    display.versMj('characters:relus', null)
+    if (pochette.suivreInventaires()) display.versMj('pochette:changee', null)
+    mobile.broadcast()
+    return r
+  })
   on('rolls:exportCsv', async () => {
     const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
     const session = timeline.currentSession()

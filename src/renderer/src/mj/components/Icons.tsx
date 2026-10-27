@@ -425,6 +425,16 @@ export const IconRotate = (p: P = {}): JSX.Element =>
     p
   )
 
+/** Flèche ronde à rebours — « tout reprendre au départ » (réinitialiser la séance). */
+export const IconRecommencer = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M4 11a8 8 0 1 1 2.3 5.6" />
+      <path d="M4 5v6h6" />
+    </>,
+    p
+  )
+
 /**
  * Flèche de retour — « remettre comme c'était ». Volontairement distincte de
  * `IconRotate`, la flèche circulaire du pivot : les deux se côtoient dans la
