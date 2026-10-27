@@ -7,6 +7,7 @@ import { IconClose } from '../components/Icons'
 import { useSm } from './etat'
 import { Bareme, type Ou } from './Bareme'
 import { ChoixJoueurs } from './ChoixJoueurs'
+import { JournalSm } from './Journal'
 import { Bandeaux, Lignes, type JoueurSm } from './Joueurs'
 
 /**
@@ -168,6 +169,7 @@ export function VueSm({ onFerme }: { onFerme: () => void }): JSX.Element {
               {activite ? ` — ${activite}` : ''}
             </p>
           ) : null}
+          <JournalSm joueurs={joueurs} cle={jauge.key} />
         </div>
       </div>
       {choix ? (

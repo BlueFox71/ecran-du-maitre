@@ -24675,6 +24675,57 @@ button.fdc-vig:hover {
   color: var(--text-dim);
 }
 
+/* Le journal : sous la moyenne, s'il y a la place. Il défile en lui-même
+   pour ne pas pousser la vue, et s'efface quand le détail est trop bas. */
+.sm-journal {
+  display: grid;
+  gap: 4px;
+  min-height: 0;
+}
+.sm-journal ol {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  max-height: 38cqh;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-top: 1px solid var(--line-soft);
+}
+.sm-journal li {
+  display: grid;
+  grid-template-columns: auto auto auto minmax(0, 1fr);
+  align-items: baseline;
+  gap: 8px;
+  padding: 3px 2px;
+  border-bottom: 1px solid var(--line-soft);
+  font-size: 11.5px;
+  color: var(--text-dim);
+  font-variant-numeric: tabular-nums;
+}
+.sm-journal li b {
+  color: var(--text);
+  font-weight: 500;
+}
+.sm-j-heure {
+  color: var(--text-faint);
+}
+.sm-j-delta.perte {
+  color: var(--blood);
+}
+.sm-j-delta.gain {
+  color: var(--moss);
+}
+.sm-j-raison {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+@container detail (max-height: 300px) {
+  .sm-journal {
+    display: none;
+  }
+}
+
 /* ---- santé mentale : « qui le paie ? », posé sous un prix ---- */
 .sm-choix-portail .pop-fond {
   position: fixed;
