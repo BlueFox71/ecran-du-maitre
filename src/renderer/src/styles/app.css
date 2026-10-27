@@ -24545,3 +24545,73 @@ button.fdc-vig:hover {
   font-size: 12px;
   color: var(--text-dim);
 }
+
+/* ---- santé mentale : « qui le paie ? », posé sous un prix ---- */
+.sm-choix-portail .pop-fond {
+  position: fixed;
+  inset: 0;
+  z-index: 59;
+}
+.pop.sm-choix {
+  position: fixed;
+  z-index: 60;
+  width: 240px;
+  max-height: 420px;
+  overflow: auto;
+  padding: 6px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  box-shadow: var(--shadow-lift);
+}
+.pop.sm-choix > .eyebrow {
+  display: block;
+  padding: 4px 8px 6px;
+}
+.sm-choix-fermer {
+  float: right;
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 4px;
+  color: var(--text-faint);
+}
+.sm-choix-fermer:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+.sm-choix-fermer svg {
+  width: 11px;
+  height: 11px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
+.sm-choix-opt {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 8px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.sm-choix-opt:hover {
+  background: var(--surface);
+  color: var(--text);
+}
+.sm-choix-sm {
+  margin-left: auto;
+  color: var(--iris);
+  font-size: 11.5px;
+}
+.sm-choix-pied {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding-top: 6px;
+  border-top: 1px solid var(--line-soft);
+}

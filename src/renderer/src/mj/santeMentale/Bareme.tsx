@@ -41,7 +41,8 @@ interface Props {
   recupsFaites: Record<string, number[]>
   onChoc: (c: Choc) => void
   onEvenement: (e: EvenementSm) => void
-  onPrix: (p: Prix) => void
+  /** `ou` : sous le bouton cliqué, là où poser le choix des joueurs. */
+  onPrix: (p: Prix, ou: { x: number; y: number }) => void
   onRecup: (rec: Recup) => void
   onScene: () => void
   onNuit: () => void
@@ -96,7 +97,10 @@ export function Bareme(p: Props): JSX.Element {
           type="button"
           className="sm-it"
           title={x.intervalleMin ? 'Lance un chrono sur le joueur, jusqu’à ce que tu l’arrêtes' : undefined}
-          onClick={() => p.onPrix(x)}
+          onClick={(ev) => {
+            const b = ev.currentTarget.getBoundingClientRect()
+            p.onPrix(x, { x: b.left, y: b.bottom + 4 })
+          }}
         >
           <span>{x.nom}</span>
           <span className="sm-perte">

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { activiteDe, cibleDesEntites, palierDe, type EvenementSm } from '@shared/santeMentale'
+import { activiteDe, cibleDesEntites, palierDe, type EvenementSm, type Prix } from '@shared/santeMentale'
 import { jaugeSanite } from '@shared/types'
 import { useStore } from '../store'
 import { ouvrirParametres } from '../components/parametres/registre'
 import { IconClose } from '../components/Icons'
 import { useSm } from './etat'
 import { Bareme } from './Bareme'
+import { ChoixJoueurs } from './ChoixJoueurs'
 import { Bandeaux, Lignes, type JoueurSm } from './Joueurs'
 
 /**
@@ -53,6 +54,8 @@ export function VueSm({ onFerme }: { onFerme: () => void }): JSX.Element {
   const maintenant = useMaintenant()
   /* Les cases cochées vivent ici, et se vident après chaque déclaration. */
   const [coches, setCoches] = useState<Set<number>>(new Set())
+  /* Le prix cliqué, en attendant qu'on dise qui le paie. */
+  const [choix, setChoix] = useState<{ prix: Prix; x: number; y: number } | null>(null)
 
   const jauge = spec ? jaugeSanite(spec, spec.gauges) : undefined
 
@@ -129,7 +132,11 @@ export function VueSm({ onFerme }: { onFerme: () => void }): JSX.Element {
           recupsFaites={sm.recupsFaites}
           onChoc={(c) => declarer((qui) => sm.declarerChoc(c.nom, c.perte, qui))}
           onEvenement={(e) => declarer((qui) => sm.declarerPrix(e, qui), e.tous)}
-          onPrix={(p) => declarer((qui) => sm.declarerPrix(p, qui), p.tous)}
+          /* Un prix « tous » tombe sur toute la table : rien à choisir. Les
+             autres demandent qui le paie. */
+          onPrix={(p, ou) =>
+            p.tous ? declarer((qui) => sm.declarerPrix(p, qui), true) : setChoix({ prix: p, ...ou })
+          }
           onRecup={(rec) => declarer((qui) => sm.recuperer(rec, qui))}
           onScene={sm.nouvelleScene}
           onNuit={sm.nouvelleNuit}
@@ -157,6 +164,22 @@ export function VueSm({ onFerme }: { onFerme: () => void }): JSX.Element {
           ) : null}
         </div>
       </div>
+      {choix ? (
+        <ChoixJoueurs
+          x={choix.x}
+          y={choix.y}
+          titre={`${choix.prix.nom} — qui le paie ?`}
+          joueurs={joueurs}
+          coches={cochesValides}
+          onClose={() => setChoix(null)}
+          onValide={(ids) => {
+            const p = choix.prix
+            setChoix(null)
+            setCoches(new Set())
+            void sm.declarerPrix(p, ids)
+          }}
+        />
+      ) : null}
     </div>
   )
 }
