@@ -1946,5 +1946,26 @@ export const MIGRATIONS: { id: number; sql: string }[] = [
     UPDATE mot SET lot = 'm' || id WHERE lot IS NULL;
     CREATE INDEX idx_mot_lot ON mot(campaign_id, lot);
     `
+  },
+  {
+    id: 88,
+    sql: `
+    /* Les événements de santé mentale : ce qui, dans une séance, peut faire
+       perdre de la raison — son nom, une note, la perte, et si on la tempère
+       d'un jet, pour un seul personnage ou pour tous. Chacun appartient à sa
+       séance et y garde son rang ; il s'en va avec elle. */
+    CREATE TABLE sm_evenement (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL REFERENCES campaign(id) ON DELETE CASCADE,
+      session_id  INTEGER NOT NULL REFERENCES game_session(id) ON DELETE CASCADE,
+      ord         INTEGER NOT NULL DEFAULT 0,
+      nom         TEXT NOT NULL,
+      note        TEXT,
+      perte       INTEGER NOT NULL,
+      jet         INTEGER NOT NULL DEFAULT 1,
+      tous        INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX idx_sm_evenement ON sm_evenement(session_id, ord);
+    `
   }
 ]

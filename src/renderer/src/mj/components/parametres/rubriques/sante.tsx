@@ -4,6 +4,7 @@ import { Confirmer } from '../../Rangement'
 import { SM_DEFAUT, type Choc, type Palier, type Prix, type Recup, type ReglageSm } from '@shared/santeMentale'
 import type { Reglage } from '../registre'
 import { SanteMentale, sansFiche, useFiche } from './regles'
+import { Evenements } from './smEvenements'
 
 /* ============================================================
    Santé mentale
@@ -20,7 +21,7 @@ const nouvelId = (): string => `n${Date.now().toString(36)}${Math.floor(Math.ran
 
 /* ---------------- les champs : ils n'écrivent qu'au blur ---------------- */
 
-function Txt({
+export function Txt({
   v,
   onCommit,
   large,
@@ -46,7 +47,7 @@ function Txt({
 }
 
 /** Un nombre ; vide, il vaut `null` si le champ le permet. */
-function Num({
+export function Num({
   v,
   onCommit,
   nul,
@@ -85,7 +86,7 @@ function Num({
   )
 }
 
-function Champ({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
+export function Champ({ label, children }: { label: string; children: React.ReactNode }): JSX.Element {
   return (
     <label className="sm-champ">
       <span>{label}</span>
@@ -507,7 +508,8 @@ export const reglages: Reglage[] = [
           aria-label="Assistance de santé mentale"
           onChange={(e) => {
             /* Jamais posé : on écrit tout le barème de l'annexe avec l'activation. */
-            if (e.target.checked && jamais) void poserSm({ ...SM_DEFAUT, actif: true })
+            if (e.target.checked && jamais)
+              void poserSm({ ...SM_DEFAUT, actif: true }).then(() => window.jdr.sm.semer())
             else void poserSm({ actif: e.target.checked })
           }}
         />
@@ -622,6 +624,16 @@ export const reglages: Reglage[] = [
     mots: ['rappel', 'règle', 'modificateur', 'ambiance', 'mémo'],
     pleine: true,
     Cmd: Rappels
+  },
+  {
+    id: 'sm.evenements',
+    rubrique: 'sante',
+    visible: actif,
+    nom: 'Les événements',
+    aide: 'Ce qui, dans chaque séance, peut faire perdre de la raison : la perte proposée, avec ou sans jet, pour un personnage ou pour tous. Chaque séance a sa liste.',
+    mots: ['événement', 'séance', 'perte', 'scène', 'jet', 'dupliquer', 'harrow mill'],
+    pleine: true,
+    Cmd: Evenements
   },
   {
     id: 'sm.retablir',

@@ -1,6 +1,7 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Brut } from '@shared/reglages'
 import type { Modif } from '@shared/modifs'
+import type { EvenementSm } from '@shared/santeMentale'
 import type {
   Annotation,
   MotifVibration,
@@ -225,6 +226,19 @@ const api = {
     add: (itemId: number) => call<UiItem[]>('annexes:add', itemId),
     remove: (itemId: number) => call<UiItem[]>('annexes:remove', itemId),
     reorder: (itemIds: number[]) => call<UiItem[]>('annexes:reorder', itemIds)
+  },
+
+  /** La santé mentale : les événements de chaque séance. */
+  sm: {
+    evenements: (sessionId: number) => call<EvenementSm[]>('sm:evenements', sessionId),
+    /** Écrit (ou crée) un événement ; rend la liste de sa séance. */
+    ecrire: (e: Omit<EvenementSm, 'id' | 'ord'> & { id?: number }) => call<EvenementSm[]>('sm:ecrire', e),
+    effacer: (id: number) => call<EvenementSm[]>('sm:effacer', id),
+    ranger: (sessionId: number, ids: number[]) => call<EvenementSm[]>('sm:ranger', sessionId, ids),
+    /** Ajouté en fin de liste de l'autre séance. */
+    dupliquer: (id: number, versSessionId: number) => call<void>('sm:dupliquer', id, versSessionId),
+    /** Les événements du barème sous la séance active, si la campagne n'en a aucun. */
+    semer: () => call<void>('sm:semer')
   },
 
   /**

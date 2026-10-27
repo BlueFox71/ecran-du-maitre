@@ -17,6 +17,7 @@ import * as carnet from '../carnet'
 import * as mobile from '../mobile'
 import * as projet from '../project'
 import * as annexes from '../db/repos/annexes'
+import * as smEvenements from '../db/repos/smEvenements'
 import * as pochette from '../db/repos/pochette'
 import * as mots from '../db/repos/mots'
 import * as annotations from '../db/repos/annotations'
@@ -861,6 +862,15 @@ export function registerIpc(): void {
   on('annexes:add', (itemId: number) => annexes.addAnnexe(itemId).map(withUrl))
   on('annexes:remove', (itemId: number) => annexes.removeAnnexe(itemId).map(withUrl))
   on('annexes:reorder', (itemIds: number[]) => annexes.reorderAnnexes(itemIds).map(withUrl))
+
+  /* ---------------- santé mentale : les événements ---------------- */
+
+  on('sm:evenements', (sessionId: number) => smEvenements.listEvenements(sessionId))
+  on('sm:ecrire', (e: Parameters<typeof smEvenements.ecrireEvenement>[0]) => smEvenements.ecrireEvenement(e))
+  on('sm:effacer', (id: number) => smEvenements.effacerEvenement(id))
+  on('sm:ranger', (sessionId: number, ids: number[]) => smEvenements.rangerEvenements(sessionId, ids))
+  on('sm:dupliquer', (id: number, versSessionId: number) => smEvenements.dupliquerEvenement(id, versSessionId))
+  on('sm:semer', () => smEvenements.semerEvenements())
 
   /* ---------------- la pochette ---------------- */
 

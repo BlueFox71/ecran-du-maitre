@@ -60,6 +60,7 @@ const MODULES: Record<string, string> = {
   objets: 'Objets',
   characters: 'Fiches',
   annexes: 'Annexes',
+  sm: 'Santé mentale',
   trame: 'Arborescence',
   templates: 'Fiche de campagne',
   sheet: 'Fiche de campagne',
