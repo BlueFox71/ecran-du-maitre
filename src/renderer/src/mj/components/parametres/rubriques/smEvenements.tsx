@@ -32,22 +32,28 @@ export function Evenements(): JSX.Element {
     return () => window.removeEventListener('jdr:defait', f)
   }, [relire])
 
+  /* Une liste réécrite : la vue SM du Paravent se relit aussi. */
+  const ecrit = (l: EvenementSm[]): void => {
+    setListe(l)
+    window.dispatchEvent(new Event('jdr:sm-evenements'))
+  }
+
   if (sid === null) return <p className="rgm-aide">Aucune séance : crée-en une pour y poser des événements.</p>
 
   const maj = async (e: EvenementSm, p: Maj): Promise<void> => {
     const { ord: _ord, ...reste } = { ...e, ...p }
     void _ord
-    setListe(await window.jdr.sm.ecrire(reste))
+    ecrit(await window.jdr.sm.ecrire(reste))
   }
   const deplacer = async (i: number, d: number): Promise<void> => {
     const j = i + d
     if (j < 0 || j >= liste.length) return
     const ids = liste.map((e) => e.id)
     ;[ids[i], ids[j]] = [ids[j], ids[i]]
-    setListe(await window.jdr.sm.ranger(sid, ids))
+    ecrit(await window.jdr.sm.ranger(sid, ids))
   }
   const ajouter = async (): Promise<void> =>
-    setListe(
+    ecrit(
       await window.jdr.sm.ecrire({ sessionId: sid, nom: 'Nouvel événement', note: null, perte: 3, jet: true, tous: false })
     )
   const autres = sessions.filter((x) => x.id !== sid)
@@ -99,7 +105,10 @@ export function Evenements(): JSX.Element {
                   aria-label="Dupliquer vers une séance"
                   onChange={(x) => {
                     const vers = Number(x.target.value)
-                    if (vers) void window.jdr.sm.dupliquer(e.id, vers)
+                    if (vers)
+                      void window.jdr.sm
+                        .dupliquer(e.id, vers)
+                        .then(() => window.dispatchEvent(new Event('jdr:sm-evenements')))
                   }}
                 >
                   <option value="">Dupliquer vers une séance…</option>
@@ -128,7 +137,7 @@ export function Evenements(): JSX.Element {
               className="btn btn-sm btn-ghost"
               aria-label="Effacer"
               title="Effacer (Ctrl+Z le rend)"
-              onClick={async () => setListe(await window.jdr.sm.effacer(e.id))}
+              onClick={async () => ecrit(await window.jdr.sm.effacer(e.id))}
             >
               ✕
             </button>

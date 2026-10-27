@@ -509,7 +509,9 @@ export const reglages: Reglage[] = [
           onChange={(e) => {
             /* Jamais posé : on écrit tout le barème de l'annexe avec l'activation. */
             if (e.target.checked && jamais)
-              void poserSm({ ...SM_DEFAUT, actif: true }).then(() => window.jdr.sm.semer())
+              void poserSm({ ...SM_DEFAUT, actif: true })
+                .then(() => window.jdr.sm.semer())
+                .then(() => window.dispatchEvent(new Event('jdr:sm-evenements')))
             else void poserSm({ actif: e.target.checked })
           }}
         />

@@ -5,6 +5,7 @@ import { ChoixPnj, RetirerDeLaReserve, usePnjEnReserve } from '../components/Res
 import { MenuPion, type CiblePion } from '../components/MenuPion'
 import { TailleEchelle } from '../components/TailleEchelle'
 import { DetailPion } from '../components/DetailPion'
+import { VueSm } from '../santeMentale/VueSm'
 import { BoutonAffichage, useTraitsMj } from '../components/Affichage'
 import { MenuImage, type CibleImage } from '../components/MenuImage'
 import { ARTICLES_SITUES, FicheCompacte } from '../components/FicheDuLieu'
@@ -160,6 +161,12 @@ export function Pupitre(): JSX.Element {
     'choisi',
     null
   )
+  /* La vue SM prend la place du détail du pion : l'une ou l'autre, jamais les
+     deux. Ouvrir la vue SM désélectionne le pion ; choisir un pion la ferme. */
+  const [vueSm, setVueSm] = useRetenu<boolean>('vueSm', false)
+  useEffect(() => {
+    if (choisi) setVueSm(false)
+  }, [choisi])
   /* Le lieu survolé dans le fil, et où poser sa bulle : à gauche de la ligne. */
   const [bulleLieu, setBulleLieu] = useState<{ id: number; x: number; y: number } | null>(null)
   /* Le choix qu'ouvre un clic sur une image : visuel libre, ou fenêtre sur le direct. */
@@ -1829,6 +1836,20 @@ export function Pupitre(): JSX.Element {
               </button>
             </div>
 
+            {s.reglages.sm.actif ? (
+              <button
+                type="button"
+                className={`btn btn-sm${vueSm ? ' btn-on' : ''}`}
+                title="Le barème de la santé mentale et l’état des joueurs, à la place du détail du pion"
+                onClick={() => {
+                  setChoisi(null)
+                  setVueSm((v) => !v)
+                }}
+              >
+                ◐ Gérer les SM
+              </button>
+            ) : null}
+
             {/* Les gestes s'apprennent au survol ; seul l'empêchement se dit. */}
             {editPlaceId == null ? <span className="note">Prépare un lieu pour poser des pions.</span> : null}
 
@@ -1902,6 +1923,10 @@ export function Pupitre(): JSX.Element {
                 }}
                 pose={editPlaceId != null ? { arme: objetAPoser, armer: setObjetAPoser } : undefined}
               />
+            </div>
+          ) : vueSm && s.reglages.sm.actif ? (
+            <div className="pu-detail">
+              <VueSm onFerme={() => setVueSm(false)} />
             </div>
           ) : null}
 

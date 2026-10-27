@@ -24221,3 +24221,300 @@ button.fdc-vig:hover {
   gap: 4px;
   align-items: center;
 }
+
+/* ---- la vue SM du Paravent, à la place du détail du pion ----
+   Le barème à gauche, les joueurs à droite ; elle défile dans `.pu-detail`. */
+.sm-vue {
+  border: 1px solid var(--brass-line);
+  border-radius: 5px;
+  background: var(--raised);
+  padding: 8px 10px 10px;
+  display: grid;
+  gap: 8px;
+}
+.sm-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+.sm-manque {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 12px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.sm-manque p {
+  margin: 0;
+}
+.sm-cols {
+  display: grid;
+  grid-template-columns: minmax(190px, 240px) minmax(0, 1fr);
+  gap: 8px;
+  align-items: start;
+}
+@media (max-width: 720px) {
+  .sm-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.sm-vide {
+  margin: 2px 0;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* le barème */
+.sm-bareme {
+  display: grid;
+  gap: 0;
+  align-content: start;
+  padding: 7px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  min-width: 0;
+}
+.sm-groupe {
+  margin: 9px 0 2px;
+}
+.sm-chocs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin-top: 4px;
+}
+.sm-it {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  padding: 4px 6px;
+  border: 0;
+  border-bottom: 1px solid var(--line-soft);
+  background: none;
+  color: var(--text);
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+.sm-it:hover {
+  background: var(--raised);
+}
+.sm-it.sm-plus {
+  color: var(--text-faint);
+}
+.sm-perte {
+  flex: none;
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 11px;
+  color: var(--text-dim);
+}
+.sm-recups {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
+}
+.btn.sm-recup {
+  white-space: normal;
+  text-align: left;
+}
+.btn.sm-epuise {
+  text-decoration: line-through;
+}
+.sm-pied-recup {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 6px;
+  padding-top: 4px;
+  border-top: 1px solid var(--line-soft);
+}
+
+/* la colonne des joueurs */
+.sm-droite {
+  display: grid;
+  gap: 8px;
+  align-content: start;
+  min-width: 0;
+}
+.sm-rappels {
+  margin: 0;
+  padding: 0 0 0 16px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.sm-attente {
+  border: 1px dashed var(--brass);
+  border-radius: 5px;
+  padding: 7px 8px;
+  background: var(--brass-wash);
+  display: grid;
+  gap: 6px;
+}
+.sm-attente-tete {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+.sm-jetons {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px;
+}
+.sm-jeton {
+  padding: 1px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.sm-jeton.fait {
+  color: var(--text);
+  border-color: var(--moss);
+}
+.sm-a-droite {
+  margin-left: auto;
+}
+.sm-saisie {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+}
+.sm-de {
+  width: 64px;
+}
+.sm-alerte {
+  border: 1px solid var(--blood);
+  background: var(--blood-wash);
+  border-radius: 5px;
+  padding: 7px 8px;
+  font-size: 12.5px;
+}
+.sm-alerte > b {
+  color: var(--blood);
+}
+.sm-alerte-iris {
+  border-color: var(--iris);
+  background: var(--iris-wash);
+}
+.sm-alerte-iris > b {
+  color: var(--iris);
+}
+.sm-alerte-moss {
+  border-color: var(--moss);
+  background: var(--moss-wash);
+}
+.sm-alerte-moss > b {
+  color: var(--moss);
+}
+.sm-texte {
+  margin: 4px 0 0;
+  color: var(--text-dim);
+}
+.sm-hallu {
+  margin: 5px 0 0;
+  font-style: italic;
+}
+.sm-alerte-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.sm-dim {
+  color: var(--text-dim);
+}
+
+/* une ligne par joueur */
+.sm-joueurs {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 5px;
+}
+.sm-ligne {
+  display: grid;
+  grid-template-columns: minmax(90px, 150px) minmax(40px, 1fr) auto;
+  align-items: center;
+  gap: 4px 10px;
+  padding: 6px 8px;
+  border-bottom: 1px solid var(--line-soft);
+}
+.sm-ligne:last-child {
+  border-bottom: 0;
+}
+.sm-ligne.coche {
+  background: color-mix(in srgb, var(--brass-wash) 60%, transparent);
+}
+.sm-qui {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.sm-qui b {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.sm-cible {
+  width: 16px;
+  flex: none;
+  text-align: center;
+}
+.sm-pastille {
+  font-size: 11px;
+  padding: 1px 8px;
+  border-radius: 99px;
+  border: 1px solid currentColor;
+  white-space: nowrap;
+}
+.sm-pastille.c-moss {
+  color: var(--moss);
+  background: var(--moss-wash);
+}
+.sm-pastille.c-brass {
+  color: var(--brass);
+  background: var(--brass-wash);
+}
+.sm-pastille.c-iris {
+  color: var(--iris);
+  background: var(--iris-wash);
+}
+.sm-pastille.c-blood {
+  color: var(--blood);
+  background: var(--blood-wash);
+}
+.sm-effets {
+  grid-column: 1 / -1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px 12px;
+  padding-left: 46px;
+  font-size: 11.5px;
+  color: var(--text-dim);
+}
+.sm-chrono,
+.sm-folie {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.sm-folie {
+  color: var(--blood);
+}
+.sm-moyenne {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-dim);
+}
