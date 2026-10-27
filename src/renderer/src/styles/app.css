@@ -6590,6 +6590,57 @@ input[type='range']::-webkit-slider-thumb {
 .toast.err .dot {
   background: var(--blood);
 }
+/* Les annonces de partie : empilées en bas à droite, une croix chacune. */
+.annonces {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 80;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  max-width: min(420px, 60vw);
+}
+.annonce {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-left: 3px solid var(--iris);
+  border-radius: 6px;
+  padding: 6px 6px 6px 12px;
+  font-size: 12.5px;
+  box-shadow: var(--shadow-lift);
+}
+.annonce .dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--iris);
+  flex: none;
+}
+.annonce button {
+  display: grid;
+  place-items: center;
+  width: 22px;
+  height: 22px;
+  flex: none;
+  border-radius: 4px;
+  color: var(--text-faint);
+}
+.annonce button:hover {
+  color: var(--text);
+  background: var(--surface);
+}
+.annonce button svg {
+  width: 11px;
+  height: 11px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 2;
+}
 
 /* ============================================================
    Fenêtre modale
@@ -24493,16 +24544,12 @@ button.fdc-vig:hover {
 .sm-ligne:last-child {
   border-bottom: 0;
 }
-.sm-ligne.coche {
-  background: color-mix(in srgb, var(--brass-wash) 60%, transparent);
-}
 .sm-qui {
   display: flex;
   align-items: center;
   gap: 6px;
   min-width: 0;
   font-size: 12.5px;
-  cursor: pointer;
 }
 .sm-qui b {
   overflow: hidden;
@@ -24554,7 +24601,7 @@ button.fdc-vig:hover {
   flex-wrap: wrap;
   align-items: center;
   gap: 2px 12px;
-  padding-left: 46px;
+  padding-left: 22px;
   font-size: 11.5px;
   color: var(--text-dim);
   /* Les comptes à rebours bougent chaque seconde : des chiffres de même largeur. */
@@ -24646,4 +24693,12 @@ button.fdc-vig:hover {
   margin-top: 6px;
   padding-top: 6px;
   border-top: 1px solid var(--line-soft);
+}
+/* Un remède limité déjà pris : on le voit, on ne peut pas le cocher. */
+.sm-choix-opt.sm-exclu {
+  opacity: 0.5;
+  cursor: default;
+}
+.sm-choix-opt.sm-exclu:hover {
+  background: none;
 }

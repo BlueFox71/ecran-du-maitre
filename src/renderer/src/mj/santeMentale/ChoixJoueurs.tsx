@@ -5,11 +5,12 @@ import { IconClose } from '../components/Icons'
 import type { JoueurSm } from './Joueurs'
 
 /**
- * « Qui paie ? » — posé sous un prix qu'on vient de cliquer.
+ * « Qui le subit ? » — posé sous l'entrée du barème qu'on vient de cliquer.
  *
- * Un prix tombe rarement sur toute la table : celui qui s'est moqué, celui qui
- * tient la spirit box. On choisit ici, au bout du geste, plutôt que de penser
- * à cocher avant. Les joueurs déjà cochés à droite arrivent cochés.
+ * Un choc, un prix, un remède tombe rarement sur toute la table : celui qui a
+ * vu les yeux verts, celui qui tient la spirit box. On choisit ici, au bout du
+ * geste, plutôt que de penser à cocher avant. `exclus` : ceux qui ne peuvent
+ * pas (un remède « une fois par scène » déjà pris), montrés grisés.
  *
  * Posé dans le corps du document : `.pu-detail` est un conteneur de taille, et
  * un panneau `fixed` resté dedans se placerait par rapport à lui, pas à la fenêtre.
@@ -19,7 +20,7 @@ export function ChoixJoueurs({
   y,
   titre,
   joueurs,
-  coches,
+  exclus = [],
   onValide,
   onClose
 }: {
@@ -27,11 +28,12 @@ export function ChoixJoueurs({
   y: number
   titre: string
   joueurs: JoueurSm[]
-  coches: number[]
+  exclus?: number[]
   onValide: (ids: number[]) => void
   onClose: () => void
 }): JSX.Element {
-  const [choisis, setChoisis] = useState<Set<number>>(() => new Set(coches))
+  const [choisis, setChoisis] = useState<Set<number>>(() => new Set())
+  const possibles = joueurs.filter((j) => !exclus.includes(j.id))
   const basculer = (id: number): void =>
     setChoisis((c) => {
       const n = new Set(c)
@@ -39,7 +41,7 @@ export function ChoixJoueurs({
       else n.add(id)
       return n
     })
-  const tous = joueurs.length > 0 && joueurs.every((j) => choisis.has(j.id))
+  const tous = possibles.length > 0 && possibles.every((j) => choisis.has(j.id))
 
   return createPortal(
     <div className="sm-choix-portail">
@@ -48,18 +50,22 @@ export function ChoixJoueurs({
           <IconClose />
         </button>
         <span className="eyebrow">{titre}</span>
-        {joueurs.map((j) => (
-          <label key={j.id} className="sm-choix-opt">
-            <input type="checkbox" checked={choisis.has(j.id)} onChange={() => basculer(j.id)} />
-            <span>{j.nom}</span>
-            <span className="sm-choix-sm num">{j.sm}</span>
-          </label>
-        ))}
+        {joueurs.map((j) => {
+          const exclu = exclus.includes(j.id)
+          return (
+            <label key={j.id} className={`sm-choix-opt${exclu ? ' sm-exclu' : ''}`}>
+              <input type="checkbox" checked={choisis.has(j.id)} disabled={exclu} onChange={() => basculer(j.id)} />
+              <span>{j.nom}</span>
+              <span className="sm-choix-sm num">{exclu ? 'déjà pris' : j.sm}</span>
+            </label>
+          )
+        })}
         <div className="sm-choix-pied">
           <button
             type="button"
             className="btn btn-sm btn-ghost"
-            onClick={() => setChoisis(tous ? new Set() : new Set(joueurs.map((j) => j.id)))}
+            disabled={possibles.length === 0}
+            onClick={() => setChoisis(tous ? new Set() : new Set(possibles.map((j) => j.id)))}
           >
             {tous ? 'Personne' : 'Tout le groupe'}
           </button>

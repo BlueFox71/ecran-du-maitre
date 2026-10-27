@@ -60,7 +60,12 @@ interface Toast {
   id: number
   msg: string
   error?: boolean
+  /** Un événement de partie : il s'empile à part, reste plus longtemps et se ferme à la croix. */
+  annonce?: boolean
 }
+
+/** Le temps qu'une annonce de partie reste à l'écran : le MJ a souvent les yeux ailleurs. */
+const DUREE_ANNONCE = 30_000
 
 interface State {
   ready: boolean
@@ -388,8 +393,8 @@ export const useStore = create<State>((set, get) => ({
      tombe pendant qu'il regarde une carte. */
   annoncer: (msg) => {
     const id = toastSeq++
-    set((s) => ({ toasts: [...s.toasts, { id, msg, error: false }] }))
-    setTimeout(() => get().dismissToast(id), 4000)
+    set((s) => ({ toasts: [...s.toasts, { id, msg, annonce: true }] }))
+    setTimeout(() => get().dismissToast(id), DUREE_ANNONCE)
   },
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),
 

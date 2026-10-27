@@ -27,24 +27,30 @@ function texteGain(g: Recup['gain']): string {
 
 const LIMITE = { scene: 'une fois par scène', nuit: 'une fois dans la nuit' } as const
 
-/** Une entrée qui vaut pour tous les joueurs présents : les coches n'y changent rien. */
+/** Une entrée qui vaut pour tous les joueurs présents : elle s'applique sans demander à qui. */
 const Tous = (): JSX.Element => (
-  <span className="sm-tous" title="Pour tous les joueurs présents, cochés ou non">
+  <span className="sm-tous" title="Pour tous les joueurs présents, sans demander">
     tous
   </span>
 )
 
+/** Sous le bouton cliqué : là où poser le choix des joueurs. */
+export type Ou = { x: number; y: number }
+const sous = (ev: React.MouseEvent<HTMLElement>): Ou => {
+  const b = ev.currentTarget.getBoundingClientRect()
+  return { x: b.left, y: b.bottom + 4 }
+}
+
 interface Props {
   r: ReglageSm
   evenements: EvenementSm[]
-  /** Ceux que vise un clic : les cochés, sinon tous les joueurs présents. */
-  vises: number[]
+  /** Les joueurs présents : un remède limité que tous ont déjà pris se grise. */
+  presents: number[]
   recupsFaites: Record<string, number[]>
-  onChoc: (c: Choc) => void
-  onEvenement: (e: EvenementSm) => void
-  /** `ou` : sous le bouton cliqué, là où poser le choix des joueurs. */
-  onPrix: (p: Prix, ou: { x: number; y: number }) => void
-  onRecup: (rec: Recup) => void
+  onChoc: (c: Choc, ou: Ou) => void
+  onEvenement: (e: EvenementSm, ou: Ou) => void
+  onPrix: (p: Prix, ou: Ou) => void
+  onRecup: (rec: Recup, ou: Ou) => void
   onScene: () => void
   onNuit: () => void
 }
@@ -97,7 +103,7 @@ export function Bareme(p: Props): JSX.Element {
           <span className="eyebrow">Choc (jet de Volonté)</span>
           <div className="sm-chocs">
             {p.r.chocs.map((c) => (
-              <button key={c.id} type="button" className="btn btn-sm btn-c" onClick={() => p.onChoc(c)}>
+              <button key={c.id} type="button" className="btn btn-sm btn-c" onClick={(ev) => p.onChoc(c, sous(ev))}>
                 {c.nom} {moins(c.perte)}
               </button>
             ))}
@@ -115,7 +121,7 @@ export function Bareme(p: Props): JSX.Element {
           title={[e.note, e.jet ? 'Avec jet de Volonté' : 'Sans jet : la perte est retirée tout de suite']
             .filter(Boolean)
             .join(' — ')}
-          onClick={() => p.onEvenement(e)}
+          onClick={(ev) => p.onEvenement(e, sous(ev))}
         >
           <span>{e.nom}</span>
           <span className="sm-perte">
@@ -138,10 +144,7 @@ export function Bareme(p: Props): JSX.Element {
           type="button"
           className="sm-it"
           title={x.intervalleMin ? 'Lance un chrono sur le joueur, jusqu’à ce que tu l’arrêtes' : undefined}
-          onClick={(ev) => {
-            const b = ev.currentTarget.getBoundingClientRect()
-            p.onPrix(x, { x: b.left, y: b.bottom + 4 })
-          }}
+          onClick={(ev) => p.onPrix(x, sous(ev))}
         >
           <span>{x.nom}</span>
           <span className="sm-perte">
@@ -155,8 +158,8 @@ export function Bareme(p: Props): JSX.Element {
       <div className="sm-recups">
         {recups.map((rec) => {
           const faits = p.recupsFaites[rec.id] ?? []
-          /* Une fois par scène ou par nuit, et déjà pris par tous ceux que viserait le clic. */
-          const epuise = !!rec.limite && p.vises.length > 0 && p.vises.every((id) => faits.includes(id))
+          /* Une fois par scène ou par nuit, et déjà pris par tous les présents. */
+          const epuise = !!rec.limite && p.presents.length > 0 && p.presents.every((id) => faits.includes(id))
           const gain = texteGain(rec.gain)
           return (
             <button
@@ -169,7 +172,7 @@ export function Bareme(p: Props): JSX.Element {
                   ? `${LIMITE[rec.limite]}${epuise ? ' — déjà pris ; « Nouvelle scène » ou « Nouvelle nuit » le rend' : ''}`
                   : undefined
               }
-              onClick={() => p.onRecup(rec)}
+              onClick={(ev) => p.onRecup(rec, sous(ev))}
             >
               {rec.nom}
               {gain ? ` ${gain}` : ''}

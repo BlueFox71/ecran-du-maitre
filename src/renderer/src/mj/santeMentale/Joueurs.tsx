@@ -315,15 +315,13 @@ function ValeurSm({ j }: { j: JoueurSm }): JSX.Element {
 interface PropsLignes {
   r: ReglageSm
   joueurs: JoueurSm[]
-  coches: Set<number>
-  onCoche: (id: number) => void
   /** Le joueur à la SM la plus basse : 🎯. */
   cible: number | null
   nomCarac: NomCarac
   maintenant: number
 }
 
-export function Lignes({ r, joueurs, coches, onCoche, cible, nomCarac, maintenant }: PropsLignes): JSX.Element {
+export function Lignes({ r, joueurs, cible, nomCarac, maintenant }: PropsLignes): JSX.Element {
   const chronos = useSm((s) => s.chronos)
   const halluA = useSm((s) => s.halluA)
   const folies = useSm((s) => s.folies)
@@ -347,14 +345,13 @@ export function Lignes({ r, joueurs, coches, onCoche, cible, nomCarac, maintenan
         const siens = chronos[j.id] ?? []
         const folie = folies[j.id]
         return (
-          <div key={j.id} className={`sm-ligne${coches.has(j.id) ? ' coche' : ''}`}>
-            <label className="sm-qui">
-              <input type="checkbox" checked={coches.has(j.id)} onChange={() => onCoche(j.id)} />
+          <div key={j.id} className="sm-ligne">
+            <span className="sm-qui">
               <span className="sm-cible" title={cible === j.id ? 'Cible des entités : la SM la plus basse' : undefined}>
                 {cible === j.id ? '🎯' : ''}
               </span>
               <b>{j.nom}</b>
-            </label>
+            </span>
             <div className={`dp-barre c-${j.palier.couleur}`}>
               <i style={{ width: `${pct}%` }} />
             </div>

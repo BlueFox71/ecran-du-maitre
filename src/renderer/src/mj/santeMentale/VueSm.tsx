@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { activiteDe, cibleDesEntites, palierDe, type EvenementSm, type Prix } from '@shared/santeMentale'
+import { activiteDe, cibleDesEntites, palierDe, type EvenementSm } from '@shared/santeMentale'
 import { jaugeSanite } from '@shared/types'
 import { useStore } from '../store'
 import { ouvrirParametres } from '../components/parametres/registre'
 import { IconClose } from '../components/Icons'
 import { useSm } from './etat'
-import { Bareme } from './Bareme'
+import { Bareme, type Ou } from './Bareme'
 import { ChoixJoueurs } from './ChoixJoueurs'
 import { Bandeaux, Lignes, type JoueurSm } from './Joueurs'
 
@@ -52,10 +52,14 @@ export function VueSm({ onFerme }: { onFerme: () => void }): JSX.Element {
   const sm = useSm()
   const evenements = useEvenements(sessionId)
   const maintenant = useMaintenant()
-  /* Les cases cochées vivent ici, et se vident après chaque déclaration. */
-  const [coches, setCoches] = useState<Set<number>>(new Set())
-  /* Le prix cliqué, en attendant qu'on dise qui le paie. */
-  const [choix, setChoix] = useState<{ prix: Prix; x: number; y: number } | null>(null)
+  /* L'entrée cliquée, en attendant qu'on dise à qui elle s'applique. */
+  const [choix, setChoix] = useState<{
+    titre: string
+    x: number
+    y: number
+    exclus?: number[]
+    appliquer: (ids: number[]) => unknown
+  } | null>(null)
 
   const jauge = spec ? jaugeSanite(spec, spec.gauges) : undefined
 
@@ -93,24 +97,21 @@ export function VueSm({ onFerme }: { onFerme: () => void }): JSX.Element {
       </div>
     )
 
-  const presents = new Set(joueurs.map((j) => j.id))
-  const cochesValides = [...coches].filter((id) => presents.has(id))
-  const vises = cochesValides.length ? cochesValides : joueurs.map((j) => j.id)
+  const presents = joueurs.map((j) => j.id)
   /**
-   * Déclare sur les cochés (vide : tous), puis décoche. Une entrée « tous »
-   * ignore les coches (le module prend tous les présents) : elles restent pour la suivante.
+   * Une entrée « tous » s'applique tout de suite (une cible vide : tous les
+   * présents). Les autres demandent à qui, sous le bouton cliqué.
    */
-  const declarer = (f: (cible: number[]) => unknown, tous = false): void => {
-    void f(cochesValides)
-    if (!tous) setCoches(new Set())
+  const demander = (
+    tous: boolean,
+    titre: string,
+    ou: Ou,
+    appliquer: (ids: number[]) => unknown,
+    exclus?: number[]
+  ): void => {
+    if (tous) void appliquer([])
+    else setChoix({ titre, ...ou, exclus, appliquer })
   }
-  const basculer = (id: number): void =>
-    setCoches((c) => {
-      const n = new Set(c)
-      if (n.has(id)) n.delete(id)
-      else n.add(id)
-      return n
-    })
 
   const nomCarac = (cle: string): string => {
     const st = spec?.stats.find((x) => x.key === cle)
@@ -128,16 +129,23 @@ export function VueSm({ onFerme }: { onFerme: () => void }): JSX.Element {
         <Bareme
           r={r}
           evenements={evenements}
-          vises={vises}
+          presents={presents}
           recupsFaites={sm.recupsFaites}
-          onChoc={(c) => declarer((qui) => sm.declarerChoc(c.nom, c.perte, qui))}
-          onEvenement={(e) => declarer((qui) => sm.declarerPrix(e, qui), e.tous)}
-          /* Un prix « tous » tombe sur toute la table : rien à choisir. Les
-             autres demandent qui le paie. */
-          onPrix={(p, ou) =>
-            p.tous ? declarer((qui) => sm.declarerPrix(p, qui), true) : setChoix({ prix: p, ...ou })
+          onChoc={(c, ou) =>
+            demander(false, `${c.nom} — qui le subit ?`, ou, (ids) => sm.declarerChoc(c.nom, c.perte, ids))
           }
-          onRecup={(rec) => declarer((qui) => sm.recuperer(rec, qui))}
+          onEvenement={(e, ou) => demander(e.tous, `${e.nom} — qui le subit ?`, ou, (ids) => sm.declarerPrix(e, ids))}
+          onPrix={(p, ou) => demander(p.tous, `${p.nom} — qui le paie ?`, ou, (ids) => sm.declarerPrix(p, ids))}
+          onRecup={(rec, ou) =>
+            demander(
+              false,
+              `${rec.nom} — pour qui ?`,
+              ou,
+              (ids) => sm.recuperer(rec, ids),
+              /* Un remède limité ne se reprend pas avant « Nouvelle scène » ou « Nouvelle nuit ». */
+              rec.limite ? (sm.recupsFaites[rec.id] ?? []) : undefined
+            )
+          }
           onScene={sm.nouvelleScene}
           onNuit={sm.nouvelleNuit}
         />
@@ -147,8 +155,6 @@ export function VueSm({ onFerme }: { onFerme: () => void }): JSX.Element {
             <Lignes
               r={r}
               joueurs={joueurs}
-              coches={coches}
-              onCoche={basculer}
               cible={cible}
               nomCarac={nomCarac}
               maintenant={maintenant}
@@ -168,15 +174,13 @@ export function VueSm({ onFerme }: { onFerme: () => void }): JSX.Element {
         <ChoixJoueurs
           x={choix.x}
           y={choix.y}
-          titre={`${choix.prix.nom} — qui le paie ?`}
+          titre={choix.titre}
           joueurs={joueurs}
-          coches={cochesValides}
+          exclus={choix.exclus}
           onClose={() => setChoix(null)}
           onValide={(ids) => {
-            const p = choix.prix
             setChoix(null)
-            setCoches(new Set())
-            void sm.declarerPrix(p, ids)
+            void choix.appliquer(ids)
           }}
         />
       ) : null}
