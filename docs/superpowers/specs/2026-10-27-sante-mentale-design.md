@@ -233,8 +233,9 @@ active.
   `ord`, nom, note, perte, avec jet), en suivant la migration du projet
   (`main/db/schema.ts`).
 - L'état de jeu (jets attendus, chronos, comptes à rebours d'hallucination,
-  folies en cours, dernière pilule) vit dans le processus principal le temps de
-  la séance, **sans être écrit en base** : fermer l'app le perd, et c'est
+  folies en cours, dernière pilule) vit en mémoire dans la fenêtre du MJ (un
+  store qui survit aux changements de module) le temps de la séance, **sans
+  être écrit en base** : fermer l'app le perd, et c'est
   accepté. Les points retirés et les malus posés, eux, sont écrits sur la fiche
   au moment même.
 
