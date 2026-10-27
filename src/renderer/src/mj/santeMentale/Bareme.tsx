@@ -26,6 +26,13 @@ function texteGain(g: Recup['gain']): string {
 
 const LIMITE = { scene: 'une fois par scène', nuit: 'une fois dans la nuit' } as const
 
+/** Une entrée qui vaut pour tous les joueurs présents : les coches n'y changent rien. */
+const Tous = (): JSX.Element => (
+  <span className="sm-tous" title="Pour tous les joueurs présents, cochés ou non">
+    tous
+  </span>
+)
+
 interface Props {
   r: ReglageSm
   evenements: EvenementSm[]
@@ -70,6 +77,7 @@ export function Bareme(p: Props): JSX.Element {
         >
           <span>{e.nom}</span>
           <span className="sm-perte">
+            {e.tous ? <Tous /> : null}
             {moins(e.perte)}
             {e.jet ? ' 🎲' : ''}
           </span>
@@ -91,7 +99,10 @@ export function Bareme(p: Props): JSX.Element {
           onClick={() => p.onPrix(x)}
         >
           <span>{x.nom}</span>
-          <span className="sm-perte">{pertePrix(x)}</span>
+          <span className="sm-perte">
+            {x.tous ? <Tous /> : null}
+            {pertePrix(x)}
+          </span>
         </button>
       ))}
 

@@ -10,10 +10,24 @@ import { Evenements } from './smEvenements'
    Santé mentale
    ============================================================ */
 
-/** Écrit un morceau du réglage : toujours sur la valeur la plus fraîche, pour que deux retouches de suite ne s'écrasent pas. */
-export async function poserSm(patch: Partial<ReglageSm>): Promise<void> {
-  const s = useStore.getState()
-  await s.poserReglage('sm', JSON.stringify({ ...s.reglages.sm, ...patch }))
+/** La dernière écriture du réglage : la suivante part d'elle, pas d'avant. */
+let enCours: Promise<void> = Promise.resolve()
+
+/**
+ * Écrit un morceau du réglage : toujours sur la valeur la plus fraîche, pour
+ * que deux retouches de suite ne s'écrasent pas. Les écritures passent une à
+ * une ; un patch en fonction se calcule sur le réglage tel que la précédente
+ * l'a laissé (un blur puis un clic sur « + » : le clic garde la saisie).
+ */
+export function poserSm(patch: Partial<ReglageSm> | ((sm: ReglageSm) => Partial<ReglageSm>)): Promise<void> {
+  const ecrire = async (): Promise<void> => {
+    const s = useStore.getState()
+    const p = typeof patch === 'function' ? patch(s.reglages.sm) : patch
+    await s.poserReglage('sm', JSON.stringify({ ...s.reglages.sm, ...p }))
+  }
+  const fait = enCours.then(ecrire, ecrire)
+  enCours = fait.catch(() => undefined)
+  return fait
 }
 
 const actif = (s: ReturnType<typeof useStore.getState>): boolean => s.reglages.sm.actif
@@ -99,8 +113,12 @@ export function Champ({ label, children }: { label: string; children: React.Reac
 
 interface ChampListe<T> {
   label: string
-  rendu: (it: T, maj: (p: Partial<T>) => void) => JSX.Element
+  /** `maj` reçoit un patch, ou une fonction de l'élément tel qu'il est au moment d'écrire. */
+  rendu: (it: T, maj: (p: Partial<T> | ((x: T) => Partial<T>)) => void) => JSX.Element
 }
+
+/** Une retouche de liste, appliquée à la liste la plus fraîche. */
+type Retouche<T> = (items: T[]) => T[]
 
 const txt = <T,>(k: keyof T & string, label: string, large?: boolean): ChampListe<T> => ({
   label,
@@ -154,19 +172,22 @@ function ListeEditeur<T>({
   ajout
 }: {
   items: T[]
-  onChange: (items: T[]) => void
+  /** Chaque geste est une retouche : rejouée sur la liste à jour, il n'efface pas une saisie en vol. */
+  onChange: (f: Retouche<T>) => void
   champs: ChampListe<T>[]
   nouveau: () => T
   ajout: string
 }): JSX.Element {
-  const remplacer = (i: number, p: Partial<T>): void => onChange(items.map((x, j) => (j === i ? { ...x, ...p } : x)))
-  const deplacer = (i: number, d: number): void => {
-    const j = i + d
-    if (j < 0 || j >= items.length) return
-    const c = [...items]
-    ;[c[i], c[j]] = [c[j], c[i]]
-    onChange(c)
-  }
+  const remplacer = (i: number, p: Partial<T> | ((x: T) => Partial<T>)): void =>
+    onChange((l) => l.map((x, j) => (j === i ? { ...x, ...(typeof p === 'function' ? p(x) : p) } : x)))
+  const deplacer = (i: number, d: number): void =>
+    onChange((l) => {
+      const j = i + d
+      if (j < 0 || j >= l.length) return l
+      const c = [...l]
+      ;[c[i], c[j]] = [c[j], c[i]]
+      return c
+    })
   return (
     <div className="sm-liste">
       {items.map((it, i) => (
@@ -194,7 +215,7 @@ function ListeEditeur<T>({
               className="btn btn-sm btn-ghost"
               aria-label="Retirer"
               title="Retirer"
-              onClick={() => onChange(items.filter((_, j) => j !== i))}
+              onClick={() => onChange((l) => l.filter((_, j) => j !== i))}
             >
               ✕
             </button>
@@ -202,7 +223,7 @@ function ListeEditeur<T>({
         </div>
       ))}
       <div>
-        <button className="btn btn-sm" onClick={() => onChange([...items, nouveau()])}>
+        <button className="btn btn-sm" onClick={() => onChange((l) => [...l, nouveau()])}>
           + {ajout}
         </button>
       </div>
@@ -210,20 +231,20 @@ function ListeEditeur<T>({
   )
 }
 
-/** Une liste de phrases : la même éditeur, sur des objets `{ t }`. */
+/** Une liste de phrases : le même éditeur, sur des objets `{ t }`. */
 function Phrases({
   items,
   onChange,
   ajout
 }: {
   items: string[]
-  onChange: (items: string[]) => void
+  onChange: (f: Retouche<string>) => void
   ajout: string
 }): JSX.Element {
   return (
     <ListeEditeur<{ t: string }>
       items={items.map((t) => ({ t }))}
-      onChange={(l) => onChange(l.map((x) => x.t))}
+      onChange={(f) => onChange((l) => f(l.map((t) => ({ t }))).map((x) => x.t))}
       champs={[txt('t', 'Texte', true)]}
       nouveau={() => ({ t: '' })}
       ajout={ajout}
@@ -233,11 +254,11 @@ function Phrases({
 
 /* ---------------- le malus d'un palier ---------------- */
 
-function Malus({ it, maj }: { it: Palier; maj: (p: Partial<Palier>) => void }): JSX.Element {
+function Malus({ it, maj }: { it: Palier; maj: (p: Partial<Palier> | ((x: Palier) => Partial<Palier>)) => void }): JSX.Element {
   const { spec } = useFiche()
   const caracs = spec?.stats ?? []
   const poser = (i: number, p: Partial<Palier['malus'][number]>): void =>
-    maj({ malus: it.malus.map((m, j) => (j === i ? { ...m, ...p } : m)) })
+    maj((x) => ({ malus: x.malus.map((m, j) => (j === i ? { ...m, ...p } : m)) }))
   return (
     <span className="sm-malus">
       {it.malus.map((m, i) => (
@@ -261,13 +282,13 @@ function Malus({ it, maj }: { it: Palier; maj: (p: Partial<Palier>) => void }): 
           <button
             className="btn btn-sm btn-ghost"
             aria-label="Retirer le malus"
-            onClick={() => maj({ malus: it.malus.filter((_, j) => j !== i) })}
+            onClick={() => maj((x) => ({ malus: x.malus.filter((_, j) => j !== i) }))}
           >
             ✕
           </button>
         </span>
       ))}
-      <button className="btn btn-sm btn-ghost" onClick={() => maj({ malus: [...it.malus, { valeur: -1, caracKey: null }] })}>
+      <button className="btn btn-sm btn-ghost" onClick={() => maj((x) => ({ malus: [...x.malus, { valeur: -1, caracKey: null }] }))}>
         + malus
       </button>
     </span>
@@ -335,13 +356,21 @@ function Folie(): JSX.Element {
     <div className="sm-liste">
       <div className="sm-champs">
         <Champ label="Perte d’un coup à partir de">
-          <Num v={f.seuil} label="Seuil de folie" onCommit={(v) => void poserSm({ folie: { ...f, seuil: v ?? 0 } })} />
+          <Num v={f.seuil} label="Seuil de folie" onCommit={(v) => void poserSm((sm) => ({ folie: { ...sm.folie, seuil: v ?? 0 } }))} />
         </Champ>
         <Champ label="Durée (min)">
-          <Num v={f.minutes} label="Durée de la folie" onCommit={(v) => void poserSm({ folie: { ...f, minutes: v ?? 0 } })} />
+          <Num
+            v={f.minutes}
+            label="Durée de la folie"
+            onCommit={(v) => void poserSm((sm) => ({ folie: { ...sm.folie, minutes: v ?? 0 } }))}
+          />
         </Champ>
       </div>
-      <Phrases items={f.table} ajout="Une crise" onChange={(table) => void poserSm({ folie: { ...f, table } })} />
+      <Phrases
+        items={f.table}
+        ajout="Une crise"
+        onChange={(g) => void poserSm((sm) => ({ folie: { ...sm.folie, table: g(sm.folie.table) } }))}
+      />
     </div>
   )
 }
@@ -371,13 +400,13 @@ function Pilules(): JSX.Element {
         </select>
       </Champ>
       <Champ label="Nausée si deux pilules en (min)">
-        <Num v={n.fenetreMin} label="Fenêtre de nausée" onCommit={(v) => void poserSm({ nausee: { ...n, fenetreMin: v ?? 0 } })} />
+        <Num v={n.fenetreMin} label="Fenêtre de nausée" onCommit={(v) => void poserSm((sm) => ({ nausee: { ...sm.nausee, fenetreMin: v ?? 0 } }))} />
       </Champ>
       <Champ label="Malus">
-        <Num v={n.malus} label="Malus de nausée" onCommit={(v) => void poserSm({ nausee: { ...n, malus: v ?? 0 } })} />
+        <Num v={n.malus} label="Malus de nausée" onCommit={(v) => void poserSm((sm) => ({ nausee: { ...sm.nausee, malus: v ?? 0 } }))} />
       </Champ>
       <Champ label="Durée (min)">
-        <Num v={n.dureeMin} label="Durée de la nausée" onCommit={(v) => void poserSm({ nausee: { ...n, dureeMin: v ?? 0 } })} />
+        <Num v={n.dureeMin} label="Durée de la nausée" onCommit={(v) => void poserSm((sm) => ({ nausee: { ...sm.nausee, dureeMin: v ?? 0 } }))} />
       </Champ>
     </div>
   )
@@ -421,7 +450,7 @@ function liste<T>(cle: keyof ReglageSm, champs: ChampListe<T>[], nouveau: () => 
         champs={champs}
         nouveau={nouveau}
         ajout={ajout}
-        onChange={(l) => void poserSm({ [cle]: l } as Partial<ReglageSm>)}
+        onChange={(f) => void poserSm((sm) => ({ [cle]: f(sm[cle] as unknown as T[]) }) as Partial<ReglageSm>)}
       />
     )
   }
@@ -484,11 +513,17 @@ const Activites = liste<Activite>(
 
 function Hallucinations(): JSX.Element {
   const l = useStore((s) => s.reglages.sm.hallucinations)
-  return <Phrases items={l} ajout="Une hallucination" onChange={(hallucinations) => void poserSm({ hallucinations })} />
+  return (
+    <Phrases
+      items={l}
+      ajout="Une hallucination"
+      onChange={(f) => void poserSm((sm) => ({ hallucinations: f(sm.hallucinations) }))}
+    />
+  )
 }
 function Rappels(): JSX.Element {
   const l = useStore((s) => s.reglages.sm.rappels)
-  return <Phrases items={l} ajout="Un rappel" onChange={(rappels) => void poserSm({ rappels })} />
+  return <Phrases items={l} ajout="Un rappel" onChange={(f) => void poserSm((sm) => ({ rappels: f(sm.rappels) }))} />
 }
 
 export const reglages: Reglage[] = [
@@ -581,7 +616,7 @@ export const reglages: Reglage[] = [
     id: 'sm.prix',
     rubrique: 'sante',
     visible: actif,
-    nom: 'Les pertes',
+    nom: 'Prix (sans jet)',
     aide: 'Ce qui coûte de la santé mentale : une fois, ou à chaque intervalle tant que ça dure.',
     mots: ['perte', 'prix', 'coût', 'noir', 'seul', 'ouija', 'spirit box', 'intervalle'],
     pleine: true,

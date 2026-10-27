@@ -93,10 +93,13 @@ export function VueSm({ onFerme }: { onFerme: () => void }): JSX.Element {
   const presents = new Set(joueurs.map((j) => j.id))
   const cochesValides = [...coches].filter((id) => presents.has(id))
   const vises = cochesValides.length ? cochesValides : joueurs.map((j) => j.id)
-  /** Déclare sur les cochés (vide : tous), puis décoche. */
-  const declarer = (f: (cible: number[]) => unknown): void => {
+  /**
+   * Déclare sur les cochés (vide : tous), puis décoche. Une entrée « tous »
+   * ignore les coches (le module prend tous les présents) : elles restent pour la suivante.
+   */
+  const declarer = (f: (cible: number[]) => unknown, tous = false): void => {
     void f(cochesValides)
-    setCoches(new Set())
+    if (!tous) setCoches(new Set())
   }
   const basculer = (id: number): void =>
     setCoches((c) => {
@@ -125,8 +128,8 @@ export function VueSm({ onFerme }: { onFerme: () => void }): JSX.Element {
           vises={vises}
           recupsFaites={sm.recupsFaites}
           onChoc={(c) => declarer((qui) => sm.declarerChoc(c.nom, c.perte, qui))}
-          onEvenement={(e) => declarer((qui) => sm.declarerPrix(e, qui))}
-          onPrix={(p) => declarer((qui) => sm.declarerPrix(p, qui))}
+          onEvenement={(e) => declarer((qui) => sm.declarerPrix(e, qui), e.tous)}
+          onPrix={(p) => declarer((qui) => sm.declarerPrix(p, qui), p.tous)}
           onRecup={(rec) => declarer((qui) => sm.recuperer(rec, qui))}
           onScene={sm.nouvelleScene}
           onNuit={sm.nouvelleNuit}

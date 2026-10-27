@@ -24311,6 +24311,15 @@ button.fdc-vig:hover {
   font-size: 11px;
   color: var(--text-dim);
 }
+.sm-tous {
+  margin-right: 6px;
+  padding: 0 4px;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
 .sm-recups {
   display: flex;
   flex-wrap: wrap;
