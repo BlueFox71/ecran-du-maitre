@@ -1120,6 +1120,16 @@ export interface Roll {
   level: RollLevel
 }
 
+/** Un jet de personnage noté : ce que la santé mentale lit pour réagir. */
+export interface JetSm {
+  characterId: number
+  caracKey: string
+  /** Le dé brut, avant modificateur. */
+  die: number
+  /** Dé plus modificateur, bonus et malus. */
+  total: number
+}
+
 export interface RollRequest {
   characterId: number | null
   label: string

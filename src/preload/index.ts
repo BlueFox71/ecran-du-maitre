@@ -3,6 +3,7 @@ import type { Brut } from '@shared/reglages'
 import type { Modif } from '@shared/modifs'
 import type { EvenementSm } from '@shared/santeMentale'
 import type {
+  JetSm,
   Annotation,
   MotifVibration,
   Son,
@@ -238,7 +239,13 @@ const api = {
     /** Ajouté en fin de liste de l'autre séance. */
     dupliquer: (id: number, versSessionId: number) => call<void>('sm:dupliquer', id, versSessionId),
     /** Les événements du barème sous la séance active, si la campagne n'en a aucun. */
-    semer: () => call<void>('sm:semer')
+    semer: () => call<void>('sm:semer'),
+    /** Un jet de personnage vient d'être noté (téléphone ou saisie du MJ). */
+    onJet: (cb: (j: JetSm) => void) => {
+      const h = (_: unknown, j: JetSm): void => cb(j)
+      ipcRenderer.on('sm:jet', h)
+      return () => void ipcRenderer.removeListener('sm:jet', h)
+    }
   },
 
   /**

@@ -10,7 +10,8 @@ import * as objets from './db/repos/objets'
 import * as rolls from './db/repos/rolls'
 import { modificateur, signe } from '@shared/jet'
 import { apresUnJet, bonusDuJet, sommeBonus, type LigneBonus } from '@shared/modifs'
-import type { Character, Roll, StatSpec } from '@shared/types'
+import type { Character, JetSm, Roll, StatSpec } from '@shared/types'
+import * as display from './display'
 
 /** Les caracs de sa fiche : son gabarit, sinon celui de la campagne. */
 function caracsDe(perso: Character): StatSpec[] {
@@ -66,6 +67,8 @@ export function noterJet(
     die: de,
     detail
   })
+  /* Un seul point d'émission : téléphone et saisie du MJ passent tous deux ici. */
+  display.versMj('sm:jet', { characterId: perso.id, caracKey, die: de, total: de + bonus } satisfies JetSm)
   const apres = apresUnJet(perso.data.modifs, caracKey)
   const use = JSON.stringify(apres) !== JSON.stringify(perso.data.modifs ?? [])
   if (use) chars.setModifs(perso.id, apres)
