@@ -33,6 +33,7 @@ import { PAGES_PREPARATION } from './components/SousMenuPreparation'
 import { BlocNotes } from './modules/BlocNotes'
 import { Sheets } from './modules/Sheets'
 import { Dice } from './modules/Dice'
+import { demarrerSm } from './santeMentale/etat'
 import {
   IconChevron,
   IconCadrage,
@@ -118,6 +119,8 @@ export function App(): JSX.Element {
 
   useEffect(() => {
     void s.boot()
+    /* La santé mentale écoute les jets et fait tourner ses chronos dès l'ouverture. */
+    demarrerSm()
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
