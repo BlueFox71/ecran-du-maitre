@@ -402,4 +402,15 @@ describe('useSm', () => {
     await sm().saisirJet(sm().attentes[0].id, LEA, 12)
     expect(jdr.rolls.record).toHaveBeenCalled()
   })
+
+  it('une perte s’annonce et pose une carte ; les retraits d’un chrono la grossissent', async () => {
+    const prix = SM_DEFAUT.prix.find((p) => p.id === 'seul-noir')!
+    await sm().declarerPrix(prix, [TOM])
+    await sm().tick(T0 + 60_000)
+    await sm().tick(T0 + 120_000)
+    const pertes = sm().alertes.filter((a) => a.genre === 'perte')
+    expect(pertes).toEqual([expect.objectContaining({ characterId: TOM, perte: 4, raison: prix.nom })])
+    const annonces = useStore.getState().toasts.filter((t) => !t.error)
+    expect(annonces.at(-1)?.msg).toMatch(/perd 2 SM/)
+  })
 })

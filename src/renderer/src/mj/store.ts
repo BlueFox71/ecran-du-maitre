@@ -207,6 +207,8 @@ interface State {
   /** Refait ce qu'on vient de défaire. */
   refaire: () => Promise<void>
   toast: (msg: string, error?: boolean) => void
+  /** Un événement de partie que le MJ doit voir passer, même ailleurs (une perte de SM). */
+  annoncer: (msg: string) => void
   dismissToast: (id: number) => void
 
   boot: () => Promise<void>
@@ -379,6 +381,14 @@ export const useStore = create<State>((set, get) => ({
     if (!error) return
     const id = toastSeq++
     set((s) => ({ toasts: [...s.toasts, { id, msg, error }] }))
+    setTimeout(() => get().dismissToast(id), 4000)
+  },
+  /* L'exception à la règle des ratés : ce n'est pas un geste du MJ qu'on
+     confirme, c'est la partie qui bouge — un chrono qui mord, un jet qui
+     tombe pendant qu'il regarde une carte. */
+  annoncer: (msg) => {
+    const id = toastSeq++
+    set((s) => ({ toasts: [...s.toasts, { id, msg, error: false }] }))
     setTimeout(() => get().dismissToast(id), 4000)
   },
   dismissToast: (id) => set((s) => ({ toasts: s.toasts.filter((t) => t.id !== id) })),

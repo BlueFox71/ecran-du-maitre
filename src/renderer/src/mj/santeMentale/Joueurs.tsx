@@ -205,6 +205,19 @@ function CarteAlerte({ a, r, nom, nomCarac, maintenant }: PropsAlerte): JSX.Elem
       </div>
     )
 
+  if (a.genre === 'perte')
+    return (
+      <div className="sm-alerte sm-alerte-perte">
+        <span>
+          <b>
+            {qui} perd {a.perte} SM
+          </b>{' '}
+          — {a.raison} <span className="sm-dim">→ {a.sm}</span>
+        </span>
+        <div className="sm-alerte-actions">{vu}</div>
+      </div>
+    )
+
   if (a.genre === 'hallucination')
     return (
       <div className="sm-alerte sm-alerte-iris">

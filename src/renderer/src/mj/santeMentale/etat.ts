@@ -42,6 +42,8 @@ export type Alerte =
   | { id: string; genre: 'folie'; characterId: number; effet: string; finA: number }
   | { id: string; genre: 'hallucination'; characterId: number; texte: string }
   | { id: string; genre: 'nausee'; characterId: number }
+  /** Une perte de SM ; les retraits d'un même chrono se cumulent sur la même carte. */
+  | { id: string; genre: 'perte'; characterId: number; perte: number; raison: string; sm: number }
 
 export interface EtatSm {
   attentes: Attente[]
@@ -118,6 +120,23 @@ function vises(cible: Cible): number[] {
 }
 
 const prevenir = (msg: string): void => useStore.getState().toast(msg, true)
+
+/**
+ * Une perte se voit deux fois : une annonce en bas de l'écran, même vue SM
+ * fermée, et une carte qui reste dans la vue. Un chrono qui mord chaque minute
+ * ne pose pas une carte par minute : il grossit la sienne.
+ */
+function signalerPerte(characterId: number, perte: number, raison: string, sm: number): void {
+  useStore.getState().annoncer(`${nomDe(characterId)} perd ${perte} SM — ${raison} → ${sm}`)
+  useSm.setState((s) => {
+    const deja = s.alertes.find((a) => a.genre === 'perte' && a.characterId === characterId && a.raison === raison)
+    if (deja && deja.genre === 'perte')
+      return {
+        alertes: s.alertes.map((a) => (a === deja ? { ...deja, perte: deja.perte + perte, sm } : a))
+      }
+    return { alertes: [...s.alertes, { id: nouvelId('al'), genre: 'perte', characterId, perte, raison, sm }] }
+  })
+}
 const nomDe = (id: number): string => fiche(id)?.name ?? 'ce personnage'
 
 const fiche = (id: number): Character | undefined => contexte().characters.find((c) => c.id === id)
@@ -352,6 +371,7 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
         /* Le main a borné : on raisonne sur ce qui est vraiment écrit. */
         const apres = character.data.gauges[cle]?.value ?? avant
         const perteReelle = avant - apres
+        if (perteReelle > 0) signalerPerte(characterId, perteReelle, raison, apres)
         if (delta < 0 && estFolie(perteReelle, r)) ouvrirAttente(`Folie passagère — ${raison}`, perteReelle, 'folie', [characterId])
         try {
           await accorderPalier(character, avant)

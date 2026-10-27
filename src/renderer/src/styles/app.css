@@ -24442,6 +24442,20 @@ button.fdc-vig:hover {
 .sm-alerte-moss > b {
   color: var(--moss);
 }
+/* Une perte : une ligne, plus discrète qu'un changement de palier. */
+.sm-alerte-perte {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  border-color: var(--line);
+  background: var(--surface);
+}
+.sm-alerte-perte b {
+  color: var(--blood);
+}
+.sm-alerte-perte .sm-alerte-actions {
+  margin: 0 0 0 auto;
+}
 .sm-texte {
   margin: 4px 0 0;
   color: var(--text-dim);
