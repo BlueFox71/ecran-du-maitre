@@ -236,19 +236,29 @@ function CarteAlerte({ a, r, nom, nomCarac, maintenant }: PropsAlerte): JSX.Elem
 /** La phrase proposée : elle ne part que sur un clic du meneur. */
 function Hallucination(p: { alerteId: string; characterId: number; texte: string }): JSX.Element {
   const sm = useSm()
-  /* Sans joueur lié, pas de mot secret possible : le meneur la glisse à voix basse. */
+  /* Sans joueur lié, pas de mot secret possible : seule la voix reste. */
   const lie = useStore((s) => s.players.some((x) => x.characterId === p.characterId))
   return (
     <>
       <p className="sm-hallu">« {p.texte} »</p>
       <div className="sm-alerte-actions">
+        {lie ? (
+          <button
+            type="button"
+            className="btn btn-sm btn-brass"
+            title="L’envoyer en mot secret sur son téléphone"
+            onClick={() => void sm.envoyerHallucination(p.alerteId)}
+          >
+            Envoyer
+          </button>
+        ) : null}
         <button
           type="button"
-          className="btn btn-sm btn-brass"
-          title={lie ? 'L’envoyer en mot secret sur son téléphone' : 'Pas de joueur lié : dis-la-lui à voix basse'}
-          onClick={() => void sm.envoyerHallucination(p.alerteId)}
+          className={`btn btn-sm${lie ? '' : ' btn-brass'}`}
+          title="Tu la lui as glissée à voix basse : rien n’est envoyé, la prochaine viendra à son heure"
+          onClick={() => void sm.envoyerHallucination(p.alerteId, true)}
         >
-          {lie ? 'Envoyer' : 'Fait'}
+          Dite à l’oral
         </button>
         <button type="button" className="btn btn-sm" onClick={() => sm.autreHallucination(p.alerteId)}>
           Une autre

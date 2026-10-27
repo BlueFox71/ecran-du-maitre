@@ -258,6 +258,18 @@ describe('useSm', () => {
     expect(montee.genre === 'palier' && montee.texte).toBeUndefined()
   })
 
+  it('une hallucination dite à l’oral : rien ne part, le compte repart', async () => {
+    useStore.setState({ players: [{ id: 11, uid: 'v', name: 'Marc', color: null, characterId: TOM }] })
+    await sm().appliquer(TOM, -3, 'Pas au-dessus')
+    const alerte = sm().alertes.find((a) => a.genre === 'palier')!
+    monde.maintenant = () => T0 + 5 * 60_000
+    await sm().envoyerHallucination(alerte.id, true)
+    expect(jdr.mots.ecrire).not.toHaveBeenCalled()
+    const apres = sm().alertes.find((a) => a.id === alerte.id)!
+    expect(apres.genre === 'palier' && apres.texte).toBeFalsy()
+    expect(sm().halluA[TOM]).toBe(T0 + 20 * 60_000)
+  })
+
   it('nouvelleScene rend les récupérations de scène, nouvelleNuit toutes', async () => {
     const encens = SM_DEFAUT.recups.find((r) => r.id === 'encens')!
     const chapelle = SM_DEFAUT.recups.find((r) => r.id === 'chapelle')!

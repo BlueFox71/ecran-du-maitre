@@ -86,7 +86,8 @@ export interface EtatSm {
   calmer(characterId: number): void
   /** Chronos échus, hallucinations dues, folies et nausées finies. */
   tick(maintenant: number): Promise<void>
-  envoyerHallucination(alerteId: string): Promise<void>
+  /** `aLOral` : le MJ la lui a dite lui-même ; rien ne part, mais elle compte comme donnée. */
+  envoyerHallucination(alerteId: string, aLOral?: boolean): Promise<void>
   autreHallucination(alerteId: string): void
   fermerAlerte(id: string): void
   /** Les récupérations « une fois par scène » redeviennent possibles. */
@@ -548,11 +549,11 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
       await Promise.all(ids.map(accorder))
     },
 
-    envoyerHallucination: async (alerteId) => {
+    envoyerHallucination: async (alerteId, aLOral = false) => {
       const a = get().alertes.find((x) => x.id === alerteId)
       if (!a || (a.genre !== 'hallucination' && a.genre !== 'palier') || !a.texte) return
       const joueur = useStore.getState().players.find((p) => p.characterId === a.characterId)
-      if (joueur) await window.jdr.mots.ecrire([joueur.id], a.texte, null, true, true)
+      if (joueur && !aLOral) await window.jdr.mots.ecrire([joueur.id], a.texte, null, true, true)
       if (a.genre === 'hallucination') return get().fermerAlerte(alerteId)
       /* L'alerte de palier reste, pour son texte ; seule la proposition part, et le compte repart. */
       set((s) => ({
