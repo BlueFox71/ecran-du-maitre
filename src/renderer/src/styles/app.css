@@ -17046,6 +17046,41 @@ ul[data-type='taskList'] li[data-checked='true'] > div {
 .hs-min.hs-min-sm.arretee .hs-min-temps {
   color: var(--text-faint);
 }
+/* Le visage du joueur à la place de son nom : la place va au nom du prix. */
+.hs-min.hs-min-sm {
+  align-items: center;
+}
+.hs-min.hs-min-sm .hs-min-nom {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.hs-min-visage {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 99px;
+  flex: none;
+  overflow: hidden;
+  display: grid;
+  place-items: center;
+  border: 1.5px solid var(--pion-ring, var(--line));
+  background: var(--pion-fill, var(--sunk));
+  font-family: 'IBM Plex Mono', monospace;
+  font-size: 8.5px;
+  color: var(--pion-ring, var(--text-faint));
+}
+.hs-min-visage img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.hs-min-texte {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
 .hs-min.finie {
   border-color: var(--blood);
 }

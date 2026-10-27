@@ -1,5 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
+import { Visage } from '../../shared/Visage'
+import { initials } from '../modules/Sheets'
 import { useSm } from './etat'
 
 /**
@@ -23,6 +25,7 @@ export function ChronosHorloge(): JSX.Element | null {
   const prix = useStore((s) => s.reglages.sm.prix)
   const actif = useStore((s) => s.reglages.sm.actif)
   const characters = useStore((s) => s.characters)
+  const allItems = useStore((s) => s.allItems)
 
   const lignes = Object.entries(chronos).flatMap(([id, liste]) =>
     liste.map((c) => ({ id: Number(id), c, prix: prix.find((p) => p.id === c.prixId) }))
@@ -43,15 +46,22 @@ export function ChronosHorloge(): JSX.Element | null {
     <div className="hs-minuteries hs-sm">
       {lignes.map(({ id, c, prix: p }) => {
         const enPause = c.resteMs !== undefined
-        const nom = characters.find((x) => x.id === id)?.name ?? '?'
+        const ch = characters.find((x) => x.id === id)
+        const nom = ch?.name ?? '?'
         const libelle = `${nom} — ${p?.nom ?? c.prixId}`
+        /* Son visage plutôt que son nom : la place va au nom du prix. */
+        const portrait = ch?.portraitItemId != null ? allItems.find((i) => i.id === ch.portraitItemId) : undefined
+        const url = portrait?.poster ?? portrait?.url ?? null
         return (
           <div key={`${id}-${c.prixId}`} className={`hs-min hs-min-sm${enPause ? ' arretee' : ''}`}>
             <span
               className="hs-min-nom"
               title={`${libelle}${p ? ` : −${p.perte} SM toutes les ${p.intervalleMin} min` : ''}`}
             >
-              {libelle}
+              <span className={`hs-min-visage c-${ch?.color ?? 'neutral'}`} aria-label={nom}>
+                {url ? <Visage url={url} cadre={ch?.portraitCadre} /> : initials(nom)}
+              </span>
+              <span className="hs-min-texte">{p?.nom ?? c.prixId}</span>
             </span>
             <span className="hs-min-temps num">{chrono(enPause ? (c.resteMs ?? 0) : c.prochainA - maintenant)}</span>
             <span className="hs-min-gestes">
