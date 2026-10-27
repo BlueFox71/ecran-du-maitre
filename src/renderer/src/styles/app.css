@@ -24541,6 +24541,8 @@ button.fdc-vig:hover {
   padding-left: 46px;
   font-size: 11.5px;
   color: var(--text-dim);
+  /* Les comptes à rebours bougent chaque seconde : des chiffres de même largeur. */
+  font-variant-numeric: tabular-nums;
 }
 .sm-chrono,
 .sm-folie {

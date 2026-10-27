@@ -20,13 +20,15 @@ export interface JoueurSm {
 /** Le libellé court d'une caractéristique (« PER »), d'après sa clé. */
 export type NomCarac = (cle: string) => string
 
-const MINUTE = 60_000
-
-/** « 40 s », « 6 min » : ce qui reste avant `a`. */
+/** « 09:15 », « 1:02:30 » : ce qui reste avant `a`, à la seconde — on le voit filer. */
 function delai(a: number, maintenant: number): string {
   const ms = a - maintenant
   if (ms <= 0) return 'maintenant'
-  return ms < MINUTE ? `${Math.ceil(ms / 1000)} s` : `${Math.ceil(ms / MINUTE)} min`
+  const s = Math.ceil(ms / 1000)
+  const deux = (n: number): string => String(n).padStart(2, '0')
+  const h = Math.floor(s / 3600)
+  const mmss = `${deux(Math.floor((s % 3600) / 60))}:${deux(s % 60)}`
+  return h ? `${h}:${mmss}` : mmss
 }
 
 const signe = (n: number): string => (n < 0 ? moins(-n) : `+${n}`)
