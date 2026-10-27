@@ -415,9 +415,9 @@ describe('useSm', () => {
   })
 
   it('une perte déclarée par le MJ ne s’annonce pas', async () => {
-    const respect = SM_DEFAUT.prix.find((p) => p.intervalleMin === null)!
-    await sm().declarerPrix(respect, [LEA])
-    expect(deltasSm()).toEqual([-respect.perte])
+    const fixe = SM_DEFAUT.prix.find((p) => p.intervalleMin === null && !p.tous)!
+    await sm().declarerPrix(fixe, [LEA])
+    expect(deltasSm()).toEqual([-fixe.perte])
     expect(useStore.getState().toasts.filter((t) => !t.error)).toEqual([])
   })
 
