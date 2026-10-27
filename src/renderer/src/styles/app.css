@@ -17034,6 +17034,18 @@ ul[data-type='taskList'] li[data-checked='true'] > div {
 .hs-min.arretee .hs-min-temps {
   color: var(--text-faint);
 }
+/* Les chronos de santé mentale : en rouge, ils mordent les joueurs. */
+.hs-min.hs-min-sm {
+  border-color: color-mix(in oklab, var(--blood) 55%, transparent);
+  background: color-mix(in oklab, var(--blood) 9%, transparent);
+}
+.hs-min.hs-min-sm .hs-min-nom,
+.hs-min.hs-min-sm .hs-min-temps {
+  color: var(--blood);
+}
+.hs-min.hs-min-sm.arretee .hs-min-temps {
+  color: var(--text-faint);
+}
 .hs-min.finie {
   border-color: var(--blood);
 }

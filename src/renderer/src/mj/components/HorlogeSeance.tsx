@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { Minuteries, useMinuteries } from './Minuteries'
+import { ChronosHorloge } from '../santeMentale/ChronosHorloge'
 
 /**
  * L'horloge de la séance, au pied du rail : on la commence en début de soirée,
@@ -179,6 +180,7 @@ export function HorlogeSeance(): JSX.Element | null {
         </>
       )}
 
+      <ChronosHorloge />
       <Minuteries m={minuteries} />
     </div>
   )
