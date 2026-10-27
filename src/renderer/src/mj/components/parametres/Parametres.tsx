@@ -111,7 +111,14 @@ export function Parametres({
   const [carnet, setCarnet] = useState(false)
 
   const [q, setQ] = useState('')
-  const trouves = useMemo(() => chercher(CHERCHABLES, q), [q])
+  /* Une ligne masquée (l'assistance SM éteinte) ne se cherche pas : sans cela
+     la recherche montrerait un groupe sans ligne. */
+  const sm = s.reglages.sm
+  const trouves = useMemo(
+    () => chercher(CHERCHABLES.filter((r) => !r.visible || r.visible(useStore.getState())), q),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [q, sm]
+  )
   const ailleurs = useMemo(() => chercher(AILLEURS, q), [q])
   const cherche = q.trim() !== ''
 
