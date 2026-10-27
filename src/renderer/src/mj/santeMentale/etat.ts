@@ -42,14 +42,20 @@ export type Alerte =
   | { id: string; genre: 'folie'; characterId: number; effet: string; finA: number }
   | { id: string; genre: 'hallucination'; characterId: number; texte: string }
   | { id: string; genre: 'nausee'; characterId: number }
-  /** Une perte de SM ; les retraits d'un même chrono se cumulent sur la même carte. */
-  | { id: string; genre: 'perte'; characterId: number; perte: number; raison: string; sm: number }
+
+/** Un prix dans la durée qui court sur un joueur ; `resteMs` posé, il est en pause. */
+export interface Chrono {
+  prixId: string
+  prochainA: number
+  /** En pause : ce qu'il restait avant le prochain retrait. */
+  resteMs?: number
+}
 
 export interface EtatSm {
   attentes: Attente[]
   alertes: Alerte[]
   /** Par personnage : les prix dans la durée qui courent sur lui. */
-  chronos: Record<number, { prixId: string; prochainA: number }[]>
+  chronos: Record<number, Chrono[]>
   /** La prochaine hallucination due (ms epoch). */
   halluA: Record<number, number>
   folies: Record<number, { effet: string; finA: number }>
@@ -68,8 +74,12 @@ export interface EtatSm {
   annulerAttente(id: string): void
   /** Le seul chemin d'écriture de la SM. */
   appliquer(characterId: number, delta: number, raison: string): Promise<void>
+  /** Le MJ corrige la valeur à la main : le palier suit, sans folie ni annonce. */
+  rectifier(characterId: number, valeur: number): Promise<void>
   recuperer(r: Recup, cible: Cible): Promise<void>
   arreterChrono(characterId: number, prixId: string): void
+  /** Ce n'est pas son tour : le chrono s'arrête où il en est, et repart de là. */
+  basculerPause(characterId: number, prixId: string): void
   calmer(characterId: number): void
   /** Chronos échus, hallucinations dues, folies et nausées finies. */
   tick(maintenant: number): Promise<void>
@@ -121,21 +131,9 @@ function vises(cible: Cible): number[] {
 
 const prevenir = (msg: string): void => useStore.getState().toast(msg, true)
 
-/**
- * Une perte se voit deux fois : une annonce en bas de l'écran, même vue SM
- * fermée, et une carte qui reste dans la vue. Un chrono qui mord chaque minute
- * ne pose pas une carte par minute : il grossit la sienne.
- */
+/** Une perte s'annonce en bas de l'écran, même vue SM fermée — un chrono à chaque retrait. */
 function signalerPerte(characterId: number, perte: number, raison: string, sm: number): void {
   useStore.getState().annoncer(`${nomDe(characterId)} perd ${perte} SM — ${raison} → ${sm}`)
-  useSm.setState((s) => {
-    const deja = s.alertes.find((a) => a.genre === 'perte' && a.characterId === characterId && a.raison === raison)
-    if (deja && deja.genre === 'perte')
-      return {
-        alertes: s.alertes.map((a) => (a === deja ? { ...deja, perte: deja.perte + perte, sm } : a))
-      }
-    return { alertes: [...s.alertes, { id: nouvelId('al'), genre: 'perte', characterId, perte, raison, sm }] }
-  })
 }
 const nomDe = (id: number): string => fiche(id)?.name ?? 'ce personnage'
 
@@ -351,6 +349,30 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
 
     annulerAttente: (id) => set((s) => ({ attentes: s.attentes.filter((a) => a.id !== id) })),
 
+    rectifier: (characterId, valeur) =>
+      enFile(async () => {
+        const { cle } = contexte()
+        if (!cle) return
+        let character: Character
+        let avant: number
+        try {
+          const lu = await window.jdr.characters.get(characterId)
+          const v = lu?.data.gauges[cle]?.value
+          if (v === undefined || v === valeur) return
+          avant = v
+          character = (await window.jdr.characters.adjust(characterId, cle, valeur - v, 'Rectifié à la main')).character
+          poser(character)
+        } catch {
+          return prevenir(`Santé mentale : la correction de ${nomDe(characterId)} n’a pas pu s’écrire.`)
+        }
+        /* Une correction du MJ n'est pas un choc : ni folie ni annonce, mais le palier suit. */
+        try {
+          await accorderPalier(character, avant)
+        } catch {
+          prevenir(`Santé mentale : les malus de palier de ${nomDe(characterId)} n’ont pas pu s’écrire.`)
+        }
+      }),
+
     appliquer: (characterId, delta, raison) =>
       enFile(async () => {
         const { r, cle } = contexte()
@@ -432,6 +454,20 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
         chronos: { ...s.chronos, [characterId]: (s.chronos[characterId] ?? []).filter((c) => c.prixId !== prixId) }
       })),
 
+    basculerPause: (characterId, prixId) => {
+      const maintenant = monde.maintenant()
+      set((s) => ({
+        chronos: {
+          ...s.chronos,
+          [characterId]: (s.chronos[characterId] ?? []).map((c): Chrono => {
+            if (c.prixId !== prixId) return c
+            if (c.resteMs === undefined) return { ...c, resteMs: Math.max(0, c.prochainA - maintenant) }
+            return { prixId: c.prixId, prochainA: maintenant + c.resteMs }
+          })
+        }
+      }))
+    },
+
     calmer: (characterId) =>
       set((s) => ({
         folies: sansCle(s.folies, characterId),
@@ -460,7 +496,7 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
             bouge = true
             return []
           }
-          if (c.prochainA > maintenant) return [c]
+          if (c.resteMs !== undefined || c.prochainA > maintenant) return [c]
           dus.push({ id, prix })
           bouge = true
           /* Après une veille, un seul intervalle se paie : l'échéance repart de maintenant. */

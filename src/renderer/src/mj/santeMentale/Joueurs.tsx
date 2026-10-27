@@ -205,19 +205,6 @@ function CarteAlerte({ a, r, nom, nomCarac, maintenant }: PropsAlerte): JSX.Elem
       </div>
     )
 
-  if (a.genre === 'perte')
-    return (
-      <div className="sm-alerte sm-alerte-perte">
-        <span>
-          <b>
-            {qui} perd {a.perte} SM
-          </b>{' '}
-          — {a.raison} <span className="sm-dim">→ {a.sm}</span>
-        </span>
-        <div className="sm-alerte-actions">{vu}</div>
-      </div>
-    )
-
   if (a.genre === 'hallucination')
     return (
       <div className="sm-alerte sm-alerte-iris">
@@ -276,6 +263,53 @@ function Hallucination(p: { alerteId: string; characterId: number; texte: string
    Les joueurs
    ------------------------------------------------------------ */
 
+/**
+ * « 47 · Hallucinations » : un clic, et la valeur se corrige à la main — une
+ * erreur de saisie, un « 20 naturel : +2 » rendu à la table. Entrée valide,
+ * Échap renonce. Le palier suit, sans folie ni annonce.
+ */
+function ValeurSm({ j }: { j: JoueurSm }): JSX.Element {
+  const rectifier = useSm((s) => s.rectifier)
+  const [edite, setEdite] = useState<string | null>(null)
+  if (edite === null)
+    return (
+      <button
+        type="button"
+        className={`sm-pastille c-${j.palier.couleur}`}
+        title="Corriger la santé mentale à la main"
+        onClick={() => setEdite(String(j.sm))}
+      >
+        {j.sm} · {j.palier.nom}
+      </button>
+    )
+  const valider = (): void => {
+    const n = Math.round(Number(edite))
+    setEdite(null)
+    if (edite.trim() !== '' && Number.isFinite(n) && n !== j.sm) void rectifier(j.id, Math.max(0, Math.min(j.max, n)))
+  }
+  return (
+    <input
+      type="number"
+      className="sm-rectif num"
+      autoFocus
+      min={0}
+      max={j.max}
+      value={edite}
+      aria-label={`Santé mentale de ${j.nom}`}
+      onChange={(e) => setEdite(e.target.value)}
+      onFocus={(e) => e.currentTarget.select()}
+      onBlur={valider}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') e.currentTarget.blur()
+        if (e.key === 'Escape') {
+          e.stopPropagation()
+          setEdite(null)
+        }
+      }}
+    />
+  )
+}
+
 interface PropsLignes {
   r: ReglageSm
   joueurs: JoueurSm[]
@@ -293,6 +327,7 @@ export function Lignes({ r, joueurs, coches, onCoche, cible, nomCarac, maintenan
   const folies = useSm((s) => s.folies)
   const nausees = useSm((s) => s.nausees)
   const arreter = useSm((s) => s.arreterChrono)
+  const basculerPause = useSm((s) => s.basculerPause)
   const calmer = useSm((s) => s.calmer)
 
   return (
@@ -321,17 +356,28 @@ export function Lignes({ r, joueurs, coches, onCoche, cible, nomCarac, maintenan
             <div className={`dp-barre c-${j.palier.couleur}`}>
               <i style={{ width: `${pct}%` }} />
             </div>
-            <span className={`sm-pastille c-${j.palier.couleur}`}>
-              {j.sm} · {j.palier.nom}
-            </span>
+            <ValeurSm j={j} />
             {effets.length || siens.length || folie ? (
               <div className="sm-effets">
                 {effets.length ? <span>{effets.join(' · ')}</span> : null}
                 {siens.map((c) => {
                   const prix = r.prix.find((x) => x.id === c.prixId)
+                  const enPause = c.resteMs !== undefined
                   return (
-                    <span key={c.prixId} className="sm-chrono">
-                      ⏱ {prix?.nom ?? c.prixId} — prochain retrait dans {delai(c.prochainA, maintenant)}
+                    <span key={c.prixId} className={`sm-chrono${enPause ? ' sm-pause' : ''}`}>
+                      ⏱ {prix?.nom ?? c.prixId} —{' '}
+                      {enPause
+                        ? `en pause (${delai(maintenant + (c.resteMs ?? 0), maintenant)} avant le retrait)`
+                        : `prochain retrait dans ${delai(c.prochainA, maintenant)}`}
+                      <button
+                        type="button"
+                        className="btn btn-sm btn-ghost"
+                        title={enPause ? 'Reprendre ce chrono' : 'Mettre en pause — ce n’est pas son tour'}
+                        aria-label={enPause ? 'Reprendre ce chrono' : 'Mettre ce chrono en pause'}
+                        onClick={() => basculerPause(j.id, c.prixId)}
+                      >
+                        {enPause ? '▶' : '⏸'}
+                      </button>
                       <button
                         type="button"
                         className="btn btn-sm btn-ghost"

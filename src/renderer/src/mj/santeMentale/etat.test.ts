@@ -403,14 +403,37 @@ describe('useSm', () => {
     expect(jdr.rolls.record).toHaveBeenCalled()
   })
 
-  it('une perte s’annonce et pose une carte ; les retraits d’un chrono la grossissent', async () => {
+  it('chaque retrait d’un chrono s’annonce, sans carte dans la vue', async () => {
     const prix = SM_DEFAUT.prix.find((p) => p.id === 'seul-noir')!
     await sm().declarerPrix(prix, [TOM])
     await sm().tick(T0 + 60_000)
     await sm().tick(T0 + 120_000)
-    const pertes = sm().alertes.filter((a) => a.genre === 'perte')
-    expect(pertes).toEqual([expect.objectContaining({ characterId: TOM, perte: 4, raison: prix.nom })])
-    const annonces = useStore.getState().toasts.filter((t) => !t.error)
-    expect(annonces.at(-1)?.msg).toMatch(/perd 2 SM/)
+    const annonces = useStore.getState().toasts.filter((t) => !t.error && /perd 2 SM/.test(t.msg))
+    expect(annonces).toHaveLength(2)
+    /* Seule carte : Tom passe de 52 à 48, en Hallucinations. Les pertes n'en posent pas. */
+    expect(sm().alertes.map((a) => a.genre)).toEqual(['palier'])
+  })
+
+  it('un chrono en pause ne retire rien, et repart avec ce qu’il lui restait', async () => {
+    const prix = SM_DEFAUT.prix.find((p) => p.id === 'seul-noir')!
+    await sm().declarerPrix(prix, [TOM])
+    monde.maintenant = () => T0 + 20_000
+    sm().basculerPause(TOM, 'seul-noir')
+    await sm().tick(T0 + 10 * 60_000)
+    expect(deltasSm()).toEqual([])
+    monde.maintenant = () => T0 + 10 * 60_000
+    sm().basculerPause(TOM, 'seul-noir')
+    expect(sm().chronos[TOM][0]).toEqual({ prixId: 'seul-noir', prochainA: T0 + 10 * 60_000 + 40_000 })
+    await sm().tick(T0 + 10 * 60_000 + 40_000)
+    expect(deltasSm()).toEqual([-2])
+  })
+
+  it('rectifier à la main : la valeur est posée, le palier suit, sans folie ni annonce', async () => {
+    await sm().rectifier(LEA, 40)
+    expect(jdr.characters.adjust).toHaveBeenCalledWith(LEA, 'sm', -40, 'Rectifié à la main')
+    expect(sm().attentes).toEqual([])
+    expect(useStore.getState().toasts.filter((t) => !t.error)).toEqual([])
+    const lea = useStore.getState().characters.find((c) => c.id === LEA)!
+    expect(lea.data.modifs).toContainEqual(expect.objectContaining({ caracKey: 'per', valeur: -2 }))
   })
 })

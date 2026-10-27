@@ -24442,20 +24442,6 @@ button.fdc-vig:hover {
 .sm-alerte-moss > b {
   color: var(--moss);
 }
-/* Une perte : une ligne, plus discrète qu'un changement de palier. */
-.sm-alerte-perte {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  border-color: var(--line);
-  background: var(--surface);
-}
-.sm-alerte-perte b {
-  color: var(--blood);
-}
-.sm-alerte-perte .sm-alerte-actions {
-  margin: 0 0 0 auto;
-}
 .sm-texte {
   margin: 4px 0 0;
   color: var(--text-dim);
@@ -24518,6 +24504,17 @@ button.fdc-vig:hover {
   border-radius: 99px;
   border: 1px solid currentColor;
   white-space: nowrap;
+  font-family: inherit;
+  line-height: inherit;
+  cursor: pointer;
+}
+.sm-pastille:hover {
+  filter: brightness(1.15);
+}
+/* La valeur qu'on corrige à la main, à la place de la pastille. */
+.sm-rectif {
+  width: 64px;
+  justify-self: start;
 }
 .sm-pastille.c-moss {
   color: var(--moss);
@@ -24550,6 +24547,9 @@ button.fdc-vig:hover {
   display: inline-flex;
   align-items: center;
   gap: 4px;
+}
+.sm-chrono.sm-pause {
+  color: var(--text-faint);
 }
 .sm-folie {
   color: var(--blood);

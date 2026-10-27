@@ -843,6 +843,20 @@ function SheetBody({
                   ? 'aucune modification enregistrée'
                   : `${s.charLog.length} entrée${s.charLog.length > 1 ? 's' : ''}`}
               </span>
+              {s.charLog.length > 0 && (
+                <button
+                  className="btn btn-sm btn-ghost btn-danger"
+                  title={`Vider le journal de ${ch.name} — ses chiffres ne bougent pas`}
+                  onClick={async () => {
+                    if (!confirm(`Vider le journal de ${ch.name} ? Ctrl+Z le rendra.`)) return
+                    await window.jdr.characters.viderJournal(ch.id)
+                    await s.loadCharLog(ch.id)
+                  }}
+                >
+                  <IconTrash />
+                  Vider
+                </button>
+              )}
             </div>
             <ol className="jrn">
               {s.charLog.map((e) => (
