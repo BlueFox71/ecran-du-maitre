@@ -12,8 +12,14 @@ const T0 = 1_000_000_000_000
 
 /** Les personnages tels que le main les tient : `adjust` les borne, comme lui. */
 let fiches: Map<number, Character>
+/** Posée par un test : `adjust` écrit tout de suite mais ne répond qu'à son ouverture. */
+let barriere: Promise<void> | null
 let jdr: {
-  characters: { adjust: ReturnType<typeof vi.fn>; setModifs: ReturnType<typeof vi.fn> }
+  characters: {
+    adjust: ReturnType<typeof vi.fn>
+    setModifs: ReturnType<typeof vi.fn>
+    get: ReturnType<typeof vi.fn>
+  }
   rolls: { record: ReturnType<typeof vi.fn> }
   mots: { ecrire: ReturnType<typeof vi.fn> }
   sm: { onJet: ReturnType<typeof vi.fn> }
@@ -63,12 +69,15 @@ beforeEach(() => {
       adjust: vi.fn(async (id: number, key: string, delta: number) => {
         const g = fiches.get(id)!.data.gauges[key]
         g.value = Math.max(0, Math.min(g.max, g.value + delta))
-        return { character: copie(id), log: [] }
+        const character = copie(id)
+        if (barriere) await barriere
+        return { character, log: [] }
       }),
       setModifs: vi.fn(async (id: number, modifs: Modif[]) => {
         fiches.get(id)!.data.modifs = modifs
         return copie(id)
-      })
+      }),
+      get: vi.fn(async (id: number) => copie(id))
     },
     rolls: { record: vi.fn(async () => ({})) },
     mots: { ecrire: vi.fn(async () => []) },
@@ -93,6 +102,7 @@ beforeEach(() => {
   })
   monde.maintenant = () => T0
   monde.de = () => 1
+  barriere = null
 })
 
 afterEach(() => {
@@ -200,5 +210,61 @@ describe('useSm', () => {
     /* La nausée passe après sa durée. */
     await sm().tick(T0 + 41 * 60_000)
     expect(fiches.get(LEA)!.data.modifs?.some((m) => m.id === 'sm-nausee')).toBe(false)
+  })
+
+  it('la fin d’une nausée pendant une écriture de palier : malus gardé, nausée retirée', async () => {
+    const nausee: Modif = { id: 'sm-nausee', valeur: -2, raison: 'SM — Nausée', caracKey: null, duree: { genre: 'retrait' } }
+    fiches.get(LEA)!.data.modifs = [nausee]
+    useStore.setState({ characters: [copie(LEA), copie(TOM)] })
+    useSm.setState({ nausees: { [LEA]: T0 } })
+    let ouvrir!: () => void
+    barriere = new Promise((r) => (ouvrir = r))
+    /* Léa passe de 80 à 70 (Ébranlé) ; adjust est en vol quand la nausée finit. */
+    const perte = sm().appliquer(LEA, -10, 'Les yeux verts')
+    await Promise.resolve()
+    const tick = sm().tick(T0 + 1)
+    ouvrir()
+    await Promise.all([perte, tick])
+    const modifs = fiches.get(LEA)!.data.modifs ?? []
+    expect(modifs).toContainEqual(expect.objectContaining({ id: expect.stringMatching(/^sm-palier-ebranle-/), valeur: -1 }))
+    expect(modifs.some((m) => m.id === 'sm-nausee')).toBe(false)
+  })
+
+  it('la descente dans un palier qui hallucine propose une hallucination, à envoyer ou changer', async () => {
+    useStore.setState({ players: [{ id: 11, uid: 'v', name: 'Marc', color: null, characterId: TOM }] })
+    await sm().appliquer(TOM, -3, 'Pas au-dessus')
+    const alerte = sm().alertes.find((a) => a.genre === 'palier')!
+    expect(alerte.genre === 'palier' && alerte.texte).toBe(SM_DEFAUT.hallucinations[0])
+    monde.de = () => 2
+    sm().autreHallucination(alerte.id)
+    const changee = sm().alertes.find((a) => a.id === alerte.id)!
+    expect(changee.genre === 'palier' && changee.texte).toBe(SM_DEFAUT.hallucinations[2])
+    monde.maintenant = () => T0 + 5 * 60_000
+    await sm().envoyerHallucination(alerte.id)
+    expect(jdr.mots.ecrire).toHaveBeenCalledWith([11], SM_DEFAUT.hallucinations[2], null, true, true)
+    const apres = sm().alertes.find((a) => a.id === alerte.id)!
+    expect(apres.genre === 'palier' && apres.texte).toBeFalsy()
+    expect(sm().halluA[TOM]).toBe(T0 + 20 * 60_000)
+
+    /* À la remontée, rien n'est proposé. */
+    await sm().appliquer(TOM, 10, 'Fin heureuse')
+    const montee = sm().alertes.find((a) => a.genre === 'palier' && a.montee)!
+    expect(montee.genre === 'palier' && montee.texte).toBeUndefined()
+  })
+
+  it('nouvelleScene rend les récupérations de scène, nouvelleNuit toutes', async () => {
+    const encens = SM_DEFAUT.recups.find((r) => r.id === 'encens')!
+    const chapelle = SM_DEFAUT.recups.find((r) => r.id === 'chapelle')!
+    await sm().recuperer(encens, [LEA])
+    await sm().recuperer(chapelle, [LEA])
+    await sm().recuperer(encens, [LEA])
+    expect(deltasSm()).toEqual([5, 5])
+    sm().nouvelleScene()
+    await sm().recuperer(encens, [LEA])
+    await sm().recuperer(chapelle, [LEA])
+    expect(deltasSm()).toEqual([5, 5, 5])
+    sm().nouvelleNuit()
+    await sm().recuperer(chapelle, [LEA])
+    expect(deltasSm()).toEqual([5, 5, 5, 5])
   })
 })

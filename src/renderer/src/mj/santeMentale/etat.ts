@@ -36,7 +36,8 @@ export interface Attente {
 }
 
 export type Alerte =
-  | { id: string; genre: 'palier'; characterId: number; palier: Palier; sm: number; montee: boolean }
+  /** `texte` : une hallucination proposée, à la descente dans un palier qui en a. */
+  | { id: string; genre: 'palier'; characterId: number; palier: Palier; sm: number; montee: boolean; texte?: string }
   | { id: string; genre: 'folie'; characterId: number; effet: string; finA: number }
   | { id: string; genre: 'hallucination'; characterId: number; texte: string }
   | { id: string; genre: 'nausee'; characterId: number }
@@ -72,6 +73,10 @@ export interface EtatSm {
   envoyerHallucination(alerteId: string): Promise<void>
   autreHallucination(alerteId: string): void
   fermerAlerte(id: string): void
+  /** Les récupérations « une fois par scène » redeviennent possibles. */
+  nouvelleScene(): void
+  /** Toutes les limites tombent : scène et nuit. */
+  nouvelleNuit(): void
 }
 
 /** Le hasard et l'heure : remplaçables dans les tests. */
@@ -161,6 +166,16 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
   const ecrireModifs = async (id: number, modifs: Modif[]): Promise<void> => {
     poser(await window.jdr.characters.setModifs(id, modifs))
   }
+
+  /**
+   * Retouche les modifs hors d'`appliquer` : dans la file, à partir de la fiche
+   * relue du main — jamais d'une copie qu'une écriture en vol aurait dépassée.
+   */
+  const retoucherModifs = (id: number, f: (modifs: Modif[]) => Modif[]): Promise<void> =>
+    enFile(async () => {
+      const c = await window.jdr.characters.get(id)
+      if (c) await ecrireModifs(id, f(c.data.modifs ?? []))
+    })
 
   return {
     attentes: [],
@@ -261,10 +276,21 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
         const nouveau = palierDe(apres, r.paliers)
         if (ancien.id !== nouveau.id) {
           await ecrireModifs(characterId, modifsDuPalier(character.data.modifs, nouveau))
+          const montee = apres > avant
+          /* À la descente dans un palier qui hallucine, l'alerte en propose une. */
+          const texte = !montee && nouveau.hallucinations != null ? auHasard(r.hallucinations) : null
           set((s) => ({
             alertes: [
               ...s.alertes,
-              { id: nouvelId('al'), genre: 'palier', characterId, palier: nouveau, sm: apres, montee: apres > avant }
+              {
+                id: nouvelId('al'),
+                genre: 'palier',
+                characterId,
+                palier: nouveau,
+                sm: apres,
+                montee,
+                ...(texte ? { texte } : {})
+              }
             ]
           }))
           if (nouveau.hallucinations == null) set((s) => ({ halluA: sansCle(s.halluA, characterId) }))
@@ -302,8 +328,7 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
               caracKey: null,
               duree: { genre: 'retrait' }
             }
-            const modifs = (fiche(id)?.data.modifs ?? []).filter((m) => m.id !== NAUSEE)
-            await ecrireModifs(id, [...modifs, modif])
+            await retoucherModifs(id, (modifs) => [...modifs.filter((m) => m.id !== NAUSEE), modif])
             set((s) => ({
               nausees: { ...s.nausees, [id]: maintenant + r.nausee.dureeMin * MINUTE },
               alertes: [...s.alertes, { id: nouvelId('al'), genre: 'nausee', characterId: id }]
@@ -366,8 +391,7 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
         if (fin > maintenant) continue
         const id = Number(cle)
         set((s) => ({ nausees: sansCle(s.nausees, id) }))
-        const modifs = fiche(id)?.data.modifs ?? []
-        if (modifs.some((m) => m.id === NAUSEE)) await ecrireModifs(id, modifs.filter((m) => m.id !== NAUSEE))
+        await retoucherModifs(id, (modifs) => modifs.filter((m) => m.id !== NAUSEE))
       }
 
       for (const d of dus) await get().appliquer(d.id, -d.prix.perte, d.prix.nom)
@@ -375,20 +399,34 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
 
     envoyerHallucination: async (alerteId) => {
       const a = get().alertes.find((x) => x.id === alerteId)
-      if (!a || a.genre !== 'hallucination') return
+      if (!a || (a.genre !== 'hallucination' && a.genre !== 'palier') || !a.texte) return
       const joueur = useStore.getState().players.find((p) => p.characterId === a.characterId)
       if (joueur) await window.jdr.mots.ecrire([joueur.id], a.texte, null, true, true)
-      get().fermerAlerte(alerteId)
+      if (a.genre === 'hallucination') return get().fermerAlerte(alerteId)
+      /* L'alerte de palier reste, pour son texte ; seule la proposition part, et le compte repart. */
+      set((s) => ({
+        alertes: s.alertes.map((x) => (x.id === alerteId && x.genre === 'palier' ? { ...x, texte: undefined } : x))
+      }))
+      rearmer(a.characterId)
     },
 
     autreHallucination: (alerteId) =>
       set((s) => ({
         alertes: s.alertes.map((a) => {
-          if (a.id !== alerteId || a.genre !== 'hallucination') return a
+          if (a.id !== alerteId || (a.genre !== 'hallucination' && a.genre !== 'palier') || !a.texte) return a
           const texte = auHasard(contexte().r.hallucinations, a.texte)
           return texte ? { ...a, texte } : a
         })
       })),
+
+    nouvelleScene: () => {
+      const scene = new Set(contexte().r.recups.filter((r) => r.limite === 'scene').map((r) => r.id))
+      set((s) => ({
+        recupsFaites: Object.fromEntries(Object.entries(s.recupsFaites).filter(([id]) => !scene.has(id)))
+      }))
+    },
+
+    nouvelleNuit: () => set({ recupsFaites: {} }),
 
     fermerAlerte: (id) => {
       const a = get().alertes.find((x) => x.id === id)
