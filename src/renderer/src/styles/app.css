@@ -24196,8 +24196,11 @@ button.fdc-vig:hover {
 .sm-champ > span {
   opacity: 0.7;
 }
-.sm-champ input[type='text'].sm-large {
+.sm-champ textarea.sm-large {
   width: min(520px, 62vw);
+  resize: none;
+  overflow: hidden;
+  line-height: 1.35;
 }
 .sm-champ input[type='text'] {
   min-width: 130px;
