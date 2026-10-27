@@ -24278,6 +24278,21 @@ button.fdc-vig:hover {
   border: 1px solid var(--line);
   border-radius: 5px;
   min-width: 0;
+  /* Le barème défile à part : on y cherche un événement sans faire bouger
+     les joueurs, et il reste sous la main quand on descend dans leurs lignes.
+     `.pu-detail` est un conteneur de taille : 100cqh est sa hauteur visible. */
+  position: sticky;
+  top: 0;
+  max-height: calc(100cqh - 2px);
+  overflow-y: auto;
+  overscroll-behavior: contain;
+}
+@media (max-width: 720px) {
+  /* Une seule colonne : le barème, posé au-dessus des joueurs, ne doit pas les recouvrir. */
+  .sm-bareme {
+    position: static;
+    max-height: none;
+  }
 }
 .sm-groupe {
   margin: 9px 0 2px;
