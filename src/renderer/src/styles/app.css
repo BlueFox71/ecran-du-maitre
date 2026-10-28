@@ -24860,3 +24860,30 @@ button.fdc-vig:hover {
 .sm-choix-opt.sm-exclu:hover {
   background: none;
 }
+
+/* ============================================================
+   Le surligneur du Paravent
+   ============================================================ */
+
+/*
+ * Un jaune de feutre, posé par-dessus le texte (CSS Custom Highlight API) :
+ * la couleur du texte ne bouge pas, seul le fond se teinte. Plus couvrant sur
+ * le papier clair, plus retenu sur le fond sombre pour ne pas éblouir.
+ */
+:root,
+:root[data-theme='dark'] {
+  --surligneur: rgba(255, 214, 0, 0.3);
+}
+:root[data-theme='light'] {
+  --surligneur: rgba(255, 221, 0, 0.5);
+}
+::highlight(surligne) {
+  background-color: var(--surligneur);
+  color: inherit;
+}
+/* Feutre en main : le texte se sélectionne partout, même là où un clic
+   déplie ou coche d'ordinaire, et le curseur le dit. */
+body.surligneur-actif [data-cible] {
+  user-select: text;
+  cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23ffd600' stroke='%23222' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='m14.5 4.5 5 5-8 8H6.5v-5z'/%3E%3C/svg%3E") 4 20, text;
+}

@@ -425,6 +425,17 @@ export const IconRotate = (p: P = {}): JSX.Element =>
     p
   )
 
+/** Un feutre surligneur en biais, sa trace dessous — le surligneur du Paravent. */
+export const IconSurligneur = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="m14.5 4.5 5 5-8 8H6.5v-5z" />
+      <path d="m9 10 5 5" />
+      <path d="M4 21h9" />
+    </>,
+    p
+  )
+
 /** Flèche ronde à rebours — « tout reprendre au départ » (réinitialiser la séance). */
 export const IconRecommencer = (p: P = {}): JSX.Element =>
   box(
