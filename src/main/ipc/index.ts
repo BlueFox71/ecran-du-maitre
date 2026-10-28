@@ -114,6 +114,8 @@ export function registerIpc(): void {
   const apresPas = (libelle: string | null): string | null => {
     if (libelle) {
       display.refreshJoueurs()
+      /* Des pions rendus — ceux qu'une réinitialisation avait retirés — reviennent à l'écran. */
+      display.refreshPions()
       display.calqueABouge()
       /* Une apparence rendue ou reprise : la carte à l'écran la suit. */
       display.rehabiller()
@@ -1169,6 +1171,7 @@ export function registerIpc(): void {
   /* Remettre la séance à son départ : suivi par le défaire, un Ctrl+Z la rend. */
   on('seance:reinitialiser', (choix: ChoixReinit) => {
     const r = reinitialiser(choix)
+    if (r.pions) display.refreshPions()
     display.refreshJoueurs()
     display.versMj('characters:relus', null)
     if (pochette.suivreInventaires()) display.versMj('pochette:changee', null)

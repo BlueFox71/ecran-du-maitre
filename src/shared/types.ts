@@ -1136,6 +1136,8 @@ export interface ChoixReinit {
   etatSm: boolean
   /** Les surlignages du Paravent, de toute la campagne. */
   surlignages: boolean
+  /** Les pions des personnages joueurs, retirés de tous les lieux. */
+  pionsPj: boolean
 }
 
 /** Un jet de personnage noté : ce que la santé mentale lit pour réagir. */

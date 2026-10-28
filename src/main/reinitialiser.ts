@@ -12,7 +12,12 @@ import type { ChoixReinit } from '@shared/types'
  * Tout passe par un seul appel suivi par le défaire : un Ctrl+Z rend la
  * séance telle qu'elle était, objets, jauges et journaux compris.
  */
-export function reinitialiser(c: ChoixReinit): { objets: number; jauges: number; surlignages: number } {
+export function reinitialiser(c: ChoixReinit): {
+  objets: number
+  jauges: number
+  surlignages: number
+  pions: number
+} {
   const db = getDb()
   const cid = activeCampaignId()
   let ranges = 0
@@ -52,6 +57,15 @@ export function reinitialiser(c: ChoixReinit): { objets: number; jauges: number;
     )
   if (c.journalJets) rolls.clearSessionRolls()
   const surlignages = c.surlignages ? surlignage.toutEffacer() : 0
+  /* Les joueurs quittent le plateau : on les reposera là où la partie reprend.
+     Les pions des PNJ et les images restent où le MJ les a mis. */
+  const pions = c.pionsPj
+    ? db
+        .prepare(
+          `DELETE FROM pion WHERE character_id IN (SELECT id FROM character WHERE campaign_id = ? AND kind = 'pj')`
+        )
+        .run(cid).changes
+    : 0
 
-  return { objets: ranges, jauges, surlignages }
+  return { objets: ranges, jauges, surlignages, pions }
 }

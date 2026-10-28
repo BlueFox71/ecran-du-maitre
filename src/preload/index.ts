@@ -1135,7 +1135,7 @@ const api = {
   /** Remettre la séance à son départ, case par case ; un Ctrl+Z la rend. */
   seance: {
     reinitialiser: (choix: ChoixReinit) =>
-      call<{ objets: number; jauges: number; surlignages: number }>('seance:reinitialiser', choix)
+      call<{ objets: number; jauges: number; surlignages: number; pions: number }>('seance:reinitialiser', choix)
   },
 
   /**
