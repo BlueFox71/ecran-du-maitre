@@ -36,6 +36,8 @@ export const useSurligneur = create<Surligneur>((set, get) => ({
 /** Les textes surlignables à l'écran, et le texte qu'ils portent. */
 const inscrits = new Map<HTMLElement, Cible>()
 let prevu = 0
+/* Le Paravent est là : hors de lui, rien ne se peint. */
+let monte = false
 
 /** Les nœuds texte d'un élément, dans l'ordre de lecture. */
 function noeudsTexte(el: HTMLElement): Text[] {
@@ -75,7 +77,7 @@ function decalage(el: HTMLElement, noeud: Node, offset: number): number {
 
 function peindre(): void {
   prevu = 0
-  if (!('highlights' in CSS)) return
+  if (!('highlights' in CSS) || !monte) return
   const { plages } = useSurligneur.getState()
   const h = new Highlight()
   for (const [el, c] of inscrits) {
@@ -153,8 +155,8 @@ export function Surligneur(): null {
   useEchap(() => useSurligneur.getState().basculerMode(false), actif)
 
   useEffect(() => {
-    const st = useSurligneur.getState()
-    void st.charger()
+    monte = true
+    void useSurligneur.getState().charger()
     const relire = (): void => void useSurligneur.getState().charger()
     window.addEventListener('jdr:defait', relire)
 
@@ -184,6 +186,7 @@ export function Surligneur(): null {
       window.removeEventListener('jdr:defait', relire)
       window.removeEventListener('keydown', touche)
       document.removeEventListener('mouseup', lache)
+      monte = false
       useSurligneur.getState().basculerMode(false)
       if ('highlights' in CSS) CSS.highlights.delete('surligne')
     }

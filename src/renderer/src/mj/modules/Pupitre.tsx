@@ -10,7 +10,7 @@ import { BoutonAffichage, useTraitsMj } from '../components/Affichage'
 import { MenuImage, type CibleImage } from '../components/MenuImage'
 import { ARTICLES_SITUES, FicheCompacte } from '../components/FicheDuLieu'
 import { BoutonSurligneur, EffacerSurlignage, Surlignable, Surligneur } from '../surligneur'
-import { cible } from '@shared/surlignage'
+import { cible, type Cible } from '@shared/surlignage'
 import { useViseCarte } from '../viseCarte'
 import type { ArticleSurCarte } from '../../shared/Slide'
 import { Slide } from '../../shared/Slide'
@@ -1175,13 +1175,13 @@ export function Pupitre(): JSX.Element {
                       avant={
                         <article className="read pu-lieu-lecture">
                           <h4>Ce que voient les joueurs</h4>
-                          <TexteDeLieu texte={lieuLu.summary} />
+                          <TexteDeLieu texte={lieuLu.summary} cible={cible('place', lieuLu.id, 'summary')} />
                         </article>
                       }
                       apres={
                         <article className="read pu-lieu-lecture">
                           <h4>Notes du MJ</h4>
-                          <TexteDeLieu texte={lieuLu.notes} />
+                          <TexteDeLieu texte={lieuLu.notes} cible={cible('place', lieuLu.id, 'notes')} />
                         </article>
                       }
                     />
@@ -2060,7 +2060,7 @@ const COTES = [
  * Le texte d'un lieu, tel qu'on l'a tapé ou écrit dans son fichier : une ligne
  * vide sépare deux paragraphes, un retour simple reste un retour.
  */
-function TexteDeLieu({ texte }: { texte: string | null }): JSX.Element {
+function TexteDeLieu({ texte, cible: c }: { texte: string | null; cible: Cible }): JSX.Element {
   const paras = (texte ?? '')
     .replace(/\r\n?/g, '\n')
     .split(/\n\s*\n/)
@@ -2069,9 +2069,12 @@ function TexteDeLieu({ texte }: { texte: string | null }): JSX.Element {
   if (paras.length === 0) return <p className="rien">Rien d’écrit.</p>
   return (
     <TexteCourt lignes={4} className="read-body">
-      {paras.map((p, i) => (
-        <p key={i}>{p}</p>
-      ))}
+      {/* Un seul texte surlignable, tous ses paragraphes ensemble : c'est un seul champ. */}
+      <Surlignable cible={c}>
+        {paras.map((p, i) => (
+          <p key={i}>{p}</p>
+        ))}
+      </Surlignable>
     </TexteCourt>
   )
 }

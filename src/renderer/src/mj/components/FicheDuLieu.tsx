@@ -17,6 +17,8 @@
  */
 import { Fragment, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
+import { Surlignable } from '../surligneur'
+import { cible } from '@shared/surlignage'
 import {
   IconCheck,
   IconDonner,
@@ -2397,7 +2399,9 @@ function CarteLue({
         {c.sorte === 'decouverte' ? <IconDecouverte /> : <IconEclair />}
       </span>
       <span className="fdl-titre">
-        {c.titre}
+        <Surlignable as="span" cible={cible('carte', c.id, 'titre')}>
+          {c.titre}
+        </Surlignable>
         {de && onBatiment ? (
           <>
             {' '}
@@ -2419,9 +2423,13 @@ function CarteLue({
       {ouvert && (c.si || c.alors) ? (
         <dl className="fdl-si">
           <dt>SI</dt>
-          <dd>{c.si || '—'}</dd>
+          <Surlignable as="dd" cible={cible('carte', c.id, 'si')}>
+            {c.si || '—'}
+          </Surlignable>
           <dt>ALORS</dt>
-          <dd>{c.alors || '—'}</dd>
+          <Surlignable as="dd" cible={cible('carte', c.id, 'alors')}>
+            {c.alors || '—'}
+          </Surlignable>
         </dl>
       ) : null}
       {objets.length || pnjs.length || moment ? (
@@ -2687,7 +2695,9 @@ export function FicheCompacte({
                 )}
                 <div className="fdc-t">
                   <b>
-                    {o.nom}
+                    <Surlignable as="span" cible={cible('objet', o.id, 'nom')}>
+                      {o.nom}
+                    </Surlignable>
                     {x.qte > 1 ? <span className="num"> ×{x.qte}</span> : null}
                   </b>
                   <span className="fdc-sous">
@@ -2699,7 +2709,9 @@ export function FicheCompacte({
                   </span>
                   {o.su ? (
                     <TexteCourt className="fdc-info" lignes={1}>
-                      {o.su}
+                      <Surlignable as="span" cible={cible('objet', o.id, 'su')}>
+                        {o.su}
+                      </Surlignable>
                     </TexteCourt>
                   ) : null}
                 </div>
@@ -2764,11 +2776,17 @@ export function FicheCompacte({
                   <span className="fdc-vig pnj vide">{initiales(c.name)}</span>
                 )}
                 <div className="fdc-t">
-                  <b>{c.name}</b>
+                  <b>
+                    <Surlignable as="span" cible={cible('character', c.id, 'name')}>
+                      {c.name}
+                    </Surlignable>
+                  </b>
                   {c.occupation ? <span className="fdc-sous">{c.occupation}</span> : null}
                   {c.notes ? (
                     <TexteCourt className="fdc-info" lignes={1}>
-                      {c.notes}
+                      <Surlignable as="span" cible={cible('character', c.id, 'notes')}>
+                        {c.notes}
+                      </Surlignable>
                     </TexteCourt>
                   ) : null}
                   {detenus.length ? (
@@ -2897,8 +2915,16 @@ export function FicheCompacte({
                 >
                   <span className="fdl-num num">{num}</span>
                   <span className="fdc-scen-t">
-                    <b>{sc.titre || 'Sans titre'}</b>
-                    {sc.info ? <span className="fdc-scen-info">{sc.info}</span> : null}
+                    <b>
+                      <Surlignable as="span" cible={cible('scenario', sc.id, 'titre')}>
+                        {sc.titre || 'Sans titre'}
+                      </Surlignable>
+                    </b>
+                    {sc.info ? (
+                      <Surlignable as="span" className="fdc-scen-info" cible={cible('scenario', sc.id, 'info')}>
+                        {sc.info}
+                      </Surlignable>
+                    ) : null}
                   </span>
                 </button>
                 </div>
