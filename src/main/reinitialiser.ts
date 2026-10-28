@@ -2,6 +2,7 @@ import { activeCampaignId, getDb } from './db/index'
 import * as chars from './db/repos/characters'
 import * as objets from './db/repos/objets'
 import * as rolls from './db/repos/rolls'
+import * as surlignage from './db/repos/surlignage'
 import type { ChoixReinit } from '@shared/types'
 
 /**
@@ -11,7 +12,7 @@ import type { ChoixReinit } from '@shared/types'
  * Tout passe par un seul appel suivi par le défaire : un Ctrl+Z rend la
  * séance telle qu'elle était, objets, jauges et journaux compris.
  */
-export function reinitialiser(c: ChoixReinit): { objets: number; jauges: number } {
+export function reinitialiser(c: ChoixReinit): { objets: number; jauges: number; surlignages: number } {
   const db = getDb()
   const cid = activeCampaignId()
   let ranges = 0
@@ -50,6 +51,7 @@ export function reinitialiser(c: ChoixReinit): { objets: number; jauges: number 
       cid
     )
   if (c.journalJets) rolls.clearSessionRolls()
+  const surlignages = c.surlignages ? surlignage.toutEffacer() : 0
 
-  return { objets: ranges, jauges }
+  return { objets: ranges, jauges, surlignages }
 }

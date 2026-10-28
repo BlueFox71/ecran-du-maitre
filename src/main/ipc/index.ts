@@ -21,6 +21,7 @@ import * as smEvenements from '../db/repos/smEvenements'
 import * as pochette from '../db/repos/pochette'
 import * as mots from '../db/repos/mots'
 import * as annotations from '../db/repos/annotations'
+import * as surlignage from '../db/repos/surlignage'
 import * as objets from '../db/repos/objets'
 import * as murs from '../db/repos/murs'
 import * as reglages from '../db/repos/reglages'
@@ -44,6 +45,7 @@ import { apresLeCombat, apresUnTour, type Modif } from '@shared/modifs'
 import { noterJet } from '../jetDuPerso'
 import { reinitialiser } from '../reinitialiser'
 import type { ChoixReinit } from '@shared/types'
+import type { Cible, Plage } from '@shared/surlignage'
 
 /** Des bonus ont vieilli tout seuls : la fiche du MJ et les téléphones relisent. */
 function modifsVieillis(): void {
@@ -503,6 +505,13 @@ export function registerIpc(): void {
     annotations.moveAnnotation(id, x, y)
   )
   on('annotations:remove', (id: number) => annotations.removeAnnotation(id))
+
+  /* ---------------- surligneur du Paravent ---------------- */
+  /* Pas de `display` non plus : le surlignage reste au MJ. Suivi par le défaire. */
+
+  on('surlignage:liste', () => surlignage.listSurlignages())
+  on('surlignage:remplacer', (changes: { cible: Cible; plages: Plage[] }[]) => surlignage.remplacer(changes))
+  on('surlignage:effacer', (cibles: Cible[]) => surlignage.effacer(cibles))
 
   /* ---------------- la réserve d'objets ---------------- */
   /* Même isolement que les annotations : aucun de ces canaux ne touche

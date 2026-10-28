@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { Brut } from '@shared/reglages'
 import type { Modif } from '@shared/modifs'
 import type { EvenementSm } from '@shared/santeMentale'
+import type { Cible, Plage } from '@shared/surlignage'
 import type {
   JetSm,
   ChoixReinit,
@@ -527,6 +528,16 @@ const api = {
    * Les annotations d'un lieu, pour le MJ seul. Rien ici ne passe par
    * `display` : la fenêtre joueurs ne peut pas les recevoir.
    */
+  /**
+   * Le surligneur du Paravent, pour le MJ seul : rien ici ne passe par
+   * `display`. Chaque écriture est un pas de Ctrl+Z.
+   */
+  surlignage: {
+    liste: () => call<Record<Cible, Plage[]>>('surlignage:liste'),
+    remplacer: (changes: { cible: Cible; plages: Plage[] }[]) => call<void>('surlignage:remplacer', changes),
+    effacer: (cibles: Cible[]) => call<void>('surlignage:effacer', cibles)
+  },
+
   annotations: {
     of: (placeId: number | null) => call<Annotation[]>('annotations:of', placeId),
     counts: () => call<Record<number, number>>('annotations:counts'),
@@ -1123,7 +1134,8 @@ const api = {
 
   /** Remettre la séance à son départ, case par case ; un Ctrl+Z la rend. */
   seance: {
-    reinitialiser: (choix: ChoixReinit) => call<{ objets: number; jauges: number }>('seance:reinitialiser', choix)
+    reinitialiser: (choix: ChoixReinit) =>
+      call<{ objets: number; jauges: number; surlignages: number }>('seance:reinitialiser', choix)
   },
 
   /**

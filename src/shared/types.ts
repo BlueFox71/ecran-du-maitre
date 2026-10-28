@@ -1134,6 +1134,8 @@ export interface ChoixReinit {
   journalJets: boolean
   /** Chronos, jets attendus, alertes, remèdes déjà pris — rien en base, côté MJ. */
   etatSm: boolean
+  /** Les surlignages du Paravent, de toute la campagne. */
+  surlignages: boolean
 }
 
 /** Un jet de personnage noté : ce que la santé mentale lit pour réagir. */

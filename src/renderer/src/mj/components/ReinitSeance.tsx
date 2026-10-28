@@ -29,7 +29,8 @@ const DEFAUT: ChoixReinit = {
   modifs: false,
   journalJauges: true,
   journalJets: true,
-  etatSm: true
+  etatSm: true,
+  surlignages: false
 }
 
 export function ReinitSeance({ onFerme }: { onFerme: () => void }): JSX.Element {

@@ -1967,5 +1967,22 @@ export const MIGRATIONS: { id: number; sql: string }[] = [
     );
     CREATE INDEX idx_sm_evenement ON sm_evenement(session_id, ord);
     `
+  },
+  {
+    id: 89,
+    sql: `
+    /* Le surligneur du Paravent : ce que le MJ a marqué « fait » dans ce qu'il
+       lit. À part des textes, qui n'en savent rien ; adressé au texte
+       propriétaire (cible « item:12:body »), pas à l'endroit où on le lit. */
+    CREATE TABLE surlignage (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL REFERENCES campaign(id) ON DELETE CASCADE,
+      cible       TEXT NOT NULL,
+      debut       INTEGER NOT NULL,
+      fin         INTEGER NOT NULL,
+      cite        TEXT NOT NULL
+    );
+    CREATE INDEX idx_surlignage ON surlignage(campaign_id, cible);
+    `
   }
 ]
