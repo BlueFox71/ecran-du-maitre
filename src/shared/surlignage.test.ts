@@ -1,5 +1,5 @@
 import { expect, it } from 'vitest'
-import { basculer, cible, placer } from './surlignage'
+import { basculer, cible, couvre, placer } from './surlignage'
 
 const T = 'Le manoir est vide. La cave cache un corps.'
 
@@ -52,10 +52,17 @@ it('retrouve un passage déplacé par une réécriture', () => {
   ])
 })
 
-it('choisit l’occurrence la plus proche de l’ancienne place', () => {
-  expect(placer([{ debut: 18, fin: 22, cite: 'cave' }], 'cave. Le manoir. La cave.')).toEqual([
-    { debut: 20, fin: 24 }
-  ])
+it('ne devine pas entre plusieurs occurrences : mieux vaut rien que le mauvais mot', () => {
+  expect(placer([{ debut: 18, fin: 22, cite: 'cave' }], 'cave. Le manoir. La cave.')).toEqual([])
+  expect(placer([{ debut: 7, fin: 9, cite: 'et' }], 'XYZA et B et C')).toEqual([])
+})
+
+it('dit si un point du texte est déjà surligné — là où le geste a commencé', () => {
+  const ps = [{ debut: 3, fin: 9, cite: 'manoir' }]
+  expect(couvre(ps, 3)).toBe(true)
+  expect(couvre(ps, 8)).toBe(true)
+  expect(couvre(ps, 9)).toBe(false)
+  expect(couvre(ps, 0)).toBe(false)
 })
 
 it('oublie un passage disparu', () => {

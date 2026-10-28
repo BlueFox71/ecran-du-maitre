@@ -21,6 +21,9 @@ export interface Plage {
   cite: string
 }
 
+/** Ce point du texte est-il déjà surligné ? C'est là où le geste commence qui décide du sens. */
+export const couvre = (plages: Plage[], x: number): boolean => plages.some((p) => p.debut <= x && x < p.fin)
+
 /**
  * Un glissé de feutre sur [debut, fin[. S'il commence dans du surligné, il
  * dé-surligne ce qu'il couvre (en coupant au besoin) ; sinon il surligne, et
@@ -32,7 +35,7 @@ export function basculer(plages: Plage[], debut: number, fin: number, texte: str
   const a = borne(Math.min(debut, fin))
   const b = borne(Math.max(debut, fin))
   if (a === b) return plages
-  const retirer = effacer ?? plages.some((p) => p.debut <= a && a < p.fin)
+  const retirer = effacer ?? couvre(plages, a)
 
   let bornes: [number, number][]
   if (retirer) {
@@ -60,9 +63,10 @@ export function basculer(plages: Plage[], debut: number, fin: number, texte: str
 
 /**
  * Où montrer chaque surlignage dans le texte tel qu'il est maintenant. Un
- * passage resté en place y reste ; déplacé par une réécriture, on le reprend
- * à l'occurrence la plus proche de son ancienne place ; disparu, on ne montre
- * plus rien plutôt que de surligner le mauvais mot.
+ * passage resté en place y reste ; déplacé par une réécriture, on ne le
+ * reprend que s'il n'apparaît qu'une fois dans le texte. Disparu, ou présent
+ * à plusieurs endroits, on ne montre plus rien plutôt que de surligner le
+ * mauvais mot.
  */
 export function placer(plages: Plage[], texte: string): { debut: number; fin: number }[] {
   const places: { debut: number; fin: number }[] = []
@@ -72,10 +76,8 @@ export function placer(plages: Plage[], texte: string): { debut: number; fin: nu
       places.push({ debut: p.debut, fin: p.fin })
       continue
     }
-    let meilleur = -1
-    for (let i = texte.indexOf(p.cite); i !== -1; i = texte.indexOf(p.cite, i + 1))
-      if (meilleur === -1 || Math.abs(i - p.debut) < Math.abs(meilleur - p.debut)) meilleur = i
-    if (meilleur !== -1) places.push({ debut: meilleur, fin: meilleur + p.cite.length })
+    const i = texte.indexOf(p.cite)
+    if (i !== -1 && texte.indexOf(p.cite, i + 1) === -1) places.push({ debut: i, fin: i + p.cite.length })
   }
   return places
 }

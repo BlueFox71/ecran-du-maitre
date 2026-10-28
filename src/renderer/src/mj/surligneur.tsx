@@ -1,6 +1,6 @@
 import { createElement, useEffect, useLayoutEffect, useRef, useState } from 'react'
 import { create } from 'zustand'
-import { basculer, placer, type Cible, type Plage } from '@shared/surlignage'
+import { basculer, couvre, placer, type Cible, type Plage } from '@shared/surlignage'
 import { useEchap } from './echap'
 import { IconSurligneur } from './components/Icons'
 
@@ -102,7 +102,19 @@ useSurligneur.subscribe((s, avant) => {
 
 /* ---------- le glissé ---------- */
 
-const longueur = (ps: Plage[]): number => ps.reduce((n, p) => n + p.fin - p.debut, 0)
+/**
+ * Un texte replié par `TexteCourt` garde tout son DOM, seules ses premières
+ * lignes se voient : un glissé qui le dépasse ne marque que ce qu'on a lu. On
+ * rend le décalage du dernier caractère visible, ou null s'il n'est pas replié.
+ */
+function finVisible(el: HTMLElement): number | null {
+  const replie = el.closest<HTMLElement>('.replie')
+  if (!replie || replie.scrollHeight <= replie.clientHeight + 1) return null
+  const b = replie.getBoundingClientRect()
+  const pos = document.caretRangeFromPoint(b.right - 1, b.bottom - 2)
+  if (!pos || !el.contains(pos.startContainer)) return null
+  return decalage(el, pos.startContainer, pos.startOffset)
+}
 
 /**
  * Un glissé terminé : chaque texte qu'il touche bascule sur sa portion. Le
@@ -118,24 +130,33 @@ function glisse(): boolean {
     .sort(([a], [b]) => (a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING ? -1 : 1))
 
   const { plages } = useSurligneur.getState()
-  const changes: { cible: Cible; plages: Plage[] }[] = []
-  let effacer: boolean | undefined
+  const portions: { el: HTMLElement; c: Cible; texte: string; debut: number; fin: number; avant: Plage[] }[] = []
   for (const [el, c] of touches) {
-    if (changes.some((x) => x.cible === c)) continue
+    if (portions.some((x) => x.c === c)) continue
     const texte = el.textContent ?? ''
     const tout = document.createRange()
     tout.selectNodeContents(el)
     const debut =
       r.compareBoundaryPoints(Range.START_TO_START, tout) > 0 ? decalage(el, r.startContainer, r.startOffset) : 0
-    const fin = r.compareBoundaryPoints(Range.END_TO_END, tout) < 0 ? decalage(el, r.endContainer, r.endOffset) : texte.length
+    let fin = r.compareBoundaryPoints(Range.END_TO_END, tout) < 0 ? decalage(el, r.endContainer, r.endOffset) : texte.length
+    fin = Math.min(fin, finVisible(el) ?? fin)
     if (fin <= debut) continue
     /* Le texte a pu être réécrit depuis : on repart de là où on montre les passages. */
     const avant = placer(plages[c] ?? [], texte).map((p) => ({ ...p, cite: texte.slice(p.debut, p.fin) }))
-    const apres = basculer(avant, debut, fin, texte, effacer)
-    effacer ??= longueur(apres) < longueur(avant)
-    changes.push({ cible: c, plages: apres })
+    portions.push({ el, c, texte, debut, fin, avant })
   }
-  if (!changes.length) return false
+  if (!portions.length) return false
+
+  /* Le sens se décide là où le geste a commencé — l'ancre de la sélection —,
+     pas au début du passage : un glissé fait à rebours part de sa fin. */
+  const depart = portions.find((x) => sel.anchorNode && x.el.contains(sel.anchorNode))
+  const effacer = depart
+    ? couvre(depart.avant, decalage(depart.el, sel.anchorNode!, sel.anchorOffset))
+    : couvre(portions[0].avant, portions[0].debut)
+  const changes = portions.map((x) => ({
+    cible: x.c,
+    plages: basculer(x.avant, x.debut, x.fin, x.texte, effacer)
+  }))
 
   const suite = { ...plages }
   for (const x of changes) suite[x.cible] = x.plages
@@ -171,8 +192,17 @@ export function Surligneur(): null {
     /* Un glissé surligne ; le clic qui le termine n'a pas à cocher la case ou
        à replier l'article sur lequel on a lâché. Un clic simple, lui, garde
        son effet. */
+    /* Seul compte un geste commencé dans un texte surlignable, feutre en main :
+       une sélection laissée d'avant ne se surligne pas au premier clic venu. */
+    let geste = false
+    const appuie = (e: MouseEvent): void => {
+      geste =
+        useSurligneur.getState().actif && e.target instanceof Element && !!e.target.closest('[data-cible]')
+    }
     const lache = (): void => {
-      if (!useSurligneur.getState().actif || !glisse()) return
+      const parti = geste
+      geste = false
+      if (!parti || !useSurligneur.getState().actif || !glisse()) return
       const avale = (e: MouseEvent): void => {
         e.stopPropagation()
         e.preventDefault()
@@ -181,8 +211,10 @@ export function Surligneur(): null {
       setTimeout(() => window.removeEventListener('click', avale, { capture: true }), 0)
     }
     window.addEventListener('keydown', touche)
+    document.addEventListener('mousedown', appuie, true)
     document.addEventListener('mouseup', lache)
     return () => {
+      document.removeEventListener('mousedown', appuie, true)
       window.removeEventListener('jdr:defait', relire)
       window.removeEventListener('keydown', touche)
       document.removeEventListener('mouseup', lache)

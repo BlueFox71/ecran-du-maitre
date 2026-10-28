@@ -2431,6 +2431,12 @@ function CarteLue({
             {c.alors || '—'}
           </Surlignable>
         </dl>
+      ) : c.si || c.alors ? (
+        /* Replié, le si/alors n'est pas rendu : on dit quand même qu'il est là,
+           pour que « Effacer le surlignage » de la fiche le prenne aussi. */
+        <span hidden data-cible={cible('carte', c.id, 'si')}>
+          <span hidden data-cible={cible('carte', c.id, 'alors')} />
+        </span>
       ) : null}
       {objets.length || pnjs.length || moment ? (
         <div className="fdl-liens">
