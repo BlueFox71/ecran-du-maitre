@@ -9,6 +9,8 @@ import { VueSm } from '../santeMentale/VueSm'
 import { BoutonAffichage, useTraitsMj } from '../components/Affichage'
 import { MenuImage, type CibleImage } from '../components/MenuImage'
 import { ARTICLES_SITUES, FicheCompacte } from '../components/FicheDuLieu'
+import { BoutonSurligneur, EffacerSurlignage, Surlignable, Surligneur } from '../surligneur'
+import { cible } from '@shared/surlignage'
 import { useViseCarte } from '../viseCarte'
 import type { ArticleSurCarte } from '../../shared/Slide'
 import { Slide } from '../../shared/Slide'
@@ -210,6 +212,8 @@ export function Pupitre(): JSX.Element {
   const [pointing, setPointing] = useState(false)
   const [pointer, setPointer] = useState<Pointer | null>(null)
   const held = useRef(false)
+  /* La fiche du lieu lu : son bouton « Effacer le surlignage » la prend toute. */
+  const ficheLue = useRef<HTMLDivElement>(null)
   const lastSent = useRef(0)
 
   const ondes = usePings()
@@ -921,6 +925,7 @@ export function Pupitre(): JSX.Element {
     /* `chrono` n'est pas décoratif : les panneaux, leurs en-têtes et le
        sélecteur à deux boutons ne sont stylés que sous cette classe. */
     <section className="view chrono pupitre">
+      <Surligneur />
       <div
         ref={colonnes.ref}
         className="pu-grid"
@@ -1138,6 +1143,8 @@ export function Pupitre(): JSX.Element {
                       <h3 className="display">{lieuLu.name}</h3>
                     </div>
                     <div className="spacer" />
+                    <EffacerSurlignage conteneur={ficheLue} />
+                    <BoutonSurligneur />
                     <button
                       className={`btn btn-sm${display?.pendingPlaceId === lieuLu.id ? ' btn-on' : ''}`}
                       onClick={() => void preparePlace(lieuLu.id)}
@@ -1157,7 +1164,7 @@ export function Pupitre(): JSX.Element {
                       <div className="pu-etagere">{imagesLieuLu.map(vignetteVisuel)}</div>
                     </div>
                   ) : null}
-                  <div className="lect-body lect-lieu">
+                  <div className="lect-body lect-lieu" ref={ficheLue}>
                     {/* La fiche du lieu, simplifiée : on y coche et on y montre ;
                         on l'écrit dans Lieux. */}
                     <FicheCompacte
@@ -1194,16 +1201,22 @@ export function Pupitre(): JSX.Element {
                   <header className="lect-head">
                     <div>
                       <span className="eyebrow">document annexe</span>
-                      <h3 className="display">{annexe.title}</h3>
+                      <Surlignable as="h3" className="display" cible={cible('item', annexe.id, 'title')}>
+                        {annexe.title}
+                      </Surlignable>
                     </div>
+                    <div className="spacer" />
+                    <EffacerSurlignage
+                      cibles={[cible('item', annexe.id, 'title'), cible('item', annexe.id, 'body')]}
+                    />
+                    <BoutonSurligneur />
                   </header>
                   <div className="lect-body">
                     <article className="read">
-                      <div
+                      <Surlignable
                         className="read-body"
-                        dangerouslySetInnerHTML={{
-                          __html: annexe.body || '<p class="rien">Ce texte est vide.</p>'
-                        }}
+                        cible={cible('item', annexe.id, 'body')}
+                        html={annexe.body || '<p class="rien">Ce texte est vide.</p>'}
                       />
                     </article>
                   </div>
@@ -1226,6 +1239,9 @@ export function Pupitre(): JSX.Element {
                     <h3 className="display">{beat.title}</h3>
                   </div>
                   <div className="spacer" />
+                  {/* La note du moment ; chaque document a son bouton, à son titre. */}
+                  <EffacerSurlignage cibles={[cible('beat', beat.id, 'note')]} />
+                  <BoutonSurligneur />
                   <button
                     className={`btn btn-sm${beat.done ? ' btn-on' : ''}`}
                     onClick={() => void setDone(!beat.done)}
@@ -1377,19 +1393,25 @@ export function Pupitre(): JSX.Element {
                 <MotsSecrets key={beat.id} beatId={beat.id} />
 
                 <div className="lect-body">
-                  {beat.note ? <p className="mine">{beat.note}</p> : null}
+                  {beat.note ? (
+                    <Surlignable as="p" className="mine" cible={cible('beat', beat.id, 'note')}>
+                      {beat.note}
+                    </Surlignable>
+                  ) : null}
                   {docs.map((d) => (
                     <article key={d.id} className="read">
                       {/* On lit au Paravent ; on écrit dans la Chronologie. */}
                       <h4>
                         <IconDoc />
-                        {d.title}
+                        <Surlignable as="span" cible={cible('item', d.id, 'title')}>
+                          {d.title}
+                        </Surlignable>
+                        <EffacerSurlignage cibles={[cible('item', d.id, 'title'), cible('item', d.id, 'body')]} />
                       </h4>
-                      <div
+                      <Surlignable
                         className="read-body"
-                        dangerouslySetInnerHTML={{
-                          __html: d.body || '<p class="rien">Ce texte est vide.</p>'
-                        }}
+                        cible={cible('item', d.id, 'body')}
+                        html={d.body || '<p class="rien">Ce texte est vide.</p>'}
                       />
                     </article>
                   ))}

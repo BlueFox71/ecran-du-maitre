@@ -205,7 +205,7 @@ export function Surlignable({
   children
 }: {
   cible: Cible
-  as?: 'div' | 'span' | 'dd' | 'p'
+  as?: 'div' | 'span' | 'dd' | 'p' | 'h3' | 'h4'
   className?: string
   html?: string
   children?: React.ReactNode
@@ -255,14 +255,22 @@ export function BoutonSurligneur(): JSX.Element {
 }
 
 /**
- * « Effacer le surlignage » de tout ce qui est surlignable sous `conteneur`.
- * Il ne se montre que s'il y a quelque chose à effacer.
+ * « Effacer le surlignage » de tout ce qui est surlignable sous `conteneur`
+ * — ou des `cibles` nommées, pour un texte seul. Il ne se montre que s'il y a
+ * quelque chose à effacer.
  */
-export function EffacerSurlignage({ conteneur }: { conteneur: React.RefObject<HTMLElement> }): JSX.Element | null {
+export function EffacerSurlignage({
+  conteneur,
+  cibles: nommees
+}: {
+  conteneur?: React.RefObject<HTMLElement>
+  cibles?: Cible[]
+}): JSX.Element | null {
   const plages = useSurligneur((s) => s.plages)
-  const [cibles, setCibles] = useState<Cible[]>([])
+  const [vues, setCibles] = useState<Cible[]>([])
+  const cibles = nommees ?? vues
   useEffect(() => {
-    const el = conteneur.current
+    const el = conteneur?.current
     if (!el) return
     const lire = (): void => {
       const vues = [...new Set([...el.querySelectorAll<HTMLElement>('[data-cible]')].map((x) => x.dataset.cible!))]
