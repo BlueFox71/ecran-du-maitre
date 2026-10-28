@@ -1,7 +1,9 @@
-<!-- version: 1.5.0 -->
+<!-- version: 1.5.1 -->
 ### Nouveautés
-- **L'assistance à la santé mentale.** Pour les parties de chasse aux fantômes : active-la dans Paramètres › Santé mentale. Elle se remplit avec des règles prêtes à jouer — tailles de choc, jet de Volonté, paliers et ce qu'ils changent, folie passagère, hallucinations, pertes, remèdes, activité de la maison — que tu retouches comme tu veux. Chaque séance a ses propres événements (« Les yeux verts au fond du couloir, −10 »), et un événement se copie d'une séance à l'autre.
-- **La vue SM du Paravent.** « Gérer les SM », sous la réserve des pions : le barème à gauche (avec une recherche), les joueurs à droite. Clique ce qui arrive, choisis qui le subit : l'outil attend le jet de Volonté sur le téléphone (ou ta saisie), retire la bonne perte, pose et retire tout seul les malus de palier, te prévient quand quelqu'un bascule, et pointe la cible des entités. Une hallucination t'est proposée à son heure : envoie-la en mot secret, ou dis-la à l'oral. Clique sur la valeur d'un joueur pour la corriger à la main. Un journal, en bas, garde qui a perdu quoi et pourquoi.
-- **Les pertes qui durent.** « Seul dans le noir, −2 par minute » lance un minuteur sur le joueur, qui se voit aussi en rouge dans l'horloge de séance, avec son visage. Mets-le en pause quand ce n'est pas son tour. Chaque retrait automatique s'annonce en bas de l'écran.
-- **Réinitialiser la séance.** La petite flèche ronde de l'horloge de séance : coche ce qui repart de zéro — objets rangés à leur place, jauges au maximum, bonus et malus, journaux des jauges et des jets, santé mentale en cours — et valide. Un Ctrl+Z rend la séance telle qu'elle était.
-- **Vider le journal d'un personnage.** Dans sa fiche, « Vider » efface son historique ; ses chiffres ne bougent pas, et Ctrl+Z le rend.
+- **Le surligneur du Paravent.** Pour savoir d'un coup d'œil ce qui est fait : clique « Surligneur » dans l'en-tête de ce que tu lis (ou appuie sur H), puis glisse sur le texte d'un moment, d'une annexe ou de la fiche d'un lieu — articles, si/alors, notes des PNJ, objets compris. Repasse sur un passage surligné pour l'effacer ; Échap repose le feutre. Les surlignages restent d'une séance à l'autre, ne se voient que de toi (jamais sur l'écran des joueurs ni sur les téléphones), et Ctrl+Z annule le dernier coup de feutre. « Effacer le surlignage » vide un document d'un coup.
+
+### Améliorations
+- **Réinitialiser la séance** propose deux nouvelles cases : « Retirer les pions des joueurs » de tous les lieux et visuels (cochée par défaut ; ceux des PNJ restent), et « Retirer tous les surlignages » (décochée par défaut). Un Ctrl+Z rend tout, pions compris.
+
+### Corrections
+- Après un Ctrl+Z, les pions rendus réapparaissent aussi sur l'écran des joueurs.
