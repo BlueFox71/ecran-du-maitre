@@ -762,6 +762,11 @@ export function setState(characterId: number, key: string, on: boolean): Charact
   return getCharacter(characterId)!
 }
 
+/** Vider son journal. Les chiffres restent ce qu'ils sont ; seul l'historique part. */
+export function viderJournal(characterId: number): void {
+  getDb().prepare(`DELETE FROM character_log WHERE character_id = ?`).run(characterId)
+}
+
 export function characterLog(characterId: number, limit = 60): CharacterLogEntry[] {
   return getDb()
     .prepare(

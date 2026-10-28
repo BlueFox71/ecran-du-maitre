@@ -1087,6 +1087,8 @@ const api = {
     /** Les mêmes, écrits par le jeu (santé mentale) : le Ctrl+Z ne les défait pas. */
     setModifsJeu: (id: number, modifs: Modif[]) => call<Character>('characters:setModifsJeu', id, modifs),
     log: (id: number) => call<CharacterLogEntry[]>('characters:log', id),
+    /** Effacer son journal ; ses jauges et sa bourse n'en bougent pas. */
+    viderJournal: (id: number) => call<void>('characters:viderJournal', id),
     /** Ajouter ou retirer de sa bourse, monnaie par monnaie ; chaque écart est journalisé. */
     bourse: (id: number, ecarts: Record<string, number>, reason?: string | null) =>
       call<{ character: Character; log: CharacterLogEntry[] }>('characters:bourse', id, ecarts, reason),

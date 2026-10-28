@@ -1124,6 +1124,8 @@ export function registerIpc(): void {
   })
   on('characters:setState', (id: number, key: string, on2: boolean) => chars.setState(id, key, on2))
   on('characters:log', (id: number) => chars.characterLog(id))
+  /* Suivi par le Ctrl+Z : un journal vidé par mégarde revient. */
+  on('characters:viderJournal', (id: number) => chars.viderJournal(id))
   /* La bourse : le téléphone du joueur la lit, il doit la voir bouger. */
   on('characters:bourse', (id: number, ecarts: Record<string, number>, reason?: string | null) => {
     const r = chars.bougerBourse(id, ecarts, monnaiesActives(lireCampagne(reglages.tous()).monnaies), reason)
