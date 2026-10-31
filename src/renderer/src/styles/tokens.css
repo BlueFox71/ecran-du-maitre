@@ -199,10 +199,13 @@ textarea {
   font-family: 'Fraunces Variable', Fraunces, Georgia, serif;
 }
 
+/* L'écran « Ça commence bientôt » (.att) en est exempté : c'est un écran
+   d'ambiance, projeté, dont le mouvement est tout l'objet — et le Bureau à
+   distance coupe les effets d'animation de Windows sans qu'on le demande. */
 @media (prefers-reduced-motion: reduce) {
-  *,
-  *::before,
-  *::after {
+  :not(.att, .att *),
+  :not(.att, .att *)::before,
+  :not(.att, .att *)::after {
     animation-duration: 0.001ms !important;
     animation-iteration-count: 1 !important;
     transition-duration: 0.001ms !important;

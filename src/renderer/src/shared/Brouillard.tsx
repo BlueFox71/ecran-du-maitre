@@ -470,6 +470,10 @@ export function Brouillard({
       }
     })
     .filter((p): p is NonNullable<typeof p> => !!p)
+  /* L'ombre déborde un peu de l'image. Arrêtée pile à son bord, qui tombe
+     entre deux pixels, elle n'en couvrait qu'une part, et la dernière colonne
+     de la carte passait en liseré clair sur le côté. */
+  const deb = Math.max(w, h) * 0.004
   return (
     <svg
       className="brouillard"
@@ -513,7 +517,7 @@ export function Brouillard({
         </mask>
         {/* Blanc = on ne voit pas. Chaque regard y creuse son trou. */}
         <mask id={`${id}-vu`}>
-          <rect x="0" y="0" width={w} height={h} fill="#fff" />
+          <rect x={-deb} y={-deb} width={w + 2 * deb} height={h + 2 * deb} fill="#fff" />
           {regardsDans(false)}
           {/* Ce qu'on a au bout des bras, lampe ou pas : on ne joue pas un
               aveugle qui ne sait pas où il pose les pieds. */}
@@ -547,10 +551,10 @@ export function Brouillard({
           plein sinon. Sans mémoire, il n'y a qu'un seul noir — et tant que
           rien n'a été vu, rien n'est « déjà vu » : tout est noir. */}
       <rect
-        x="0"
-        y="0"
-        width={w}
-        height={h}
+        x={-deb}
+        y={-deb}
+        width={w + 2 * deb}
+        height={h + 2 * deb}
         className={lumGarde && connu.size ? 'br-vu' : 'br-noir'}
         mask={`url(#${id}-vu)`}
       />

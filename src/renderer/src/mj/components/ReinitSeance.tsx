@@ -23,6 +23,11 @@ const CASES: { k: keyof ChoixReinit; nom: string; aide: string; sm?: boolean }[]
   { k: 'journalJets', nom: 'Vider le journal des jets', aide: 'Les jets de la séance active.' },
   { k: 'pionsPj', nom: 'Retirer les pions des joueurs', aide: 'De tous les lieux et visuels. Ceux des PNJ restent.' },
   { k: 'sons', nom: 'Réarmer les sons', aide: 'Les sons posés « une seule fois » déjà joués, dans toute la campagne.' },
+  {
+    k: 'mots',
+    nom: 'Reprendre les mots secrets',
+    aide: 'Ils disparaissent des portables et attendent de nouveau sur leur moment, prêts à repartir.'
+  },
   { k: 'surlignages', nom: 'Retirer tous les surlignages', aide: 'Ceux du Paravent, dans toute la campagne.' },
   { k: 'etatSm', nom: 'Effacer la santé mentale en cours', aide: 'Chronos, jets attendus, alertes, remèdes déjà pris.', sm: true }
 ]
@@ -37,7 +42,8 @@ const DEFAUT: ChoixReinit = {
   etatSm: true,
   surlignages: false,
   pionsPj: true,
-  sons: true
+  sons: true,
+  mots: true
 }
 
 export function ReinitSeance({ onFerme }: { onFerme: () => void }): JSX.Element {
@@ -58,6 +64,7 @@ export function ReinitSeance({ onFerme }: { onFerme: () => void }): JSX.Element 
       if (choix.surlignages) await useSurligneur.getState().charger()
       /* Le plan qu'on arrange dans Lieux relit ses pions. */
       if (choix.pionsPj) window.dispatchEvent(new Event(PIONS_POSES))
+      if (choix.mots) s.setMots(await window.jdr.mots.list())
       await Promise.all([s.refreshCharacters(), s.refreshObjets(), s.refreshRolls()])
       s.annoncer('Séance réinitialisée — Ctrl+Z pour revenir en arrière.')
       onFerme()

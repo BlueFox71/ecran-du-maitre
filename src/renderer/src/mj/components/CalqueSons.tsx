@@ -813,6 +813,7 @@ export function VoletSons({
           value={son.volume * 100}
           max={100}
           unite=" %"
+          volume
           onChange={async (v) => {
             /* Le volume est celui du son : il change aussi dans la sonothèque. */
             volumeApercu(v / 100)

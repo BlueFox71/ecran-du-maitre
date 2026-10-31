@@ -90,6 +90,8 @@
   width: 100%;
   height: 100%;
   display: block;
+  /* L'ombre déborde de l'image de quelques pixels (voir Brouillard.tsx). */
+  overflow: visible;
 }
 /* Ce qu'on n'a jamais vu : du noir, pas une teinte. Les joueurs ne doivent
    pas deviner le plan d'une pièce où ils ne sont jamais entrés. */

@@ -922,6 +922,11 @@ export function Pupitre(): JSX.Element {
   /* La frontière entre la lecture et la régie se tire à la souris. */
   const colonnes = usePoignee({ variable: '--pu-g', cle: 'paravent.largeurGauche', gauche: ':scope > .pu-chrono', min: 420, resteMin: 480, demiEcart: 7 })
 
+  /** « 2 sur Rez-de-chaussée », au bout de la réserve de pions. */
+  const compte = edit.pions.length
+    ? `${edit.pions.length} sur ${s.places.find((p) => p.id === editPlaceId)?.name ?? ''}`
+    : ''
+
   return (
     /* `chrono` n'est pas décoratif : les panneaux, leurs en-têtes et le
        sélecteur à deux boutons ne sont stylés que sous cette classe. */
@@ -1874,52 +1879,53 @@ export function Pupitre(): JSX.Element {
             ) : null}
 
             {/* Les gestes s'apprennent au survol ; seul l'empêchement se dit. */}
-            {editPlaceId == null ? <span className="note">Prépare un lieu pour poser des pions.</span> : null}
-
-            <span className="sep" />
-            <label className="size" title="Taille des pions de ce lieu">
-              <span className="eyebrow">Taille</span>
-              <input
-                type="range"
-                min={2}
-                max={20}
-                step={0.5}
-                value={edit.size}
-                disabled={editPlaceId == null}
-                onChange={async (e) => {
-                  if (editPlaceId == null) return
-                  await window.jdr.pions.size(editPlaceId, Number(e.target.value))
-                  await refreshEdit()
-                }}
-              />
-              <Valeur
-                className="val num"
-                value={edit.size}
-                min={2}
-                max={20}
-                step={0.5}
-                decimales={1}
-                unite=" %"
-                disabled={editPlaceId == null}
-                label="Taille des pions"
-                onChange={async (v) => {
-                  if (editPlaceId == null) return
-                  await window.jdr.pions.size(editPlaceId, v)
-                  await refreshEdit()
-                }}
-              />
-            </label>
-            <TailleEchelle placeId={editPlaceId} size={edit.size} onFait={refreshEdit} />
-            <AllurePions placeId={editPlaceId} />
-
-            <span className="sep" />
+            {/* Sans lieu préparé, la taille, l'échelle et l'allure ne règlent
+                rien : la consigne prend leur place, et la rangée tient sur une
+                ligne même dans la colonne étroite d'un écran de 1920. */}
+            {editPlaceId == null ? (
+              <span className="note">Prépare un lieu pour poser des pions.</span>
+            ) : (
+              <>
+                <span className="sep" />
+                <label className="size" title="Taille des pions de ce lieu">
+                  <span className="eyebrow">Taille</span>
+                  <input
+                    type="range"
+                    min={2}
+                    max={20}
+                    step={0.5}
+                    value={edit.size}
+                    onChange={async (e) => {
+                      await window.jdr.pions.size(editPlaceId, Number(e.target.value))
+                      await refreshEdit()
+                    }}
+                  />
+                  <Valeur
+                    className="val num"
+                    value={edit.size}
+                    min={2}
+                    max={20}
+                    step={0.5}
+                    decimales={1}
+                    unite=" %"
+                    label="Taille des pions"
+                    onChange={async (v) => {
+                      await window.jdr.pions.size(editPlaceId, v)
+                      await refreshEdit()
+                    }}
+                  />
+                </label>
+                <TailleEchelle placeId={editPlaceId} size={edit.size} onFait={refreshEdit} />
+                <AllurePions placeId={editPlaceId} />
+                <span className="sep" />
+              </>
+            )}
             {/* Noms et PV sous les pions : dans « Affichage », avec le reste. */}
 
-            <div className="spacer" />
-            <span className="eyebrow">
-              {edit.pions.length
-                ? `${edit.pions.length} sur ${s.places.find((p) => p.id === editPlaceId)?.name ?? ''}`
-                : ''}
+            {/* Le compte prend la place qui reste et s'abrège : il ne renvoie
+                plus « Retirer » seul sur une seconde ligne. */}
+            <span className="eyebrow pu-compte" title={compte || undefined}>
+              {compte}
             </span>
             <button
               className="btn btn-sm btn-danger"

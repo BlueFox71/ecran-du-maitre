@@ -21,6 +21,10 @@ const W = 210
 const H = 104
 const H_IMAGE = 82
 const PAS = 20
+/* Le zoom le plus serré. À 30 %, une arborescence de trente-cinq cartes ne
+   tenait pas dans la fenêtre du Paravent sur un écran de 1920 : « Tout voir »
+   en coupait les deux bouts. */
+const ZOOM_MIN = 0.15
 /** Les proportions du bandeau : la largeur de la carte entre ses bords, sur sa hauteur. */
 const RAPPORT_IMAGE = (W - 2) / H_IMAGE
 
@@ -145,7 +149,7 @@ export function PlanTrame({
     const y0 = Math.min(...trame.cartes.map((c) => c.y)) - 30
     const x1 = Math.max(...trame.cartes.map((c) => c.x + W)) + 30
     const y1 = Math.max(...trame.cartes.map((c) => c.y + hauteur(c))) + 30
-    const z = Math.max(0.3, Math.min(1, r.width / (x1 - x0), r.height / (y1 - y0)))
+    const z = Math.max(ZOOM_MIN, Math.min(1, r.width / (x1 - x0), r.height / (y1 - y0)))
     setVue({ z, x: (r.width - (x1 - x0) * z) / 2 - x0 * z, y: (r.height - (y1 - y0) * z) / 2 - y0 * z })
   }, [trame])
 
@@ -167,7 +171,7 @@ export function PlanTrame({
     const px = cx ?? r.width / 2
     const py = cy ?? r.height / 2
     setVue((v) => {
-      const z = Math.min(1.6, Math.max(0.3, v.z * facteur))
+      const z = Math.min(1.6, Math.max(ZOOM_MIN, v.z * facteur))
       return { z, x: px - ((px - v.x) * z) / v.z, y: py - ((py - v.y) * z) / v.z }
     })
   }

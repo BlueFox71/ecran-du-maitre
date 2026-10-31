@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Valeur } from '../Valeur'
+import { COURSE, positionDe, texteVolume, volumeDe } from '../../volume'
 
 /* ============================================================
    Les briques d'une rubrique
@@ -86,7 +87,8 @@ export function Curseur({
   texte,
   desactive,
   onPoser,
-  label
+  label,
+  volume = false
 }: {
   valeur: number
   min: number
@@ -96,6 +98,8 @@ export function Curseur({
   desactive?: boolean
   onPoser: (v: number) => void
   label: string
+  /** Un volume en pour cent (0 à 100) : le curseur suit l'oreille, fin dans le bas (voir `volume.ts`). */
+  volume?: boolean
 }): JSX.Element {
   /* On suit le doigt à l'écran et on n'écrit qu'au relâchement : sans cela,
      tirer un curseur écrirait cinquante lignes en base pour un seul geste. */
@@ -105,13 +109,16 @@ export function Curseur({
     <>
       <input
         type="range"
-        min={min}
-        max={max}
-        step={pas ?? 1}
-        value={vu}
+        min={volume ? 0 : min}
+        max={volume ? COURSE : max}
+        step={volume ? 1 : (pas ?? 1)}
+        value={volume ? positionDe(vu / 100) : vu}
         disabled={desactive}
         aria-label={label}
-        onChange={(e) => setVu(Number(e.target.value))}
+        onChange={(e) => {
+          const n = Number(e.target.value)
+          setVu(volume ? volumeDe(n) * 100 : n)
+        }}
         onPointerUp={() => onPoser(vu)}
         onKeyUp={() => onPoser(vu)}
       />
@@ -120,9 +127,9 @@ export function Curseur({
         value={vu}
         min={min}
         max={max}
-        step={pas ?? 1}
-        decimales={pas !== undefined && pas < 1 ? 1 : 0}
-        affiche={texte}
+        step={volume ? 0.5 : (pas ?? 1)}
+        decimales={volume || (pas !== undefined && pas < 1) ? 1 : 0}
+        affiche={volume ? texteVolume : texte}
         disabled={desactive}
         label={label}
         onChange={(v) => {

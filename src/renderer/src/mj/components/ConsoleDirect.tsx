@@ -4,6 +4,7 @@ import { emojiDe, useSons } from '../sons'
 import { useEchap } from '../echap'
 import { Slide } from '../../shared/Slide'
 import { Valeur } from './Valeur'
+import { COURSE, positionDe, texteVolume, volumeDe } from '../volume'
 import { slideLabel } from './Monitor'
 import { TRANSITIONS, type Transition } from '@shared/types'
 import { IconAudio, IconEyeOff, IconFade, IconFreeze, IconStop } from './Icons'
@@ -106,18 +107,20 @@ export function ConsoleDirect({
           <input
             type="range"
             min={0}
-            max={1}
-            step={0.01}
-            value={audio?.volume ?? 0.35}
+            max={COURSE}
+            step={1}
+            value={positionDe(audio?.volume ?? 0.35)}
             aria-label="Volume de l’ambiance"
-            onChange={(e) => void window.jdr.display.audio({ volume: Number(e.target.value) })}
+            onChange={(e) => void window.jdr.display.audio({ volume: volumeDe(Number(e.target.value)) })}
           />
           <Valeur
             className="val num"
-            value={Math.round((audio?.volume ?? 0.35) * 100)}
+            value={(audio?.volume ?? 0.35) * 100}
             min={0}
             max={100}
-            unite=" %"
+            step={0.5}
+            decimales={1}
+            affiche={texteVolume}
             label="Volume de l’ambiance"
             onChange={(v) => void window.jdr.display.audio({ volume: v / 100 })}
           />

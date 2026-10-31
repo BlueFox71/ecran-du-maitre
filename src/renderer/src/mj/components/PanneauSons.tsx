@@ -9,6 +9,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import { emojiDe, sonsDAilleurs, useSons, viser } from '../sons'
 import { Valeur } from './Valeur'
+import { COURSE, positionDe, texteVolume, volumeDe } from '../volume'
 import { IconClose, IconLecture, IconRetour, IconStop, IconVibre } from './Icons'
 import { dansForme } from '@shared/pieces'
 import {
@@ -256,18 +257,20 @@ function CeQuiJoue(): JSX.Element {
         <input
           type="range"
           min={0}
-          max={1}
-          step={0.01}
-          value={general}
+          max={COURSE}
+          step={1}
+          value={positionDe(general)}
           aria-label="Volume général"
-          onChange={(e) => void window.jdr.regieSon.regler({ general: Number(e.target.value) })}
+          onChange={(e) => void window.jdr.regieSon.regler({ general: volumeDe(Number(e.target.value)) })}
         />
         <Valeur
           className="num"
-          value={Math.round(general * 100)}
+          value={general * 100}
           min={0}
           max={100}
-          unite=" %"
+          step={0.5}
+          decimales={1}
+          affiche={texteVolume}
           label="Volume général"
           onChange={(v) => void window.jdr.regieSon.regler({ general: v / 100 })}
         />
@@ -315,11 +318,12 @@ function Piste({
         <input
           type="range"
           min={0}
-          max={1}
-          step={0.01}
-          value={volume ?? 0}
+          max={COURSE}
+          step={1}
+          value={positionDe(volume ?? 0)}
           aria-label={`Volume de ${nom}`}
-          onChange={(e) => onVolume?.(Number(e.target.value))}
+          title={texteVolume((volume ?? 0) * 100)}
+          onChange={(e) => onVolume?.(volumeDe(Number(e.target.value)))}
         />
       )}
       {onCouper ? (

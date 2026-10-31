@@ -217,9 +217,10 @@ export const reglages: Reglage[] = [
       return (
         <Curseur
           label="Volume de l’ambiance"
-          valeur={Math.round(volume * 100)}
+          valeur={volume * 100}
           min={0}
           max={100}
+          volume
           texte={(v) => `${v} %`}
           onPoser={(v) => void window.jdr.display.audio({ volume: v / 100 })}
         />

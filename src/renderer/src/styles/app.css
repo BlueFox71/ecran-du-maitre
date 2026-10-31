@@ -3409,7 +3409,10 @@ input[type='range']::-webkit-slider-thumb {
 .saisie-bar {
   flex: none;
   display: grid;
-  grid-template-columns: auto minmax(200px, 1fr);
+  /* Les joueurs prenaient toute la largeur qu'ils voulaient (`auto`) : sur un
+     écran de 1920, il ne restait aux caractéristiques que 200 px, deux par
+     colonne, et le reste à faire défiler. Trois cinquièmes, deux cinquièmes. */
+  grid-template-columns: minmax(0, 3fr) minmax(200px, 2fr);
   align-items: start;
   gap: 14px 20px;
   padding: 14px 16px;
@@ -10364,6 +10367,20 @@ input[type='range']::-webkit-slider-thumb {
   align-self: stretch;
   overflow: hidden;
 }
+/* Un volet ouvert (portes, objets, sons) rétrécit la carte : sa largeur, donc
+   sa hauteur. Sur un écran de 1920, un grand vide restait alors entre les
+   pions et la console. La rangée prend cette hauteur ; la carte garde la
+   sienne, calée en haut (et rapetisse toujours si la fenêtre est basse), et
+   c'est le volet qui s'allonge — moins de défilement dans les sons. Pas quand
+   le détail d'un pion est ouvert : c'est lui qui a besoin de la place. */
+.pupitre .pu-avec-tableau:has(> .tableau):not(:has(~ .pu-detail)) {
+  flex: 1 1 auto;
+}
+.pupitre .pu-avec-tableau:has(> .tableau):not(:has(~ .pu-detail)) > .big-frame {
+  align-self: flex-start;
+  aspect-ratio: var(--ecran, 16 / 9);
+  max-height: 100%;
+}
 /* L'en-tête (filtres, tout allumer) reste en place ; seule la liste des
    pièces défile, à la hauteur de l'image. */
 .pupitre .pu-avec-tableau .tb-salles {
@@ -10478,6 +10495,16 @@ input[type='range']::-webkit-slider-thumb {
 }
 .pu-tray .size input[type='range'] {
   width: 74px;
+}
+/* « 2 sur Rez-de-chaussée » : une base nulle, il ne fait jamais passer la
+   rangée à la ligne ; il prend ce qui reste, calé à droite, et s'abrège. */
+.pu-tray .pu-compte {
+  flex: 1 1 0;
+  min-width: 0;
+  text-align: right;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* ---- le dossier et les portables, à gauche ----
@@ -18069,6 +18096,11 @@ input.valeur-saisie:disabled {
 /* ---- le volet ---- */
 .tm-volet {
   display: grid;
+  /* Une colonne qui ne dépasse pas le volet : sans elle, la ligne la plus
+     longue (« Interventions des entités (à tout moment) ») élargissait la
+     grille au-delà des 280 px du Paravent, qui défilait de côté et coupait
+     « Ouvert ». */
+  grid-template-columns: minmax(0, 1fr);
   align-content: start;
   gap: 12px;
   padding: 12px 14px 18px;
@@ -18088,6 +18120,7 @@ input.valeur-saisie:disabled {
 .tm-types,
 .tm-liste {
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   gap: 4px;
 }
 .tm-types span,
@@ -20917,6 +20950,15 @@ button.fdc-vig:hover {
 .fiche-qui .presenter {
   margin-top: 10px;
   gap: 6px;
+  /* La colonne du portrait ne fait que ~210 px sur un écran de 1920 : le
+     bouton y tient, et ses émojis passent dessous plutôt que d'être rognés
+     au bord de la colonne. */
+  max-width: 100%;
+  flex-wrap: wrap;
+  justify-content: center;
+  row-gap: 2px;
+  white-space: normal;
+  text-align: center;
 }
 .fiche-qui .presenter svg {
   width: 13px;
@@ -23919,8 +23961,11 @@ button.fdc-vig:hover {
   flex: none;
   padding: 7px 16px;
 }
-/* Portable : les transitions passent en liste, « À suivre » perd ses mots. */
-@container cd (max-width: 860px) {
+/* Portable : les transitions passent en liste, « À suivre » perd ses mots.
+   Au Paravent d'un écran de 1920 (bureau à distance), la console ne fait que
+   935 px : en pleine largeur, le volume de l'ambiance chevauchait « À suivre »
+   et le nom de l'ambiance tombait à rien. Le seuil est donc au-dessus. */
+@container cd (max-width: 1000px) {
   .cd-modes {
     display: none;
   }
@@ -24024,6 +24069,25 @@ button.fdc-vig:hover {
   padding: 0;
   gap: 0;
   overflow: hidden;
+}
+/* Le tiroir n'a que la hauteur de l'image : trois étages qui défilent chacun
+   chez soi n'y tiennent pas — « Ce qui joue » prenait presque tout, et la
+   séance, écrasée sous son chercheur, coupée, ne se déroulait plus. Ici le
+   panneau défile d'un bloc, chaque étage à sa hauteur. */
+.sons-scene .spx {
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+.sons-scene .spx-etage,
+.sons-scene .spx-ici,
+.sons-scene .spx-seance {
+  flex: none;
+  max-height: none;
+  min-height: 0;
+  overflow: visible;
+}
+.sons-scene .spx-defile {
+  overflow: visible;
 }
 
 /* ============================================================

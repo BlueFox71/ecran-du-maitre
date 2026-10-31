@@ -17,6 +17,7 @@ import { LieuxDuSon, type UsageSon } from '../components/LieuxDuSon'
 import { ImportSons } from '../components/ImportSons'
 import { ChoixDansArbre } from '../components/ChoixDansArbre'
 import { Valeur } from '../components/Valeur'
+import { COURSE, positionDe, texteVolume, volumeDe } from '../volume'
 import {
   IconAudio,
   IconClose,
@@ -840,6 +841,7 @@ function ReglageSon({
           value={son.volume * 100}
           max={100}
           unite=" %"
+          volume
           onChange={(v) => {
             volumeApercu(v / 100)
             void regler({ volume: v / 100 })
@@ -1019,6 +1021,7 @@ export function Curseur({
   step = 1,
   decimales = 0,
   unite,
+  volume = false,
   onChange
 }: {
   label: string
@@ -1028,6 +1031,8 @@ export function Curseur({
   step?: number
   decimales?: number
   unite: string
+  /** Un volume en pour cent (0 à 100) : le curseur suit l'oreille, fin dans le bas (voir `volume.ts`). */
+  volume?: boolean
   onChange: (v: number) => void
 }): JSX.Element {
   /* Le curseur bouge tout de suite ; la base, elle, ne reçoit que la valeur où il s'arrête. */
@@ -1038,11 +1043,14 @@ export function Curseur({
       <span>{label}</span>
       <input
         type="range"
-        min={min}
-        max={max}
-        step={step}
-        value={v}
-        onChange={(e) => setBrouillon(Number(e.target.value))}
+        min={volume ? 0 : min}
+        max={volume ? COURSE : max}
+        step={volume ? 1 : step}
+        value={volume ? positionDe(v / 100) : v}
+        onChange={(e) => {
+          const n = Number(e.target.value)
+          setBrouillon(volume ? volumeDe(n) * 100 : n)
+        }}
         onPointerUp={() => {
           if (brouillon !== null) onChange(brouillon)
           setBrouillon(null)
@@ -1052,7 +1060,11 @@ export function Curseur({
           setBrouillon(null)
         }}
       />
-      <Valeur className="num" value={v} min={min} max={max} step={step} decimales={decimales} unite={unite} label={label} onChange={onChange} />
+      {volume ? (
+        <Valeur className="num" value={v} min={0} max={100} step={0.5} decimales={1} affiche={texteVolume} label={label} onChange={onChange} />
+      ) : (
+        <Valeur className="num" value={v} min={min} max={max} step={step} decimales={decimales} unite={unite} label={label} onChange={onChange} />
+      )}
     </label>
   )
 }

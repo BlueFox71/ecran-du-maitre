@@ -4,6 +4,7 @@ import * as objets from './db/repos/objets'
 import * as rolls from './db/repos/rolls'
 import * as surlignage from './db/repos/surlignage'
 import * as sons from './db/repos/sons'
+import * as mots from './db/repos/mots'
 import type { ChoixReinit } from '@shared/types'
 
 /**
@@ -19,6 +20,7 @@ export function reinitialiser(c: ChoixReinit): {
   surlignages: number
   pions: number
   sons: number
+  mots: number
 } {
   const db = getDb()
   const cid = activeCampaignId()
@@ -73,5 +75,9 @@ export function reinitialiser(c: ChoixReinit): {
      Ctrl+Z, comme un son qui part : ça se réarme, ça ne s'annule pas. */
   const sonsRearmes = c.sons ? sons.rearmerTout(cid) : 0
 
-  return { objets: ranges, jauges, surlignages, pions, sons: sonsRearmes }
+  /* Les mots secrets partis quittent les téléphones et attendent de nouveau
+     sur leur moment : rejouer la scène les renverra. */
+  const motsRepris = c.mots ? mots.reprendreTout() : 0
+
+  return { objets: ranges, jauges, surlignages, pions, sons: sonsRearmes, mots: motsRepris }
 }

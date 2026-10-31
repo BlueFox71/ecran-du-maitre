@@ -133,6 +133,17 @@ export function effacer(lot: string): void {
   getDb().prepare(`DELETE FROM mot WHERE lot = ? AND campaign_id = ?`).run(lot, activeCampaignId())
 }
 
+/**
+ * « Réinitialiser la séance » : tous les mots partis quittent les téléphones
+ * et redeviennent gardés, sur leur moment, non lus — prêts à repartir quand
+ * on rejoue la scène. Rend le nombre d'exemplaires repris.
+ */
+export function reprendreTout(): number {
+  return getDb()
+    .prepare(`UPDATE mot SET envoye_at = NULL, lu_at = NULL WHERE campaign_id = ? AND envoye_at IS NOT NULL`)
+    .run(activeCampaignId()).changes
+}
+
 /* ============================================================
    Ce que le téléphone lit, et ce qu'il en dit
    ============================================================ */

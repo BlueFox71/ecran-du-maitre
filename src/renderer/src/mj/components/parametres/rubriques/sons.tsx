@@ -19,9 +19,10 @@ export const reglages: Reglage[] = [
       return (
         <Curseur
           label="Volume général des sons"
-          valeur={Math.round(general * 100)}
+          valeur={general * 100}
           min={0}
           max={100}
+          volume
           texte={(v) => `${v} %`}
           onPoser={(v) => void window.jdr.regieSon.regler({ general: v / 100 })}
         />

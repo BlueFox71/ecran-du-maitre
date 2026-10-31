@@ -1140,6 +1140,8 @@ export interface ChoixReinit {
   pionsPj: boolean
   /** Les sons posés déjà joués, réarmés dans toute la campagne. */
   sons: boolean
+  /** Les mots secrets envoyés : repris des téléphones, de nouveau gardés sur leur moment. */
+  mots: boolean
 }
 
 /** Un jet de personnage noté : ce que la santé mentale lit pour réagir. */
