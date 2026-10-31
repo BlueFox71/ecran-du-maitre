@@ -23385,6 +23385,15 @@ button.fdc-vig:hover {
 .spx-joue {
   background: var(--raised);
 }
+/* Un étage plein de sons posés défile au lieu de pousser la séance hors du
+   volet : la moitié de la hauteur au plus. */
+.spx-ici {
+  flex: 0 1 auto;
+  min-height: 0;
+  max-height: 50%;
+  overflow-y: auto;
+  align-content: start;
+}
 .spx-tete {
   display: flex;
   align-items: center;
@@ -23669,7 +23678,8 @@ button.fdc-vig:hover {
 }
 .spx-seance {
   flex: 1;
-  min-height: 0;
+  /* Jamais écrasée : le chercheur et une rangée de tuiles restent visibles. */
+  min-height: 140px;
   display: flex;
   flex-direction: column;
   border-bottom: 0;
@@ -24026,6 +24036,17 @@ button.fdc-vig:hover {
 @media (max-width: 1700px) {
   .app {
     grid-template-columns: 236px minmax(0, 1fr);
+  }
+}
+/* Écran 1920 (ou portable que la fenêtre ramène à 1920, voir zoom.ts) : à
+   quelques pixels près, les dix dispositions de la Régie tenaient sur une
+   ligne. La barre se resserre d'autant ; le grand écran garde ses aises. */
+@media (max-width: 2100px) {
+  .stage-bar {
+    gap: 8px;
+  }
+  .stage-bar .lum input[type='range'] {
+    width: 72px;
   }
 }
 @media (max-width: 1440px) {

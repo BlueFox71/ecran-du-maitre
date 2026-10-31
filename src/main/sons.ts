@@ -16,6 +16,7 @@
  * derrière une cloison, ou derrière une porte fermée, n'entend rien.
  */
 import * as display from './display'
+import { activeCampaignId } from './db/index'
 import * as mobile from './mobile'
 import * as sons from './db/repos/sons'
 import { listPions } from './db/repos/pions'
@@ -42,8 +43,15 @@ const regie = {
   nappes: [] as SonsMj['nappes'],
   journal: [] as SonJoue[]
 }
-/** L'état de chaque son posé ; absent, il est armé (ou à l'écoute). */
+/**
+ * Les sons posés qui attendent le feu vert. « Déjà joué » n'est pas ici : il
+ * est en base (`son_zone.joue`), pour survivre à une relance de l'outil.
+ */
 const etats = new Map<number, EtatZone>()
+
+/** Où en est un son posé : en attente, déjà joué, ou armé (à l'écoute pour une source). */
+const etatDe = (z: ZoneSon): EtatZone =>
+  etats.get(z.id) ?? (z.joue ? 'fait' : z.quand === 'proche' ? 'ecoute' : 'arme')
 const attente = new Map<number, string | null>()
 /** Le dernier départ de chaque son posé, pour son temps mort. */
 const dernier = new Map<number, number>()
@@ -58,6 +66,21 @@ let sources: SonsMj['sources'] = []
 const fichierDeSource = new Map<number, string | null>()
 let suite = 0
 
+/** Le temps qu'un feu vert reste demandé une fois le pion ressorti du cercle. */
+const DELAI_SORTIE = 10_000
+/** Les demandes de feu vert dont le pion est ressorti, et leur compte à rebours. */
+const sorties = new Map<number, ReturnType<typeof setTimeout>>()
+
+function lacherSortie(zoneId: number): void {
+  clearTimeout(sorties.get(zoneId))
+  sorties.delete(zoneId)
+}
+
+function oublierSorties(): void {
+  for (const t of sorties.values()) clearTimeout(t)
+  sorties.clear()
+}
+
 /* ============================================================
    L'état envoyé au MJ
    ============================================================ */
@@ -65,7 +88,7 @@ let suite = 0
 export function etat(): SonsMj {
   const zones: Record<number, EtatZone> = {}
   for (const z of sons.listZones(lieuSuivi))
-    zones[z.id] = etats.get(z.id) ?? (z.quand === 'proche' ? 'ecoute' : 'arme')
+    zones[z.id] = etatDe(z)
   return {
     general: regie.general,
     auto: regie.auto,
@@ -95,15 +118,16 @@ function tirer(son: Son): { itemId: number; url: string | null } | null {
 /**
  * Faire partir un son. Un bruitage part tel quel ; une nappe s'ajoute à
  * celles qui tournent ; une ambiance prend la place de la précédente.
+ * `unCoup` : il part une fois, sans boucle, quelle que soit sa nature.
  */
 export function jouer(
   sonId: number,
-  depuis: { qui?: string | null; zoneId?: number | null; vibrer?: number[] | 'tous' | null } = {}
+  depuis: { qui?: string | null; zoneId?: number | null; vibrer?: number[] | 'tous' | null; unCoup?: boolean } = {}
 ): SonsMj {
   const son = sons.getSon(sonId)
   if (!son) return etat()
-  if (son.nature === 'ambiance') return ambiance(sonId)
-  if (son.nature === 'nappe') return ajouterNappe(sonId)
+  if (!depuis.unCoup && son.nature === 'ambiance') return ambiance(sonId)
+  if (!depuis.unCoup && son.nature === 'nappe') return ajouterNappe(sonId)
 
   const f = tirer(son)
   const joue: SonJoue = {
@@ -193,7 +217,8 @@ export function regler(patch: { general?: number; auto?: boolean }): SonsMj {
 export function silence(): SonsMj {
   regie.nappes = regie.nappes.map((n) => ({ ...n, on: false }))
   attente.clear()
-  for (const [id, e] of etats) if (e === 'attente') etats.set(id, 'arme')
+  oublierSorties()
+  etats.clear()
   display.setAudio({ playing: false })
   display.versMj('sons:silence', null)
   diffuser()
@@ -222,10 +247,25 @@ const concerne = (z: ZoneSon, p: Pion): boolean => {
   return z.par === 'tous' || (z.par === 'joueurs' ? joueur : !joueur)
 }
 
+/**
+ * Où est le pion **sur la carte**. Il est rangé en fractions du cadre de
+ * l'écran des joueurs, où la carte entre entière, centrée, avec des bandes
+ * là où les proportions diffèrent — le chemin même de `pionVersCarte`
+ * (Slide.tsx). Sans lui, sur une carte moins large que l'écran, le pion
+ * posé dans un cercle passait pour être à côté.
+ */
+function surCarte(p: Pion, g: { w: number; h: number }): Pt {
+  const carte = g.w / g.h
+  const ecran = display.ratioEcran()
+  const x = ecran > carte ? (p.x - 0.5) * (ecran / carte) + 0.5 : p.x
+  const y = ecran < carte ? (p.y - 0.5) * (carte / ecran) + 0.5 : p.y
+  return { x: x * g.w, y: y * g.h }
+}
+
 /** La part du rayon qui reste entre le pion et le bord : 1 au centre, 0 au bord ou au-delà. */
 function proximite(z: ZoneSon, p: Pion, g: { murs: Barriere[]; w: number; h: number }): number {
   const c = { x: z.x * g.w, y: z.y * g.h }
-  const q = { x: p.x * g.w, y: p.y * g.h }
+  const q = surCarte(p, g)
   const d = Math.hypot(q.x - c.x, q.y - c.y) / (z.rayon * g.w)
   if (d > 1) return 0
   for (const m of g.murs) if (seCroisent(c, q, m.a, m.b)) return 0
@@ -236,8 +276,10 @@ function proximite(z: ZoneSon, p: Pion, g: { murs: Barriere[]; w: number; h: num
 function declencher(z: ZoneSon, qui: Pion | null): void {
   if (z.sonId == null) return
   dernier.set(z.id, Date.now())
-  etats.set(z.id, z.quand === 'une' ? 'fait' : 'arme')
+  etats.delete(z.id)
+  if (z.quand === 'une') sons.marquerJoue(z.id, true)
   attente.delete(z.id)
+  lacherSortie(z.id)
   /* « Lui » : le téléphone de celui qui entre — un PNJ n'en a pas. */
   const vibrer =
     z.vibrer === 'tous'
@@ -245,7 +287,10 @@ function declencher(z: ZoneSon, qui: Pion | null): void {
       : z.vibrer === 'lui' && qui?.characterId != null
         ? [qui.characterId]
         : null
-  jouer(z.sonId, { qui: qui?.label ?? null, zoneId: z.id, vibrer })
+  /* Un son posé qui part — seul ou au feu vert — se joue une fois, quelle que
+     soit sa nature : une nappe ne s'installe pas en boucle. Ce qui tourne tant
+     qu'on est près, c'est la source (« Tant qu'on est proche »). */
+  jouer(z.sonId, { qui: qui?.label ?? null, zoneId: z.id, vibrer, unCoup: true })
 }
 
 /**
@@ -260,6 +305,7 @@ function surPions(placeId: number | null): void {
     dedans = new Set()
     connus = new Set()
     attente.clear()
+    oublierSorties()
   }
   if (!zones.length || placeId == null) {
     const avait = sources.length > 0 || changeDeLieu
@@ -281,7 +327,7 @@ function surPions(placeId: number | null): void {
       maintenant.add(cle)
       /* Déjà dedans, ou tout juste posé : ce n'est pas une entrée. */
       if (dedans.has(cle) || !connus.has(p.id)) continue
-      const e = etats.get(z.id) ?? 'arme'
+      const e = etatDe(z)
       if (e === 'fait' || e === 'attente') continue
       if (z.quand === 'chaque' && Date.now() - (dernier.get(z.id) ?? 0) < z.tempsMort * 1000) continue
       bouge = true
@@ -293,6 +339,25 @@ function surPions(placeId: number | null): void {
   }
   dedans = maintenant
   connus = new Set(pions.map((p) => p.id))
+
+  /* Un feu vert demandé pour quelqu'un qui est ressorti : s'il ne revient pas
+     dans les dix secondes, la demande s'efface et le son se réarme. */
+  for (const z of zones) {
+    if (etats.get(z.id) !== 'attente') continue
+    const quelquun = pions.some((p) => maintenant.has(`${z.id}:${p.id}`))
+    if (quelquun) lacherSortie(z.id)
+    else if (!sorties.has(z.id))
+      sorties.set(
+        z.id,
+        setTimeout(() => {
+          sorties.delete(z.id)
+          if (etats.get(z.id) !== 'attente') return
+          etats.delete(z.id)
+          attente.delete(z.id)
+          diffuser()
+        }, DELAI_SORTIE)
+      )
+  }
 
   /* Les sources : le pion le plus proche fixe le gain. */
   const avant = JSON.stringify(sources)
@@ -334,7 +399,9 @@ export function jouerZone(zoneId: number): SonsMj {
 /** Refuser le feu vert, ou réarmer un son déjà joué. */
 export function rearmer(zoneId: number): SonsMj {
   etats.delete(zoneId)
+  sons.marquerJoue(zoneId, false)
   attente.delete(zoneId)
+  lacherSortie(zoneId)
   dernier.delete(zoneId)
   diffuser()
   return etat()
@@ -342,7 +409,9 @@ export function rearmer(zoneId: number): SonsMj {
 
 export function toutRearmer(): SonsMj {
   etats.clear()
+  sons.rearmerTout(activeCampaignId())
   attente.clear()
+  oublierSorties()
   dernier.clear()
   diffuser()
   return etat()
@@ -361,6 +430,7 @@ export function oublier(): void {
   regie.journal = []
   etats.clear()
   attente.clear()
+  oublierSorties()
   dernier.clear()
   fichierDeSource.clear()
   dedans = new Set()

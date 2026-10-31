@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom'
 import { COLLAGE_CELLS, FRAME_NEUTRE, corpsDeCase, etatDeVie } from '@shared/types'
 import { Brouillard, regardsDes, sousUnRegard } from './Brouillard'
 import { Visage } from './Visage'
+import { usePionsLisses } from './pionsLisses'
 import { barrieres, pasContraint, type Pt } from '@shared/murs'
 import { bordsOuverture } from '@shared/ouvertures'
 import type { Surbrillance } from '../mj/components/Tableau'
@@ -294,7 +295,7 @@ export function Slide({
   brouillard,
   ombre = true,
   surbrillance,
-  pions,
+  pions: pionsRecus,
   pionSize = 6,
   focusPionId,
   onDefocus,
@@ -332,6 +333,10 @@ export function Slide({
   articlesMj,
   jour
 }: { slide: SlidePayload; animate?: boolean } & SlideExtras): JSX.Element {
+  /* Les pions arrivent par crans (vingt par seconde quand on marche) : on
+     dessine les positions glissées, sur lesquelles se calent aussi la caméra
+     qui suit et l'ombre des murs. Voir pionsLisses.ts. */
+  const pions = usePionsLisses(pionsRecus)
   const cls = `slide sl-${slide.type}${animate ? ' slide-fade' : ''}${
     onPoserSurCarte ? ' pose-point' : ''
   }`

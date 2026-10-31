@@ -102,7 +102,9 @@ const INVERSES_DU_JEU = [
   /* Ouvrir une porte, tirer un rideau, allumer une lampe : ça se referme et
      ça s'éteint, ça ne s'annule pas. */
   /^UPDATE "ouverture" SET "ouverte"=/,
-  /^UPDATE "lumiere" SET "allumee"=/
+  /^UPDATE "lumiere" SET "allumee"=/,
+  /* Un son posé qui joue en pleine partie : ça se réarme, ça ne s'annule pas. */
+  /^UPDATE "son_zone" SET "joue"=/
 ]
 
 /**

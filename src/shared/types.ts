@@ -1138,6 +1138,8 @@ export interface ChoixReinit {
   surlignages: boolean
   /** Les pions des personnages joueurs, retirés de tous les lieux. */
   pionsPj: boolean
+  /** Les sons posés déjà joués, réarmés dans toute la campagne. */
+  sons: boolean
 }
 
 /** Un jet de personnage noté : ce que la santé mentale lit pour réagir. */
@@ -1998,6 +2000,8 @@ export interface ZoneSon {
   /** Attendre le feu vert du MJ au Paravent plutôt que jouer tout seul. */
   confirmer: boolean
   vibrer: VibrerZone
+  /** « Une seule fois » et déjà joué : gardé en base jusqu'à ce qu'on le réarme. */
+  joue: boolean
 }
 
 /** Où en est un son posé, le temps d'une partie. */

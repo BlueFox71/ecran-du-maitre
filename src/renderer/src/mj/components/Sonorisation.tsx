@@ -12,7 +12,8 @@ import { brancherSons, useSons } from '../sons'
  * - **les nappes** lancées à la main, en boucle, chacune à son volume ;
  * - **les sources** posées sur le plan, dont le volume suit le pion le plus
  *   proche ;
- * - **les bruitages**, qui partent et s'oublient.
+ * - **les bruitages** — et les sons posés qu'un pion déclenche —, qui
+ *   partent et s'oublient.
  *
  * Il ne décide de rien : il suit `display.audio` et la régie du son.
  */
@@ -140,7 +141,9 @@ export function Sonorisation(): JSX.Element | null {
 
   useEffect(() => {
     const finir = window.jdr.regieSon.onJoue((j) => {
-      if (j.nature !== 'bruitage' || !j.url) return
+      /* Tout ce qui arrive ici part une fois : nappes et ambiances n'y passent
+         qu'en coup unique (un son posé qu'un pion a déclenché). */
+      if (!j.url) return
       const el = new Audio(j.url)
       el.volume = Math.max(0, Math.min(1, j.volume * generalRef.current))
       enCours.current.add(el)

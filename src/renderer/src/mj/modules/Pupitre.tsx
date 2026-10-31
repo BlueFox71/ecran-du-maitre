@@ -4,6 +4,7 @@ import { usePoignee } from '../components/Poignee'
 import { ChoixPnj, RetirerDeLaReserve, usePnjEnReserve } from '../components/ReservePnj'
 import { MenuPion, type CiblePion } from '../components/MenuPion'
 import { TailleEchelle } from '../components/TailleEchelle'
+import { AllurePions } from '../components/AllurePions'
 import { DetailPion } from '../components/DetailPion'
 import { VueSm } from '../santeMentale/VueSm'
 import { BoutonAffichage, useTraitsMj } from '../components/Affichage'
@@ -1909,6 +1910,7 @@ export function Pupitre(): JSX.Element {
               />
             </label>
             <TailleEchelle placeId={editPlaceId} size={edit.size} onFait={refreshEdit} />
+            <AllurePions placeId={editPlaceId} />
 
             <span className="sep" />
             {/* Noms et PV sous les pions : dans « Affichage », avec le reste. */}

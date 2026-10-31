@@ -100,6 +100,16 @@ function targetDisplay(): Electron.Display {
   return all.find((d) => d.id !== primary.id) ?? primary
 }
 
+/**
+ * Les proportions de l'écran des joueurs. Les pions y sont posés en fractions
+ * de ce cadre, pas de la carte (voir `pionVersCarte` dans Slide.tsx) : qui
+ * veut les situer sur le plan doit les connaître.
+ */
+export function ratioEcran(): number {
+  const { width, height } = targetDisplay().size
+  return width > 0 && height > 0 ? width / height : 16 / 9
+}
+
 export function setOutput(displayId: number | null): DisplayState {
   state.outputDisplayId = displayId
   if (playerWindow && !playerWindow.isDestroyed()) {

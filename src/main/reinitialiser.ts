@@ -3,6 +3,7 @@ import * as chars from './db/repos/characters'
 import * as objets from './db/repos/objets'
 import * as rolls from './db/repos/rolls'
 import * as surlignage from './db/repos/surlignage'
+import * as sons from './db/repos/sons'
 import type { ChoixReinit } from '@shared/types'
 
 /**
@@ -17,6 +18,7 @@ export function reinitialiser(c: ChoixReinit): {
   jauges: number
   surlignages: number
   pions: number
+  sons: number
 } {
   const db = getDb()
   const cid = activeCampaignId()
@@ -67,5 +69,9 @@ export function reinitialiser(c: ChoixReinit): {
         .run(cid).changes
     : 0
 
-  return { objets: ranges, jauges, surlignages, pions }
+  /* Les sons posés « une seule fois » déjà joués se réarment. Hors du
+     Ctrl+Z, comme un son qui part : ça se réarme, ça ne s'annule pas. */
+  const sonsRearmes = c.sons ? sons.rearmerTout(cid) : 0
+
+  return { objets: ranges, jauges, surlignages, pions, sons: sonsRearmes }
 }

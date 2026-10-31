@@ -22,6 +22,7 @@ const CASES: { k: keyof ChoixReinit; nom: string; aide: string; sm?: boolean }[]
   { k: 'journalJauges', nom: 'Vider le journal des jauges', aide: 'L’historique des fiches, et le journal de la santé mentale.' },
   { k: 'journalJets', nom: 'Vider le journal des jets', aide: 'Les jets de la séance active.' },
   { k: 'pionsPj', nom: 'Retirer les pions des joueurs', aide: 'De tous les lieux et visuels. Ceux des PNJ restent.' },
+  { k: 'sons', nom: 'Réarmer les sons', aide: 'Les sons posés « une seule fois » déjà joués, dans toute la campagne.' },
   { k: 'surlignages', nom: 'Retirer tous les surlignages', aide: 'Ceux du Paravent, dans toute la campagne.' },
   { k: 'etatSm', nom: 'Effacer la santé mentale en cours', aide: 'Chronos, jets attendus, alertes, remèdes déjà pris.', sm: true }
 ]
@@ -35,7 +36,8 @@ const DEFAUT: ChoixReinit = {
   journalJets: true,
   etatSm: true,
   surlignages: false,
-  pionsPj: true
+  pionsPj: true,
+  sons: true
 }
 
 export function ReinitSeance({ onFerme }: { onFerme: () => void }): JSX.Element {

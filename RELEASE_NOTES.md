@@ -1,9 +1,17 @@
-<!-- version: 1.5.1 -->
+<!-- version: 1.5.2 -->
 ### Nouveautés
-- **Le surligneur du Paravent.** Pour savoir d'un coup d'œil ce qui est fait : clique « Surligneur » dans l'en-tête de ce que tu lis (ou appuie sur H), puis glisse sur le texte d'un moment, d'une annexe ou de la fiche d'un lieu — articles, si/alors, notes des PNJ, objets compris. Repasse sur un passage surligné pour l'effacer ; Échap repose le feutre. Les surlignages restent d'une séance à l'autre, ne se voient que de toi (jamais sur l'écran des joueurs ni sur les téléphones), et Ctrl+Z annule le dernier coup de feutre. « Effacer le surlignage » vide un document d'un coup.
+- **La vitesse des pions, réglable au Paravent.** À côté de « Taille », un curseur « Vitesse » règle l'allure des pions que les joueurs font marcher depuis leur téléphone (et du pion que tu pilotes toi-même). Les téléphones la reçoivent dès que tu lâches le curseur. Elle vaut pour tout le plan : les pièces d'un même étage la partagent, comme dans Lieux.
+- **Réarmer les sons**, nouvelle case de « Réinitialiser la séance » (cochée par défaut) : les sons posés « une seule fois » déjà joués repartent à zéro dans toute la campagne.
 
 ### Améliorations
-- **Réinitialiser la séance** propose deux nouvelles cases : « Retirer les pions des joueurs » de tous les lieux et visuels (cochée par défaut ; ceux des PNJ restent), et « Retirer tous les surlignages » (décochée par défaut). Un Ctrl+Z rend tout, pions compris.
+- **Petits écrans et bureau à distance.** Sur un portable ou à distance, l'interface se met à l'échelle au lieu de replier ses colonnes : le Paravent et la Régie gardent la même disposition que sur un grand écran, simplement plus petite. Sur un grand écran, rien ne change. Agrandir et Réduire (Ctrl + / Ctrl −) fonctionnent toujours en plus de cet ajustement.
+- **La caméra qui suit un pion est fluide.** Quand l'écran suit un pion qui marche, la carte glisse avec lui au lieu d'avancer par à-coups ; les autres pions et l'ombre des murs suivent le même mouvement.
+- Un son posé « une seule fois » se souvient d'avoir joué, même après une relance de l'outil : la porte ne regrince pas à la séance suivante.
+- Un son posé déclenché par un pion se joue une fois, même si c'est une nappe ou une ambiance : il ne s'installe plus en boucle.
+- Une demande de feu vert pour un son s'efface d'elle-même si le pion ressort du cercle et n'y revient pas dans les dix secondes.
+- Dans la Régie, les dix dispositions tiennent de nouveau sur une seule ligne sur un écran de 1920 de large.
+- Dans le panneau des sons, la partie « Ici » défile quand le lieu porte beaucoup de sons, sans jamais écraser « La séance ».
 
 ### Corrections
-- Après un Ctrl+Z, les pions rendus réapparaissent aussi sur l'écran des joueurs.
+- Un pion posé dans le cercle d'un son, sur une carte moins large que l'écran des joueurs, déclenche bien le son (il passait pour être à côté).
+- Le pion que tu pilotes prend en compte un changement de vitesse sans qu'il faille refermer le pilote.

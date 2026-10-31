@@ -107,7 +107,9 @@ const TOUTES = '\u0000toutes'
  *  — **Ici** : le lieu en scène — son ambiance, ses sons posés et ceux qui
  *    attendent le feu vert ;
  *  — **La séance** : le reste des sons de la séance, en tuiles par planche.
- * Seul le dernier étage défile. Un clic sur une tuile joue, selon la nature.
+ * « La séance » défile ; « Ici » aussi quand le lieu porte beaucoup de sons
+ * posés, sans jamais prendre plus de la moitié de la hauteur — sinon il
+ * écrasait la séance à rien. Un clic sur une tuile joue, selon la nature.
  */
 export function PanneauSons(): JSX.Element {
   const liste = useSons((x) => x.liste)
@@ -366,7 +368,7 @@ function Ici({ lieu, regie }: { lieu: Place | null; regie: SonsMj | null }): JSX
   const ambEnCours = !!amb && audio?.itemId === amb.itemId && !!audio?.playing
 
   return (
-    <section className="spx-etage" aria-label="Le lieu en scène">
+    <section className="spx-etage spx-ici" aria-label="Le lieu en scène">
       <div className="spx-tete">
         <span className="eyebrow">Ici</span>
         <span className="spx-lieu">{lieu ? lieu.name : 'Aucun lieu en scène'}</span>

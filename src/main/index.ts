@@ -10,6 +10,7 @@ import * as carnet from './carnet'
 import * as projet from './project'
 import { registerMediaProtocol, registerProtocolScheme } from './vault'
 import * as examen from './examen'
+import { suivreZoom, zoomer } from './zoom'
 import { synchroniserBientot } from './lieuxTexte'
 import { synchroniserPnjBientot } from './pnjTexte'
 import { synchroniserArborescencesBientot } from './arborescenceTexte'
@@ -46,6 +47,8 @@ function createMainWindow(): void {
   /* Au démarrage, la fenêtre occupe tout l'écran sans passer en plein écran
      exclusif : la barre de titre et la barre des tâches restent accessibles.
      Les dimensions ci-dessus servent alors de taille restaurée. */
+  suivreZoom(mainWindow)
+
   mainWindow.on('ready-to-show', () => {
     mainWindow?.maximize()
     mainWindow?.show()
@@ -68,7 +71,10 @@ function createMainWindow(): void {
   })
 
   if (process.env.ELECTRON_RENDERER_URL) {
-    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL)
+    /* Chromium partage le zoom entre les pages d'un même hôte : par un autre
+       nom que l'écran joueurs et le graveur, le zoom ajusté de cette fenêtre
+       (zoom.ts) ne les rétrécit pas. En production, chaque fichier a le sien. */
+    mainWindow.loadURL(process.env.ELECTRON_RENDERER_URL.replace('//localhost', '//127.0.0.1'))
   } else {
     mainWindow.loadFile(join(__dirname, '../renderer/index.html'))
   }
@@ -162,9 +168,12 @@ function buildMenu(): void {
         { role: 'reload', label: 'Recharger' },
         { role: 'toggleDevTools', label: 'Outils de développement' },
         { type: 'separator' },
-        { role: 'resetZoom', label: 'Zoom normal' },
-        { role: 'zoomIn', label: 'Agrandir' },
-        { role: 'zoomOut', label: 'Réduire' }
+        /* Pas les rôles tout faits d'Electron : ils écraseraient le zoom que
+           la fenêtre ajuste à la taille de l'écran (voir zoom.ts). */
+        { label: 'Zoom normal', accelerator: 'CommandOrControl+0', click: () => zoomer('normal') },
+        { label: 'Agrandir', accelerator: 'CommandOrControl+=', click: () => zoomer('plus') },
+        { label: 'Agrandir', accelerator: 'CommandOrControl+Plus', click: () => zoomer('plus'), visible: false, acceleratorWorksWhenHidden: true },
+        { label: 'Réduire', accelerator: 'CommandOrControl+-', click: () => zoomer('moins') }
       ]
     }
   ])

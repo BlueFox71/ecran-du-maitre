@@ -1984,5 +1984,14 @@ export const MIGRATIONS: { id: number; sql: string }[] = [
     );
     CREATE INDEX idx_surlignage ON surlignage(campaign_id, cible);
     `
+  },
+  {
+    id: 90,
+    sql: `
+    /* Un son posé « une seule fois » qui a joué s'en souvient, d'une soirée à
+       l'autre : la porte ne grince pas de nouveau parce qu'on a relancé
+       l'outil. « Réinitialiser la séance » (case Sons) le réarme. */
+    ALTER TABLE son_zone ADD COLUMN joue INTEGER NOT NULL DEFAULT 0;
+    `
   }
 ]

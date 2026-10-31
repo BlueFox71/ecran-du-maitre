@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { ALLURE_DEFAUT, type Pion } from '@shared/types'
+import { ALLURE_CHANGEE } from './AllurePions'
 
 /*
  * Les mêmes allures que le pupitre du téléphone (voir mobile/Mobile.tsx) : un
@@ -41,11 +42,17 @@ export function PilotePion({ pion }: { pion: Pion }): JSX.Element {
   useEffect(() => {
     let vivant = true
     allure.current = ALLURE_DEFAUT
-    void window.jdr.places.echelle(pion.placeId).then((e) => {
-      if (vivant) allure.current = e.allure
-    })
+    const lire = (): void => {
+      void window.jdr.places.echelle(pion.placeId).then((e) => {
+        if (vivant) allure.current = e.allure
+      })
+    }
+    lire()
+    /* Réglée au Paravent pendant qu'on pilote : on la relit aussitôt. */
+    window.addEventListener(ALLURE_CHANGEE, lire)
     return () => {
       vivant = false
+      window.removeEventListener(ALLURE_CHANGEE, lire)
     }
   }, [pion.placeId])
 

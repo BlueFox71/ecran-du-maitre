@@ -247,8 +247,21 @@ function toZone(r: any): ZoneSon {
     par: parmi(r.par, PARS, 'joueurs'),
     tempsMort: borne(r.temps_mort, 0, 600, 10),
     confirmer: !!r.confirmer,
-    vibrer: parmi(r.vibrer, VIBRERS, 'lui')
+    vibrer: parmi(r.vibrer, VIBRERS, 'lui'),
+    joue: !!r.joue
   }
+}
+
+/** Noter qu'un son posé a joué, ou le réarmer. */
+export function marquerJoue(id: number, joue: boolean): void {
+  getDb().prepare(`UPDATE son_zone SET joue = ? WHERE id = ? AND joue <> ?`).run(joue ? 1 : 0, id, joue ? 1 : 0)
+}
+
+/** Réarmer tous les sons posés déjà joués de la campagne ; rend combien. */
+export function rearmerTout(campaignId: number): number {
+  return getDb()
+    .prepare(`UPDATE son_zone SET joue = 0 WHERE joue = 1 AND place_id IN (SELECT id FROM place WHERE campaign_id = ?)`)
+    .run(campaignId).changes
 }
 
 export function listZones(placeId: number | null): ZoneSon[] {

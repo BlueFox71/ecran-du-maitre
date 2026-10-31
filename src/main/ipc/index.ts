@@ -46,6 +46,7 @@ import { noterJet } from '../jetDuPerso'
 import { reinitialiser } from '../reinitialiser'
 import type { ChoixReinit } from '@shared/types'
 import type { Cible, Plage } from '@shared/surlignage'
+import { estFenetreSuivie, zoomer } from '../zoom'
 
 /** Des bonus ont vieilli tout seuls : la fiche du MJ et les téléphones relisent. */
 function modifsVieillis(): void {
@@ -193,9 +194,10 @@ export function registerIpc(): void {
       case 'coller': wc.paste(); break
       case 'recharger': wc.reload(); break
       case 'outils': wc.toggleDevTools(); break
-      case 'zoomPlus': wc.setZoomLevel(Math.min(4, wc.getZoomLevel() + 0.5)); break
-      case 'zoomMoins': wc.setZoomLevel(Math.max(-4, wc.getZoomLevel() - 0.5)); break
-      case 'zoomNormal': wc.setZoomLevel(0); break
+      // La fenêtre du MJ ajuste son zoom à l'écran : on règle la préférence, pas le zoom brut.
+      case 'zoomPlus': if (estFenetreSuivie(w)) zoomer('plus'); else wc.setZoomLevel(Math.min(4, wc.getZoomLevel() + 0.5)); break
+      case 'zoomMoins': if (estFenetreSuivie(w)) zoomer('moins'); else wc.setZoomLevel(Math.max(-4, wc.getZoomLevel() - 0.5)); break
+      case 'zoomNormal': if (estFenetreSuivie(w)) zoomer('normal'); else wc.setZoomLevel(0); break
       case 'quitter': app.quit(); break
     }
   })
@@ -1172,6 +1174,8 @@ export function registerIpc(): void {
   on('seance:reinitialiser', (choix: ChoixReinit) => {
     const r = reinitialiser(choix)
     if (r.pions) display.refreshPions()
+    /* La régie relit : demandes de feu vert et temps morts repartent aussi de zéro. */
+    if (choix.sons) regieSon.toutRearmer()
     display.refreshJoueurs()
     display.versMj('characters:relus', null)
     if (pochette.suivreInventaires()) display.versMj('pochette:changee', null)

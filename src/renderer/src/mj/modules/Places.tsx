@@ -77,6 +77,7 @@ import {
   type Zone
 } from '@shared/types'
 import { ALLURE_DEFAUT, ALLURE_MAX, ALLURE_MIN } from '@shared/types'
+import { ALLURE_CHANGEE } from '../components/AllurePions'
 import { boiteDe, centreDe, dansForme, pointInterieur, type Forme } from '@shared/pieces'
 import { barrieres, carreDAngle, mettreDEquerre, pasContraint, type Pt } from '@shared/murs'
 import { BoutonEquerre } from '../components/BoutonEquerre'
@@ -3981,7 +3982,10 @@ function FicheLieu({
                     if (!apercuPion) setPoseApercu({ x: 0.5, y: 0.5, cap: 0 })
                     setApercuPion((a) => !a)
                   }}
-                  onAllure={async (v) => setEch(await window.jdr.pions.allure(p.id, v))}
+                  onAllure={async (v) => {
+                    setEch(await window.jdr.pions.allure(p.id, v))
+                    window.dispatchEvent(new Event(ALLURE_CHANGEE))
+                  }}
                   onPousse={(v) => (pousseApercu.current = v)}
                 />
               ) : null}
