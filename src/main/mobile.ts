@@ -19,7 +19,7 @@
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { createReadStream, existsSync, statSync } from 'node:fs'
 import { networkInterfaces } from 'node:os'
-import { randomBytes, randomUUID } from 'node:crypto'
+import { randomBytes, randomInt, randomUUID } from 'node:crypto'
 import { basename, extname, join, normalize } from 'node:path'
 import { BrowserWindow, app } from 'electron'
 import { toDataURL } from 'qrcode'
@@ -1312,7 +1312,10 @@ function roll(res: ServerResponse, url: URL, corps: any): void {
 
   const fiche = chars.campaignSheet()
   const carac = fiche.spec.stats.find((st) => st.key === String(corps.caracKey))
-  const de = Number(corps.de)
+  /* « Lancer le dé » : le poste tire le d20 lui-même — le téléphone ne fait
+     qu'animer le chiffre qu'on lui rend, et personne ne choisit son résultat. */
+  const lance = corps.lancer === true
+  const de = lance ? randomInt(1, 21) : Number(corps.de)
   if (!carac) return json(res, 400, { erreur: 'Caractéristique inconnue.' })
   if (!Number.isInteger(de) || de < 1 || de > 20) return json(res, 400, { erreur: 'Valeur de dé impossible.' })
 
@@ -1323,6 +1326,21 @@ function roll(res: ServerResponse, url: URL, corps: any): void {
   if (fait.use) {
     versMj('characters:relus', null)
     broadcast()
+  }
+
+  /* Un dé lancé dans l'application tombe aussi sur l'écran de la table ; une
+     valeur recopiée d'un vrai dé, toute la table l'a déjà vue rouler. */
+  if (lance) {
+    display.poserDe({
+      joueur: joueur!.name,
+      perso: perso.name,
+      couleur: joueur!.color,
+      carac: carac.label,
+      code: carac.code ?? null,
+      de,
+      bonus: fait.bonus,
+      total: fait.total
+    })
   }
 
   versMj('mobile:roll', {
@@ -1342,7 +1360,8 @@ function roll(res: ServerResponse, url: URL, corps: any): void {
     mod: fait.mod,
     lignes: fait.lignes,
     total: fait.total,
-    naturel: naturel(de)
+    naturel: naturel(de),
+    lance
   })
 }
 

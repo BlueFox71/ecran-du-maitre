@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { IconTrash } from './Icons'
+import { signe } from '@shared/jet'
 import type { MobileInfo } from '@shared/types'
 
 /**
@@ -205,6 +206,45 @@ export function Annonces(): JSX.Element | null {
             ? `${noms[0]} déplace son pion`
             : `${noms.slice(0, -1).join(', ')} et ${noms.at(-1)} déplacent leurs pions`}
         </div>
+      ) : null}
+    </div>
+  )
+}
+
+/**
+ * Les d20 qu'un joueur a lancés depuis son téléphone et qui attendent, au
+ * centre de l'écran de la table, que le MJ les ait lus. « Vu » les retire.
+ *
+ * Il suit le MJ partout — Régie, Paravent ou ailleurs : un dé oublié resterait
+ * sinon planté sur l'écran des joueurs sans que rien ne le rappelle.
+ */
+export function DesALaTable(): JSX.Element | null {
+  /* Pas de `?? []` dans le sélecteur : un tableau neuf à chaque lecture ferait
+     croire au store que tout a changé, et le rendu bouclerait. */
+  const des = useStore((s) => s.display?.des)
+  if (!des?.length) return null
+  return (
+    <div className="pt-des" role="region" aria-label="Dés sur l’écran de la table">
+      <span className="pt-des-titre">Sur l’écran de la table</span>
+      {des.map((d) => (
+        <div className={`pt-de c-${d.couleur ?? 'neutral'}`} key={d.id}>
+          <span className="pip teinte" />
+          <span className="pt-de-qui">
+            <b>{d.perso || d.joueur}</b> {d.code ?? d.carac}
+          </span>
+          <span className="pt-de-calc">
+            {d.de} {signe(d.bonus)} = <b>{d.total}</b>
+            {d.de === 20 ? <em className="crit">20 naturel</em> : d.de === 1 ? <em className="mal">1 naturel</em> : null}
+          </span>
+          <button className="btn btn-sm btn-brass" onClick={() => void window.jdr.display.retirerDe(d.id)}>
+            Vu
+          </button>
+        </div>
+      ))}
+      {des.length > 1 ? (
+        <button className="btn btn-sm btn-ghost pt-des-tout" onClick={() => void window.jdr.display.retirerDe()}>
+          Tout vu
+        </button>
       ) : null}
     </div>
   )

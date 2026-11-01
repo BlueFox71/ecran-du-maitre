@@ -14925,6 +14925,23 @@ button.ou-etat:hover {
   fill: none;
   stroke-width: 1.3;
 }
+/* Clic droit sur le plan : à qui est l'objet, au-dessus de ses objets. */
+.pop.menu-donner .mp-qui {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 3px;
+  font-size: 11.5px;
+  font-weight: 600;
+  color: var(--text);
+}
+.pop.menu-donner .mp-qui .pip {
+  width: 8px;
+  height: 8px;
+  border-radius: 99px;
+  flex: none;
+  background: var(--pion-ring, var(--text-faint));
+}
 .pop.menu-donner .opt .det {
   margin-left: auto;
   font-family: 'IBM Plex Mono', monospace;
@@ -24971,4 +24988,59 @@ button.fdc-vig:hover {
 body.surligneur-actif [data-cible] {
   user-select: text;
   cursor: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='24' height='24' viewBox='0 0 24 24' fill='%23ffd600' stroke='%23222' stroke-width='1.5' stroke-linejoin='round'%3E%3Cpath d='m14.5 4.5 5 5-8 8H6.5v-5z'/%3E%3C/svg%3E") 4 20, text;
+}
+
+/* --- les d20 qui attendent un « Vu » sur l'écran de la table ------------- */
+.pt-des {
+  position: fixed;
+  right: 18px;
+  bottom: 18px;
+  z-index: 56;
+  display: grid;
+  gap: 6px;
+  min-width: 260px;
+  padding: 10px 11px 11px;
+  border-radius: 11px;
+  background: var(--raised);
+  border: 1px solid var(--brass-line, var(--line));
+  box-shadow: var(--shadow-lift);
+  animation: pt-arrive 0.28s ease;
+}
+.pt-des-titre {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.pt-de {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 6px 0 6px 8px;
+  border-left: 3px solid var(--pion-ring, var(--brass));
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.pt-de-qui b,
+.pt-de-calc b {
+  color: var(--text);
+  font-weight: 600;
+}
+.pt-de-calc {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+.pt-de-calc em {
+  margin-left: 6px;
+  font-style: normal;
+  font-size: 11px;
+}
+.pt-de-calc em.crit {
+  color: var(--brass);
+}
+.pt-de-calc em.mal {
+  color: var(--blood);
+}
+.pt-des-tout {
+  justify-self: end;
 }

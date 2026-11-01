@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { Slide } from '../shared/Slide'
 import { Pings, usePings } from '../shared/Pings'
 import { BandeauTour } from '../shared/BandeauTour'
+import { DesSurTable } from '../shared/DesSurTable'
 import { montreLaCarte } from '@shared/scene'
 import type {
   CalqueBrouillard,
@@ -136,6 +137,9 @@ export function Player(): JSX.Element {
             {/* Ce qu'un joueur montre du doigt depuis son téléphone. */}
             <Pings pings={ondes.pings} />
 
+            {/* Les d20 lancés depuis un téléphone, au centre, jusqu'au « Vu » du MJ. */}
+            <DesSurTable des={state.des ?? []} />
+
             {state.qr ? (
               <div className="pv-qr">
                 <div className="pv-qr-carte">
@@ -157,4 +161,3 @@ export function Player(): JSX.Element {
     </div>
   )
 }
-

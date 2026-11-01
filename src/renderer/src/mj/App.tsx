@@ -17,7 +17,7 @@ import { Ident } from './components/Ident'
 import { CacheMJ } from './components/CacheMJ'
 import { Home } from './components/Home'
 import { Toasts } from './components/Toasts'
-import { Annonces, EcouteDesPortables } from './components/Portables'
+import { Annonces, DesALaTable, EcouteDesPortables } from './components/Portables'
 import { JetRapide } from './components/JetRapide'
 import { Regie } from './modules/Regie'
 import { Pupitre } from './modules/Pupitre'
@@ -283,6 +283,7 @@ export function App(): JSX.Element {
 
       <EcouteDesPortables />
       <Annonces />
+      <DesALaTable />
 
       <div className="stage">
         <header className="topbar">

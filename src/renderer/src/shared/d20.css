@@ -1,0 +1,195 @@
+/*
+ * Le d20 qui tombe (D20.tsx) — le même au téléphone et sur l'écran de la
+ * table. Sa taille vient de `--d20-taille`, posée par qui l'affiche ; la chute
+ * se compte en part de cette taille, si bien qu'un petit dé et un grand
+ * tombent de la même façon.
+ */
+.d20 {
+  --d20-or: #d8a94a;
+  --d20-clair: #e8bf62;
+  --d20-trait: #6b5526;
+  --d20-encre: #1a140a;
+  width: var(--d20-taille, 120px);
+  height: var(--d20-taille, 120px);
+  animation: d20-tombe 1.6s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+.d20 svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.55));
+  transition: filter 0.4s ease;
+}
+.d20-corps {
+  fill: var(--d20-or);
+  stroke: var(--d20-trait);
+  stroke-width: 3;
+  stroke-linejoin: round;
+  transition: fill 0.4s ease;
+}
+.d20-face {
+  fill: var(--d20-clair);
+  stroke: var(--d20-trait);
+  stroke-width: 2;
+  stroke-linejoin: round;
+  transition: fill 0.4s ease;
+}
+.d20-aretes line {
+  stroke: var(--d20-trait);
+  stroke-width: 2;
+}
+.d20 text {
+  font: 700 30px 'Segoe UI', system-ui, sans-serif;
+  fill: var(--d20-encre);
+}
+
+/* Lancé du coin haut gauche, il glisse, rebondit deux fois et se cale. */
+@keyframes d20-tombe {
+  0% {
+    transform: translate(-240%, -240%) rotate(-540deg) scale(0.6);
+    opacity: 0;
+  }
+  12% {
+    opacity: 1;
+  }
+  45% {
+    transform: translate(28%, 0) rotate(-40deg) scale(1);
+  }
+  60% {
+    transform: translate(9%, -36%) rotate(-10deg);
+  }
+  75% {
+    transform: translate(0, 0) rotate(8deg);
+  }
+  88% {
+    transform: translate(0, -7%) rotate(-3deg);
+  }
+  100% {
+    transform: translate(0, 0) rotate(0);
+  }
+}
+
+/* Un 20 naturel s'allume d'or ; un 1 tourne au rouge. */
+.d20-critique {
+  --d20-or: #f0c35a;
+  --d20-clair: #ffe08a;
+}
+.d20-critique svg {
+  filter: drop-shadow(0 0 calc(var(--d20-taille, 120px) * 0.16) rgba(255, 214, 110, 0.85));
+  animation: d20-eclat 1.1s ease-in-out infinite alternate;
+}
+@keyframes d20-eclat {
+  to {
+    filter: drop-shadow(0 0 calc(var(--d20-taille, 120px) * 0.28) rgba(255, 214, 110, 1));
+  }
+}
+.d20-maladresse {
+  --d20-or: #b5473f;
+  --d20-clair: #d46a60;
+  --d20-trait: #4a1612;
+  --d20-encre: #fff1ec;
+}
+.d20-maladresse svg {
+  filter: drop-shadow(0 0 calc(var(--d20-taille, 120px) * 0.14) rgba(192, 86, 77, 0.8));
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .d20,
+  .d20-critique svg {
+    animation: none;
+  }
+}
+
+.d20-sans-chute {
+  animation: none;
+}
+
+/* --- les dés au centre de la scène (DesSurTable.tsx) ----------------------
+   Écran de la table et Régie : la couche se mesure elle-même, et tout se
+   compte en `cqmin` — la part du plus petit côté de la scène. */
+.des-table {
+  position: absolute;
+  inset: 0;
+  z-index: 35;
+  container-type: size;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  align-content: center;
+  justify-content: center;
+  gap: 4cqmin 7cqmin;
+  padding: 4cqmin;
+  background: radial-gradient(ellipse at center, rgba(5, 8, 10, 0.7), rgba(5, 8, 10, 0.25) 75%);
+  pointer-events: none;
+  animation: des-table-parait 0.3s ease;
+}
+@keyframes des-table-parait {
+  from {
+    opacity: 0;
+  }
+}
+.des-table-de {
+  --d20-taille: 24cqmin;
+  display: grid;
+  justify-items: center;
+  gap: 2cqmin;
+}
+.des-table.nombreux .des-table-de {
+  --d20-taille: 17cqmin;
+}
+.des-table-qui {
+  font-size: 2.6cqmin;
+  color: #e7e2d4;
+  padding: 0.6cqmin 2cqmin;
+  border-radius: 99px;
+  background: rgba(10, 16, 19, 0.85);
+  border: 0.3cqmin solid var(--pion-ring, #d8a94a);
+  white-space: nowrap;
+}
+.des-table-qui b {
+  font-weight: 600;
+}
+.des-table-calc {
+  font-size: 3.4cqmin;
+  color: #e7e2d4;
+  padding: 0.5cqmin 2.2cqmin;
+  border-radius: 1.2cqmin;
+  background: rgba(10, 16, 19, 0.85);
+  opacity: 0;
+  transform: translateY(1cqmin);
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease;
+}
+.des-table-calc.vu {
+  opacity: 1;
+  transform: none;
+}
+.des-table-calc b {
+  color: #f0d193;
+  font-size: 4.6cqmin;
+}
+/* Le « Vu » du MJ, sous le dé : seul élément de la couche qui prend la souris,
+   pour que la scène dessous reste maniable. */
+.des-table-vu {
+  pointer-events: auto;
+  font: inherit;
+  font-size: max(12px, 2.4cqmin);
+  font-weight: 600;
+  padding: 0.6cqmin 3cqmin;
+  min-height: 28px;
+  border-radius: 99px;
+  border: 1px solid #6b5526;
+  background: #3a2f16;
+  color: #f0d193;
+  cursor: pointer;
+}
+.des-table-vu:hover {
+  background: #4a3c1c;
+}
+@media (prefers-reduced-motion: reduce) {
+  .des-table {
+    animation: none;
+  }
+}

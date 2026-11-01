@@ -11,6 +11,7 @@ import { BoutonTours, Tours, pionEnJeu } from '../components/Tours'
 import { Valeur } from '../components/Valeur'
 import { Visage } from '../../shared/Visage'
 import { Pings, usePings } from '../../shared/Pings'
+import { DesSurTable } from '../../shared/DesSurTable'
 import { decorDossier, folderIcon } from '../components/FolderIcons'
 import { Annotations, CadreAnnote, type OutilAnnotation } from '../components/Annotations'
 import { slideLabel } from '../components/Monitor'
@@ -1029,6 +1030,14 @@ Clic : préparer`
                   {/* Les ondes ne se voient que sur l'écran qu'on regarde
                       vraiment : sur la préparation, elles mentiraient. */}
                   {onLive ? <Pings pings={ondes.pings} /> : null}
+                  {/* Les d20 des joueurs tombent ici en même temps que chez eux ;
+                      « Vu » sur le dé les retire des deux écrans. */}
+                  {onLive ? (
+                    <DesSurTable
+                      des={display?.des ?? []}
+                      onVu={(id) => void window.jdr.display.retirerDe(id)}
+                    />
+                  ) : null}
                   <Slide
                     slide={slide}
                     /* Le calque est toujours donné : même quand tu vois la

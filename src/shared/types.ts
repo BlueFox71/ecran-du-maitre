@@ -315,6 +315,23 @@ export interface CalqueBrouillard {
   porteurs: { characterId: number; rayon: number; ouverture: number; objet: string; teinte: string }[]
   /** Le soleil ou la lune de cette carte ; `null`, la nuit noire d'avant. */
   astre: Astre | null
+  /**
+   * Les objets que la table sait là : trouvés, et posés en un point du plan —
+   * dans le lieu même ou l'une de ses pièces. Ce que l'objet cache, sa fiche,
+   * reste au MJ : seuls voyagent son nom et sa place.
+   */
+  objets: ObjetVu[]
+}
+
+/** Un objet posé sur le plan, tel que les joueurs le voient. */
+export interface ObjetVu {
+  /** L'exemplaire (`objet_placement`), pas le modèle. */
+  id: number
+  /** En fractions de la carte. */
+  x: number
+  y: number
+  nom: string
+  qte: number
 }
 
 /**
@@ -2229,6 +2246,27 @@ export interface DisplayState {
    * s'en va avec l'invitation, au bout de cinq minutes ou d'un clic.
    */
   qr: { dataUrl: string; url: string } | null
+  /**
+   * Les d20 lancés depuis un téléphone, posés au centre de l'écran de la table.
+   * Ils y restent jusqu'à ce que le MJ dise « Vu » : un jet que la table n'a
+   * pas eu le temps de lire ne s'efface pas tout seul.
+   */
+  des: DeSurTable[]
+}
+
+/** Un d20 lancé par l'application, tel que la table le voit tomber. */
+export interface DeSurTable {
+  id: number
+  joueur: string
+  perso: string
+  couleur: string | null
+  /** La caractéristique, en toutes lettres et en abrégé (« Force », « FOR »). */
+  carac: string
+  code: string | null
+  de: number
+  /** Tout ce qui s'ajoute au dé : modificateur et bonus. */
+  bonus: number
+  total: number
 }
 
 export interface ScreenInfo {

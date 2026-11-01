@@ -26,6 +26,7 @@ import type {
   Objet,
   ObjetFamille,
   ObjetPlacement,
+  ObjetVu,
   PortObjet
 } from '@shared/types'
 
@@ -795,12 +796,14 @@ function majPlacementLibre(
  * `placeId` le range en même temps dans une autre pièce du même plan : on le
  * change d'abord, puisque changer de lieu efface le point (déclencheur de la
  * migration 72). Sur le plan, c'est la préparation : son emplacement
- * initial suit.
+ * initial suit — sauf en partie (`enJeu`), où le MJ déplace ce que la table
+ * a sous les yeux : la séance réinitialisée doit le rendre où il était.
  */
 export function situer(
   id: number,
   pos: { x: number; y: number } | null,
-  placeId?: number
+  placeId?: number,
+  enJeu = false
 ): Objet | null {
   const db = getDb()
   const cur = db
@@ -810,7 +813,7 @@ export function situer(
   db.transaction(() => {
     if (placeId != null && placeId !== cur.placeId) {
       db.prepare(`UPDATE objet_placement SET place_id = ? WHERE id = ?`).run(placeId, id)
-      fixerInitial(id)
+      if (!enJeu) fixerInitial(id)
     }
     db.prepare(`UPDATE objet_placement SET pos_x = ?, pos_y = ? WHERE id = ?`).run(
       pos ? Math.min(1, Math.max(0, pos.x)) : null,
@@ -819,6 +822,36 @@ export function situer(
     )
   })()
   return getObjet(cur.objetId)
+}
+
+/**
+ * Ce que la table voit d'un lieu : les exemplaires **trouvés** et posés en un
+ * point du plan, dans le lieu ou l'une de ses pièces. C'est la seule porte de
+ * ce dépôt vers l'écran des joueurs, et elle ne laisse passer que le nom et la
+ * place — jamais la fiche. Un objet caché n'y entre pas.
+ */
+export function objetsVus(placeId: number | null): ObjetVu[] {
+  if (placeId == null) return []
+  const rows = getDb()
+    .prepare(
+      `SELECT p.id, p.pos_x AS x, p.pos_y AS y, p.qte, o.nom
+         FROM objet_placement p
+         JOIN objet o ON o.id = p.objet_id
+         JOIN place l ON l.id = p.place_id
+        WHERE p.port = 'lieu' AND p.etat = 'trouve'
+          AND p.pos_x IS NOT NULL AND p.pos_y IS NOT NULL
+          AND (p.place_id = @placeId OR l.parent_id = @placeId)
+          AND (p.session_id = @session OR p.session_id IS NULL)
+        ORDER BY p.ord, p.id`
+    )
+    .all({ placeId, session: activeSessionId() }) as {
+    id: number
+    x: number
+    y: number
+    qte: number | null
+    nom: string
+  }[]
+  return rows.map((r) => ({ id: r.id, x: r.x, y: r.y, nom: r.nom, qte: r.qte ?? 1 }))
 }
 
 function reprendreLibre(id: number): Objet | null {

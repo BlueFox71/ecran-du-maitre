@@ -518,9 +518,10 @@ export function registerIpc(): void {
   on('surlignage:effacer', (cibles: Cible[]) => surlignage.effacer(cibles))
 
   /* ---------------- la réserve d'objets ---------------- */
-  /* Même isolement que les annotations : aucun de ces canaux ne touche
-     `display`, donc ce que le MJ sait d'un objet ne peut pas partir vers la
-     fenêtre des joueurs. */
+  /* Même isolement que les annotations : aucun de ces canaux n'écrit dans
+     `display` — ils ne font qu'avancer le compteur du calque. Ce que le MJ sait
+     d'un objet ne part donc pas vers la fenêtre des joueurs ; seul un objet
+     trouvé et posé sur le plan s'y montre, par son nom. */
 
   /* Ce que le MJ range ou donne, les téléphones le voient : un joueur qui
      reçoit un objet doit le trouver dans son sac sans rien toucher. */
@@ -531,8 +532,10 @@ export function registerIpc(): void {
     mobile.broadcast()
     return v
   }
-  /* Ce qui change de main peut être une lampe : l'écran des joueurs relit son
-     calque. Ce n'est qu'un compteur — rien de ce que le MJ sait ne part. */
+  /* Ce qui change de main peut être une lampe, ou un objet trouvé qu'on pose
+     sur le plan : l'écran des joueurs relit son calque. On ne pousse qu'un
+     compteur ; le calque ne laisse passer, d'un objet, que le nom et la place
+     des exemplaires trouvés (`objets.objetsVus`). */
   const eclaireAutrement = <T>(v: T): T => {
     display.calqueABouge()
     return remue(v)
@@ -545,18 +548,20 @@ export function registerIpc(): void {
     inventaires: objets.listInventaires()
   }))
   on('objets:add', (input: { nom: string; familleId?: number | null }) => remue(objets.addObjet(input)))
-  on('objets:update', (id: number, patch: any) => remue(objets.updateObjet(id, patch)))
-  on('objets:copy', (id: number) => remue(objets.copyObjet(id)))
-  on('objets:remove', (id: number) => remue(objets.removeObjet(id)))
-  on('objets:poser', (input: any) => remue(objets.poser(input)))
-  on('objets:placement', (id: number, patch: any) => remue(objets.majPlacement(id, patch)))
-  on('objets:situer', (id: number, pos: { x: number; y: number } | null, placeId?: number) =>
-    remue(objets.situer(id, pos, placeId))
+  on('objets:update', (id: number, patch: any) => eclaireAutrement(objets.updateObjet(id, patch)))
+  on('objets:copy', (id: number) => eclaireAutrement(objets.copyObjet(id)))
+  on('objets:remove', (id: number) => eclaireAutrement(objets.removeObjet(id)))
+  on('objets:poser', (input: any) => eclaireAutrement(objets.poser(input)))
+  on('objets:placement', (id: number, patch: any) => eclaireAutrement(objets.majPlacement(id, patch)))
+  on(
+    'objets:situer',
+    (id: number, pos: { x: number; y: number } | null, placeId?: number, enJeu?: boolean) =>
+      eclaireAutrement(objets.situer(id, pos, placeId, !!enJeu))
   )
-  on('objets:reprendre', (id: number) => remue(objets.reprendre(id)))
+  on('objets:reprendre', (id: number) => eclaireAutrement(objets.reprendre(id)))
   /* La corbeille, et le retour de chaque exemplaire à son emplacement initial. */
-  on('objets:jeter', (id: number) => remue(objets.jeter(id)))
-  on('objets:ranger', (ids: number[]) => remue(objets.ranger(ids)))
+  on('objets:jeter', (id: number) => eclaireAutrement(objets.jeter(id)))
+  on('objets:ranger', (ids: number[]) => eclaireAutrement(objets.ranger(ids)))
   on('objets:fixerInitial', (id: number) => objets.fixerInitial(id))
   on('objets:changerInitial', (id: number, cible: any) => objets.changerInitial(id, cible))
   on('objets:supprimerJetes', (ids: number[]) => objets.supprimerJetes(ids))
@@ -1249,6 +1254,14 @@ export function registerIpc(): void {
     return null
   }
 
+  /* Le lieu de celui qui joue se prépare pour le MJ : sa carte dans le visuel
+     libre, rien d'autre — ni le son, ni l'écran de la table. */
+  tours.surPreparerCarte((placeId) => {
+    const p = places.getPlace(placeId)
+    const slide = p?.mapItemId ? slideOf(p.mapItemId) : null
+    if (slide) display.prepare(slide)
+  })
+
   const asAudio = (itemId: number, playing: boolean): boolean => {
     const it = lib.getItem(itemId)
     const url = mediaUrl(it?.relPath ?? null)
@@ -1307,6 +1320,7 @@ export function registerIpc(): void {
   on('display:fenetre', (itemId: number) => display.ouvrirFenetre(itemId))
   on('display:reglerFenetre', (itemId: number, patch: any) => display.reglerFenetre(itemId, patch))
   on('display:fermerFenetre', (itemId?: number) => display.fermerFenetre(itemId))
+  on('display:retirerDe', (id?: number) => display.retirerDe(id))
   on('display:setOutput', (id: number | null) => display.setOutput(id))
   on('display:openPlayer', () => display.openPlayer())
   on('display:closePlayer', () => display.closePlayer())

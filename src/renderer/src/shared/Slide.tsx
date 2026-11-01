@@ -265,6 +265,11 @@ export interface SlideExtras {
    */
   onPoserSurCarte?: (x: number, y: number) => void
   /**
+   * Côté MJ : le clic droit sur l'image, hors pion — le point visé en
+   * fractions de la carte, et le curseur à l'écran pour y ouvrir un menu.
+   */
+  onMenuCarte?: (x: number, y: number, ecranX: number, ecranY: number) => void
+  /**
    * Côté MJ : l'icône de **toutes** les lumières du calque. Sans cela — chez
    * les joueurs —, seules celles que le MJ a choisi de montrer.
    */
@@ -282,6 +287,13 @@ export interface SlideExtras {
   sonsMj?: SonSurCarte[]
   /** Côté MJ : les objets posés sur le plan à l'écran. */
   objetsMj?: ObjetSurCarte[]
+  /**
+   * Côté MJ : un objet du plan tiré à la souris et lâché ailleurs — le point
+   * d'arrivée, en fractions de la carte. Absent, les objets ne bougent pas.
+   */
+  onDeplacerObjet?: (id: number, x: number, y: number) => void
+  /** Côté MJ : un clic sur un objet du plan — le montrer aux joueurs, ou le leur cacher. */
+  onBasculerObjet?: (id: number) => void
   /** Côté MJ : ce qui peut arriver, posé sur le plan à l'écran. */
   articlesMj?: ArticleSurCarte[]
   /** Texte en cours de modification dans la régie. */
@@ -325,11 +337,14 @@ export function Slide({
   activeText,
   onPickText,
   onPoserSurCarte,
+  onMenuCarte,
   lumieresMJ,
   traitsMj,
   nomsPieces,
   sonsMj,
   objetsMj,
+  onDeplacerObjet,
+  onBasculerObjet,
   articlesMj,
   jour
 }: { slide: SlidePayload; animate?: boolean } & SlideExtras): JSX.Element {
@@ -467,6 +482,20 @@ export function Slide({
             e.preventDefault()
             if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) return
             onPoserSurCarte(p.x, p.y)
+          }
+        }
+      : {}),
+    /* Le pion a son propre menu et arrête l'événement : on n'arrive ici
+       qu'à côté des pions. */
+    ...(onMenuCarte
+      ? {
+          onContextMenu: (e: React.MouseEvent) => {
+            if (!repere) return
+            const b = (e.currentTarget as HTMLElement).getBoundingClientRect()
+            const p = repere.versCarte((e.clientX - b.left) / b.width, (e.clientY - b.top) / b.height)
+            e.preventDefault()
+            if (p.x < 0 || p.x > 1 || p.y < 0 || p.y > 1) return
+            onMenuCarte(p.x, p.y, e.clientX, e.clientY)
           }
         }
       : {})
@@ -652,6 +681,8 @@ export function Slide({
             nomsPieces={nomsPieces}
             sonsMj={sonsMj}
             objetsMj={objetsMj}
+            onDeplacerObjet={onDeplacerObjet}
+            onBasculerObjet={onBasculerObjet}
             articlesMj={articlesMj}
             onRepere={setRepere}
             onFrame={onFrame ? (f) => onFrame(null, f) : undefined}
@@ -727,6 +758,8 @@ export function Slide({
                   nomsPieces={cases.length === 1 ? nomsPieces : undefined}
                   sonsMj={cases.length === 1 ? sonsMj : undefined}
                   objetsMj={cases.length === 1 ? objetsMj : undefined}
+                  onDeplacerObjet={cases.length === 1 ? onDeplacerObjet : undefined}
+                  onBasculerObjet={cases.length === 1 ? onBasculerObjet : undefined}
                   articlesMj={cases.length === 1 ? articlesMj : undefined}
                   onRepere={cases.length === 1 ? setRepere : undefined}
                 />
@@ -1292,6 +1325,8 @@ export function Framed({
   nomsPieces,
   sonsMj,
   objetsMj,
+  onDeplacerObjet,
+  onBasculerObjet,
   articlesMj,
   onRepere
 }: {
@@ -1326,6 +1361,10 @@ export function Framed({
   sonsMj?: SonSurCarte[]
   /** Les objets posés, dessinés pour le MJ seul. */
   objetsMj?: ObjetSurCarte[]
+  /** L'objet tiré à la souris est lâché ici, en fractions de la carte. */
+  onDeplacerObjet?: (id: number, x: number, y: number) => void
+  /** Un clic sans glisser sur l'objet : visible des joueurs, ou plus. */
+  onBasculerObjet?: (id: number) => void
   /** Ce qui peut arriver, posé sur le plan, dessiné pour le MJ seul. */
   articlesMj?: ArticleSurCarte[]
   /** L'image publie son repère : c'est par là qu'on passe de l'écran à la carte. */
@@ -1335,6 +1374,11 @@ export function Framed({
   const [nat, setNat] = useState<{ w: number; h: number } | null>(null)
   /* L'article survolé sur la carte du MJ, et où poser sa bulle — à l'écran. */
   const [survolArticle, setSurvolArticle] = useState<{ a: ArticleSurCarte; x: number; y: number } | null>(null)
+  /* L'objet que le MJ tire sur le plan, et où il en est. Il garde sa place
+     d'arrivée jusqu'à ce que la réserve relue la confirme : sans quoi il
+     sauterait en arrière le temps d'un aller-retour. */
+  const [tire, setTire] = useState<{ id: number; x: number; y: number; bouge: boolean } | null>(null)
+  useEffect(() => setTire(null), [objetsMj])
   /* La taille du cadre, mesurée et non devinée : l'ombre doit tomber au pixel
      sur l'image, y compris quand la fenêtre change de taille. */
   const [taille, setTaille] = useState<{ w: number; h: number } | null>(null)
@@ -1623,6 +1667,38 @@ export function Framed({
   })()
 
   /*
+   * Les objets que la table sait là : trouvés et posés sur le plan. Dessinés
+   * **sous** l'ombre, pour qu'un objet hors de vue y reste caché comme un
+   * pion. Chez le MJ, c'est son propre calque qui les montre — et les déplace.
+   */
+  const objetsVus = ((): JSX.Element | null => {
+    if (traitsMj || !brouillard?.objets?.length || !nat || !repere) return null
+    const w = nat.w
+    const h = nat.h
+    const r = Math.max(6, w * 0.007)
+    return (
+      <div className="brouillard-cadre objets-vus" style={{ ...repere.cadre, transform: repere.transform }}>
+        <svg className="brouillard" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+          {brouillard.objets.map((o) => (
+            <g key={o.id} className="objet-vu" transform={`translate(${o.x * w} ${o.y * h})`}>
+              <path d={`M0 ${-r}L${r} 0L0 ${r}L${-r} 0Z`} strokeWidth={Math.max(1.5, w * 0.0018)} />
+              <text
+                y={r * 1.4}
+                textAnchor="middle"
+                dominantBaseline="hanging"
+                fontSize={Math.max(10, w * 0.012)}
+                strokeWidth={Math.max(2, w * 0.003)}
+              >
+                {o.qte > 1 ? `${o.nom} ×${o.qte}` : o.nom}
+              </text>
+            </g>
+          ))}
+        </svg>
+      </div>
+    )
+  })()
+
+  /*
    * Le calque, dessiné pour le MJ seul : les murs, les portes et les fenêtres
    * qu'il a tracés, et d'où vient le soleil ou la lune. Ces traits ne passent
    * que par `traitsMj`, que la fenêtre des joueurs ne reçoit jamais.
@@ -1633,7 +1709,12 @@ export function Framed({
     const noms = pieces ? (nomsPieces ?? []) : []
     const sons = (sonsMj ?? []).filter((z) => traitsMj.sons || z.vise)
     /* Ce qu'on survole dans la fiche se montre toujours, case cochée ou non. */
-    const objets = (objetsMj ?? []).filter((o) => traitsMj.objets || o.vise)
+    /* Un objet que la table voit, le MJ le voit aussi, case cochée ou non :
+       c'est sur la carte des joueurs, il doit pouvoir le reprendre en main. */
+    const vusTable = new Set((brouillard.objets ?? []).map((o) => o.id))
+    const objets = (objetsMj ?? [])
+      .filter((o) => traitsMj.objets || o.vise || vusTable.has(o.id))
+      .map((o) => (tire?.id === o.id ? { ...o, x: tire.x, y: tire.y } : o))
     const SORTES = { decouverte: 'decouvertes', declencheur: 'declencheurs', scenario: 'scenarios' } as const
     const articles = (articlesMj ?? []).filter((x) => traitsMj[SORTES[x.genre]] || x.vise)
     if (
@@ -1736,10 +1817,60 @@ export function Framed({
             return (
               <g
                 key={`b${o.id}`}
-                className={`trait-objet ${o.etat}${o.vise ? ' vise' : ''}`}
+                className={`trait-objet ${o.etat}${o.vise ? ' vise' : ''}${
+                  vusTable.has(o.id) ? ' vu' : ''
+                }${onDeplacerObjet ? ' mobile' : ''}${tire?.id === o.id ? ' tire' : ''}`}
                 transform={`translate(${o.x * w} ${o.y * h})`}
+                {...(onDeplacerObjet
+                  ? {
+                      onPointerDown: (e: React.PointerEvent<SVGGElement>) => {
+                        if (e.button !== 0) return
+                        /* Le glisser de l'objet n'est pas celui du cadrage. */
+                        e.stopPropagation()
+                        e.currentTarget.setPointerCapture(e.pointerId)
+                        setTire({ id: o.id, x: o.x, y: o.y, bouge: false })
+                      },
+                      onPointerMove: (e: React.PointerEvent<SVGGElement>) => {
+                        if (tire?.id !== o.id) return
+                        const svg = e.currentTarget.ownerSVGElement
+                        const m = svg?.getScreenCTM()
+                        if (!svg || !m) return
+                        /* L'écran vers la carte, transformations comprises :
+                           l'image peut être agrandie, recadrée ou couchée. */
+                        const q = new DOMPoint(e.clientX, e.clientY).matrixTransform(m.inverse())
+                        setTire({
+                          id: o.id,
+                          x: Math.min(1, Math.max(0, q.x / w)),
+                          y: Math.min(1, Math.max(0, q.y / h)),
+                          bouge: true
+                        })
+                      },
+                      onPointerUp: (e: React.PointerEvent<SVGGElement>) => {
+                        if (tire?.id !== o.id) return
+                        e.currentTarget.releasePointerCapture(e.pointerId)
+                        if (tire.bouge) onDeplacerObjet(o.id, tire.x, tire.y)
+                        else {
+                          /* Un clic, pas un glisser : on dit si la table le voit. */
+                          setTire(null)
+                          onBasculerObjet?.(o.id)
+                        }
+                      },
+                      onPointerCancel: () => setTire(null)
+                    }
+                  : {})}
               >
+                {onDeplacerObjet ? (
+                  <title>
+                    {vusTable.has(o.id)
+                      ? `${o.nom} — les joueurs le voient · clic : le leur cacher · glisser : le déplacer`
+                      : onBasculerObjet
+                        ? `${o.nom} — caché aux joueurs · clic : le leur montrer · glisser : le déplacer`
+                        : `${o.nom} — glisser pour le déplacer`}
+                  </title>
+                ) : null}
                 {o.vise ? <circle className="halo-vise" r={r * 2.6} strokeWidth={ep * 1.2} /> : null}
+                {/* Un losange de quelques pixels s'attrape mal : la prise est plus large. */}
+                {onDeplacerObjet ? <circle className="prise" r={r * 2.4} /> : null}
                 <path d={`M0 ${-r}L${r} 0L0 ${r}L${-r} 0Z`} strokeWidth={ep * 0.9} />
                 <text
                   y={r * 1.4}
@@ -1966,6 +2097,7 @@ export function Framed({
       )}
       {/* Après l'image, jamais avant : peinte dessous, l'ombre ne se verrait
           pas. C'est le genre de détail qui ne se trouve qu'à l'écran. */}
+      {objetsVus}
       {ombre}
       {traits}
       {/* La case décochée, l'article parti : sa bulle part avec lui. */}

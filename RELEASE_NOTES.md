@@ -1,17 +1,12 @@
-<!-- version: 1.5.3 -->
+<!-- version: 1.5.4 -->
 ### Nouveautés
-- **Reprendre les mots secrets**, nouvelle case de « Réinitialiser la séance » (cochée par défaut) : les mots déjà envoyés disparaissent des portables et attendent de nouveau sur leur moment, prêts à repartir quand tu rejoues la scène.
+- **Lancer le d20 depuis son téléphone.** Dans l'onglet Jet, un nouveau bouton « Lancer le d20 » : le dé à facettes tombe, rebondit et se pose, puis le calcul s'affiche (dé + bonus = total). La saisie d'un vrai dé reste possible juste en dessous. Le d20 est tiré par le poste du MJ : personne ne choisit son résultat.
+- **Le dé tombe aussi sur l'écran de la table et dans la Régie**, au centre, avec le nom du personnage et sa carac. Un 20 naturel s'allume d'or, un 1 vire au rouge. Il reste affiché jusqu'à ce que le MJ clique « Vu » : sur le dé dans la Régie, ou dans l'encadré « Sur l'écran de la table » en bas à droite, présent sur toutes les pages.
+- **Au tour d'un joueur, la Régie se met sur son lieu.** S'il est dans le lieu à l'écran, la Régie revient au direct ; sinon, la carte de son lieu se prépare dans le visuel libre. L'écran de la table et le son ne bougent pas.
+- **Les objets trouvés se voient sur le plan.** Un objet posé par terre et trouvé apparaît sur la carte des joueurs, avec son nom (jamais sa fiche). Au Paravent, un clic droit sur le plan pose ici l'objet d'un joueur ; un clic sur un objet le montre ou le cache à la table ; on le déplace en le faisant glisser.
 
 ### Améliorations
-- **Des curseurs de volume qui suivent l'oreille.** Tous les volumes (ambiance, volume général, chaque son) se règlent finement dans le bas de la course, là où l'on dose une ambiance discrète : le premier tiers du curseur couvre 0 à 10 %. Sous 10 %, la valeur s'affiche au dixième près (« 5,4 % »).
-- **Paravent sur un écran de 1920 ou en bureau à distance :**
-  - la console du bas passe en version compacte et ne se chevauche plus ; le nom de l'ambiance y est de nouveau visible ;
-  - la rangée des pions tient sur une ligne ; sans lieu préparé, les réglages inutilisables laissent la place à la consigne ;
-  - un volet ouvert (Sons, Portes et lumières, Objets) prend toute la hauteur libre sous la carte : moins de défilement.
-- **Arborescence au Paravent :** « Tout voir » montre bien tout le schéma, même grand, et le volet « Où en sont-ils » ne déborde plus.
-- **Jets de dés :** toutes les caractéristiques s'affichent d'un coup, sans défilement.
-- **Fiches :** le bouton « Présenter le joueur à l'écran » tient dans sa colonne.
-- L'écran « Ça commence bientôt » garde ses animations même en bureau à distance, qui coupe d'habitude les effets de Windows.
+- **Le bouton retour du téléphone** revient à l'onglet précédent au lieu de quitter l'Écran, et referme d'abord ce qui est ouvert par-dessus (document, mot du MJ, dé, objet).
 
 ### Corrections
-- Le brouillard ne laisse plus un fin liseré clair au bord de la carte, sur l'écran des joueurs comme sur les téléphones.
+- **Sur iPad**, le bas de chaque onglet est de nouveau accessible : la page se cale sur la hauteur réellement visible, sous les barres de Safari. Une image ouverte depuis la Pochette tient entière dans l'écran.

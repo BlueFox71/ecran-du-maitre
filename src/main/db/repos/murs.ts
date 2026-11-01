@@ -10,6 +10,7 @@ import { getDb } from '../index'
 import * as places from './places'
 import * as ouvertures from './ouvertures'
 import * as lumieres from './lumieres'
+import { objetsVus } from './objets'
 import { echelleDe } from './echelle'
 import * as reglages from './reglages'
 import { lireCampagne } from '@shared/reglages'
@@ -219,6 +220,7 @@ export function calqueDe(placeId: number | null): CalqueBrouillard {
     regardPortee: lieu?.regardPortee ?? null,
     regardOuverture: lireCampagne(reglages.tous()).mursAngle,
     porteurs: lumieres.porteursDeLumiere(placeId == null ? null : echelleDe(placeId).metres),
-    astre: placeId == null ? null : places.cielDe(placeId).astre
+    astre: placeId == null ? null : places.cielDe(placeId).astre,
+    objets: objetsVus(placeId)
   }
 }

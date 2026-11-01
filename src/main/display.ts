@@ -24,7 +24,8 @@ import type {
   JoueurVu,
   SlidePayload,
   TextOverlay,
-  MobilePing
+  MobilePing,
+  DeSurTable
 } from '@shared/types'
 
 const BLACK: SlidePayload = { type: 'black' }
@@ -64,7 +65,8 @@ const state: DisplayState = {
   pions: [],
   pionSize: 6,
   focusPionId: null,
-  pointer: null
+  pointer: null,
+  des: []
 }
 
 let playerWindow: BrowserWindow | null = null
@@ -819,6 +821,25 @@ export function broadcast(): void {
  */
 export function setQr(qr: DisplayState['qr']): DisplayState {
   state.qr = qr
+  broadcast()
+  return state
+}
+
+/**
+ * Un d20 lancé depuis un téléphone tombe au centre de l'écran de la table.
+ * Plusieurs jets coup sur coup s'alignent côte à côte ; le MJ les retire.
+ */
+let suiteDes = 0
+export function poserDe(d: Omit<DeSurTable, 'id'>): DeSurTable {
+  const de = { ...d, id: ++suiteDes }
+  state.des = [...state.des, de]
+  broadcast()
+  return de
+}
+
+/** « Vu » : retire ce dé de l'écran de la table, ou tous sans identifiant. */
+export function retirerDe(id?: number): DisplayState {
+  state.des = id == null ? [] : state.des.filter((d) => d.id !== id)
   broadcast()
   return state
 }

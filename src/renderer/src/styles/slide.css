@@ -2117,6 +2117,41 @@ text.trait-son.repos.fait {
 .trait-objet.cache path {
   fill: rgba(10, 16, 19, 0.55);
 }
+/* Sur le plan du MJ, un objet se prend à la main et se pose ailleurs. */
+.trait-objet.mobile {
+  pointer-events: auto;
+  cursor: grab;
+}
+.trait-objet.mobile.tire {
+  cursor: grabbing;
+}
+.trait-objet .prise {
+  fill: transparent;
+  stroke: none;
+}
+/* Celui que la table voit : un liseré clair, comme chez les joueurs. */
+.trait-objet.vu path {
+  stroke: #f0e8d6;
+}
+.trait-objet.tire path {
+  filter: drop-shadow(0 0 6px rgba(216, 169, 74, 0.9));
+}
+/* L'objet trouvé, posé sur la carte des joueurs. */
+.objets-vus {
+  pointer-events: none;
+}
+.objet-vu path {
+  fill: #d8a94a;
+  stroke: #f0e8d6;
+  filter: drop-shadow(0 0 3px rgba(0, 0, 0, 0.85));
+}
+.objet-vu text {
+  fill: #f0e8d6;
+  stroke: rgba(10, 16, 19, 0.85);
+  paint-order: stroke;
+  stroke-linejoin: round;
+  font-weight: 600;
+}
 .trait-objet text {
   fill: #f0e8d6;
   stroke: rgba(10, 16, 19, 0.85);

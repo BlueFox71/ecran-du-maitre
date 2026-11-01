@@ -376,6 +376,12 @@ const api = {
       const h = (_e: unknown, t: ToursMj | null): void => cb(t)
       ipcRenderer.on('tours:state', h)
       return (): void => void ipcRenderer.removeListener('tours:state', h)
+    },
+    /** La main passe à un joueur : la Régie se met sur son lieu, au direct ou au visuel libre. */
+    onLieu: (cb: (ou: 'direct' | 'libre') => void) => {
+      const h = (_e: unknown, ou: 'direct' | 'libre'): void => cb(ou)
+      ipcRenderer.on('tours:lieu', h)
+      return (): void => void ipcRenderer.removeListener('tours:lieu', h)
     }
   },
 
@@ -624,8 +630,13 @@ const api = {
     porter: (placementId: number, emplacement: string | null) =>
       call<Objet | null>('objets:porter', placementId, emplacement),
     /** Son point sur le plan (`null` l'en retire) ; `placeId` le range dans une autre pièce du plan. */
-    situer: (placementId: number, pos: { x: number; y: number } | null, placeId?: number) =>
-      call<Objet | null>('objets:situer', placementId, pos, placeId),
+    /** `enJeu` : déplacé en partie, l'emplacement de départ ne suit pas. */
+    situer: (
+      placementId: number,
+      pos: { x: number; y: number } | null,
+      placeId?: number,
+      enJeu?: boolean
+    ) => call<Objet | null>('objets:situer', placementId, pos, placeId, enJeu),
     /** Allumer ou éteindre une lampe portée, sans la ranger. */
     allumer: (placementId: number, allumee: boolean) =>
       call<Objet | null>('objets:allumer', placementId, allumee),
@@ -1206,6 +1217,8 @@ const api = {
     ) => call<DisplayState>('display:reglerFenetre', itemId, patch),
     /** Ferme la fenêtre d'une image ; sans image, toutes. */
     fermerFenetre: (itemId?: number) => call<DisplayState>('display:fermerFenetre', itemId),
+    /** « Vu » : retire un d20 de l'écran de la table, ou tous sans identifiant. */
+    retirerDe: (id?: number) => call<DisplayState>('display:retirerDe', id),
     setOutput: (displayId: number | null) => call<DisplayState>('display:setOutput', displayId),
     openPlayer: () => call<DisplayState>('display:openPlayer'),
     closePlayer: () => call<DisplayState>('display:closePlayer'),

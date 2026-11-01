@@ -23,6 +23,8 @@ import { Pings, usePings } from '../../shared/Pings'
 import { duree } from '../../shared/mesures'
 import { accepteSi, initials, profondeur, useMontrerPieces } from './Regie'
 import { estPiece } from './Places'
+import { dansForme } from '@shared/pieces'
+import { MenuPoserIci } from '../components/MenuPoserIci'
 import { decorDossier, folderIcon } from '../components/FolderIcons'
 import { Annotations, CadreAnnote } from '../components/Annotations'
 import { TableauDeScene, type Surbrillance } from '../components/Tableau'
@@ -307,18 +309,57 @@ export function Pupitre(): JSX.Element {
   const [objetAPoser, setObjetAPoser] = useState<number | null>(null)
   useEffect(() => setObjetAPoser(null), [editPlaceId])
   useEchap(() => setObjetAPoser(null), objetAPoser != null)
+  /* Un point du plan tombe dans l'une des pièces de l'étage, ou sur l'étage
+     même : c'est là que l'objet se range, et que la fiche du lieu le retrouve. */
+  const lieuSous = (x: number, y: number): number | null => {
+    if (editPlaceId == null) return null
+    const piece = s.places.find(
+      (p) => p.parentId === editPlaceId && p.zone && p.zone.length > 2 && dansForme([x, y], p.zone)
+    )
+    return piece?.id ?? editPlaceId
+  }
   const poserObjet =
     objetAPoser != null && editPlaceId != null
       ? (x: number, y: number): void => {
           const id = objetAPoser
           setObjetAPoser(null)
           void (async () => {
-            await window.jdr.objets.donner(id, { port: 'lieu', placeId: editPlaceId })
+            /* Posé par un joueur, l'objet est su de la table : il arrive
+               « trouvé », et sa place part vers l'écran des joueurs. */
+            await window.jdr.objets.donner(id, { port: 'lieu', placeId: lieuSous(x, y) })
             await window.jdr.objets.situer(id, { x, y })
             await s.refreshObjets()
           })()
         }
       : undefined
+  /* Le clic droit sur le plan : poser là l'objet d'un joueur, sans passer
+     par le détail de son pion. */
+  const [menuPoser, setMenuPoser] = useState<{ x: number; y: number; ex: number; ey: number } | null>(null)
+  useEffect(() => setMenuPoser(null), [editPlaceId])
+  const poserIci = (placementId: number, x: number, y: number): void => {
+    void (async () => {
+      await window.jdr.objets.donner(placementId, { port: 'lieu', placeId: lieuSous(x, y) })
+      await window.jdr.objets.situer(placementId, { x, y })
+      await s.refreshObjets()
+    })()
+  }
+  /* Un clic sur un objet du plan : la table le voit, ou ne le voit plus. */
+  const basculerObjet = (id: number): void => {
+    const p = s.objets.flatMap((o) => o.placements).find((x) => x.id === id)
+    if (!p) return
+    void (async () => {
+      await window.jdr.objets.placement(id, { etat: p.etat === 'trouve' ? 'cache' : 'trouve' })
+      await s.refreshObjets()
+    })()
+  }
+  /* Le MJ reprend un objet du plan à la main et le pose ailleurs — dans une
+     autre pièce de l'étage s'il le lâche dedans. */
+  const deplacerObjet = (id: number, x: number, y: number): void => {
+    void (async () => {
+      await window.jdr.objets.situer(id, { x, y }, lieuSous(x, y) ?? undefined, true)
+      await s.refreshObjets()
+    })()
+  }
   /* Les sons posés sur ce lieu, pour la carte du MJ (case « Sons » d'Affichage). */
   const sonsScene = useSonsSurCarte(editPlaceId)
   /* Les objets posés en un point du plan : dans l'étage même, ou l'une de
@@ -1685,6 +1726,11 @@ export function Pupitre(): JSX.Element {
                   activeText={textes.over?.id ?? null}
                   onPickText={textes.choisit}
                   onPoserSurCarte={lampe.poser ?? poserObjet}
+                  onMenuCarte={
+                    editPlaceId != null
+                      ? (x, y, ex, ey) => setMenuPoser({ x, y, ex, ey })
+                      : undefined
+                  }
                   lumieresMJ
                   traitsMj={traits}
                   /* Les pièces de l'étage qu'on arrange, là où on les a nommées. */
@@ -1693,6 +1739,8 @@ export function Pupitre(): JSX.Element {
                     .map((p) => ({ nom: p.name, x: p.ancre![0], y: p.ancre![1] }))}
                   sonsMj={sonsScene}
                   objetsMj={objetsVises}
+                  onDeplacerObjet={editPlaceId != null ? deplacerObjet : undefined}
+                  onBasculerObjet={editPlaceId != null ? basculerObjet : undefined}
                   articlesMj={articlesScene}
                 />
                 {/* Par-dessus la scène, jamais dedans : le calque du MJ ne fait
@@ -2005,6 +2053,14 @@ export function Pupitre(): JSX.Element {
       />
       {bulleLieu ? <BulleLieu {...bulleLieu} /> : null}
       {menuEncart ? <MenuEncart {...menuEncart} onFerme={() => setMenuEncart(null)} /> : null}
+      {menuPoser ? (
+        <MenuPoserIci
+          x={menuPoser.ex}
+          y={menuPoser.ey}
+          onPoser={(id) => poserIci(id, menuPoser.x, menuPoser.y)}
+          onClose={() => setMenuPoser(null)}
+        />
+      ) : null}
       <MenuPion
         cible={ciblePion}
         focusId={display?.focusPionId ?? null}

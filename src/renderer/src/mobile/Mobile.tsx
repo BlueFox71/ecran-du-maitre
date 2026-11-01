@@ -4,6 +4,7 @@ import { Pings, usePings } from '../shared/Pings'
 import { Brouillard, regardsDes, sousUnRegard } from '../shared/Brouillard'
 import { Visage } from '../shared/Visage'
 import { Piece } from '../shared/Piece'
+import { D20 } from '../shared/D20'
 import { barrieres, pasContraint, seCroisent, type Pt } from '@shared/murs'
 import { bordsOuverture } from '@shared/ouvertures'
 import { modificateur, naturel, signe, type Naturel } from '@shared/jet'
@@ -232,6 +233,37 @@ interface Convive {
 
 type Onglet = 'fiche' | 'jet' | 'pion' | 'sac' | 'poche'
 
+/**
+ * Le bouton retour du téléphone.
+ *
+ * Les onglets et les volets ne changeaient pas d'adresse : pour le navigateur
+ * il n'y avait qu'une page, et « retour » quittait l'Écran au lieu de revenir
+ * à l'onglet d'avant. Chaque onglet visité laisse donc une marque dans
+ * l'historique, et chaque volet ouvert par-dessus (document, mot du MJ, dé,
+ * objet) aussi : « retour » le referme d'abord.
+ *
+ * Un volet fermé par son propre bouton reprend sa marque (`history.back()`),
+ * pour qu'un retour suivant ne tombe pas dans le vide.
+ */
+function useRetourFerme(ouvert: boolean, fermer: () => void): void {
+  const rappel = useRef(fermer)
+  rappel.current = fermer
+  useEffect(() => {
+    if (!ouvert) return
+    history.pushState({ ...(history.state ?? {}), volet: true }, '')
+    let parRetour = false
+    const surRetour = (): void => {
+      parRetour = true
+      rappel.current()
+    }
+    window.addEventListener('popstate', surRetour)
+    return () => {
+      window.removeEventListener('popstate', surRetour)
+      if (!parRetour && history.state?.volet) history.back()
+    }
+  }, [ouvert])
+}
+
 const jetonGarde = (): string | null => {
   try {
     return localStorage.getItem(CLE)
@@ -312,7 +344,29 @@ export function Mobile(): JSX.Element {
   const [convives, setConvives] = useState<Convive[] | null>(null)
   const [ferme, setFerme] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
-  const [onglet, setOnglet] = useState<Onglet>('fiche')
+  const [onglet, setOngletBrut] = useState<Onglet>(
+    () => (history.state?.onglet as Onglet | undefined) ?? 'fiche'
+  )
+  /* Changer d'onglet laisse une marque ; le premier, posé à l'arrivée, la remplace. */
+  const ongletVu = useRef(onglet)
+  ongletVu.current = onglet
+  const setOnglet = useCallback((o: Onglet, remplacer = false): void => {
+    if (o === ongletVu.current && !remplacer) return
+    if (remplacer) history.replaceState({ onglet: o }, '')
+    else history.pushState({ onglet: o }, '')
+    ongletVu.current = o
+    setOngletBrut(o)
+  }, [])
+  useEffect(() => {
+    if (!history.state?.onglet) history.replaceState({ onglet }, '')
+    const surRetour = (e: PopStateEvent): void => {
+      const o = (e.state?.onglet as Onglet | undefined) ?? 'fiche'
+      setOngletBrut(o)
+    }
+    window.addEventListener('popstate', surRetour)
+    return () => window.removeEventListener('popstate', surRetour)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   /* La préparation refermée par le joueur, notée par son ouverture : une
      nouvelle invitation du MJ la rouvre d'elle-même. */
   const [prepaRangee, setPrepaRangee] = useState<string | null>(null)
@@ -428,7 +482,7 @@ export function Mobile(): JSX.Element {
     setJeton(d.token)
     setEtat(d.etat)
     setConvives(null)
-    setOnglet(d.etat?.perso ? 'fiche' : 'pion')
+    setOnglet(d.etat?.perso ? 'fiche' : 'pion', true)
   }
 
   /* ---------------- les écrans ---------------- */
@@ -661,7 +715,7 @@ function Table({
   jeton: string
   ondes: MobilePing[]
   onglet: Onglet
-  setOnglet: (o: Onglet) => void
+  setOnglet: (o: Onglet, remplacer?: boolean) => void
   /** La préparation est ouverte mais rangée : de quoi y revenir. */
   onPreparer: (() => void) | null
   onOublier: () => void
@@ -669,6 +723,7 @@ function Table({
   const mots = etat.mots ?? []
   const [motOuvert, setMotOuvert] = useState<number | null>(null)
   const mot = mots.find((m) => m.id === motOuvert) ?? null
+  useRetourFerme(!!mot, () => setMotOuvert(null))
   /* Le plus ancien qui attend : s'il y en a plusieurs, on les lit dans l'ordre. */
   const enAttente = mots.filter((m) => !m.lu)
   const ouvrirMot = (m: MotTel): void => {
@@ -1238,6 +1293,7 @@ function Fiche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
  */
 function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
   const [ouvert, setOuvert] = useState<number | null>(null)
+  useRetourFerme(ouvert !== null, () => setOuvert(null))
   const [erreur, setErreur] = useState<string | null>(null)
   const [cherche, setCherche] = useState('')
   const [envoi, setEnvoi] = useState<number | null>(null)
@@ -1512,6 +1568,7 @@ function Poche({
 
   const vus = docs.filter((d) => rang === 'tout' || d.ongletId === rang)
   const doc = docs.find((d) => d.id === ouvert) ?? null
+  useRetourFerme(!!doc, () => setOuvert(null))
   /* Ce qu'on feuillette d'un glissement, dans l'ordre de la liste : les images
      et les vidéos du rangement ouvert. Un PDF s'ouvre ailleurs, il n'en est pas. */
   const feuilletables = vus.filter((d) => d.genre !== 'pdf')
@@ -1725,7 +1782,7 @@ function Lire({
         ) : null}
         <button onClick={onClose}>fermer</button>
       </div>
-      <div className="m-lire-corps">
+      <div className="m-lire-corps m-lire-doc">
         {/* `API` est vide en production — la page vient du même serveur — et
             nomme le poste du MJ en développement, où elle vient de Vite. Sans
             lui, l'aperçu partait chercher le fichier chez Vite, qui n'en a
@@ -1953,6 +2010,9 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
   const [envoi, setEnvoi] = useState<'non' | 'encours' | 'fait'>('non')
   const [erreur, setErreur] = useState<string | null>(null)
   const [faits, setFaits] = useState<JetFait[]>(mesJets)
+  /* Le d20 lancé par l'application, déplié par-dessus l'onglet le temps qu'il tombe. */
+  const [lance, setLance] = useState<JetFait | null>(null)
+  useRetourFerme(!!lance, () => setLance(null))
   const minuteur = useRef<ReturnType<typeof setTimeout> | null>(null)
 
   useEffect(() => () => void (minuteur.current && clearTimeout(minuteur.current)), [])
@@ -1970,14 +2030,19 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
    * confirmation prend la place du bouton, le temps de se lire — mise
    * au-dessus, elle décalerait l'écran sous le pouce.
    */
-  const envoyer = async (): Promise<void> => {
-    if (!carac || de === null) return
+  /**
+   * « Lancer le dé » ne tire rien ici : le poste du MJ tire le d20, le note et
+   * le fait tomber sur l'écran de la table ; le téléphone anime le chiffre
+   * qu'on lui rend. Ainsi le dé de la table et celui de la main sont le même.
+   */
+  const envoyer = async (lancer = false): Promise<void> => {
+    if (!carac || (!lancer && de === null)) return
     setEnvoi('encours')
     setErreur(null)
     const r = await fetch(`${API}/api/roll?t=${encodeURIComponent(jeton)}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ caracKey: carac.key, de })
+      body: JSON.stringify(lancer ? { caracKey: carac.key, lancer: true } : { caracKey: carac.key, de })
     })
     if (!r.ok) {
       setEnvoi('non')
@@ -1985,15 +2050,17 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
     }
     /* Le compte du serveur fait foi ; un serveur plus ancien ne rend que le total. */
     const rep = (await r.json()) as Partial<JetFait> & { total: number }
+    const valeur = rep.de ?? de ?? 0
     const fait: JetFait = {
       n: (mesJets[0]?.n ?? 0) + 1,
       carac: carac.code ?? abrege(carac.label),
-      de: rep.de ?? de,
+      de: valeur,
       bonus: rep.bonus ?? bonus,
       lignes: rep.lignes ?? carac.bonus ?? [],
       total: rep.total,
-      naturel: rep.naturel ?? naturel(de)
+      naturel: rep.naturel ?? naturel(valeur)
     }
+    if (lancer) setLance(fait)
     mesJets = [fait, ...mesJets].slice(0, 8)
     setFaits(mesJets)
     setDe(null)
@@ -2043,8 +2110,20 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
         ) : null}
       </section>
 
+      <button
+        className="m-btn m-btn-brass m-lancer-bouton"
+        disabled={!carac || envoi === 'encours'}
+        onClick={() => void envoyer(true)}
+      >
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          <polygon points="50,3 93,27 93,73 50,97 7,73 7,27" />
+          <polygon points="50,22 78,68 22,68" />
+        </svg>
+        Lancer le d20
+      </button>
+
       <section>
-        <span className="m-eyebrow">La valeur de ton dé</span>
+        <span className="m-eyebrow">Ou la valeur de ton vrai dé</span>
         <div className="m-des" role="radiogroup" aria-label="Valeur du dé">
           {Array.from({ length: 20 }, (_, i) => i + 1).map((v) => (
             <button
@@ -2093,6 +2172,8 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
         </button>
       )}
 
+      {lance ? <DeLance fait={lance} onClose={() => setLance(null)} /> : null}
+
       {faits.length ? (
         <section className="m-mesjets">
           <span className="m-eyebrow">Mes jets</span>
@@ -2111,6 +2192,26 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
         </section>
       ) : null}
     </div>
+  )
+}
+
+/**
+ * Le d20 qui tombe dans la main du joueur, au moment où il tombe sur l'écran
+ * de la table. Une fois posé, le calcul ; un toucher referme.
+ */
+function DeLance({ fait, onClose }: { fait: JetFait; onClose: () => void }): JSX.Element {
+  const [pose, setPose] = useState(false)
+  return (
+    <button className="m-lancer" onClick={() => pose && onClose()} aria-label="Fermer le dé">
+      <D20 valeur={fait.de} onPose={() => setPose(true)} />
+      <span className={`m-lancer-calc${pose ? ' vu' : ''}`}>
+        {fait.carac} · {fait.de} {signe(fait.bonus)} = <b>{fait.total}</b>
+        {fait.naturel ? (
+          <span className={`m-nat m-nat-${fait.naturel}`}>{NATUREL_DIT[fait.naturel]}</span>
+        ) : null}
+      </span>
+      <span className={`m-lancer-dit${pose ? ' vu' : ''}`}>Aussi sur l’écran de la table · touche pour fermer</span>
+    </button>
   )
 }
 
@@ -2621,6 +2722,34 @@ function Plan({
                   strokeWidth={trait}
                   strokeDasharray={ouverte ? `${trait} ${trait * 1.6}` : undefined}
                 />
+              )
+            })}
+          </svg>
+        ) : null}
+        {/* Les objets trouvés, posés sur le plan : sous l'ombre, comme à l'écran
+            de la table — ce qu'on ne voit pas d'ici reste dans le noir. */}
+        {calque?.objets?.length && nat ? (
+          <svg
+            className="m-objets"
+            viewBox={`0 0 ${nat.w} ${nat.h}`}
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {calque.objets.map((o) => {
+              const r = Math.max(nat.w, nat.h) * 0.008
+              return (
+                <g key={o.id} transform={`translate(${o.x * nat.w} ${o.y * nat.h})`}>
+                  <path d={`M0 ${-r}L${r} 0L0 ${r}L${-r} 0Z`} strokeWidth={r * 0.25} />
+                  <text
+                    y={r * 1.4}
+                    textAnchor="middle"
+                    dominantBaseline="hanging"
+                    fontSize={r * 1.6}
+                    strokeWidth={r * 0.4}
+                  >
+                    {o.qte > 1 ? `${o.nom} ×${o.qte}` : o.nom}
+                  </text>
+                </g>
               )
             })}
           </svg>

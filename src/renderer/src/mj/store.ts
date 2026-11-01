@@ -427,6 +427,13 @@ export const useStore = create<State>((set, get) => ({
     api.display.onState((d) => set({ display: d }))
     set({ tours: await api.tours.etat() })
     api.tours.onState((t) => set({ tours: t }))
+    /* La main passe à un joueur : la Régie regarde son lieu — le direct s'il
+       y est, sinon le visuel libre où il vient d'être préparé. Sans changer
+       de page : le MJ le trouve là en revenant à la Régie. */
+    api.tours.onLieu((ou) => {
+      const live = (get().display?.liveSlot ?? 0) as 0 | 1
+      set({ visuel: ou === 'direct' ? live : live === 0 ? 1 : 0 })
+    })
     /* La pile de Ctrl+Z vit côté base : elle dit ici ce qu'elle tient. */
     set({ defaireEtat: await api.defaire.etat() })
     api.defaire.onEtat((e) => set({ defaireEtat: e }))

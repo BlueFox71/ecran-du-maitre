@@ -66,6 +66,13 @@ body,
 #root {
   height: 100%;
 }
+/* La hauteur réellement visible, mesurée au chargement (main.tsx) : sur iPad,
+   « 100 % » comptait la place sous les barres de Safari, et le bas de chaque
+   onglet restait hors d'atteinte. `dvh` en attendant la mesure. */
+#root {
+  height: 100dvh;
+  height: var(--haut, 100dvh);
+}
 
 body {
   margin: 0;
@@ -782,6 +789,26 @@ img {
   stroke: var(--brass);
   stroke-opacity: 0.45;
 }
+/* Les objets trouvés, posés sur la carte : le losange de l'écran de la table. */
+.m-objets {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  overflow: visible;
+  pointer-events: none;
+}
+.m-objets path {
+  fill: #d8a94a;
+  stroke: #f0e8d6;
+}
+.m-objets text {
+  fill: #f0e8d6;
+  stroke: rgba(10, 16, 19, 0.85);
+  paint-order: stroke;
+  stroke-linejoin: round;
+  font-weight: 600;
+}
 /* Ce qui retient le pas, posé sur la carte : rien ne bouge sous le pouce. */
 .m-bute {
   position: absolute;
@@ -1385,6 +1412,9 @@ img {
 .m-lire {
   position: fixed;
   inset: 0;
+  /* Même mesure que la page : le pied et le bas du document restent en vue. */
+  bottom: auto;
+  height: var(--haut, 100dvh);
   z-index: 50;
   display: flex;
   flex-direction: column;
@@ -1422,6 +1452,14 @@ img {
   place-items: center;
   padding: 10px;
 }
+/* Un document occupe exactement la place entre l'en-tête et le pied : une
+   seule case, de la taille du cadre. Sans ce gabarit, la rangée prenait la
+   hauteur de l'image, `max-height: 100%` ne bornait plus rien, et une image
+   haute débordait par le bas — sans qu'on puisse y descendre, puisque le
+   cadre du pincement garde les gestes pour lui. */
+.m-lire-doc {
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
+}
 /* Une image tient entière dans l'écran, et se pince pour s'agrandir. Le zoom
    est le sien (ImagePincee) : la page, elle, interdit celui du navigateur. */
 .m-pince {
@@ -1434,6 +1472,8 @@ img {
   width: 100%;
   height: 100%;
   display: grid;
+  /* Même raison : une case de la taille du cadre, pour que l'image s'y borne. */
+  grid-template: minmax(0, 1fr) / minmax(0, 1fr);
   place-items: center;
   transform-origin: 0 0;
 }
@@ -1587,6 +1627,8 @@ img {
 .m-feuille-fond {
   position: fixed;
   inset: 0;
+  bottom: auto;
+  height: var(--haut, 100dvh);
   z-index: 40;
   background: rgba(5, 8, 10, 0.72);
   display: flex;
@@ -1595,6 +1637,9 @@ img {
 .m-feuille {
   width: 100%;
   max-height: 78vh;
+  /* `vh` compte la place sous la barre du navigateur, qui cachait le bas de la
+     feuille : on prend la hauteur visible mesurée. */
+  max-height: calc(var(--haut, 100dvh) * 0.78);
   overflow: auto;
   background: var(--surface);
   border-top: 1px solid var(--line);
@@ -2406,4 +2451,79 @@ body.m-frisson .m-app {
   line-height: 1.5;
   white-space: pre-wrap;
   overflow-wrap: anywhere;
+}
+
+/* --- lancer le d20 ---------------------------------------------------------
+   Le bouton vient avant la grille des valeurs : c'est le geste le plus court.
+   Le dé tombe ensuite par-dessus l'onglet, comme il tombe sur l'écran de la
+   table au même moment. */
+.m-lancer-bouton {
+  width: 100%;
+  min-height: 56px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 11px;
+  border-radius: 10px;
+  border: 1px solid var(--brass-line);
+  font-size: 16px;
+  font-weight: 600;
+}
+.m-lancer-bouton svg {
+  width: 26px;
+  height: 26px;
+}
+.m-lancer-bouton svg polygon {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 6;
+  stroke-linejoin: round;
+}
+.m-lancer-bouton:disabled {
+  opacity: 0.5;
+}
+.m-lancer {
+  position: fixed;
+  inset: 0;
+  bottom: auto;
+  height: var(--haut, 100dvh);
+  z-index: 50;
+  width: 100%;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 22px;
+  padding: 24px;
+  background: rgba(5, 9, 11, 0.94);
+  overflow: hidden;
+  --d20-taille: min(46vw, 34vh, 240px);
+}
+.m-lancer-calc {
+  font-size: 20px;
+  color: var(--text);
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  opacity: 0;
+  transform: translateY(8px);
+  transition:
+    opacity 0.35s ease,
+    transform 0.35s ease;
+}
+.m-lancer-calc b {
+  color: var(--brass-ink);
+  font-size: 30px;
+}
+.m-lancer-dit {
+  font-size: 12px;
+  color: var(--text-faint);
+  opacity: 0;
+  transition: opacity 0.35s ease 0.2s;
+}
+.m-lancer-calc.vu,
+.m-lancer-dit.vu {
+  opacity: 1;
+  transform: none;
 }
