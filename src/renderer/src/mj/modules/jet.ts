@@ -45,14 +45,15 @@ export function useSaisieJet(): {
   const [caracKey, setCaracKey] = useState<string>('')
   const [valeur, setValeur] = useState<number | null>(null)
 
-  /** Le premier joueur venu tant qu'on n'a rien choisi, et jamais un disparu. */
+  /** Le premier joueur présent tant qu'on n'a rien choisi, et jamais un disparu ni un PNJ. */
   useEffect(() => {
-    if (s.characters.length === 0) {
+    const joueurs = joueursDuJet(s.characters)
+    if (joueurs.length === 0) {
       if (charId !== null) setCharId(null)
       return
     }
-    if (charId === null || !s.characters.some((c) => c.id === charId)) {
-      setCharId(s.characters[0].id)
+    if (charId === null || !joueurs.some((c) => c.id === charId)) {
+      setCharId(joueurs[0].id)
     }
   }, [s.characters, charId])
 
@@ -128,4 +129,9 @@ export function useSaisieJet(): {
     pret,
     enregistrer
   }
+}
+
+/** Qui peut jeter : les joueurs présents à la séance, pas les PNJ. */
+export function joueursDuJet<T extends { kind: string; present?: boolean }>(persos: T[]): T[] {
+  return persos.filter((c) => c.kind !== 'pnj' && c.present)
 }

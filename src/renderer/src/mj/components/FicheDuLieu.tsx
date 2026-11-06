@@ -49,7 +49,11 @@ import type {
 import { TIER_LABEL } from '@shared/types'
 import { formesDesMurs } from '@shared/pieces'
 import { useEchap } from '../echap'
-import { survolCarte, viserCarte } from '../viseCarte'
+import { survolCarte, useDemandeFiche, viserCarte } from '../viseCarte'
+import { ETAT_OBJET_AIDE, ETAT_OBJET_DIT, etatSuivant } from '@shared/types'
+
+/** Un élément choisi sur la carte : toutes les rubriques de la fiche se déplient. */
+const DEPLIER_FICHE = 'jdr:deplier-fiche'
 
 /** L'éclair des déclencheurs. */
 function IconEclair(): JSX.Element {
@@ -431,7 +435,9 @@ async function cocherEtSuivre(c: LieuCarte, fait: boolean, placeId: number, obje
 }
 
 /** L'inverse : un objet trouvé coche les découvertes qui le révèlent. */
-async function suivreObjet(objetId: number, etat: 'cache' | 'trouve', cartes: LieuCarte[]): Promise<void> {
+async function suivreObjet(objetId: number, etat: 'cache' | 'trouve' | 'masque', cartes: LieuCarte[]): Promise<void> {
+  /* Masqué, il a été trouvé : la découverte qui le révèle reste cochée. */
+  if (etat === 'masque') return
   const fait = etat === 'trouve'
   for (const c of cartes)
     if (c.sorte === 'decouverte' && c.objetIds.includes(objetId) && c.fait !== fait)
@@ -1985,7 +1991,7 @@ function PanneauQuiQuoi({
           /* Sur le plan : son pion, posé d'avance, caché tant que la scène ne l'amène pas. */
           const pose = surPlan ? pionsPnj.find((x) => x.characterId === c.id) : undefined
           const sous = surPlan
-            ? [c.occupation, pose ? (pose.cache ? 'posé · caché' : 'posé · visible') : 'à poser'].filter(Boolean).join(' · ')
+            ? [c.occupation, pose ? `posé · ${pose.cache ? 'caché' : pose.regard ? 'au regard' : 'montré'}${pose.anonyme && !pose.cache ? ' · sans nom' : ''}` : 'à poser'].filter(Boolean).join(' · ')
             : (c.occupation ?? '')
           return (
             <Fragment key={c.id}>
@@ -2012,45 +2018,60 @@ function PanneauQuiQuoi({
                 <div className="fdl-detail">
                   {img?.url ? <img className="fdl-detail-image" src={img.url} alt={`Portrait : ${c.name}`} /> : null}
                   {c.notes ? <TexteCourt className="fdl-info">{c.notes}</TexteCourt> : <p className="fdl-vide">Rien de noté sur lui.</p>}
+                  {/* Son pion sur ce plan : comment les joueurs le voient, et
+                      s'ils savent qui c'est — les mêmes réglages que sur le
+                      pion lui-même, au Paravent. */}
+                  {pose ? (
+                    <div className="fdl-affichage">
+                      <div className="seg" role="group" aria-label={`Affichage du pion de ${c.name}`}>
+                        {(
+                          [
+                            ['montre', 'Montré', 'Les joueurs le voient, où qu’il soit'],
+                            ['regard', 'Au regard', 'Il n’apparaît que lorsqu’un joueur le voit'],
+                            ['cache', 'Caché', 'Pour toi seul']
+                          ] as const
+                        ).map(([k, l, aide]) => {
+                          const actuel = pose.cache ? 'cache' : pose.regard ? 'regard' : 'montre'
+                          return (
+                            <button
+                              key={k}
+                              className={actuel === k ? 'on' : ''}
+                              aria-pressed={actuel === k}
+                              title={aide}
+                              onClick={() =>
+                                void pion(
+                                  (async () => {
+                                    await window.jdr.pions.regard(pose.id, k === 'regard')
+                                    await window.jdr.pions.hide(pose.id, k === 'cache')
+                                  })()
+                                )
+                              }
+                            >
+                              {l}
+                            </button>
+                          )
+                        })}
+                      </div>
+                      <label className="fdl-sans-nom" title="Ils voient le jeton, pas qui c’est">
+                        <input
+                          type="checkbox"
+                          checked={pose.anonyme}
+                          disabled={pose.cache}
+                          onChange={(e) => void pion(window.jdr.pions.anonyme(pose.id, e.target.checked))}
+                        />
+                        Sans nom
+                      </label>
+                    </div>
+                  ) : null}
                   <div className="fdl-pied">
-                    <button
-                      className="btn btn-sm"
-                      onClick={() => {
-                        s.setCurrentCharacter(c.id)
-                        s.setView('sheets')
-                      }}
-                    >
-                      Ouvrir sa fiche ↗
-                    </button>
-                    {img ? (
+                    {pose ? (
                       <button
                         className="btn btn-sm btn-ghost"
-                        onClick={async () => {
-                          await window.jdr.display.showItem(img.id)
-                          s.toast(`Portrait de ${c.name} à l’écran des joueurs`)
-                        }}
+                        title="Ôter son pion du plan ; il reste dans ce lieu"
+                        onClick={() => void pion(window.jdr.pions.remove(pose.id))}
                       >
-                        <IconScreen />
-                        Portrait à l’écran
+                        Ôter du plan
                       </button>
-                    ) : null}
-                    {pose ? (
-                      <>
-                        <button
-                          className="btn btn-sm btn-ghost"
-                          title={pose.cache ? 'Les joueurs verront son pion dès que le lieu sera montré' : 'Les joueurs ne verront plus son pion'}
-                          onClick={() => void pion(window.jdr.pions.hide(pose.id, !pose.cache))}
-                        >
-                          {pose.cache ? 'Le montrer' : 'Le cacher'}
-                        </button>
-                        <button
-                          className="btn btn-sm btn-ghost"
-                          title="Ôter son pion du plan ; il reste dans ce lieu"
-                          onClick={() => void pion(window.jdr.pions.remove(pose.id))}
-                        >
-                          Ôter du plan
-                        </button>
-                      </>
                     ) : null}
                     <div className="spacer" />
                     <button
@@ -2136,7 +2157,7 @@ function RangeeObjet({
   const glissable = surPlan && !tenu
 
   const basculer = async (): Promise<void> => {
-    const etat = x.etat === 'cache' ? 'trouve' : 'cache'
+    const etat = etatSuivant(x.etat)
     await window.jdr.objets.placement(x.id, { etat })
     await suivreObjet(o.id, etat, cartes)
     await Promise.all([s.refreshObjets(), relire()])
@@ -2173,13 +2194,13 @@ function RangeeObjet({
         ) : (
           <button
             className={`fdl-etat ${x.etat}`}
-            title={x.etat === 'cache' ? 'Clic quand ils mettent la main dessus' : 'Clic pour le remettre à couvert'}
+            title={ETAT_OBJET_AIDE[x.etat]}
             onClick={(e) => {
               e.stopPropagation()
               void basculer()
             }}
           >
-            {x.etat === 'cache' ? 'caché' : 'trouvé'}
+            {ETAT_OBJET_DIT[x.etat]}
           </button>
         )}
       </div>
@@ -2514,6 +2535,12 @@ function Rubrique({
       return false
     }
   })
+  /* Un élément choisi sur la carte doit se voir : la rubrique se déplie. */
+  useEffect(() => {
+    const h = (): void => setReplie(false)
+    window.addEventListener(DEPLIER_FICHE, h)
+    return () => window.removeEventListener(DEPLIER_FICHE, h)
+  }, [])
   const basculer = (): void =>
     setReplie((v) => {
       try {
@@ -2531,8 +2558,10 @@ function Rubrique({
           {titre}
           {compte ? <span className="fdl-compte">{compte}</span> : null}
         </button>
-        <div className="spacer" />
-        {replie ? null : outils}
+        {/* Les outils se rangent à droite, et passent sous le titre quand la
+            colonne est étroite — plutôt que de couper le titre en trois et de
+            déborder du cadre. */}
+        {replie || !outils ? null : <div className="fdc-outils">{outils}</div>}
       </div>
       {replie ? null : <div className="fdc-corps">{children}</div>}
     </section>
@@ -2577,6 +2606,42 @@ export function FicheCompacte({
   })
 
   const relire = async (): Promise<void> => setFiche(await window.jdr.fiche.lire(p.id))
+
+  /* Un clic sur la carte : on vient jusqu'à la ligne de l'élément et on la
+     fait clignoter. Les rubriques se déplient et les faits se montrent le
+     temps qu'il faut — un élément trouvé reste lisible dans sa fiche. */
+  const demandeFiche = useDemandeFiche()
+  const fondFiche = useRef<HTMLDivElement>(null)
+  useEffect(() => {
+    if (!demandeFiche || !fiche) return
+    const c = demandeFiche.cible
+    const cle = 'objet' in c ? `objet-${c.objet}` : `article-${c.article}`
+    window.dispatchEvent(new Event(DEPLIER_FICHE))
+    setMasquer(false)
+    /* L'élément lui-même s'ouvre : le scénario montre tout son texte, la
+       carte son « si… alors… » — c'est lui qu'on est venu lire. */
+    if ('article' in c) {
+      const id = Number(c.article.slice(1))
+      if (c.article.startsWith('s')) setOuverts((o) => new Set(o).add(id))
+      else if (c.article.startsWith('c')) setDeplies((d) => new Set(d).add(id))
+    }
+    let essais = 0
+    const chercher = (): void => {
+      const el = fondFiche.current?.querySelector<HTMLElement>(`[data-vise="${cle}"]`)
+      if (!el) {
+        if (++essais < 12) setTimeout(chercher, 50)
+        return
+      }
+      el.scrollIntoView({ block: 'center', behavior: 'smooth' })
+      el.classList.remove('fdc-montre')
+      void el.offsetWidth
+      el.classList.add('fdc-montre')
+      setTimeout(() => el.classList.remove('fdc-montre'), 4000)
+    }
+    setTimeout(chercher, 30)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [demandeFiche?.n, fiche])
+
   /* Une autre fiche, ou plus de fiche : la ligne survolée ne l'est plus, sa
      marque sur la carte non plus. */
   useEffect(() => () => viserCarte(null), [p.id])
@@ -2646,7 +2711,7 @@ export function FicheCompacte({
     .sort((a, b) => a.ord - b.ord || a.name.localeCompare(b.name))
 
   return (
-    <div className="fdc">
+    <div className="fdc" ref={fondFiche}>
       {parent || enfants.length ? (
         <nav className="fdc-voisins" aria-label="Lieux voisins">
           {parent ? (
@@ -2684,6 +2749,7 @@ export function FicheCompacte({
                 key={x.id}
                 className={`fdc-ligne${parti ? ' parti' : ''}`}
                 data-fdl={`objet-${o.id}`}
+                data-vise={`objet-${x.id}`}
                 {...survolCarte({ objet: x.id })}
               >
                 {img?.url ? (
@@ -2724,20 +2790,16 @@ export function FicheCompacte({
                 {x.port === 'lieu' && !parti ? (
                   <button
                     className={`fdl-etat ${x.etat}`}
-                    title={
-                      x.etat === 'cache'
-                        ? 'Clic quand ils mettent la main dessus'
-                        : 'Clic pour le remettre à couvert'
-                    }
+                    title={ETAT_OBJET_AIDE[x.etat]}
                     onClick={async () => {
-                      const etat = x.etat === 'cache' ? 'trouve' : 'cache'
+                      const etat = etatSuivant(x.etat)
                       await window.jdr.objets.placement(x.id, { etat })
                       /* La découverte qui le révèle se coche avec lui. */
                       await suivreObjet(o.id, etat, cartes)
                       await Promise.all([s.refreshObjets(), relire()])
                     }}
                   >
-                    {x.etat === 'cache' ? 'caché' : 'trouvé'}
+                    {ETAT_OBJET_DIT[x.etat]}
                   </button>
                 ) : parti ? (
                   <span className="fdl-etat porte">pris</span>
@@ -2850,7 +2912,7 @@ export function FicheCompacte({
           <p className="fdl-vide">Tout a été trouvé ou déclenché.</p>
         ) : null}
         {vues.map(({ c, de }, k) => (
-          <div key={c.id} className="fdl-cartes-ligne" {...survolCarte({ article: `c${c.id}` })}>
+          <div key={c.id} className="fdl-cartes-ligne" data-vise={`article-c${c.id}`} {...survolCarte({ article: `c${c.id}` })}>
             {k === premiereFaite ? (
               <div className="fdl-groupe eyebrow">Trouvées et déclenchés · {faites}</div>
             ) : null}
@@ -2895,7 +2957,11 @@ export function FicheCompacte({
             const ouvert = ouverts.has(sc.id)
             return (
               <Fragment key={sc.id}>
-                <div className={`fdc-scen-ligne${sc.fait ? ' fait' : ''}`} {...survolCarte({ article: `s${sc.id}` })}>
+                <div
+                  className={`fdc-scen-ligne${sc.fait ? ' fait' : ''}`}
+                  data-vise={`article-s${sc.id}`}
+                  {...survolCarte({ article: `s${sc.id}` })}
+                >
                 <label className={`fdl-coche${sc.fait ? ' fait' : ''}`} title="Pendant la partie">
                   <input
                     type="checkbox"

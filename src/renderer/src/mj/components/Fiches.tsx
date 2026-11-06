@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { Pastille } from './Pastille'
-import { IconPeople, IconPen, IconPlus, IconTrash } from './Icons'
+import { IconCheck, IconClose, IconPeople, IconPen, IconPlus, IconTrash } from './Icons'
 import { PION_COULEURS } from '@shared/types'
 import type { CampaignPlayer, CarnetPlayer } from '@shared/types'
 import type { UiFolder } from '../../../../preload/index'
@@ -301,13 +301,27 @@ export function FicheSeance({ onClose }: { onClose: () => void }): JSX.Element {
  * qui devient le dossier de la nouvelle séance. La fenêtre ne se ferme pas
  * tant que la copie court : elle continuerait de toute façon, sans personne
  * pour en voir la fin.
+ *
+ * Deux façons de dupliquer : **repartir du début** (pour rejouer, ou une
+ * autre table) ou **reprendre où on en était** (une séance inachevée qui
+ * continue : tout reste où la table l'a laissé, pions compris). La suite prend le nom de la
+ * séance d'origine, « — partie 2 », puis 3…
  */
 export function DupliquerSeance({ onClose }: { onClose: () => void }): JSX.Element {
   const s = useStore()
   const derniere = [...s.sessions].sort((a, b) => b.id - a.id)[0]
   const [srcId, setSrcId] = useState(derniere?.id ?? 0)
   const [dossier, setDossier] = useState(derniere?.folderRel ?? '')
-  const [label, setLabel] = useState('Séance ' + (s.sessions.length + 1))
+  const [suite, setSuite] = useState(false)
+  /* Le nom proposé suit le mode et la séance choisie, tant qu'on n'y a pas touché. */
+  const [labelSaisi, setLabelSaisi] = useState<string | null>(null)
+  const source = s.sessions.find((x) => x.id === srcId)
+  const label =
+    labelSaisi ?? (suite && source ? nomDeLaSuite(source.label) : 'Séance ' + (s.sessions.length + 1))
+  const setLabel = setLabelSaisi
+  /* La suite peut renommer la séance d'origine, « — partie 1 » proposé. */
+  const [origineSaisi, setOrigineSaisi] = useState<string | null>(null)
+  const nomOrigine = origineSaisi ?? (source ? nomDeLaPartie1(source.label) : '')
   const [nomDossier, setNomDossier] = useState<string | null>(null)
   const [prog, setProg] = useState<{ etape: 'fichiers' | 'seance'; fait: number; total: number } | null>(null)
 
@@ -322,6 +336,7 @@ export function DupliquerSeance({ onClose }: { onClose: () => void }): JSX.Eleme
 
   const choisirSource = (id: number): void => {
     setSrcId(id)
+    setOrigineSaisi(null)
     setDossier(s.sessions.find((x) => x.id === id)?.folderRel ?? '')
   }
 
@@ -329,7 +344,9 @@ export function DupliquerSeance({ onClose }: { onClose: () => void }): JSX.Eleme
     if (!srcId || enCours) return
     setProg({ etape: dossier ? 'fichiers' : 'seance', fait: 0, total: 1 })
     try {
-      const neuve = await window.jdr.timeline.dupliquerSeance(srcId, label.trim(), dossier || null, nom.trim())
+      const neuve = await window.jdr.timeline.dupliquerSeance(srcId, label.trim(), dossier || null, nom.trim(), suite)
+      if (suite && source && nomOrigine.trim() && nomOrigine.trim() !== source.label)
+        await window.jdr.timeline.updateSession(srcId, { label: nomOrigine.trim() })
       await s.refreshSeance()
       s.toast(`« ${neuve.label} » est prête`)
       onClose()
@@ -387,6 +404,44 @@ export function DupliquerSeance({ onClose }: { onClose: () => void }): JSX.Eleme
       </div>
 
       <div className="field">
+        <label>Pour quoi faire ?</label>
+        <div className="seg-fiche" role="radiogroup" aria-label="Pour quoi faire ?">
+          {(
+            [
+              [false, 'Repartir du début', 'Lieux à découvrir, portes fermées, moments à jouer'],
+              [true, 'Reprendre où on en était', 'La séance n’est pas finie : tout reste où la table l’a laissé']
+            ] as const
+          ).map(([v, l, aide]) => (
+            <button
+              key={l}
+              type="button"
+              role="radio"
+              aria-checked={suite === v}
+              className={suite === v ? 'on' : ''}
+              disabled={enCours}
+              title={aide}
+              onClick={() => setSuite(v)}
+            >
+              {l}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {suite ? (
+        <div className="field">
+          <label htmlFor="ds-origine">Renommer la séance d’origine</label>
+          <input
+            id="ds-origine"
+            type="text"
+            value={nomOrigine}
+            disabled={enCours}
+            onChange={(e) => setOrigineSaisi(e.target.value)}
+          />
+        </div>
+      ) : null}
+
+      <div className="field">
         <label htmlFor="ds-nom">Nom de la nouvelle séance</label>
         <input
           id="ds-nom"
@@ -428,10 +483,10 @@ export function DupliquerSeance({ onClose }: { onClose: () => void }): JSX.Eleme
       <p className="expli">
         {dossier
           ? `« ${dossier} » est recopié à côté de lui sous le nom « ${nom.trim() || '…'} », qui devient le dossier de la nouvelle séance. Plans, portraits et textes des moments pointent sur la copie.`
-          : 'Sans dossier, la nouvelle séance garde les mêmes fichiers que l’autre.'}{' '}
-        Lieux (non découverts, sans pions), PNJ, moments (aucun joué) et notes sont repris ; les
-        joueurs arrivent avec leur état le plus récent.
+          : 'Sans dossier, la nouvelle séance garde les mêmes fichiers que l’autre.'}
       </p>
+
+      <ComparatifDuplication suite={suite} />
 
       {prog ? (
         <div className="dupli-avance" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(part * 100)}>
@@ -736,5 +791,62 @@ export function Fenetre({
         </footer>
       </div>
     </div>
+  )
+}
+
+/** « La traque » → « La traque — partie 2 » ; « … — partie 2 » → « … — partie 3 ». */
+function nomDeLaSuite(l: string): string {
+  const m = l.match(/^(.*?)\s*[—–-]\s*partie\s+(\d+)\s*$/i)
+  return m ? `${m[1]} — partie ${Number(m[2]) + 1}` : `${l.trim()} — partie 2`
+}
+
+/** « La traque » → « La traque — partie 1 » ; déjà numérotée, elle garde son nom. */
+function nomDeLaPartie1(l: string): string {
+  return /[—–-]\s*partie\s+\d+\s*$/i.test(l) ? l : `${l.trim()} — partie 1`
+}
+
+/* Ce que garde chaque façon de dupliquer : [libellé, repartir du début, reprendre]. */
+const COMPARATIF: [string, boolean, boolean][] = [
+  ['Lieux, PNJ, moments, trame, notes, santé mentale', true, true],
+  ['Lieux déjà découverts', false, true],
+  ['Portes ouvertes', false, true],
+  ['Pions à leur place', false, true],
+  ['Objets trouvés ou montrés', false, true],
+  ['Sons « une fois » déjà joués', false, true],
+  ['Moments et trame cochés', false, true],
+  ['Joueurs avec leur état le plus récent', true, true]
+]
+
+/** Le tableau des deux modes, la colonne choisie en avant. */
+function ComparatifDuplication({ suite }: { suite: boolean }): JSX.Element {
+  const marque = (oui: boolean): JSX.Element =>
+    oui ? (
+      <span className="cd-oui" aria-label="oui">
+        <IconCheck />
+      </span>
+    ) : (
+      <span className="cd-non" aria-label="non">
+        <IconClose />
+      </span>
+    )
+  return (
+    <table className="comparatif-dupli">
+      <thead>
+        <tr>
+          <th />
+          <th className={suite ? '' : 'on'}>Repartir du début</th>
+          <th className={suite ? 'on' : ''}>Reprendre où on en était</th>
+        </tr>
+      </thead>
+      <tbody>
+        {COMPARATIF.map(([l, debut, reprise]) => (
+          <tr key={l}>
+            <td>{l}</td>
+            <td className={suite ? '' : 'on'}>{marque(debut)}</td>
+            <td className={suite ? 'on' : ''}>{marque(reprise)}</td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
   )
 }

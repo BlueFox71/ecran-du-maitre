@@ -1,12 +1,13 @@
 /**
  * « Ça commence bientôt » : l'écran qu'on laisse aux joueurs pendant qu'ils
- * s'installent. Le bouton de la Régie ouvre ses réglages et le lance ; tant
+ * s'installent. Le bouton du Paravent ouvre ses réglages et le lance ; tant
  * qu'il est à l'écran, le même bouton le retire et rend ce qui était là avant.
  *
  * Les réglages appartiennent à la campagne (`attente`, en JSON) : on les pose
  * une fois, on relance d'un clic à chaque séance.
  */
 import { useEffect, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { itemById, playerOf, useStore } from '../store'
 import { ChampEmojis } from './ChampEmojis'
 import { IconClose, IconSablier } from './Icons'
@@ -84,7 +85,8 @@ export function lireAttente(brut: string | undefined): ReglagesAttente {
   }
 }
 
-export function BoutonAttente(): JSX.Element {
+/** `petit` : la version de la barre d'outils du Paravent, plus courte. */
+export function BoutonAttente({ petit }: { petit?: boolean } = {}): JSX.Element {
   const s = useStore()
   const [ouvert, setOuvert] = useState(false)
   const direct = s.display ? s.display.slots[s.display.liveSlot] : null
@@ -94,7 +96,7 @@ export function BoutonAttente(): JSX.Element {
   return (
     <>
       <button
-        className={`btn${enCours ? ' btn-on' : ''}`}
+        className={`btn${petit ? ' btn-sm' : ''}${enCours ? ' btn-on' : ''}`}
         disabled={fige}
         onClick={() => (enCours ? void window.jdr.display.arreterPresentation() : setOuvert(true))}
         title={
@@ -104,9 +106,11 @@ export function BoutonAttente(): JSX.Element {
         }
       >
         {enCours ? <IconClose /> : <IconSablier />}
-        {enCours ? 'Arrêter l’attente' : 'Ça commence bientôt'}
+        {enCours ? 'Arrêter l’attente' : petit ? 'Attente' : 'Ça commence bientôt'}
       </button>
-      {ouvert ? <FenetreAttente onClose={() => setOuvert(false)} /> : null}
+      {/* Dans le body : posée dans la barre d'outils du Paravent, la fenêtre
+          héritait de ses boutons sans fond — « Lancer » perdait son laiton. */}
+      {ouvert ? createPortal(<FenetreAttente onClose={() => setOuvert(false)} />, document.body) : null}
     </>
   )
 }

@@ -123,7 +123,8 @@ export function deleteSession(id: number): { ok: boolean; raison?: string } {
  * Dupliquer une séance : une nouvelle, qui devient la séance en cours, avec
  * une copie de ce que l'autre préparait — ses lieux (non découverts, sans
  * pions, comme toute reprise), ses PNJ, ses moments (à rejouer : aucun n'est
- * coché), sa trame (décochée de même), ses notes et la liste de ses absents.
+ * coché), sa trame (décochée de même), ses notes, la liste de ses absents
+ * et ses événements de santé mentale.
  *
  * `folderRel` est le dossier déjà recopié qui devient celui de la séance ;
  * `jumeaux` dit, pour chaque fichier de l'ancien dossier, son double dans le
@@ -133,12 +134,18 @@ export function deleteSession(id: number): { ok: boolean; raison?: string } {
  *
  * L'état des joueurs, lui, ne se copie pas d'ici : il suit la règle de toute
  * séance où l'on entre, et vient de la plus récente.
+ *
+ * `suite` : la nouvelle séance continue une partie inachevée au lieu de la
+ * rejouer. Tout reste où la table l'a laissé — lieux découverts, objets
+ * trouvés, sons joués, moments et trame cochés, fiches des lieux jouées — et
+ * les pions sont recopiés à leur place.
  */
 export function dupliquerSeance(
   srcId: number,
   label: string,
   folderRel: string | null,
-  jumeaux: Map<number, number>
+  jumeaux: Map<number, number>,
+  suite = false
 ): GameSession {
   const db = getDb()
   const cid = activeCampaignId()
@@ -166,7 +173,7 @@ export function dupliquerSeance(
     for (const p of siens) {
       if (p.parentId != null && ids.has(p.parentId)) continue
       const parentId = p.parentId != null && commun.get(p.parentId) ? p.parentId : null
-      for (const [a, b] of copierLieu(p.id, nid, { parentId }, jumeaux)) lieux.set(a, b)
+      for (const [a, b] of copierLieu(p.id, nid, { parentId }, jumeaux, suite)) lieux.set(a, b)
     }
 
     const pnj = new Map<number, number>()
@@ -183,7 +190,7 @@ export function dupliquerSeance(
       .all(srcId) as { id: number; placeId: number | null }[]) {
       const neuf = copierLigne('beat', b.id, {
         session_id: nid,
-        done: 0,
+        ...(suite ? {} : { done: 0 }),
         place_id: b.placeId == null ? null : (lieux.get(b.placeId) ?? b.placeId)
       })
       beats.set(b.id, neuf)
@@ -198,7 +205,28 @@ export function dupliquerSeance(
     }
 
     /* La trame suit, à rejouer : rien n'y est coché. */
-    copierTrame(srcId, nid, { beats, lieux, pnj, fichiers: jumeaux })
+    copierTrame(srcId, nid, { beats, lieux, pnj, fichiers: jumeaux }, suite)
+
+    /* La suite reprend le plateau tel quel, chaque pion sur la copie de son
+       lieu. Un personnage n'a qu'un pion dans toute la campagne : celui d'un
+       joueur (ou d'un PNJ commun) passe dans la nouvelle séance ; celui d'un
+       PNJ de la séance est recopié pour son double, comme les images. */
+    if (suite) {
+      const lirePions = db.prepare(
+        `SELECT id, character_id AS c, item_id AS i FROM pion WHERE place_id = ?`
+      )
+      const deplacer = db.prepare(`UPDATE pion SET place_id = ? WHERE id = ?`)
+      for (const [de, vers] of lieux)
+        for (const p of lirePions.all(de) as { id: number; c: number | null; i: number | null }[]) {
+          if (p.c != null && !pnj.has(p.c)) deplacer.run(vers, p.id)
+          else
+            copierLigne('pion', p.id, {
+              place_id: vers,
+              character_id: p.c == null ? null : pnj.get(p.c)!,
+              item_id: p.i == null ? null : fichier(p.i)
+            })
+        }
+    }
 
     /* Les fiches des lieux recopiés désignent les doubles des PNJ et des moments. */
     raccrocherFiches(lieux.values(), pnj, beats)
@@ -206,6 +234,13 @@ export function dupliquerSeance(
     db.prepare(
       `INSERT OR IGNORE INTO seance_absent (session_id, character_id)
          SELECT ?, character_id FROM seance_absent WHERE session_id = ?`
+    ).run(nid, srcId)
+
+    /* Les événements de santé mentale préparés pour la séance, dans leur ordre. */
+    db.prepare(
+      `INSERT INTO sm_evenement (campaign_id, session_id, ord, nom, note, perte, jet, tous)
+         SELECT campaign_id, ?, ord, nom, note, perte, jet, tous
+           FROM sm_evenement WHERE session_id = ? ORDER BY ord, id`
     ).run(nid, srcId)
 
     /* Le double d'un fichier rattaché à un lieu l'est à la copie de ce lieu,

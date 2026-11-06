@@ -13,12 +13,14 @@
  */
 import { useState } from 'react'
 import { itemById, useStore } from '../store'
-import { IconCoffre, IconDonner, IconEye, glypheObjet } from './Icons'
+import { IconCoffre, IconDonner, IconEtincelles, IconEye, glypheObjet } from './Icons'
 import { MenuDonner } from './MenuDonner'
+import { ListeEffetsPnj, effetsSurPnj } from './EffetsObjets'
 import { AlerteLieux, lieuxDe } from './ObjetsDuLieu'
 import type { Surbrillance } from './Tableau'
 import type { Objet, ObjetPlacement, Place } from '@shared/types'
 import type { UiItem } from '../../../../preload/index'
+import { ETAT_OBJET_AIDE, ETAT_OBJET_DIT, etatSuivant } from '@shared/types'
 
 interface Ici {
   o: Objet
@@ -122,6 +124,9 @@ export function ObjetsDeScene({
 }): JSX.Element {
   const s = useStore()
   const [donne, setDonne] = useState<{ x: number; y: number; p: ObjetPlacement } | null>(null)
+  /* L'exemplaire dont on lit les effets sur les PNJ, s'il y en a un d'ouvert. */
+  const [effetsVus, setEffetsVus] = useState<number | null>(null)
+
 
   const salles = lieuxDeScene(s.places, placeId)
     .map((l) => ({ l, ici: posesDans(s.objets, l.id) }))
@@ -167,8 +172,13 @@ export function ObjetsDeScene({
               {ici.map(({ o, p }) => {
                 const f = s.objetFamilles.find((y) => y.id === o.familleId) ?? null
                 const image = itemById(s.allItems, o.imageItemId)
+                const effets = effetsSurPnj(s.characters, o.id)
+                const voirEffets = effetsVus === p.id
                 return (
-                  <div key={p.id} className={`tb-ligne os-ligne c-${f?.teinte ?? 'neutral'}`}>
+                  <div
+                    key={p.id}
+                    className={`tb-ligne os-ligne c-${f?.teinte ?? 'neutral'}${voirEffets ? ' os-ouvert' : ''}`}
+                  >
                     <span className="os-g">{glypheObjet(f?.glyphe ?? 'outils', 'glyphe')}</span>
                     <span className="tb-nom" title={p.precision ?? undefined}>
                       <span className="os-nm">{o.nom}</span>
@@ -177,19 +187,13 @@ export function ObjetsDeScene({
                     </span>
                     <button
                       className={`ou-etat ${p.etat}`}
-                      title={
-                        p.etat === 'cache'
-                          ? 'Les joueurs ne l’ont pas trouvé — clic quand ils mettent la main dessus'
-                          : 'Ils savent qu’il est là — clic pour le remettre à couvert'
-                      }
+                      title={ETAT_OBJET_AIDE[p.etat]}
                       onClick={async () => {
-                        await window.jdr.objets.placement(p.id, {
-                          etat: p.etat === 'cache' ? 'trouve' : 'cache'
-                        })
+                        await window.jdr.objets.placement(p.id, { etat: etatSuivant(p.etat) })
                         await relire()
                       }}
                     >
-                      {p.etat === 'cache' ? 'caché' : 'trouvé'}
+                      {ETAT_OBJET_DIT[p.etat]}
                     </button>
                     <button
                       className="tb-oeil"
@@ -219,6 +223,28 @@ export function ObjetsDeScene({
                     >
                       <IconDonner />
                     </button>
+                  {/* Ce qu'il fait aux PNJ — écrit sur leurs fiches, jamais diffusé.
+                      Dans la tuile même : c'est de cet objet-là qu'on parle ; ouverte,
+                      la tuile prend toute la largeur pour que les effets se lisent. */}
+                  {effets.length ? (
+                    <div className="os-effets">
+                      <button
+                        className={`os-effets-bouton${voirEffets ? ' on' : ''}`}
+                        aria-expanded={voirEffets}
+                        title={
+                          voirEffets
+                            ? 'Masquer les effets PNJ'
+                            : `Ce que ${o.nom} fait à ${effets.length} PNJ — écrit sur leurs fiches`
+                        }
+                        aria-label={voirEffets ? 'Masquer les effets PNJ' : `Voir les effets PNJ (${effets.length})`}
+                        onClick={() => setEffetsVus(voirEffets ? null : p.id)}
+                      >
+                        <IconEtincelles />
+                        <span className="num">{effets.length}</span>
+                      </button>
+                      {voirEffets ? <ListeEffetsPnj effets={effets} /> : null}
+                    </div>
+                  ) : null}
                   </div>
                 )
               })}

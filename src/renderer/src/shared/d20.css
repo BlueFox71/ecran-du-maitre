@@ -3,70 +3,234 @@
  * table. Sa taille vient de `--d20-taille`, posée par qui l'affiche ; la chute
  * se compte en part de cette taille, si bien qu'un petit dé et un grand
  * tombent de la même façon.
+ *
+ * Sa couleur est celle du joueur (`--pion-ring`, des classes `c-*`) : les
+ * facettes en sont des mélanges, plus clairs en haut, plus sombres en bas.
  */
 .d20 {
-  --d20-or: #d8a94a;
-  --d20-clair: #e8bf62;
-  --d20-trait: #6b5526;
-  --d20-encre: #1a140a;
+  --d20-or: var(--d20-couleur, var(--pion-ring, #d8a94a));
+  --d20-clair: color-mix(in srgb, var(--d20-or) 62%, white);
+  --d20-trait: color-mix(in srgb, var(--d20-or) 38%, black);
+  --d20-encre: #fff;
+  --d20-duree: 1.8s;
+  position: relative;
   width: var(--d20-taille, 120px);
   height: var(--d20-taille, 120px);
-  animation: d20-tombe 1.6s cubic-bezier(0.3, 0.7, 0.4, 1) both;
+}
+.d20-vol,
+.d20-saut {
+  width: 100%;
+  height: 100%;
+}
+/* L'avancée : lancé du côté gauche, il file, puis le frottement le cale. */
+.d20-vol {
+  animation:
+    d20-avance var(--d20-duree) linear both,
+    d20-parait calc(var(--d20-duree) * 0.1) ease-out both;
+}
+/* La hauteur, la rotation et l'écrasement. Chaque étape porte sa propre
+   courbe (voir `d20-tombe`) : une seule courbe pour toute l'animation
+   s'appliquait à chaque étape, et le dé freinait jusqu'à l'arrêt à mi-vol
+   avant de repartir d'un coup — la « coupure ». */
+.d20-saut {
+  /* Il tourne sur son centre : autour d'un point plus bas, il se balançait
+     de gauche à droite en roulant. L'écrasement reste posé au sol grâce au
+     petit décalage vers le bas des points de contact. */
+  transform-origin: 50% 50%;
+  animation: d20-tombe var(--d20-duree) linear both;
 }
 .d20 svg {
   display: block;
   width: 100%;
   height: 100%;
   overflow: visible;
-  filter: drop-shadow(0 10px 18px rgba(0, 0, 0, 0.55));
+  filter: drop-shadow(0 4px 6px rgba(0, 0, 0, 0.45));
   transition: filter 0.4s ease;
 }
-.d20-corps {
-  fill: var(--d20-or);
+.d20-f {
   stroke: var(--d20-trait);
-  stroke-width: 3;
+  stroke-width: 1.4;
   stroke-linejoin: round;
   transition: fill 0.4s ease;
 }
+.d20-f-hg { fill: color-mix(in srgb, var(--d20-or) 78%, white); }
+.d20-f-hd { fill: color-mix(in srgb, var(--d20-or) 90%, white); }
+.d20-f-g  { fill: color-mix(in srgb, var(--d20-or) 88%, black); }
+.d20-f-d  { fill: var(--d20-or); }
+.d20-f-bg { fill: color-mix(in srgb, var(--d20-or) 62%, black); }
+.d20-f-bd { fill: color-mix(in srgb, var(--d20-or) 74%, black); }
+.d20-f-b  { fill: color-mix(in srgb, var(--d20-or) 68%, black); }
 .d20-face {
   fill: var(--d20-clair);
   stroke: var(--d20-trait);
-  stroke-width: 2;
+  stroke-width: 1.6;
   stroke-linejoin: round;
   transition: fill 0.4s ease;
 }
-.d20-aretes line {
+.d20-contour {
+  fill: none;
   stroke: var(--d20-trait);
-  stroke-width: 2;
+  stroke-width: 3;
+  stroke-linejoin: round;
+}
+.d20-reflet {
+  fill: none;
+  stroke: rgba(255, 255, 255, 0.55);
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
 }
 .d20 text {
-  font: 700 30px 'Segoe UI', system-ui, sans-serif;
+  font: 800 30px 'Segoe UI', system-ui, sans-serif;
   fill: var(--d20-encre);
+  stroke: color-mix(in srgb, var(--d20-or) 30%, black);
+  stroke-width: 4px;
+  paint-order: stroke;
 }
 
-/* Lancé du coin haut gauche, il glisse, rebondit deux fois et se cale. */
+/* L'ombre au sol, sous le dé : elle grandit et fonce à chaque contact. */
+.d20-ombre {
+  position: absolute;
+  left: 12%;
+  right: 12%;
+  bottom: -9%;
+  height: 16%;
+  border-radius: 50%;
+  background: radial-gradient(closest-side, rgba(0, 0, 0, 0.55), transparent);
+  animation: d20-ombre var(--d20-duree) linear both;
+}
+/* L'onde du choc, quand il touche pour de bon. */
+.d20-onde {
+  position: absolute;
+  left: 50%;
+  bottom: -2%;
+  width: 120%;
+  height: 34%;
+  border-radius: 50%;
+  border: max(2px, calc(var(--d20-taille, 120px) * 0.025)) solid var(--d20-or);
+  opacity: 0;
+  transform: translateX(-50%) scale(0.2);
+  /* `forwards`, pas `both` : pendant l'attente, l'onde ne doit pas déjà
+     montrer sa première image — un petit anneau posé au sol avant le choc. */
+  animation: d20-onde calc(var(--d20-duree) * 0.45) ease-out calc(var(--d20-duree) * 0.4) forwards;
+}
+
+/*
+ * La chute, en physique de comptoir : la gravité accélère le dé qui tombe
+ * (courbes « ease-in ») et freine celui qui remonte (« ease-out »). Il touche
+ * à 40 %, rebondit deux fois de moins en moins haut, et se cale. Le choc
+ * l'écrase, la remontée l'étire.
+ *
+ * Les points de contact (40, 63, 79 %) sont les mêmes pour l'avancée et pour
+ * l'ombre, qui suit le dé et fonce quand il touche.
+ */
 @keyframes d20-tombe {
   0% {
-    transform: translate(-240%, -240%) rotate(-540deg) scale(0.6);
-    opacity: 0;
+    transform: translateY(-320%) rotate(-560deg) scale(0.62);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.55);
   }
-  12% {
-    opacity: 1;
+  40% {
+    transform: translateY(8%) rotate(-48deg) scale(1.14, 0.84);
+    animation-timing-function: cubic-bezier(0.12, 0.55, 0.4, 1);
   }
-  45% {
-    transform: translate(28%, 0) rotate(-40deg) scale(1);
+  52% {
+    transform: translateY(-36%) rotate(-14deg) scale(0.96, 1.05);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.88, 0.45);
   }
-  60% {
-    transform: translate(9%, -36%) rotate(-10deg);
+  63% {
+    transform: translateY(3.5%) rotate(5deg) scale(1.07, 0.93);
+    animation-timing-function: cubic-bezier(0.12, 0.55, 0.4, 1);
   }
-  75% {
-    transform: translate(0, 0) rotate(8deg);
+  71% {
+    transform: translateY(-10%) rotate(-2deg) scale(0.99, 1.01);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.88, 0.45);
   }
-  88% {
-    transform: translate(0, -7%) rotate(-3deg);
+  79% {
+    transform: translateY(1.5%) rotate(0.6deg) scale(1.03, 0.97);
+    animation-timing-function: cubic-bezier(0.25, 0.6, 0.4, 1);
   }
   100% {
-    transform: translate(0, 0) rotate(0);
+    transform: translateY(0) rotate(0) scale(1);
+  }
+}
+/* De gauche à droite : vite en l'air, freiné à chaque contact. */
+@keyframes d20-avance {
+  0% {
+    transform: translateX(-240%);
+    animation-timing-function: cubic-bezier(0.3, 0.35, 0.6, 0.85);
+  }
+  40% {
+    transform: translateX(14%);
+    animation-timing-function: cubic-bezier(0.2, 0.5, 0.45, 1);
+  }
+  79% {
+    transform: translateX(0);
+  }
+  100% {
+    transform: translateX(0);
+  }
+}
+@keyframes d20-parait {
+  from {
+    opacity: 0;
+  }
+}
+/* L'ombre suit l'avancée (en part de sa propre largeur, 76 % de celle du dé)
+   et grandit, fonce, quand le dé descend vers elle. */
+@keyframes d20-ombre {
+  0% {
+    opacity: 0;
+    transform: translateX(-316%) scale(0.25);
+    animation-timing-function: cubic-bezier(0.5, 0, 0.9, 0.55);
+  }
+  40% {
+    opacity: 1;
+    transform: translateX(18%) scale(1.15, 1);
+    animation-timing-function: cubic-bezier(0.12, 0.55, 0.4, 1);
+  }
+  52% {
+    opacity: 0.55;
+    transform: translateX(11%) scale(0.75);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.88, 0.45);
+  }
+  63% {
+    opacity: 1;
+    transform: translateX(4%) scale(1.08, 1);
+    animation-timing-function: cubic-bezier(0.12, 0.55, 0.4, 1);
+  }
+  71% {
+    opacity: 0.8;
+    transform: translateX(1%) scale(0.9);
+    animation-timing-function: cubic-bezier(0.6, 0, 0.88, 0.45);
+  }
+  79% {
+    opacity: 0.95;
+    transform: translateX(0) scale(1.03, 1);
+    animation-timing-function: cubic-bezier(0.25, 0.6, 0.4, 1);
+  }
+  100% {
+    opacity: 0.9;
+    transform: translateX(0) scale(1);
+  }
+}
+@keyframes d20-onde {
+  0% {
+    opacity: 0.9;
+    transform: translateX(-50%) scale(0.2);
+  }
+  100% {
+    opacity: 0;
+    transform: translateX(-50%) scale(1.5);
+  }
+}
+
+/* Posé : un petit sursaut, le temps qu'on lise le chiffre. */
+.d20-pose:not(.d20-sans-chute) svg {
+  animation: d20-sursaut 0.35s ease-out;
+}
+@keyframes d20-sursaut {
+  50% {
+    transform: scale(1.08);
   }
 }
 
@@ -74,10 +238,18 @@
 .d20-critique {
   --d20-or: #f0c35a;
   --d20-clair: #ffe08a;
+  --d20-trait: #6b5526;
 }
 .d20-critique svg {
   filter: drop-shadow(0 0 calc(var(--d20-taille, 120px) * 0.16) rgba(255, 214, 110, 0.85));
   animation: d20-eclat 1.1s ease-in-out infinite alternate;
+}
+/* Le sursaut d'abord, l'éclat ensuite : la règle du sursaut, plus précise,
+   effaçait l'éclat d'un 20 tombé devant le joueur. */
+.d20-critique.d20-pose:not(.d20-sans-chute) svg {
+  animation:
+    d20-sursaut 0.35s ease-out,
+    d20-eclat 1.1s ease-in-out 0.35s infinite alternate;
 }
 @keyframes d20-eclat {
   to {
@@ -88,21 +260,34 @@
   --d20-or: #b5473f;
   --d20-clair: #d46a60;
   --d20-trait: #4a1612;
-  --d20-encre: #fff1ec;
 }
 .d20-maladresse svg {
   filter: drop-shadow(0 0 calc(var(--d20-taille, 120px) * 0.14) rgba(192, 86, 77, 0.8));
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .d20,
-  .d20-critique svg {
+  .d20-vol,
+  .d20-saut,
+  .d20-ombre,
+  .d20-onde,
+  .d20-pose svg,
+  .d20-critique svg,
+  .d20-critique.d20-pose:not(.d20-sans-chute) svg {
     animation: none;
+  }
+  .d20-onde {
+    display: none;
   }
 }
 
-.d20-sans-chute {
+/* Déjà vu tomber : posé d'emblée, sans chute ni onde. */
+.d20-sans-chute .d20-vol,
+.d20-sans-chute .d20-saut,
+.d20-sans-chute .d20-ombre {
   animation: none;
+}
+.d20-sans-chute .d20-onde {
+  display: none;
 }
 
 /* --- les dés au centre de la scène (DesSurTable.tsx) ----------------------

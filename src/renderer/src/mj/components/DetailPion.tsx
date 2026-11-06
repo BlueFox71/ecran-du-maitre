@@ -4,6 +4,8 @@ import { TexteCourt } from './TexteCourt'
 import { modificateur, signe } from '@shared/jet'
 import { PilotePion } from './PilotePion'
 import { BonusMalus } from './BonusMalus'
+import { Valeur } from './Valeur'
+import { BoutonEffetsPnj, EffetsObjetsPion } from './EffetsObjets'
 import { eclaire, emplacementsDe, etatDeVie, jaugesDe, nomEmplacement } from '@shared/types'
 import type { ButinLigne, Character, GaugeSpec, Objet, ObjetPlacement, Pion } from '@shared/types'
 
@@ -277,6 +279,9 @@ export function DetailPion({
             </section>
           ) : null}
 
+          {/* Ce que les objets lui font : en tête de ce qu'on manœuvre, c'est ce
+              que les joueurs vont lui brandir. */}
+          {ch ? <EffetsObjetsPion ch={ch} /> : null}
           {ch ? (
             <section>
               <Butin ch={ch} onFait={fait} />
@@ -329,7 +334,17 @@ function GrandeJauge({
       <div className="dp-jauge-ligne">
         <span>{g.label}</span>
         <span className="num dp-jauge-val">
-          {v.value}
+          {/* Le chiffre se tape aussi : on donne la nouvelle valeur, l'écart
+              part comme un coup ordinaire — journalisé, comme + et −. */}
+          <Valeur
+            value={v.value}
+            min={0}
+            max={v.max}
+            label={`${g.label} de ${ch.name}`}
+            onChange={(n) => {
+              if (n !== v.value) onAjuster(n - v.value)
+            }}
+          />
           <i>/{v.max}</i>
         </span>
       </div>
@@ -463,6 +478,7 @@ function ObjetsPortes({ ch, pose }: { ch: Character; pose?: PoseObjet }): JSX.El
                 </button>
               ) : null}
               {poser(o, p)}
+              <BoutonEffetsPnj objetId={o.id} />
             </li>
           ))}
         </ul>
@@ -478,6 +494,7 @@ function ObjetsPortes({ ch, pose }: { ch: Character; pose?: PoseObjet }): JSX.El
               {o.nom}
               <span className="q num">×{p.qte}</span>
               {poser(o, p)}
+              <BoutonEffetsPnj objetId={o.id} />
             </li>
           ))}
         </ul>

@@ -7,6 +7,7 @@ import type { Monnaie } from '@shared/monnaies'
 import type { Modif } from '@shared/modifs'
 import type {
   ButinLigne,
+  EffetSurEntite,
   CadreCarre,
   Character,
   CharacterKind,
@@ -617,6 +618,45 @@ export function setModifs(characterId: number, modifs: Modif[]): Character {
   else delete data.modifs
   ecrisDonnees(characterId, data)
   return getCharacter(characterId)!
+}
+
+/**
+ * Ce que des objets font à ce personnage, remplacé d'un bloc. Un objet n'y
+ * figure qu'une fois ; un effet encore vide reste — on a choisi l'objet, on
+ * écrira son effet ensuite.
+ */
+export function setEffetsObjets(characterId: number, effets: EffetSurEntite[]): Character {
+  const ch = getCharacter(characterId)
+  if (!ch) throw new Error('Personnage introuvable')
+  const vus = new Set<number>()
+  const propres = (Array.isArray(effets) ? effets : [])
+    .map((e) => ({ objetId: Math.trunc(Number(e.objetId)), effet: String(e.effet ?? '') }))
+    .filter((e) => Number.isInteger(e.objetId) && e.objetId > 0 && !vus.has(e.objetId) && vus.add(e.objetId))
+  const data = { ...ch.data }
+  if (propres.length) data.effetsObjets = propres
+  else delete data.effetsObjets
+  ecrisDonnees(characterId, data)
+  return getCharacter(characterId)!
+}
+
+/**
+ * Copier des effets d'objets sur d'autres personnages, d'un seul geste (un
+ * seul Ctrl+Z). Ce que la cible avait déjà reste ; un objet présent des deux
+ * côtés prend l'effet copié. Rend le nombre de personnages touchés.
+ */
+export function copierEffetsObjets(effets: EffetSurEntite[], cibles: number[]): number {
+  let n = 0
+  getDb().transaction(() => {
+    for (const id of new Set(cibles)) {
+      const ch = getCharacter(id)
+      if (!ch) continue
+      const copies = new Map(effets.map((e) => [e.objetId, e]))
+      const garde = (ch.data.effetsObjets ?? []).filter((e) => !copies.has(e.objetId))
+      setEffetsObjets(id, [...garde, ...copies.values()])
+      n++
+    }
+  })()
+  return n
 }
 
 /**

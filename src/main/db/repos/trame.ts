@@ -128,6 +128,7 @@ export function supprimerLien(id: number): void {
  * coché. Les correspondances disent où pointent désormais les moments, les
  * lieux, les PNJ et les fichiers recopiés ; ce qui n'a pas de double reste
  * partagé, comme ailleurs. À appeler dans la transaction de la duplication.
+ * `suite` garde les cartes cochées : la partie continue.
  */
 export function copierTrame(
   srcId: number,
@@ -137,13 +138,14 @@ export function copierTrame(
     lieux: Map<number, number>
     pnj: Map<number, number>
     fichiers: Map<number, number>
-  }
+  },
+  suite = false
 ): void {
   const db = getDb()
   const { cartes, liens } = lireTrame(srcId)
   const ins = db.prepare(
     `INSERT INTO trame_carte (session_id, type, titre, resume, x, y, regle, fait, item_id, image_cadre, beat_id, place_id)
-     VALUES (?, ?, ?, ?, ?, ?, ?, 0, ?, ?, ?, ?)`
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
   )
   const insPnj = db.prepare(`INSERT OR IGNORE INTO trame_carte_pnj (carte_id, character_id) VALUES (?, ?)`)
   const ids = new Map<number, number>()
@@ -158,6 +160,7 @@ export function copierTrame(
         c.x,
         c.y,
         c.regle,
+        suite && c.fait ? 1 : 0,
         via(maps.fichiers, c.itemId),
         c.imageCadre ? JSON.stringify(c.imageCadre) : null,
         /* Un moment est propre à sa séance : sans double, la carte le perd. */

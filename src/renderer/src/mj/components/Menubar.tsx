@@ -4,6 +4,7 @@ import { enCourt } from './Ident'
 import { IconCheck } from './Icons'
 import { useEchap } from '../echap'
 import type { Rubrique } from './parametres/registre'
+import { MATIERES_RAIL } from '@shared/reglages'
 
 /**
  * La barre de menus, en haut à gauche — là où tous les logiciels la mettent.
@@ -58,6 +59,14 @@ export function Menubar({
     void window.jdr.app.commande(nom)
   }
   const seance = s.session
+  /* Mode développeur, absent de l'application installée (null) : relu à
+     chaque ouverture d'un menu, la fenêtre pouvant avoir été agrandie à la
+     main entre-temps. */
+  const [portable, setPortable] = useState<boolean | null>(null)
+  useEffect(() => {
+    void window.jdr.app.modePortable().then(setPortable)
+  }, [ouvert])
+  const reference = s.sessions.find((x) => x.label.startsWith('Référence dev'))
   const recentes = s.recents.filter((r) => r.path !== s.project?.dir).slice(0, 6)
 
   return (
@@ -174,7 +183,54 @@ export function Menubar({
         <Mi label="Zoom normal" acc="Ctrl 0" on={cmd('zoomNormal')} />
         <Mi label="Agrandir" acc="Ctrl +" on={cmd('zoomPlus')} />
         <Mi label="Réduire" acc="Ctrl -" on={cmd('zoomMoins')} />
+        <hr />
+        {/* Ce que le rail montre de la Matière : coché, affiché ; un clic le masque
+            ou le rend. Réglage du poste, pas de la campagne. */}
+        <span className="eyebrow">Matière</span>
+        {MATIERES_RAIL.map((m) => {
+          const masque = s.poste.railMasques.includes(m.id)
+          return (
+            <Mi
+              key={m.id}
+              label={m.nom}
+              coche={!masque}
+              on={() =>
+                void s.poserPoste(
+                  'rail.masques',
+                  (masque
+                    ? s.poste.railMasques.filter((x) => x !== m.id)
+                    : [...s.poste.railMasques, m.id]
+                  ).join(',') || null
+                )
+              }
+            />
+          )
+        })}
       </Menu>
+
+      {portable !== null ? (
+        <Menu nom="Mode développeur" id="dev" ouvert={ouvert} onOuvrir={setOuvert}>
+          <Mi
+            label="Mode ordi portable"
+            acc="1384×716"
+            coche={portable}
+            on={async () => setPortable(await window.jdr.app.basculerModePortable())}
+          />
+          {/* La séance qui sert de banc d'essai : une copie de la scierie,
+              nommée « Référence dev — … », pour tester sans toucher aux vraies. */}
+          {reference ? (
+            <Mi
+              label="Ouvrir la séance de référence"
+              coche={reference.id === seance?.id}
+              on={async () => {
+                if (reference.id === seance?.id) return
+                await window.jdr.timeline.setActiveSession(reference.id)
+                await s.refreshSeance()
+              }}
+            />
+          ) : null}
+        </Menu>
+      ) : null}
 
       <Menu nom="Aide" id="aide" droite ouvert={ouvert} onOuvrir={setOuvert}>
         <Mi label="Raccourcis de table…" on={() => onParametres('touches')} />

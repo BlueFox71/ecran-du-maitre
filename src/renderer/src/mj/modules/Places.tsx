@@ -808,6 +808,62 @@ function peutRanger(src: Place, dst: Place, tous: Place[]): { dedans: boolean; a
   }
 }
 
+/**
+ * Accepter un lâcher demande deux choses, et Chromium n'en pardonne aucune :
+ * annuler l'événement **dès `dragenter`** — sinon il cesse d'envoyer les
+ * `dragover` et la cible reste morte — et poser un `dropEffect`, sans quoi il
+ * remplace le lâcher par un `dragleave`, silencieusement.
+ */
+export function accepteSi(e: React.DragEvent, type: string): boolean {
+  if (!e.dataTransfer.types.includes(type)) return false
+  e.preventDefault()
+  e.dataTransfer.dropEffect = 'copy'
+  return true
+}
+
+/**
+ * À quelle profondeur ce lieu se trouve dans l'arbre — en remontant vraiment
+ * ses contenants, et non en se fiant à son étage déclaré : un lieu qu'on n'a
+ * rangé nulle part est à la racine, quoi qu'en dise son étiquette.
+ */
+export function profondeur(p: Place, tous: Place[]): number {
+  let d = 0
+  let cur: Place | undefined = p
+  const vus = new Set<number>()
+  while (cur?.parentId != null && !vus.has(cur.id)) {
+    vus.add(cur.id)
+    cur = tous.find((x) => x.id === cur!.parentId)
+    if (cur) d++
+  }
+  /* Cinq crans : espace, niveau, bâtiment, son niveau, sa pièce. */
+  return Math.min(d, 4)
+}
+
+/**
+ * « Montrer les pièces » : les pièces encombrent une liste de lieux quand on
+ * mène d'étage en étage, elles sont donc tues tant qu'on ne les demande pas.
+ * Une habitude du poste, retenue d'une ouverture à l'autre — chaque liste a sa
+ * clé, et donc son propre choix.
+ */
+export function useMontrerPieces(cle: string): [boolean, (on: boolean) => void] {
+  const [on, setOn] = useState(() => {
+    try {
+      return localStorage.getItem(cle) === '1'
+    } catch {
+      return false
+    }
+  })
+  const basculer = (v: boolean): void => {
+    setOn(v)
+    try {
+      localStorage.setItem(cle, v ? '1' : '0')
+    } catch {
+      /* sans mémoire, le choix vaut pour la séance */
+    }
+  }
+  return [on, basculer]
+}
+
 /** Une pièce découpée dans le plan de son étage — pas un niveau de bâtiment cadré. */
 export function estPiece(p: Place): boolean {
   return p.tier === 'lieu' && !!p.zone
@@ -5288,7 +5344,7 @@ function CalqueObjets({
             key={x.id}
             className={`pe-objet ${x.etat}${enMain ? ' tire' : ''}`}
             style={{ left: `${pos.x * 100}%`, top: `${pos.y * 100}%` }}
-            title={`${o.nom}${x.qte > 1 ? ` ×${x.qte}` : ''} — ${x.cible}${x.etat === 'trouve' ? ' · trouvé' : ' · caché'}`}
+            title={`${o.nom}${x.qte > 1 ? ` ×${x.qte}` : ''} — ${x.cible} · ${x.etat === 'trouve' ? 'trouvé' : x.etat === 'masque' ? 'masqué' : 'caché'}`}
             onMouseDown={(e) => e.stopPropagation()}
             onClick={(e) => e.stopPropagation()}
             onPointerDown={(e) => {

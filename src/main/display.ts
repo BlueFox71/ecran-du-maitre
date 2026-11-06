@@ -12,7 +12,6 @@ import { COLLAGE_CELLS, ENCART_NEUF, jaugeSanite } from '@shared/types'
 import type {
   AudioState,
   CollageCell,
-  CollageLayout,
   DisplayState,
   Frame,
   Pointer,
@@ -272,7 +271,7 @@ export function show(slide: SlidePayload): DisplayState {
  * présentation d'un joueur, l'attente d'avant séance. Les arrêter rend ce
  * qui était là avant le premier d'entre eux.
  */
-const ECRANS_A_PART = new Set<SlidePayload['type']>(['presentation', 'attente', 'preparation'])
+const ECRANS_A_PART = new Set<SlidePayload['type']>(['presentation', 'attente', 'preparation', 'statistiques'])
 
 /** Retire la présentation d'un joueur ou l'attente : l'écran revient à ce qu'il montrait avant. */
 export function arreterPresentation(): DisplayState {
@@ -287,50 +286,6 @@ export function arreterPresentation(): DisplayState {
 /** Charge l'emplacement en préparation : rien ne bouge pour les joueurs. */
 export function prepare(slide: SlidePayload): DisplayState {
   state.slots[idle()] = garderTextes(habiller(slide, lieuDe(idle())), state.slots[idle()])
-  broadcast()
-  return state
-}
-
-/**
- * Change la disposition de l'emplacement en préparation. Ce qui y était déjà
- * reste en place tant qu'il y a des cases pour l'accueillir : on essaie une
- * disposition, on revient en arrière, rien n'est perdu.
- */
-export function prepareLayout(layout: CollageLayout): DisplayState {
-  const n = COLLAGE_CELLS[layout]
-  const cur = state.slots[idle()]
-  const avant: (CollageCell | null)[] =
-    cur.type === 'collage'
-      ? cur.cells
-      : cur.type === 'image'
-        ? [{ kind: 'image', itemId: cur.itemId, url: cur.url, title: cur.title, frame: cur.frame }]
-        : []
-  // Exactement `n` cases, sans trou : une disposition ne dessine jamais plus de
-  // cases qu'elle n'en annonce.
-  const kept = Array.from({ length: n }, (_, i) => avant[i] ?? null)
-
-  /* À une seule case, un collage d'image redevient une image plein écran : ce
-     n'est plus un collage, et l'appeler ainsi compliquerait tout le reste.
-
-     Deux cases échappent à ce repli, parce qu'elles portent quelque chose
-     qu'une image plein écran ne sait pas porter : une case de **texte**, et une
-     image **légendée** — la légende appartient à la case, et se replier la
-     ferait disparaître sans un mot. */
-  const seule = kept[0]
-  state.slots[idle()] = garderTextes(
-    n === 1 && (!seule || (seule.kind === 'image' && !seule.caption?.trim()))
-      ? seule
-        ? {
-            type: 'image',
-            itemId: seule.itemId,
-            url: seule.url,
-            title: seule.title,
-            frame: seule.frame
-          }
-        : { type: 'black' }
-      : { type: 'collage', layout, cells: kept },
-    cur
-  )
   broadcast()
   return state
 }

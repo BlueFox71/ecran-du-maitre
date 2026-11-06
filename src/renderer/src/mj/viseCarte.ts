@@ -35,3 +35,28 @@ export function survolCarte(v: Exclude<ViseCarte, null>): {
 } {
   return { onMouseEnter: () => viserCarte(v), onMouseLeave: () => viserCarte(null) }
 }
+
+/*
+ * L'inverse : un clic sur un élément de la carte demande à la fiche du lieu
+ * de le montrer — déplier sa rubrique, venir jusqu'à sa ligne, la faire
+ * clignoter. `n` change à chaque demande, pour qu'un second clic sur le même
+ * élément la rejoue.
+ */
+export type DemandeFiche = { cible: Exclude<ViseCarte, null>; n: number } | null
+
+let demande: DemandeFiche = null
+const abonnesFiche = new Set<() => void>()
+
+export function montrerDansFiche(cible: Exclude<ViseCarte, null>): void {
+  demande = { cible, n: (demande?.n ?? 0) + 1 }
+  abonnesFiche.forEach((f) => f())
+}
+
+const sAbonnerFiche = (f: () => void): (() => void) => {
+  abonnesFiche.add(f)
+  return () => abonnesFiche.delete(f)
+}
+
+export function useDemandeFiche(): DemandeFiche {
+  return useSyncExternalStore(sAbonnerFiche, () => demande)
+}

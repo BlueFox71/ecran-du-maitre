@@ -18,7 +18,8 @@
  * n'a pas de bouton « Rideaux » à ne jamais toucher, et un plan qui n'a qu'une
  * seule nature n'a pas de filtres du tout.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
+import { useStore } from '../store'
 import { dansForme, formesDesMurs, type Forme } from '@shared/pieces'
 import { bordsOuverture } from '@shared/ouvertures'
 import {
@@ -141,6 +142,68 @@ export function TableauDeScene({
      confort de lecture, pas un réglage de campagne — il n'a pas à survivre à
      la fermeture de l'application. */
   const [ecartees, setEcartees] = useState<Nature[]>([])
+  const places = useStore((s) => s.places)
+
+  /*
+   * Le bâtiment de ce plan : le lieu qui porte ses niveaux (rez-de-chaussée,
+   * étages, sous-sol). « Tout allumer » peut viser ce plan seulement, ou
+   * toutes les lampes du bâtiment — c'est le choix du MJ, retenu ici.
+   */
+  const batiment = useMemo(() => {
+    let cur = places.find((p) => p.id === placeId)
+    const vus = new Set<number>()
+    while (cur && !vus.has(cur.id)) {
+      vus.add(cur.id)
+      const niveaux = places.filter((q) => q.parentId === cur!.id && q.tier === 'niveau')
+      if (cur.tier === 'lieu' && niveaux.length > 1) {
+        /* Tout ce qu'il contient : ses niveaux, et leurs pièces — une lampe
+           peut être rangée sur l'un comme sur l'autre. */
+        const dedans: Place[] = []
+        const pile = [cur.id]
+        while (pile.length) {
+          const id = pile.pop()!
+          for (const q of places.filter((x) => x.parentId === id)) {
+            dedans.push(q)
+            pile.push(q.id)
+          }
+        }
+        return { lieu: cur, niveaux, dedans }
+      }
+      cur = places.find((p) => p.id === cur!.parentId)
+    }
+    return null
+  }, [places, placeId])
+  const [portee, setPortee] = useState<'plan' | 'batiment'>(() => {
+    try {
+      return localStorage.getItem('tableau.porteeLumieres') === 'batiment' ? 'batiment' : 'plan'
+    } catch {
+      return 'plan'
+    }
+  })
+  const choisirPortee = (v: 'plan' | 'batiment'): void => {
+    setPortee(v)
+    try {
+      localStorage.setItem('tableau.porteeLumieres', v)
+    } catch {
+      /* sans stockage, le choix vaut pour la visite */
+    }
+  }
+  /* Les lampes de tous les niveaux du bâtiment, relues quand la carte bouge
+     (une lampe allumée ici, un niveau qu'on a changé ailleurs). */
+  const [duBatiment, setDuBatiment] = useState<Lumiere[]>([])
+  const [relu, setRelu] = useState(0)
+  useEffect(() => {
+    if (!batiment) return setDuBatiment([])
+    let vivant = true
+    void Promise.all([batiment.lieu, ...batiment.dedans].map((p) => window.jdr.lumieres.of(p.id))).then((ls) => {
+      if (!vivant) return
+      const ids = new Set<number>()
+      setDuBatiment(ls.flat().filter((l) => !ids.has(l.id) && ids.add(l.id)))
+    })
+    return () => {
+      vivant = false
+    }
+  }, [batiment, calque.lumieres, relu])
 
   const salles = useMemo<Salle[]>(() => {
     const formes = formesDesMurs(calque.murs)
@@ -231,7 +294,10 @@ export function TableauDeScene({
 
   if (!calque.murs.length) return null
 
-  const toutes = calque.lumieres
+  /* Le plan seul, ou tout le bâtiment : c'est la même liste qui compte et
+     que les deux boutons allument ou éteignent. */
+  const surBatiment = portee === 'batiment' && !!batiment && duBatiment.length > 0
+  const toutes = surBatiment ? duBatiment : calque.lumieres
   const allumees = toutes.filter((l) => l.allumee).length
 
   const basculer = async (l: Lumiere, on: boolean): Promise<void> => {
@@ -241,6 +307,7 @@ export function TableauDeScene({
 
   const toutDe = async (liste: Lumiere[], on: boolean): Promise<void> => {
     for (const l of liste) await basculer(l, on)
+    setRelu((n) => n + 1)
   }
 
   /* Tirer ou ouvrir un rideau : la vue change pour tout le monde, le pas
@@ -297,16 +364,41 @@ export function TableauDeScene({
             avant : ils s'en vont avec l'éclairage qu'on écarte, et s'ils
             étaient au-dessus, la rangée de filtres sauterait sous le doigt
             au moment même où l'on s'en sert. */}
-        {voit('eclairage') && toutes.length ? (
+        {voit('eclairage') && (toutes.length || calque.lumieres.length) ? (
           <>
+            {/* Sur ce plan, ou sur tout le bâtiment : les boutons visent l'un
+                ou l'autre. Le choix n'existe que dans un bâtiment à niveaux. */}
+            {batiment ? (
+              <div className="tb-portee" role="radiogroup" aria-label="Où allumer et éteindre">
+                <label className={portee === 'plan' ? 'on' : ''}>
+                  <input
+                    type="radio"
+                    name="portee-lumieres"
+                    checked={portee === 'plan'}
+                    onChange={() => choisirPortee('plan')}
+                  />
+                  Ce plan
+                </label>
+                <label className={portee === 'batiment' ? 'on' : ''} title={`Les lampes de tous les niveaux de ${batiment.lieu.name}`}>
+                  <input
+                    type="radio"
+                    name="portee-lumieres"
+                    checked={portee === 'batiment'}
+                    onChange={() => choisirPortee('batiment')}
+                  />
+                  Tout le bâtiment
+                </label>
+              </div>
+            ) : null}
             <span className="tb-compte">
               {allumees} / {toutes.length} allumée{allumees > 1 ? 's' : ''}
+              {surBatiment ? ` · ${batiment!.lieu.name}` : ''}
             </span>
             <div className="tb-tout">
               <button
                 className="btn btn-sm"
                 disabled={allumees === toutes.length}
-                title="Allumer toutes les lampes de la carte"
+                title={surBatiment ? `Allumer toutes les lampes de ${batiment!.lieu.name}, à tous les niveaux` : 'Allumer toutes les lampes de la carte'}
                 onClick={() => void toutDe(toutes, true)}
               >
                 <IconSoleil />
@@ -315,7 +407,7 @@ export function TableauDeScene({
               <button
                 className="btn btn-sm btn-ghost"
                 disabled={!allumees}
-                title="Souffler toutes les lampes de la carte"
+                title={surBatiment ? `Souffler toutes les lampes de ${batiment!.lieu.name}, à tous les niveaux` : 'Souffler toutes les lampes de la carte'}
                 onClick={() => void toutDe(toutes, false)}
               >
                 Tout éteindre

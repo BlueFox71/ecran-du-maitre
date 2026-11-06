@@ -120,6 +120,56 @@ export function apresUnTour(modifs: Modif[] | undefined): Modif[] {
 export const apresLeCombat = (modifs: Modif[] | undefined): Modif[] =>
   (modifs ?? []).filter((m) => m.duree.genre !== 'tours')
 
+/** Un bonus ou un malus du personnage, tel que son téléphone le liste. */
+export interface BonusDuPerso {
+  valeur: number
+  raison: string
+  source: 'modif' | 'objet'
+  /** Ce qu'il touche : « Force », « tous les jets ». */
+  cible: string
+  /** Combien de temps : « prochain jet », « 3 tours », « tant qu'il le porte ». */
+  duree: string
+}
+
+/**
+ * Tous ses bonus et malus d'un coup d'œil : ceux que le MJ a posés, puis ceux
+ * de ce qu'il porte. Le même compte que `bonusDuJet`, mais rangé par source
+ * plutôt que par carac — un « +1 à tous les jets » n'y figure qu'une fois.
+ */
+export function bonusDuPerso(
+  modifs: Modif[] | undefined,
+  objets: Objet[],
+  characterId: number,
+  caracs: { key: string; label: string; code?: string | null }[]
+): BonusDuPerso[] {
+  const nomCarac = (key: string | null): string =>
+    key == null ? 'tous les jets' : (caracs.find((c) => c.key === key)?.label ?? key)
+  const lignes: BonusDuPerso[] = (modifs ?? []).map((m) => ({
+    valeur: m.valeur,
+    raison: m.raison,
+    source: 'modif',
+    cible: nomCarac(m.caracKey),
+    duree: ditDuree(m.duree)
+  }))
+  for (const o of objets) {
+    if (!o.placements.some((p) => p.characterId === characterId && p.emplacement)) continue
+    for (const e of o.effets) {
+      const v = valeurEffet(e.tete)
+      if (!v) continue
+      const d = sansAccents(e.detail)
+      const carac = caracs.find((c) => effetVise(e.detail, c) && !PARTOUT.has(d))
+      lignes.push({
+        valeur: v,
+        raison: o.nom,
+        source: 'objet',
+        cible: PARTOUT.has(d) ? 'tous les jets' : (carac?.label ?? e.detail),
+        duree: 'tant qu’il le porte'
+      })
+    }
+  }
+  return lignes
+}
+
 /** « jusqu'au retrait », « 2 jets », « prochain jet », « 3 tours ». */
 export function ditDuree(d: DureeModif): string {
   if (d.genre === 'retrait') return 'jusqu’au retrait'

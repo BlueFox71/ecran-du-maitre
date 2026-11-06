@@ -156,21 +156,80 @@ export function pasContraint(
   de: Pt,
   vers: Pt,
   cadre: { w: number; h: number },
-  marge = 0
+  marge = 0,
+  rayon = 0
 ): Pt {
   const dedans = (p: Pt): Pt => ({
     x: Math.min(cadre.w - marge, Math.max(marge, p.x)),
     y: Math.min(cadre.h - marge, Math.max(marge, p.y))
   })
-  const passe = (a: Pt, b: Pt): boolean => !murs.some((m) => seCroisent(a, b, m.a, m.b))
+  /*
+   * Le pion a un corps : `rayon`. Sans lui, c'était un point, et un point
+   * passe par la moindre fente — deux murs tracés à la main qui ne se
+   * rejoignent pas tout à fait, à un pixel près, et le pion filait dans le
+   * salon voisin. Avec lui, il ne s'approche pas d'un trait plus près que son
+   * rayon. Celui qui s'y trouve déjà (une porte refermée sur lui, un pion posé
+   * contre un mur) n'est pas collé pour autant : il peut toujours s'éloigner.
+   */
+  const passe = (a: Pt, b: Pt): boolean =>
+    !murs.some(
+      (m) =>
+        seCroisent(a, b, m.a, m.b) ||
+        (rayon > 0 &&
+          distanceAuSegment(b, m.a, m.b) < rayon &&
+          distanceAuSegment(b, m.a, m.b) < distanceAuSegment(a, m.a, m.b) - 1e-6)
+    )
+
+  /* Un glissement qui ne déplace rien n'en est pas un : sans ce garde, pousser
+     droit sur un mur « réussissait » à rester sur place. */
+  const bouge = (p: Pt): boolean => Math.abs(p.x - de.x) > 1e-9 || Math.abs(p.y - de.y) > 1e-9
 
   const cible = dedans(vers)
   if (passe(de, cible)) return cible
   const enLargeur = dedans({ x: cible.x, y: de.y })
-  if (passe(de, enLargeur)) return enLargeur
+  if (bouge(enLargeur) && passe(de, enLargeur)) return enLargeur
   const enHauteur = dedans({ x: de.x, y: cible.y })
-  if (passe(de, enHauteur)) return enHauteur
-  return de
+  if (bouge(enHauteur) && passe(de, enHauteur)) return enHauteur
+  /* Rien ne passe en entier : on va aussi loin que possible tout droit, pour
+     arriver au contact plutôt que de s'arrêter à un pas du mur. */
+  let ok = 0
+  let ko = 1
+  for (let i = 0; i < 6; i++) {
+    const t = (ok + ko) / 2
+    if (passe(de, dedans({ x: de.x + (cible.x - de.x) * t, y: de.y + (cible.y - de.y) * t }))) ok = t
+    else ko = t
+  }
+  return ok > 0 ? dedans({ x: de.x + (cible.x - de.x) * ok, y: de.y + (cible.y - de.y) * ok }) : de
+}
+
+/**
+ * Le corps d'un pion qu'on fait marcher, en part du plus grand côté du plan.
+ *
+ * Assez pour boucher les fentes qu'un tracé à la main laisse aux jonctions
+ * (on en voit jusqu'à six millièmes de la carte), assez peu pour qu'une porte
+ * étroite — trois à quatre centièmes — reste franchissable sans viser.
+ */
+export const RAYON_PION = 0.004
+
+/**
+ * Faire marcher un pion le long d'un chemin, pas après pas.
+ *
+ * Le téléphone envoie les points par où son pion est passé. Les vérifier un à
+ * un, c'est suivre le même chemin que lui ; ne vérifier que la corde entre le
+ * premier et le dernier, c'était couper l'angle du chambranle, buter dedans,
+ * et renvoyer le pion de l'autre côté de la porte qu'il venait de franchir.
+ */
+export function cheminContraint(
+  murs: Barriere[],
+  de: Pt,
+  chemin: Pt[],
+  cadre: { w: number; h: number },
+  marge = 0,
+  rayon = 0
+): Pt {
+  let p = de
+  for (const q of chemin) p = pasContraint(murs, p, q, cadre, marge, rayon)
+  return p
 }
 
 /**

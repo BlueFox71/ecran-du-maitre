@@ -80,7 +80,7 @@ export function MotsSecrets({ beatId }: { beatId: number | null }): JSX.Element 
   }
   /* Un mot part même vers un téléphone éteint : il l'attendra. On le dit. */
   const enLigne = (playerId: number): boolean =>
-    !!s.mobile?.devices.some((d) => d.playerId === playerId && d.online)
+    !!s.mobile?.devices.some((d) => d.playerId === playerId && d.online && !d.spectateur)
 
   const basculer = (id: number): void =>
     setPour((p) => (p.includes(id) ? p.filter((x) => x !== id) : [...p, id]))

@@ -8,6 +8,7 @@ import { barrieres, pasContraint, type Pt } from '@shared/murs'
 import { bordsOuverture } from '@shared/ouvertures'
 import type { Surbrillance } from '../mj/components/Tableau'
 import type {
+  CadreCarre,
   CalqueBrouillard,
   CollageCell,
   Encart,
@@ -22,6 +23,7 @@ import type {
   TextOverlay
 } from '@shared/types'
 import { urlPortraitMj } from './avatarsMj'
+import { EcranStats } from './EcranStats'
 import { modificateur, signe } from '@shared/jet'
 
 /**
@@ -68,6 +70,8 @@ export interface ArticleSurCarte {
   fait: boolean
   /** Survolé dans la fiche du lieu : il se montre, et ressort. */
   vise?: boolean
+  /** Le lieu dont la fiche le porte — l'étage ou l'une de ses pièces. */
+  lieuId?: number
 }
 
 const GENRE_ARTICLE: Record<ArticleSurCarte['genre'], string> = {
@@ -112,9 +116,27 @@ export interface ObjetSurCarte {
   x: number
   y: number
   nom: string
-  etat: 'cache' | 'trouve' | 'porte'
+  etat: 'cache' | 'trouve' | 'porte' | 'masque'
+  /** Son image et son cadrage carré ; absents, le losange. */
+  image?: string | null
+  cadre?: CadreCarre | null
   /** Survolé dans la fiche du lieu : il se montre, et ressort. */
   vise?: boolean
+}
+
+/**
+ * L'image d'un objet posé sur la carte : un carré arrondi centré sur sa
+ * place, cadré comme sa vignette. Dans le SVG de la carte, par un
+ * `foreignObject` — le cadrage carré est une affaire de CSS (voir `Visage`).
+ */
+function ImageObjetCarte({ url, cadre, cote }: { url: string; cadre: CadreCarre | null; cote: number }): JSX.Element {
+  return (
+    <foreignObject className="objet-img-hote" x={-cote / 2} y={-cote / 2} width={cote} height={cote}>
+      <div className="objet-img">
+        <Visage url={url} cadre={cadre} />
+      </div>
+    </foreignObject>
+  )
 }
 
 /** Un son posé, tel que la scène du MJ le dessine. */
@@ -294,6 +316,10 @@ export interface SlideExtras {
   onDeplacerObjet?: (id: number, x: number, y: number) => void
   /** Côté MJ : un clic sur un objet du plan — le montrer aux joueurs, ou le leur cacher. */
   onBasculerObjet?: (id: number) => void
+  /** Un clic sur un objet du plan : le montrer dans la fiche du lieu. */
+  onChoisirObjet?: (id: number) => void
+  /** Un clic sur un article du plan : le montrer dans la fiche du lieu. */
+  onChoisirArticle?: (a: ArticleSurCarte) => void
   /** Côté MJ : ce qui peut arriver, posé sur le plan à l'écran. */
   articlesMj?: ArticleSurCarte[]
   /** Texte en cours de modification dans la régie. */
@@ -345,6 +371,8 @@ export function Slide({
   objetsMj,
   onDeplacerObjet,
   onBasculerObjet,
+  onChoisirObjet,
+  onChoisirArticle,
   articlesMj,
   jour
 }: { slide: SlidePayload; animate?: boolean } & SlideExtras): JSX.Element {
@@ -683,6 +711,8 @@ export function Slide({
             objetsMj={objetsMj}
             onDeplacerObjet={onDeplacerObjet}
             onBasculerObjet={onBasculerObjet}
+            onChoisirObjet={onChoisirObjet}
+            onChoisirArticle={onChoisirArticle}
             articlesMj={articlesMj}
             onRepere={setRepere}
             onFrame={onFrame ? (f) => onFrame(null, f) : undefined}
@@ -760,6 +790,8 @@ export function Slide({
                   objetsMj={cases.length === 1 ? objetsMj : undefined}
                   onDeplacerObjet={cases.length === 1 ? onDeplacerObjet : undefined}
                   onBasculerObjet={cases.length === 1 ? onBasculerObjet : undefined}
+                  onChoisirObjet={cases.length === 1 ? onChoisirObjet : undefined}
+                  onChoisirArticle={cases.length === 1 ? onChoisirArticle : undefined}
                   articlesMj={cases.length === 1 ? articlesMj : undefined}
                   onRepere={cases.length === 1 ? setRepere : undefined}
                 />
@@ -782,6 +814,17 @@ export function Slide({
     return (
       <div className={cls} key={`pres-${slide.characterId}`}>
         <Presentation p={slide} />
+        {texte}
+        {bandeau}
+      </div>
+    )
+  }
+
+  if (slide.type === 'statistiques') {
+    /* Une clé par étape : chacune rejoue son entrée en scène. */
+    return (
+      <div className={cls} key={`stats-${slide.etape}`}>
+        <EcranStats p={slide} />
         {texte}
         {bandeau}
       </div>
@@ -1327,6 +1370,8 @@ export function Framed({
   objetsMj,
   onDeplacerObjet,
   onBasculerObjet,
+  onChoisirObjet,
+  onChoisirArticle,
   articlesMj,
   onRepere
 }: {
@@ -1365,6 +1410,10 @@ export function Framed({
   onDeplacerObjet?: (id: number, x: number, y: number) => void
   /** Un clic sans glisser sur l'objet : visible des joueurs, ou plus. */
   onBasculerObjet?: (id: number) => void
+  /** Un clic sur un objet du plan : le montrer dans la fiche du lieu. */
+  onChoisirObjet?: (id: number) => void
+  /** Un clic sur un article du plan : le montrer dans la fiche du lieu. */
+  onChoisirArticle?: (a: ArticleSurCarte) => void
   /** Ce qui peut arriver, posé sur le plan, dessiné pour le MJ seul. */
   articlesMj?: ArticleSurCarte[]
   /** L'image publie son repère : c'est par là qu'on passe de l'écran à la carte. */
@@ -1681,9 +1730,13 @@ export function Framed({
         <svg className="brouillard" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
           {brouillard.objets.map((o) => (
             <g key={o.id} className="objet-vu" transform={`translate(${o.x * w} ${o.y * h})`}>
-              <path d={`M0 ${-r}L${r} 0L0 ${r}L${-r} 0Z`} strokeWidth={Math.max(1.5, w * 0.0018)} />
+              {o.image ? (
+                <ImageObjetCarte url={o.image} cadre={o.cadre ?? null} cote={r * 7} />
+              ) : (
+                <path d={`M0 ${-r}L${r} 0L0 ${r}L${-r} 0Z`} strokeWidth={Math.max(1.5, w * 0.0018)} />
+              )}
               <text
-                y={r * 1.4}
+                y={o.image ? r * 3.8 : r * 1.4}
                 textAnchor="middle"
                 dominantBaseline="hanging"
                 fontSize={Math.max(10, w * 0.012)}
@@ -1708,15 +1761,17 @@ export function Framed({
     const { murs: voirMurs, portes, fenetres, astre, pieces } = traitsMj
     const noms = pieces ? (nomsPieces ?? []) : []
     const sons = (sonsMj ?? []).filter((z) => traitsMj.sons || z.vise)
-    /* Ce qu'on survole dans la fiche se montre toujours, case cochée ou non. */
-    /* Un objet que la table voit, le MJ le voit aussi, case cochée ou non :
-       c'est sur la carte des joueurs, il doit pouvoir le reprendre en main. */
+    /* Ce qu'on survole dans la fiche se montre toujours, case cochée ou non.
+       Un objet que la table voit, le MJ le voit aussi : il doit pouvoir le
+       reprendre en main. Un objet **masqué** quitte toutes les cartes. Les
+       articles faits, eux, quittent la carte du MJ : il ne lui reste que ce
+       qui peut encore arriver. */
     const vusTable = new Set((brouillard.objets ?? []).map((o) => o.id))
     const objets = (objetsMj ?? [])
-      .filter((o) => traitsMj.objets || o.vise || vusTable.has(o.id))
+      .filter((o) => o.vise || (o.etat !== 'masque' && (traitsMj.objets || vusTable.has(o.id))))
       .map((o) => (tire?.id === o.id ? { ...o, x: tire.x, y: tire.y } : o))
     const SORTES = { decouverte: 'decouvertes', declencheur: 'declencheurs', scenario: 'scenarios' } as const
-    const articles = (articlesMj ?? []).filter((x) => traitsMj[SORTES[x.genre]] || x.vise)
+    const articles = (articlesMj ?? []).filter((x) => x.vise || (!x.fait && traitsMj[SORTES[x.genre]]))
     if (
       !voirMurs &&
       !portes &&
@@ -1850,16 +1905,20 @@ export function Framed({
                         e.currentTarget.releasePointerCapture(e.pointerId)
                         if (tire.bouge) onDeplacerObjet(o.id, tire.x, tire.y)
                         else {
-                          /* Un clic, pas un glisser : on dit si la table le voit. */
+                          /* Un clic, pas un glisser : on le montre dans la fiche
+                             du lieu ; à défaut, on dit si la table le voit. */
                           setTire(null)
-                          onBasculerObjet?.(o.id)
+                          if (onChoisirObjet) onChoisirObjet(o.id)
+                          else onBasculerObjet?.(o.id)
                         }
                       },
                       onPointerCancel: () => setTire(null)
                     }
                   : {})}
               >
-                {onDeplacerObjet ? (
+                {onDeplacerObjet && onChoisirObjet ? (
+                  <title>{`${o.nom} — clic : le voir dans la fiche du lieu · glisser : le déplacer`}</title>
+                ) : onDeplacerObjet ? (
                   <title>
                     {vusTable.has(o.id)
                       ? `${o.nom} — les joueurs le voient · clic : le leur cacher · glisser : le déplacer`
@@ -1868,12 +1927,16 @@ export function Framed({
                         : `${o.nom} — glisser pour le déplacer`}
                   </title>
                 ) : null}
-                {o.vise ? <circle className="halo-vise" r={r * 2.6} strokeWidth={ep * 1.2} /> : null}
+                {o.vise ? <circle className="halo-vise" r={o.image ? r * 4.8 : r * 2.6} strokeWidth={ep * 1.2} /> : null}
                 {/* Un losange de quelques pixels s'attrape mal : la prise est plus large. */}
-                {onDeplacerObjet ? <circle className="prise" r={r * 2.4} /> : null}
-                <path d={`M0 ${-r}L${r} 0L0 ${r}L${-r} 0Z`} strokeWidth={ep * 0.9} />
+                {onDeplacerObjet ? <circle className="prise" r={o.image ? r * 3.8 : r * 2.4} /> : null}
+                {o.image ? (
+                  <ImageObjetCarte url={o.image} cadre={o.cadre ?? null} cote={r * 7} />
+                ) : (
+                  <path d={`M0 ${-r}L${r} 0L0 ${r}L${-r} 0Z`} strokeWidth={ep * 0.9} />
+                )}
                 <text
-                  y={r * 1.4}
+                  y={o.image ? r * 3.8 : r * 1.4}
                   textAnchor="middle"
                   dominantBaseline="hanging"
                   fontSize={Math.max(9, w * 0.011)}
@@ -1892,8 +1955,29 @@ export function Framed({
             return (
               <g
                 key={`a${x.cle}`}
-                className={`trait-article sorte-${x.genre}${x.fait ? ' fait' : ''}${x.vise ? ' vise' : ''}`}
+                className={`trait-article sorte-${x.genre}${x.fait ? ' fait' : ''}${x.vise ? ' vise' : ''}${
+                  onChoisirArticle ? ' choisissable' : ''
+                }`}
                 transform={`translate(${x.x * w} ${x.y * h})`}
+                /* Le visuel en direct capture la souris dès qu'on appuie (pour
+                   le recadrer) : sans cet arrêt, le relâcher et le clic
+                   partaient vers lui, jamais vers la pastille. */
+                onPointerDown={
+                  onChoisirArticle
+                    ? (e) => {
+                        if (e.button === 0) e.stopPropagation()
+                      }
+                    : undefined
+                }
+                onClick={
+                  onChoisirArticle
+                    ? (e) => {
+                        e.stopPropagation()
+                        setSurvolArticle(null)
+                        onChoisirArticle(x)
+                      }
+                    : undefined
+                }
                 onMouseEnter={(e) => {
                   const b = e.currentTarget.getBoundingClientRect()
                   setSurvolArticle({ a: x, x: b.left + b.width / 2, y: b.bottom + 6 })
@@ -2017,6 +2101,12 @@ export function Framed({
     <div
       ref={box}
       className={`framed${onFrame ? ' live' : ''}`}
+      /* Chaque appui repart de zéro, même celui qu'une pastille ou un objet
+         garde pour lui (il arrête la propagation) : sans quoi le « ça a
+         bougé » d'un recadrage d'avant avalait tous leurs clics suivants. */
+      onPointerDownCapture={() => {
+        bouge.current = false
+      }}
       onPointerDown={(e) => {
         if (!onFrame || e.button !== 0) return
         /* Reprendre l'image à la main, c'est lâcher le pion — mais sans saut :

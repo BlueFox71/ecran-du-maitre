@@ -40,7 +40,6 @@ import type {
 } from '@shared/types'
 
 export type ViewId =
-  | 'regie'
   | 'pupitre'
   | 'lib'
   | 'editor'

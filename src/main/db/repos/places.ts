@@ -669,12 +669,18 @@ export function duplicatePlace(id: number): number {
  * sont donnés, garde les siens sinon. `jumeaux` raccroche le plan et
  * l'ambiance au double d'un fichier quand le dossier a été recopié avec la
  * séance. Rend la correspondance des identifiants, original → copie.
+ *
+ * `suite` : la copie continue la partie au lieu de la rejouer — le lieu reste
+ * découvert s'il l'était, les portes restent ouvertes, les objets gardent leur état (trouvés, montrés),
+ * les sons déjà joués le restent et la fiche garde ses cartes cochées. Les
+ * pions, eux, se recopient dans `dupliquerSeance`, une fois les PNJ doublés.
  */
 export function copierLieu(
   id: number,
   sid: number,
   racine: { parentId?: number | null; ord?: number } = {},
-  jumeaux: Map<number, number> = new Map()
+  jumeaux: Map<number, number> = new Map(),
+  suite = false
 ): Map<number, number> {
   const db = getDb()
   const depart = getPlace(id)
@@ -696,7 +702,7 @@ export function copierLieu(
             ? racine.parentId
             : p.parentId
           : (nouveau.get(p.parentId!) ?? null),
-      seen: 0,
+      ...(suite ? {} : { seen: 0 }),
       map_item_id: fichier(brut.m),
       ambience_item_id: fichier(brut.a),
       /* Elle désigne une apparence de l'original : on la raccroche plus bas. */
@@ -723,21 +729,25 @@ export function copierLieu(
     for (const m of ids(`SELECT id FROM mur WHERE place_id = ?`, p.id)) {
       const mur = copierLigne('mur', m, { place_id: neuf })
       for (const o of ids(`SELECT id FROM ouverture WHERE mur_id = ?`, m))
-        copierLigne('ouverture', o, { mur_id: mur })
+        /* Reprise : les portes repartent fermées (les verrous préparés restent). */
+        copierLigne('ouverture', o, { mur_id: mur, ...(suite ? {} : { ouverte: 0 }) })
     }
     for (const l of ids(`SELECT id FROM lumiere WHERE place_id = ?`, p.id))
       copierLigne('lumiere', l, { place_id: neuf })
     for (const z of ids(`SELECT id FROM son_zone WHERE place_id = ?`, p.id))
-      copierLigne('son_zone', z, { place_id: neuf })
+      copierLigne('son_zone', z, { place_id: neuf, ...(suite ? {} : { joue: 0 }) })
     for (const a of ids(`SELECT id FROM annotation WHERE place_id = ?`, p.id))
       copierLigne('annotation', a, { place_id: neuf })
 
-    /* Un objet déjà trouvé là-bas est de nouveau à trouver ici. */
+    /* Un objet déjà trouvé là-bas est de nouveau à trouver ici — sauf si
+       la partie continue. */
     for (const o of ids(`SELECT id FROM objet_placement WHERE place_id = ?`, p.id))
-      fixerInitial(copierLigne('objet_placement', o, { place_id: neuf, session_id: sid, etat: 'cache' }))
+      fixerInitial(
+        copierLigne('objet_placement', o, { place_id: neuf, session_id: sid, ...(suite ? {} : { etat: 'cache' }) })
+      )
 
     /* Sa fiche : scénarios, découvertes et déclencheurs, PNJ qu'on y croise. */
-    copierFiche(p.id, neuf)
+    copierFiche(p.id, neuf, suite)
   }
 
   return nouveau

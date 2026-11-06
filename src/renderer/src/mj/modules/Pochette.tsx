@@ -15,17 +15,26 @@
  *    C'est la seule chose que le MJ ne peut pas voir en se penchant sur la
  *    table.
  *
+ * Plusieurs cartes se choisissent ensemble — la case au coin de la vignette,
+ * ou Ctrl + clic — pour les montrer, les remettre en réserve ou les donner à
+ * quelqu'un d'un seul geste.
+ *
  * Le piège du module est de donner dans le vide : si le portable est fermé,
  * personne ne verra rien. La bande du haut le dit toujours, et ouvre la porte
  * sur place.
  */
 import { useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
+import { useEchap } from '../echap'
 import { ChoixDansArbre } from '../components/ChoixDansArbre'
+import { Visionneuse } from '../components/Visionneuse'
 import {
+  IconCheck,
   IconClose,
   IconEye,
   IconEyeOff,
+  IconFolder,
+  IconLoupe,
   IconPen,
   IconPeople,
   IconPlus,
@@ -34,6 +43,7 @@ import {
   kindIcon
 } from '../components/Icons'
 import type { PochetteDoc, PochetteOnglet } from '@shared/types'
+import { PION_COULEURS } from '@shared/types'
 import { heureLocale } from '@shared/heure'
 
 /**
@@ -41,7 +51,14 @@ import { heureLocale } from '@shared/heure'
  * pense au personnage, la base tient la personne. On montre les deux, le
  * personnage d'abord — c'est à Adèle qu'on donne la lettre, pas à Marc.
  */
-type Convive = { id: number; name: string; characterName: string | null; color: string | null }
+type Convive = {
+  id: number
+  name: string
+  characterName: string | null
+  color: string | null
+  /** Son personnage est à la table ce soir : lui seul se propose dans « à qui ». */
+  present: boolean
+}
 
 /** Ce qui peut entrer dans la pochette : ce qu'on regarde, pas ce qu'on écoute. */
 const ENTRANTS = ['image', 'pdf', 'video'] as const
@@ -49,6 +66,13 @@ const ENTRANTS = ['image', 'pdf', 'video'] as const
 /** « Tout » n'est pas un onglet : c'est la pile entière. */
 const TOUT = 'tout'
 type Rangement = typeof TOUT | number
+
+/** Le code d'une teinte des pions, pour la dessiner — `null` si l'onglet n'en a pas. */
+const hexDe = (cle: string | null): string | null =>
+  PION_COULEURS.find((c) => c.key === cle)?.hex ?? null
+
+/** L'étiquette d'un onglet qu'on déplace — distincte de celle d'une carte. */
+const GLISSE_ONGLET = 'text/pochette-onglet'
 
 export function Pochette(): JSX.Element {
   const s = useStore()
@@ -58,9 +82,21 @@ export function Pochette(): JSX.Element {
   const [menu, setMenu] = useState<{ id: number; quoi: 'qui' | 'ou' } | null>(null)
   /** L'onglet qu'on est en train de nommer — `0` pour un onglet neuf. */
   const [nomme, setNomme] = useState<number | null>(null)
+  /** Où l'onglet qu'on fait glisser se poserait : avant ou après celui-ci. */
+  const [marque, setMarque] = useState<{ id: number; apres: boolean } | null>(null)
+  /** L'onglet dont on choisit la couleur, et où poser la palette sous lui. */
+  const [teinte, setTeinte] = useState<{ id: number; x: number; y: number } | null>(null)
+  useEchap(() => setTeinte(null), teinte !== null)
 
   const onglets = s.pochetteOnglets
   const docs = s.pochette
+
+  /* Un Ctrl+Z peut rendre un onglet retiré : on relit la pochette. */
+  useEffect(() => {
+    const relire = (): void => void window.jdr.pochette.list().then(s.setPochette)
+    window.addEventListener('jdr:defait', relire)
+    return () => window.removeEventListener('jdr:defait', relire)
+  }, [s.setPochette])
 
   /* L'onglet ouvert peut disparaître sous nos pieds — on le retire, ou une
      autre fenêtre le retire. On retombe alors sur la pile entière. */
@@ -73,13 +109,32 @@ export function Pochette(): JSX.Element {
     [docs, rangement]
   )
 
+  /* Les cartes choisies ensemble. Changer d'onglet repart de rien : on ne
+     montre pas ce qu'on ne voit plus. */
+  const [choisis, setChoisis] = useState<Set<number>>(new Set())
+  useEffect(() => setChoisis(new Set()), [rangement])
+  useEffect(() => {
+    setChoisis((c) => {
+      const restent = [...c].filter((id) => docs.some((d) => d.id === id))
+      return restent.length === c.size ? c : new Set(restent)
+    })
+  }, [docs])
+  useEchap(() => setChoisis(new Set()), choisis.size > 0 && menu === null)
+  const basculer = (id: number): void =>
+    setChoisis((c) => {
+      const n = new Set(c)
+      if (!n.delete(id)) n.add(id)
+      return n
+    })
+
   const convives: Convive[] = useMemo(
     () =>
       s.players.map((p) => ({
         id: p.id,
         name: p.name,
         characterName: s.characters.find((c) => c.id === p.characterId)?.name ?? null,
-        color: p.color
+        color: p.color,
+        present: !!s.characters.find((c) => c.id === p.characterId)?.present
       })),
     [s.players, s.characters]
   )
@@ -140,11 +195,52 @@ export function Pochette(): JSX.Element {
                 aria-selected={rangement === o.id}
                 onClick={() => setRangement(o.id)}
                 onDoubleClick={() => setNomme(o.id)}
-                onDragOver={(e) => e.preventDefault()}
+                /* L'onglet se déplace en le faisant glisser dans la barre ; une
+                   carte lâchée dessus s'y range. Les deux gestes ne portent pas
+                   la même étiquette, on ne les confond pas. */
+                draggable
+                className={
+                  [
+                    hexDe(o.couleur) ? 'colorie' : '',
+                    marque?.id === o.id ? (marque.apres ? 'pose-apres' : 'pose-avant') : ''
+                  ]
+                    .filter(Boolean)
+                    .join(' ') || undefined
+                }
+                style={
+                  hexDe(o.couleur) ? { ['--onglet' as string]: hexDe(o.couleur) } : undefined
+                }
+                onDragStart={(e) => {
+                  e.dataTransfer.setData(GLISSE_ONGLET, String(o.id))
+                  e.dataTransfer.effectAllowed = 'move'
+                }}
+                onDragEnd={() => setMarque(null)}
+                onDragOver={(e) => {
+                  e.preventDefault()
+                  if (!e.dataTransfer.types.includes(GLISSE_ONGLET)) return
+                  const r = e.currentTarget.getBoundingClientRect()
+                  const apres = e.clientX > r.left + r.width / 2
+                  if (marque?.id !== o.id || marque.apres !== apres) setMarque({ id: o.id, apres })
+                }}
+                onDragLeave={(e) => {
+                  if (!e.currentTarget.contains(e.relatedTarget as Node)) setMarque(null)
+                }}
                 onDrop={async (e) => {
                   e.preventDefault()
+                  const m = marque
+                  setMarque(null)
+                  if (e.dataTransfer.types.includes(GLISSE_ONGLET)) {
+                    const pris = Number(e.dataTransfer.getData(GLISSE_ONGLET))
+                    if (!m || !pris || pris === o.id) return
+                    const ids = onglets.map((x) => x.id).filter((x) => x !== pris)
+                    const i = ids.indexOf(o.id) + (m.apres ? 1 : 0)
+                    ids.splice(i, 0, pris)
+                    if (ids.every((x, n) => x === onglets[n].id)) return
+                    poser(await window.jdr.pochette.reorderOnglets(ids))
+                    return
+                  }
                   const id = Number(e.dataTransfer.getData('text/pochette'))
-                  if (Number.isFinite(id)) poser(await window.jdr.pochette.setOnglet(id, o.id))
+                  if (Number.isFinite(id) && id) poser(await window.jdr.pochette.setOnglet(id, o.id))
                 }}
               >
                 {o.name}
@@ -153,6 +249,20 @@ export function Pochette(): JSX.Element {
                     on ne défait pas un rangement en visant celui d'à côté. */}
                 {rangement === o.id && (
                   <span className="tenir">
+                    <button
+                      className="colorier"
+                      title={`Colorier « ${o.name} »`}
+                      aria-label={`Colorier « ${o.name} »`}
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        const r = e.currentTarget.getBoundingClientRect()
+                        setTeinte(
+                          teinte?.id === o.id ? null : { id: o.id, x: r.left, y: r.bottom + 6 }
+                        )
+                      }}
+                    >
+                      <span className={o.couleur ? 'disque' : 'disque sans'} />
+                    </button>
                     <button
                       title={`Renommer « ${o.name} »`}
                       aria-label={`Renommer « ${o.name} »`}
@@ -169,7 +279,23 @@ export function Pochette(): JSX.Element {
                       aria-label={`Retirer l’onglet « ${o.name} »`}
                       onClick={async (e) => {
                         e.stopPropagation()
+                        /* Ses documents passent dans l'onglet voisin : on le dit
+                           avant, et Ctrl+Z le rend après. */
+                        const i = onglets.findIndex((x) => x.id === o.id)
+                        const voisin = onglets[i - 1] ?? onglets[i + 1]
+                        const n = o.count
+                        if (
+                          !confirm(
+                            `Retirer l’onglet « ${o.name} » ?` +
+                              (n
+                                ? `\n\nSes ${n} document${n > 1 ? 's' : ''} ${n > 1 ? 'passent' : 'passe'} dans « ${voisin?.name ?? 'la pile'} » — rien n’est retiré aux joueurs.`
+                                : '') +
+                              '\n\nCtrl+Z le rendra.'
+                          )
+                        )
+                          return
                         poser(await window.jdr.pochette.removeOnglet(o.id))
+                        s.toast(`Onglet « ${o.name} » retiré — Ctrl+Z pour le rendre.`)
                       }}
                     >
                       <IconClose />
@@ -195,6 +321,46 @@ export function Pochette(): JSX.Element {
         </div>
       )}
 
+      {/* La palette d'un onglet. Posée hors de la barre, qui rogne ce qui
+          dépasse ; un clic à côté la referme. */}
+      {teinte &&
+        (() => {
+          const o = onglets.find((x) => x.id === teinte.id)
+          if (!o) return null
+          const colorier = async (cle: string | null): Promise<void> => {
+            setTeinte(null)
+            if (cle !== o.couleur) poser(await window.jdr.pochette.couleurOnglet(o.id, cle))
+          }
+          return (
+            <>
+              <div className="poche-teinte-fond" onClick={() => setTeinte(null)} />
+              <div
+                className="poche-teinte"
+                role="dialog"
+                aria-label={`Couleur de « ${o.name} »`}
+                style={{ left: teinte.x, top: teinte.y }}
+              >
+                <button
+                  className={`teinte sans${o.couleur ? '' : ' on'}`}
+                  title="Sans couleur"
+                  aria-label="Sans couleur"
+                  onClick={() => void colorier(null)}
+                />
+                {PION_COULEURS.map((c) => (
+                  <button
+                    key={c.key}
+                    className={`teinte${o.couleur === c.key ? ' on' : ''}`}
+                    style={{ background: c.hex }}
+                    title={c.name}
+                    aria-label={c.name}
+                    onClick={() => void colorier(c.key)}
+                  />
+                ))}
+              </div>
+            </>
+          )
+        })()}
+
       {docs.length === 0 ? (
         <div className="empty poche-vide">
           <b>La pochette est vide</b>
@@ -207,11 +373,25 @@ export function Pochette(): JSX.Element {
           </button>
         </div>
       ) : (
-        <div className="poche">
+        <>
+        {choisis.size > 0 && (
+          <BarreSelection
+            docs={vus.filter((d) => choisis.has(d.id))}
+            total={vus.length}
+            joueurs={convives}
+            onPoser={poser}
+            onTout={() => setChoisis(new Set(vus.map((d) => d.id)))}
+            onVider={() => setChoisis(new Set())}
+          />
+        )}
+        <div className={`poche${choisis.size > 0 ? ' en-selection' : ''}`}>
           {vus.map((d) => (
             <Carte
               key={d.id}
               doc={d}
+              choisi={choisis.has(d.id)}
+              enSelection={choisis.size > 0}
+              onChoisir={() => basculer(d.id)}
               /* Le rangement ne se rappelle que dans « Tout » : ailleurs, on
                  sait déjà où l'on est. */
               montreRangement={rangement === TOUT && onglets.length > 0}
@@ -265,6 +445,7 @@ export function Pochette(): JSX.Element {
             </button>
           )}
         </div>
+        </>
       )}
 
       {/* La saisie du premier onglet, quand la barre n'existe pas encore. */}
@@ -309,22 +490,17 @@ export function Pochette(): JSX.Element {
           kinds={[...ENTRANTS]}
           rendu="vignettes"
           courant={null}
-          onPick={async (id) => {
+          /* Plusieurs d'un coup : on coche, « Ajouter » les met tous en réserve,
+             dans l'ordre des coches. Ceux déjà donnés à toute la table sont
+             marqués et ne se cochent pas — la base n'en garderait qu'un. */
+          deja={docs.filter((d) => d.playerId === null).map((d) => d.itemId)}
+          plusieurs={async (ids) => {
             setChoix(false)
-            if (id === null) return
-            /* Le même document, au même destinataire, ne fait qu'une entrée —
-               la base le garantit. Un geste sans effet doit se dire, sinon on
-               le refait trois fois en se demandant pourquoi rien ne bouge. */
-            const avant = docs.length
-            const apres = await window.jdr.pochette.add(
-              id,
-              null,
-              rangement === TOUT ? null : rangement
-            )
-            poser(apres)
-            if (apres.docs.length === avant) {
-              s.toast('Ce document est déjà dans la pochette, pour toute la table.')
-            }
+            const onglet = rangement === TOUT ? null : rangement
+            let apres: { onglets: PochetteOnglet[]; docs: PochetteDoc[] } | null = null
+            for (const id of ids) apres = await window.jdr.pochette.add(id, null, onglet)
+            if (apres) poser(apres)
+            if (ids.length > 1) s.toast(`${ids.length} documents mis en réserve.`)
           }}
           onClose={() => setChoix(false)}
         />
@@ -384,14 +560,17 @@ function EtatDuPortable({
       </span>
       <div className="spacer" />
       <span className="gens">
-        {s.players.map((p) => (
+        {/* Les joueurs de la séance seulement : un absent n'a pas de téléphone à attendre. */}
+        {s.players
+          .filter((p) => s.characters.find((c) => c.id === p.characterId)?.present)
+          .map((p) => (
           <span
             key={p.id}
             className={`poche-pip c-${p.color ?? 'neutral'}${
-              s.mobile?.devices.some((d) => d.playerId === p.id && d.online) ? '' : ' absent'
+              s.mobile?.devices.some((d) => d.playerId === p.id && d.online && !d.spectateur) ? '' : ' absent'
             }`}
             title={`${p.name}${
-              s.mobile?.devices.some((d) => d.playerId === p.id && d.online)
+              s.mobile?.devices.some((d) => d.playerId === p.id && d.online && !d.spectateur)
                 ? ''
                 : ' — pas de téléphone en ligne'
             }`}
@@ -408,6 +587,9 @@ function EtatDuPortable({
 
 function Carte({
   doc,
+  choisi,
+  enSelection,
+  onChoisir,
   montreRangement,
   joueurs,
   onglets,
@@ -418,6 +600,10 @@ function Carte({
   onPage
 }: {
   doc: PochetteDoc
+  choisi: boolean
+  /** Au moins une carte est choisie : un clic sur la carte la choisit aussi. */
+  enSelection: boolean
+  onChoisir: () => void
   montreRangement: boolean
   joueurs: Convive[]
   onglets: PochetteOnglet[]
@@ -431,15 +617,42 @@ function Carte({
 }): JSX.Element {
   /* Un document remis à quelqu'un n'a qu'une paire d'yeux à attendre ; un
      document remis à la table les a toutes. */
-  const yeux = doc.playerId === null ? joueurs : joueurs.filter((p) => p.id === doc.playerId)
+  const yeux =
+    doc.playerId === null
+      ? joueurs.filter((p) => p.present) // la table de ce soir, pas toute la campagne
+      : joueurs.filter((p) => p.id === doc.playerId)
   const lus = yeux.filter((p) => doc.luPar.includes(p.id)).length
   /* Un document survolé par un autre qu'on glisse : un trait dit où il tombera. */
   const [vise, setVise] = useState(false)
+  /* Renommer : c'est le fichier qui change de nom, comme dans la bibliothèque —
+     le téléphone des joueurs le lit sous ce nom. */
+  const [nom, setNom] = useState<string | null>(null)
+  /* La loupe : le document en grand, pour le MJ seul. */
+  const [loupe, setLoupe] = useState(false)
+  const s = useStore()
+  const renommer = async (v: string | null): Promise<void> => {
+    setNom(null)
+    const neuf = v?.trim()
+    if (!neuf || neuf === doc.item.title) return
+    try {
+      await window.jdr.items.update(doc.itemId, { title: neuf })
+      onPoser(await window.jdr.pochette.list())
+    } catch (e) {
+      s.toast('Impossible de le renommer — un fichier porte peut-être déjà ce nom.', true)
+      console.error('[pochette] renommer', e)
+    }
+  }
 
   return (
     <div
-      className={`doc${doc.visible ? '' : ' en-reserve'}${vise ? ' vise' : ''}`}
+      className={`doc${doc.visible ? '' : ' en-reserve'}${vise ? ' vise' : ''}${choisi ? ' choisi' : ''}`}
       draggable
+      onClick={(e) => {
+        /* Ctrl + clic choisit ; une fois la sélection commencée, un simple clic
+           suffit. Les boutons de la carte gardent leur geste à eux. */
+        if ((e.target as HTMLElement).closest('button, input, .doc-menu, .visionneuse')) return
+        if (enSelection || e.ctrlKey || e.metaKey) onChoisir()
+      }}
       onDragStart={(e) => {
         e.dataTransfer.setData('text/pochette', String(doc.id))
         e.dataTransfer.effectAllowed = 'move'
@@ -462,6 +675,24 @@ function Carte({
       }}
     >
       <div className="vig">
+        <button
+          className="doc-coche"
+          role="checkbox"
+          aria-checked={choisi}
+          title={choisi ? 'Ne plus le choisir' : 'Le choisir — pour agir sur plusieurs documents à la fois'}
+          aria-label={choisi ? 'Ne plus le choisir' : 'Le choisir'}
+          onClick={onChoisir}
+        >
+          <IconCheck />
+        </button>
+        <button
+          className="doc-loupe"
+          title="Le regarder en grand — pour toi seul"
+          aria-label="Le regarder en grand"
+          onClick={() => setLoupe(true)}
+        >
+          <IconLoupe />
+        </button>
         {doc.item.poster || doc.item.kind === 'image' ? (
           <img src={doc.item.poster ?? doc.item.url ?? ''} alt="" draggable={false} />
         ) : (
@@ -490,9 +721,27 @@ function Carte({
       </div>
 
       <div className="dit">
-        <span className="t" title={doc.item.title}>
-          {doc.item.title}
-        </span>
+        {nom !== null ? (
+          <SaisieNom valeur={nom} onFini={(v) => void renommer(v)} />
+        ) : (
+          <span className="t-ligne">
+            <span
+              className="t"
+              title={`${doc.item.title} — double-clic pour le renommer`}
+              onDoubleClick={() => setNom(doc.item.title)}
+            >
+              {doc.item.title}
+            </span>
+            <button
+              className="doc-renommer"
+              title="Le renommer"
+              aria-label="Le renommer"
+              onClick={() => setNom(doc.item.title)}
+            >
+              <IconPen />
+            </button>
+          </span>
+        )}
         <span className="a-qui">
           <span className={`poche-pip c-${doc.playerColor ?? 'neutral'}`} />
           <span>
@@ -573,6 +822,15 @@ function Carte({
           </button>
         )}
         <button
+          className="ico-acte"
+          title="Ouvrir l’emplacement du fichier — l’explorateur, le fichier sélectionné"
+          aria-label="Ouvrir l’emplacement du fichier"
+          disabled={!doc.item.relPath}
+          onClick={() => doc.item.relPath && void window.jdr.items.reveal(doc.item.relPath)}
+        >
+          <IconFolder />
+        </button>
+        <button
           className="ico-acte oter"
           title="Le retirer de la pochette"
           aria-label="Le retirer de la pochette"
@@ -587,7 +845,8 @@ function Carte({
           onClose={() => onMenu(null)}
           items={[
             { cle: 'tous', libelle: 'Toute la table', on: doc.playerId === null },
-            ...joueurs.map((p) => ({
+            /* Les joueurs de la séance — et celui qui l'a déjà, même absent. */
+            ...joueurs.filter((p) => p.present || p.id === doc.playerId).map((p) => ({
               cle: String(p.id),
               libelle: `${p.characterName ?? p.name} seul`,
               sous: p.characterName ? p.name : undefined,
@@ -601,6 +860,15 @@ function Carte({
               await window.jdr.pochette.setPlayer(doc.id, cle === 'tous' ? null : Number(cle))
             )
           }}
+        />
+      )}
+
+      {loupe && (
+        <Visionneuse
+          titre={doc.item.title}
+          kind={doc.item.kind}
+          url={doc.item.url ?? null}
+          onClose={() => setLoupe(false)}
         />
       )}
 
@@ -618,6 +886,125 @@ function Carte({
           }}
         />
       )}
+    </div>
+  )
+}
+
+/* ============================================================
+   Plusieurs cartes à la fois
+   ============================================================ */
+
+/**
+ * La bande des cartes choisies : les montrer, les remettre en réserve, les
+ * donner à toute la table ou à quelqu'un. Chaque geste passe carte par carte
+ * — c'est le même que sur une seule — et la pochette se relit à la fin.
+ */
+function BarreSelection({
+  docs,
+  total,
+  joueurs,
+  onPoser,
+  onTout,
+  onVider
+}: {
+  docs: PochetteDoc[]
+  total: number
+  joueurs: Convive[]
+  onPoser: (p: { onglets: PochetteOnglet[]; docs: PochetteDoc[] }) => void
+  onTout: () => void
+  onVider: () => void
+}): JSX.Element {
+  const s = useStore()
+  const [qui, setQui] = useState(false)
+  const n = docs.length
+  const enReserve = docs.filter((d) => !d.visible)
+  const montres = docs.filter((d) => d.visible)
+
+  const pourChacun = async (
+    lesquels: PochetteDoc[],
+    geste: (d: PochetteDoc) => Promise<{ onglets: PochetteOnglet[]; docs: PochetteDoc[] }>,
+    refus?: (n: number) => string
+  ): Promise<void> => {
+    let dernier: { onglets: PochetteOnglet[]; docs: PochetteDoc[] } | null = null
+    let rates = 0
+    for (const d of lesquels) {
+      try {
+        dernier = await geste(d)
+      } catch (e) {
+        rates++
+        console.error('[pochette]', e)
+      }
+    }
+    onPoser(dernier ?? (await window.jdr.pochette.list()))
+    if (rates) s.toast(refus?.(rates) ?? `${rates} document${rates > 1 ? 's' : ''} n’ont pas bougé.`, true)
+  }
+
+  return (
+    <div className="poche-selection" role="toolbar" aria-label="Documents choisis">
+      <b className="num">
+        {n} choisi{n > 1 ? 's' : ''}
+      </b>
+      <button
+        className="btn btn-sm btn-brass"
+        disabled={enReserve.length === 0}
+        title="Les montrer, chacun à qui il est donné"
+        onClick={() => void pourChacun(enReserve, (d) => window.jdr.pochette.setVisible(d.id, true))}
+      >
+        <IconEye />
+        Montrer{enReserve.length && enReserve.length < n ? ` (${enReserve.length})` : ''}
+      </button>
+      <button
+        className="btn btn-sm"
+        disabled={montres.length === 0}
+        title="Les remettre en réserve — ils disparaissent de leur téléphone"
+        onClick={() => void pourChacun(montres, (d) => window.jdr.pochette.setVisible(d.id, false))}
+      >
+        <IconEyeOff />
+        En réserve{montres.length && montres.length < n ? ` (${montres.length})` : ''}
+      </button>
+      <span className="sel-qui">
+        <button className="btn btn-sm" aria-expanded={qui} onClick={() => setQui(!qui)}>
+          <IconPeople />
+          Qui le voit…
+        </button>
+        {qui && (
+          <Choisir
+            onClose={() => setQui(false)}
+            items={[
+              { cle: 'tous', libelle: 'Toute la table', on: docs.every((d) => d.playerId === null) },
+              ...joueurs.filter((p) => p.present).map((p) => ({
+                cle: String(p.id),
+                libelle: `${p.characterName ?? p.name} seul`,
+                sous: p.characterName ? p.name : undefined,
+                couleur: p.color,
+                on: docs.every((d) => d.playerId === p.id)
+              }))
+            ]}
+            onPick={(cle) => {
+              setQui(false)
+              const playerId = cle === 'tous' ? null : Number(cle)
+              void pourChacun(
+                docs.filter((d) => d.playerId !== playerId),
+                (d) => window.jdr.pochette.setPlayer(d.id, playerId),
+                (r) =>
+                  r > 1
+                    ? `${r} documents étaient déjà donnés ainsi : laissés tels quels.`
+                    : 'Un document était déjà donné ainsi : laissé tel quel.'
+              )
+            }}
+          />
+        )}
+      </span>
+      <div className="spacer" />
+      {n < total ? (
+        <button className="btn btn-ghost btn-sm" onClick={onTout}>
+          Tout choisir ({total})
+        </button>
+      ) : null}
+      <button className="btn btn-ghost btn-sm" title="Échap" onClick={onVider}>
+        <IconClose />
+        Désélectionner
+      </button>
     </div>
   )
 }
@@ -696,6 +1083,31 @@ function Choisir({
         ))}
       </div>
     </>
+  )
+}
+
+/** Le nouveau nom d'un document, saisi sur la carte. Entrée valide, Échap renonce. */
+function SaisieNom({ valeur, onFini }: { valeur: string; onFini: (v: string | null) => void }): JSX.Element {
+  const [v, setV] = useState(valeur)
+  const renonce = useRef(false)
+  return (
+    <input
+      className="doc-nom"
+      autoFocus
+      value={v}
+      aria-label="Nom du document"
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setV(e.target.value)}
+      onBlur={() => onFini(renonce.current ? null : v)}
+      onKeyDown={(e) => {
+        if (e.key === 'Escape') {
+          e.stopPropagation()
+          renonce.current = true
+          ;(e.target as HTMLInputElement).blur()
+        }
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur()
+      }}
+    />
   )
 }
 

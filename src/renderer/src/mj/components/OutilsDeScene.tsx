@@ -14,14 +14,10 @@ import {
 import type { Annotation, CalqueBrouillard, SlidePayload, TextOverlay } from '@shared/types'
 
 /* ============================================================
-   Les outils de scène que le Paravent partage avec la Régie : les
-   textes posés sur l'écran, la case visée d'un collage, les
-   annotations du MJ, l'œil des joueurs et le sens de l'encart.
-
-   Repris de la Régie geste pour geste — mêmes envois, mêmes répits
-   de frappe, mêmes libellés —, pour qu'on retrouve ses outils d'une
-   page à l'autre. La Régie garde encore sa propre copie ; elle
-   pourra venir puiser ici à son tour.
+   Les outils de scène du Paravent : les textes posés sur l'écran,
+   la case visée d'un collage, les annotations du MJ, l'œil des
+   joueurs et le sens de l'encart. Hérités de l'ancienne Régie,
+   geste pour geste — mêmes envois, mêmes répits de frappe.
    ============================================================ */
 
 /* ---------------- l'œil des joueurs ---------------- */

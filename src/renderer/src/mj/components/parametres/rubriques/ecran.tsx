@@ -231,5 +231,5 @@ export const reglages: Reglage[] = [
 
 /** Ce qui est aussi ailleurs : on le dit au pied de la rubrique. */
 export const apres = (
-  <p className="pm-aparte">Ces commandes sont aussi sous la main au Paravent et en Régie.</p>
+  <p className="pm-aparte">Ces commandes sont aussi sous la main au Paravent.</p>
 )

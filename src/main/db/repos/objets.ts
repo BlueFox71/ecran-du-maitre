@@ -13,6 +13,7 @@
  */
 import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { copierLigne } from '../copie'
+import { mediaUrl } from '../../vault'
 import { UNITE_VALEUR_PAR_DEFAUT, eclaire, lisCadreCarre } from '@shared/types'
 import { lireCampagne } from '@shared/reglages'
 import { EPSILON_SAC, REFUS_SAC, ditPlaces, etatSac, sacPlein } from '@shared/sac'
@@ -248,7 +249,7 @@ interface Exemplaires {
 }
 
 function lireEtat(v: string | null): ObjetPlacement['etat'] {
-  return v === 'trouve' ? 'trouve' : v === 'porte' ? 'porte' : 'cache'
+  return v === 'trouve' ? 'trouve' : v === 'porte' ? 'porte' : v === 'masque' ? 'masque' : 'cache'
 }
 
 /* Il a bougé : son port ou sa cible n'est plus celle du départ. L'endroit du
@@ -478,12 +479,17 @@ export function removeObjet(id: number): void {
 /**
  * Pose un exemplaire. Dans un lieu il commence **caché** — les joueurs ne l'ont
  * pas encore trouvé ; sur quelqu'un il est **porté**, puisqu'il l'a sur lui.
+ * À la corbeille, il n'est nulle part : comme un exemplaire jeté, sans
+ * emplacement initial où le ranger. Dans un inventaire partagé, il est **sur
+ * place** et rejoint ce que l'inventaire tient déjà du même objet.
  */
 function poserLibre(input: {
   objetId: number
   port: PortObjet
   placeId?: number | null
   characterId?: number | null
+  /** Dans un inventaire partagé (`port: 'inventaire'`). */
+  inventaireId?: number | null
   qte?: number
   precision?: string | null
   /** Sur quelqu'un : l'endroit du corps. Absent, c'est dans son sac. */
@@ -492,6 +498,17 @@ function poserLibre(input: {
   const db = getDb()
   const objet = getObjet(input.objetId)
   if (!objet) return null
+  const qte = Math.max(1, Math.round(input.qte ?? (objet.unique ? 1 : objet.qte)))
+  if (input.port === 'inventaire') {
+    if (input.inventaireId == null) return null
+    if (objet.unique) oublierCorbeille(input.objetId)
+    const deja = dansInventaire(input.inventaireId, input.objetId)
+    if (deja) {
+      db.prepare(`UPDATE objet_placement SET qte = ? WHERE id = ?`).run(deja.qte + qte, deja.id)
+      fixerInitial(deja.id)
+      return getObjet(input.objetId)
+    }
+  }
   const ord =
     ((
       db
@@ -500,19 +517,21 @@ function poserLibre(input: {
     )?.m ?? -1) + 1
   if (objet.unique) oublierCorbeille(input.objetId)
   const info = db.prepare(
-    `INSERT INTO objet_placement (objet_id, session_id, port, place_id, character_id, detail, qte, etat, emplacement, ord)
-     VALUES (@objetId, @sid, @port, @placeId, @characterId, @precision, @qte, @etat, @emplacement, @ord)`
+    `INSERT INTO objet_placement (objet_id, session_id, port, place_id, character_id, inventaire_id, detail, qte, etat, emplacement, ord)
+     VALUES (@objetId, @sid, @port, @placeId, @characterId, @inventaireId, @precision, @qte, @etat, @emplacement, @ord)`
   ).run({
     objetId: input.objetId,
     /* Un exemplaire vit dans une séance : celle où on le pose. */
     sid: activeSessionId(),
     port: input.port,
     placeId: input.port === 'lieu' ? (input.placeId ?? null) : null,
-    characterId: input.port === 'lieu' ? null : (input.characterId ?? null),
+    characterId: input.port === 'pj' || input.port === 'pnj' ? (input.characterId ?? null) : null,
+    inventaireId: input.port === 'inventaire' ? input.inventaireId : null,
     precision: input.precision ?? null,
-    qte: Math.max(1, Math.round(input.qte ?? (objet.unique ? 1 : objet.qte))),
-    etat: input.port === 'lieu' ? 'cache' : 'porte',
-    emplacement: input.port === 'lieu' ? null : (input.emplacement ?? null),
+    qte,
+    etat:
+      input.port === 'lieu' || input.port === 'corbeille' ? 'cache' : input.port === 'inventaire' ? 'trouve' : 'porte',
+    emplacement: input.port === 'pj' || input.port === 'pnj' ? (input.emplacement ?? null) : null,
     ord
   })
   fixerInitial(Number(info.lastInsertRowid))
@@ -612,12 +631,16 @@ export function objetsDe(characterId: number): {
   /** C'est une lampe : elle s'allume et s'éteint. */
   lampe: boolean
   allumee: boolean
+  /** L'image de l'objet (un item de la bibliothèque) et son cadrage carré. */
+  imageItemId: number | null
+  imageCadre: CadreCarre | null
 }[] {
   return (
     getDb()
       .prepare(
         `SELECT p.id AS placementId, o.id AS objetId, o.nom, p.emplacement, o.emplacements,
-                p.qte, f.teinte, o.effets, p.eteinte
+                p.qte, f.teinte, o.effets, p.eteinte,
+                o.image_item_id AS imageItemId, o.image_cadre AS imageCadre
            FROM objet_placement p
            JOIN objet o ON o.id = p.objet_id
            LEFT JOIN objet_famille f ON f.id = o.famille_id
@@ -634,7 +657,9 @@ export function objetsDe(characterId: number): {
     qte: r.qte ?? 1,
     teinte: r.teinte ?? null,
     lampe: eclaire({ effets: lireEffets(r.effets) }),
-    allumee: !r.eteinte
+    allumee: !r.eteinte,
+    imageItemId: r.imageItemId ?? null,
+    imageCadre: lisCadreCarre(r.imageCadre)
   }))
 }
 
@@ -717,8 +742,9 @@ function donnerLibre(
     id: placementId,
     port: cible.port,
     placeId: cible.port === 'lieu' ? (cible.placeId ?? null) : null,
-    characterId: cible.port === 'lieu' ? null : (cible.characterId ?? null),
-    etat: cible.port === 'lieu' ? 'trouve' : 'porte'
+    /* À la corbeille, il n'est plus nulle part (comme `jeter`, mais d'une partie). */
+    characterId: cible.port === 'lieu' || cible.port === 'corbeille' ? null : (cible.characterId ?? null),
+    etat: cible.port === 'lieu' ? 'trouve' : cible.port === 'corbeille' ? 'cache' : 'porte'
   })
   return getObjet(cur.objetId)
 }
@@ -834,10 +860,12 @@ export function objetsVus(placeId: number | null): ObjetVu[] {
   if (placeId == null) return []
   const rows = getDb()
     .prepare(
-      `SELECT p.id, p.pos_x AS x, p.pos_y AS y, p.qte, o.nom
+      `SELECT p.id, p.pos_x AS x, p.pos_y AS y, p.qte, o.nom,
+              i.rel_path AS image, o.image_cadre AS cadre
          FROM objet_placement p
          JOIN objet o ON o.id = p.objet_id
          JOIN place l ON l.id = p.place_id
+         LEFT JOIN item i ON i.id = o.image_item_id
         WHERE p.port = 'lieu' AND p.etat = 'trouve'
           AND p.pos_x IS NOT NULL AND p.pos_y IS NOT NULL
           AND (p.place_id = @placeId OR l.parent_id = @placeId)
@@ -850,8 +878,20 @@ export function objetsVus(placeId: number | null): ObjetVu[] {
     y: number
     qte: number | null
     nom: string
+    image: string | null
+    cadre: string | null
   }[]
-  return rows.map((r) => ({ id: r.id, x: r.x, y: r.y, nom: r.nom, qte: r.qte ?? 1 }))
+  /* Son image aussi : sur la carte, on reconnaît une lampe à son dessin plus
+     vite qu'à son nom. Elle ne dit rien de plus que ce que l'objet montre. */
+  return rows.map((r) => ({
+    id: r.id,
+    x: r.x,
+    y: r.y,
+    nom: r.nom,
+    qte: r.qte ?? 1,
+    image: mediaUrl(r.image),
+    cadre: lisCadreCarre(r.cadre)
+  }))
 }
 
 function reprendreLibre(id: number): Objet | null {
@@ -1014,11 +1054,14 @@ export function contenuInventaire(inventaireId: number): {
   nom: string
   qte: number
   teinte: string | null
+  imageItemId: number | null
+  imageCadre: CadreCarre | null
 }[] {
   return (
     getDb()
       .prepare(
-        `SELECT p.id AS placementId, o.id AS objetId, o.nom, p.qte, f.teinte
+        `SELECT p.id AS placementId, o.id AS objetId, o.nom, p.qte, f.teinte,
+                o.image_item_id AS imageItemId, o.image_cadre AS imageCadre
            FROM objet_placement p
            JOIN objet o ON o.id = p.objet_id
            LEFT JOIN objet_famille f ON f.id = o.famille_id
@@ -1026,7 +1069,13 @@ export function contenuInventaire(inventaireId: number): {
           ORDER BY o.nom COLLATE NOCASE`
       )
       .all(inventaireId, activeSessionId()) as any[]
-  ).map((r) => ({ ...r, qte: r.qte ?? 1, teinte: r.teinte ?? null }))
+  ).map((r) => ({
+    ...r,
+    qte: r.qte ?? 1,
+    teinte: r.teinte ?? null,
+    imageItemId: r.imageItemId ?? null,
+    imageCadre: lisCadreCarre(r.imageCadre)
+  }))
 }
 
 /** L'inventaire où est rangé cet exemplaire, s'il l'est. */

@@ -145,7 +145,7 @@ export const RUBRIQUES: InfoRubrique[] = [
     nom: 'Portables',
     icone: <IconPortable />,
     poste: true,
-    quoi: 'Tout passe par le Wi-Fi de la maison — rien ne sort vers Internet. Le QR code, lui, reste en Régie : le tendre à la table est un geste de partie.'
+    quoi: 'Tout passe par le Wi-Fi de la maison — rien ne sort vers Internet. Le QR code, lui, reste au Paravent : le tendre à la table est un geste de partie.'
   },
   {
     id: 'poste',
@@ -222,8 +222,8 @@ export const AILLEURS: Ailleurs[] = [
     nom: 'Taille des pions d’un lieu',
     mots: ['jetons', 'taille', 'echelle', 'lieu'],
     chemin: 'Ailleurs',
-    ou: 'Se règle sur chaque lieu — en Régie, au-dessus de la ligne des pions.',
-    aller: { libelle: 'Ouvrir la Régie', faire: () => useStore.getState().setView('regie') }
+    ou: 'Se règle sur chaque lieu — au Paravent, au-dessus de la ligne des pions.',
+    aller: { libelle: 'Ouvrir le Paravent', faire: () => useStore.getState().setView('pupitre') }
   },
   {
     id: 'seance.dossier',

@@ -14,7 +14,8 @@ import { BrowserWindow } from 'electron'
  * d'autres) se regroupe en un seul. Défaire rejoue le pas à l'envers, et les
  * mêmes déclencheurs notent au passage de quoi le refaire.
  *
- * Ce qui n'est pas suivi : le jeu (écran, pions, jets, portables, pochette),
+ * Ce qui n'est pas suivi : le jeu (écran, pions, jets, portables, pochette —
+ * sauf la suppression d'un onglet, qu'un clic malheureux ne doit pas coûter),
  * et la bibliothèque, dont le disque fait foi — une ligne de fichier ne se
  * recrée pas sans son fichier. Des tables de fichiers, on ne suit donc que
  * les modifications, jamais les naissances ni les disparitions.
@@ -68,6 +69,11 @@ const MODULES: Record<string, string> = {
   sheet: 'Fiche de campagne',
   models: 'Fiche de campagne',
   catalogue: 'Fiche de campagne'
+}
+
+/** Hors de ces modules, quelques canaux suivis un à un, et leur nom. */
+const CANAUX_SUIVIS: Record<string, string> = {
+  'pochette:removeOnglet': 'Onglet de la Pochette'
 }
 
 /**
@@ -222,7 +228,7 @@ const recolter = (): string[] => {
 }
 
 const suivi = (canal: string): boolean =>
-  canal.split(':')[0] in MODULES && !CANAUX_HORS.has(canal)
+  canal in CANAUX_SUIVIS || (canal.split(':')[0] in MODULES && !CANAUX_HORS.has(canal))
 
 function noterPas(libelle: string, sqls: string[]): void {
   const utiles = sqls.filter((q) => !INVERSES_DU_JEU.some((r) => r.test(q)))
@@ -256,7 +262,7 @@ function noterPas(libelle: string, sqls: string[]): void {
  */
 export function envelopper<R>(canal: string, fn: () => R): R {
   if (!base || !suivi(canal)) return fn()
-  const libelle = MODULES[canal.split(':')[0]]
+  const libelle = CANAUX_SUIVIS[canal] ?? MODULES[canal.split(':')[0]]
   actifs++
   if (actifs === 1) activer(true)
   const fin = (): void => {

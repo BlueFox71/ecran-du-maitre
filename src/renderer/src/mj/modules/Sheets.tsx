@@ -31,6 +31,7 @@ import type { UiItem } from '../../../../preload/index'
 import { PION_COULEURS } from '@shared/types'
 import { ChampEmojis } from '../components/ChampEmojis'
 import { Bourse } from '../components/Bourse'
+import { EffetsObjetsFiche } from '../components/EffetsObjets'
 import type {
   ButinLigne,
   CadreCarre,
@@ -227,7 +228,7 @@ export function Sheets(): JSX.Element {
               {rayonne.length === 0 ? (
                 <p className="pc-vide">
                   {rayon === 'pnj'
-                    ? 'Aucun PNJ. Crée-le ici, ou fais une fiche à un pion déjà posé — clic droit dessus, en Régie.'
+                    ? 'Aucun PNJ. Crée-le ici, ou fais une fiche à un pion déjà posé — clic droit dessus, au Paravent.'
                     : 'Aucun personnage joueur.'}
                 </p>
               ) : null}
@@ -723,6 +724,11 @@ function SheetBody({
               </div>
             )}
           </section>
+
+          {/* Ce que les objets lui font — une entité, un fantôme. Sous ses
+              jauges : c'est ce qu'on consulte quand les joueurs lui brandissent
+              quelque chose. Lu aussi au Paravent. */}
+          {ch.kind === 'pnj' ? <EffetsObjetsFiche ch={ch} /> : null}
 
           <Bourse ch={ch} />
 

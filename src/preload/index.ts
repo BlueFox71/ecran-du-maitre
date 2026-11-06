@@ -25,7 +25,6 @@ import type {
   CampaignPlayer,
   CarnetPlayer,
   CatalogueEntry,
-  CollageLayout,
   Frame,
   CadreCarre,
   Character,
@@ -40,6 +39,7 @@ import type {
   ToursMj,
   PreparationEtat,
   EffetObjet,
+  EffetSurEntite,
   FolderNode,
   GlypheObjet,
   Inventaire,
@@ -57,6 +57,7 @@ import type {
   CalqueBrouillard,
   Lumiere,
   NatureOuverture,
+  DemandePorte,
   Ouverture,
   Place,
   Astre,
@@ -83,7 +84,8 @@ import type {
   SlidePayload,
   TemplateSpec,
   TextOverlay,
-  Transition
+  Transition,
+  StatsEcran
 } from '@shared/types'
 
 /**
@@ -125,7 +127,13 @@ const api = {
       }>('app:info'),
     openDataFolder: () => call<void>('app:openDataFolder'),
     /** Un geste de la barre de menus : annuler, coller, recharger, le zoom… */
-    commande: (nom: string) => call<void>('app:commande', nom)
+    commande: (nom: string) => call<void>('app:commande', nom),
+    /** Une zone de la fenêtre, en pixels CSS, capturée en PNG (ses octets). */
+    capturerZone: (zone: { x: number; y: number; width: number; height: number }) =>
+      call<Uint8Array>('app:capturerZone', zone),
+    /** Mode développeur : la fenêtre du MJ à la taille du portable ? Null hors développement. */
+    modePortable: () => call<boolean | null>('app:modePortable'),
+    basculerModePortable: () => call<boolean>('app:basculerModePortable')
   },
 
   /**
@@ -272,6 +280,9 @@ const api = {
       call<UiPochette>('pochette:setOnglet', id, ongletId),
     createOnglet: (name: string) => call<UiPochette>('pochette:createOnglet', name),
     renameOnglet: (id: number, name: string) => call<UiPochette>('pochette:renameOnglet', id, name),
+    /** Colorier un onglet (clé d'une teinte des pions) — `null` la lui retire. */
+    couleurOnglet: (id: number, couleur: string | null) =>
+      call<UiPochette>('pochette:couleurOnglet', id, couleur),
     removeOnglet: (id: number) => call<UiPochette>('pochette:removeOnglet', id),
     reorderOnglets: (ids: number[]) => call<UiPochette>('pochette:reorderOnglets', ids),
     /** Ranger les documents dans cet ordre — ceux qu'on voit ; les autres gardent leur place. */
@@ -612,6 +623,8 @@ const api = {
       port: PortObjet
       placeId?: number | null
       characterId?: number | null
+      /** Dans un inventaire partagé (`port: 'inventaire'`). */
+      inventaireId?: number | null
       qte?: number
       precision?: string | null
       /** Sur quelqu'un : l'endroit du corps. Absent, c'est dans son sac. */
@@ -873,8 +886,9 @@ const api = {
     placerSeance: (id: number, refId: number, sens: 'avant' | 'apres') =>
       call<GameSession[]>('timeline:placerSeance', id, refId, sens),
     /** Recopie `dossier` sous `nomDossier`, puis la séance, qui devient celle en cours. */
-    dupliquerSeance: (srcId: number, label: string, dossier: string | null, nomDossier: string) =>
-      call<GameSession>('timeline:dupliquerSeance', srcId, label, dossier, nomDossier),
+    /** `suite` : continuer une partie inachevée plutôt que la rejouer. */
+    dupliquerSeance: (srcId: number, label: string, dossier: string | null, nomDossier: string, suite = false) =>
+      call<GameSession>('timeline:dupliquerSeance', srcId, label, dossier, nomDossier, suite),
     /** Où en est la duplication : les fichiers (en octets), puis la séance. */
     onProgression: (cb: (p: { etape: 'fichiers' | 'seance'; fait: number; total: number }) => void) => {
       const h = (_e: unknown, p: { etape: 'fichiers' | 'seance'; fait: number; total: number }): void => cb(p)
@@ -982,6 +996,9 @@ const api = {
    */
   mobile: {
     info: () => call<MobileInfo>('mobile:info'),
+    /** Laisser les joueurs enregistrer ces statistiques en image — `null` les reprend. */
+    partagerStats: (stats: StatsEcran | null) => call<boolean>('mobile:partagerStats', stats),
+    statsPartagees: () => call<boolean>('mobile:statsPartagees'),
     open: () => call<{ info: MobileInfo; qr: string | null }>('mobile:open'),
     closeInvite: () => call<MobileInfo>('mobile:closeInvite'),
     /** Tendre le code à la table sur l'écran des joueurs, ou l'en retirer. */
@@ -999,11 +1016,26 @@ const api = {
       ipcRenderer.on('mobile:roll', h)
       return () => void ipcRenderer.removeListener('mobile:roll', h)
     },
+    /** Un joueur a retiré un de ses jets depuis son téléphone. */
+    onJetRetire: (cb: (r: { playerName: string; color: string | null }) => void) => {
+      const h = (_: unknown, r: { playerName: string; color: string | null }): void => cb(r)
+      ipcRenderer.on('mobile:jetRetire', h)
+      return () => void ipcRenderer.removeListener('mobile:jetRetire', h)
+    },
     /** Qui remue son pion en ce moment. */
     onNudge: (cb: (n: MobileNudge[]) => void) => {
       const h = (_: unknown, n: MobileNudge[]): void => cb(n)
       ipcRenderer.on('mobile:nudge', h)
       return () => void ipcRenderer.removeListener('mobile:nudge', h)
+    },
+    /** Les pions arrivés devant une porte fermée, qui attendent la réponse du MJ. */
+    portes: () => call<DemandePorte[]>('mobile:portes'),
+    repondrePorte: (playerId: number, ouvrir: boolean) =>
+      call<void>('mobile:repondrePorte', playerId, ouvrir),
+    onPortes: (cb: (d: DemandePorte[]) => void) => {
+      const h = (_: unknown, d: DemandePorte[]): void => cb(d)
+      ipcRenderer.on('mobile:portes', h)
+      return () => void ipcRenderer.removeListener('mobile:portes', h)
     },
     /** Le téléphone a changé quelque chose que le PC affiche aussi. */
     onChanged: (cb: () => void) => {
@@ -1106,6 +1138,12 @@ const api = {
       call<Character>('characters:setState', id, key, on),
     /** Ses bonus et malus au jet, remplacés d'un bloc. */
     setModifs: (id: number, modifs: Modif[]) => call<Character>('characters:setModifs', id, modifs),
+    /** Ce que des objets font à ce personnage — une entité ; jamais diffusé. */
+    setEffetsObjets: (id: number, effets: EffetSurEntite[]) =>
+      call<Character>('characters:setEffetsObjets', id, effets),
+    /** Les mêmes effets, posés d'un coup sur d'autres personnages ; rend combien. */
+    copierEffetsObjets: (effets: EffetSurEntite[], cibles: number[]) =>
+      call<number>('characters:copierEffetsObjets', effets, cibles),
     /** Les mêmes, écrits par le jeu (santé mentale) : le Ctrl+Z ne les défait pas. */
     setModifsJeu: (id: number, modifs: Modif[]) => call<Character>('characters:setModifsJeu', id, modifs),
     log: (id: number) => call<CharacterLogEntry[]>('characters:log', id),
@@ -1140,6 +1178,9 @@ const api = {
     trashList: () => call<Roll[]>('rolls:trashList'),
     emptyTrash: () => call<void>('rolls:emptyTrash'),
     clear: () => call<void>('rolls:clear'),
+    exportImage: (png: Uint8Array) => call<string | null>('rolls:exportImage', png),
+    /** Les statistiques en image (octets PNG), dans le presse-papiers. */
+    copierImage: (png: Uint8Array) => call<boolean>('rolls:copierImage', png),
     exportCsv: () => call<string | null>('rolls:exportCsv')
   },
 
@@ -1181,8 +1222,6 @@ const api = {
     swap: (ms?: number, mode?: Transition) => call<DisplayState>('display:swap', ms, mode),
 
     /** Disposition du collage en préparation. */
-    prepareLayout: (layout: CollageLayout) =>
-      call<DisplayState>('display:prepareLayout', layout),
     /** Le temps qu'il fait sur la scène. Le même deux fois l'éteint. */
     /** Pose une image dans une case du collage, ou la vide avec `null`. */
     prepareCell: (index: number, itemId: number | null) =>

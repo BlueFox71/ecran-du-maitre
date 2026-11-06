@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { IconTrash } from './Icons'
 import { signe } from '@shared/jet'
-import type { MobileInfo } from '@shared/types'
+import type { DemandePorte, MobileInfo } from '@shared/types'
 
 /**
  * Les portables des joueurs — un onglet de la Régie, pas une fenêtre.
@@ -124,12 +124,15 @@ export function Portables(): JSX.Element {
         ) : (
           <div className="pt-liste">
             {info.devices.map((d) => {
-              const siens = info.devices.filter((x) => x.playerId === d.playerId)
+              /* Un spectateur ne prend pas de place au joueur qu'il suit. */
+              const siens = info.devices.filter((x) => x.playerId === d.playerId && !x.spectateur)
               return (
                 <div className={`pt-lig c-${d.playerColor ?? 'neutral'}`} key={d.id}>
                   <span className="pip teinte" />
                   <span className="pt-qui">
-                    <span className="pt-nom">{d.playerName}</span>
+                    <span className="pt-nom">
+                      {d.spectateur ? `Spectateur · suit ${d.playerName}` : d.playerName}
+                    </span>
                     <span className={`pt-etat${d.online ? ' on' : ''}`}>
                       {d.online ? 'en ligne' : 'hors ligne'}
                     </span>
@@ -212,6 +215,53 @@ export function Annonces(): JSX.Element | null {
 }
 
 /**
+ * « Alexis est devant la Porte de la cave. » — Ouvrir, ou la laisser fermée.
+ *
+ * Le pion poussé depuis un téléphone bute contre une porte close : c'est au MJ
+ * de dire si elle cède. La question suit le MJ partout, comme les dés, et
+ * s'efface d'elle-même quand le pion s'éloigne ou que la porte s'ouvre.
+ */
+export function DemandesDePorte(): JSX.Element | null {
+  const [demandes, setDemandes] = useState<DemandePorte[]>([])
+
+  useEffect(() => {
+    let vivant = true
+    void window.jdr.mobile.portes().then((d) => vivant && setDemandes(d))
+    const off = window.jdr.mobile.onPortes(setDemandes)
+    return () => {
+      vivant = false
+      off()
+    }
+  }, [])
+
+  if (!demandes.length) return null
+  const repondre = (playerId: number, ouvrir: boolean): void =>
+    void window.jdr.mobile.repondrePorte(playerId, ouvrir)
+
+  return (
+    <div className="pt-portes" role="region" aria-label="Pions devant une porte">
+      {demandes.map((d) => (
+        <div className={`pt-porte c-${d.couleur ?? 'neutral'}`} key={d.playerId} role="alert">
+          <span className="pt-porte-dit">
+            <span className="pip teinte" />
+            <b>{d.nom}</b> est devant <b>{d.porte}</b>
+            {d.verrouillee ? <em> · verrouillée</em> : null}
+          </span>
+          <span className="pt-porte-choix">
+            <button className="btn btn-sm btn-brass" onClick={() => repondre(d.playerId, true)}>
+              {d.verrouillee ? 'Déverrouiller et ouvrir' : 'Ouvrir'}
+            </button>
+            <button className="btn btn-sm btn-ghost" onClick={() => repondre(d.playerId, false)}>
+              Laisser fermée
+            </button>
+          </span>
+        </div>
+      ))}
+    </div>
+  )
+}
+
+/**
  * Les d20 qu'un joueur a lancés depuis son téléphone et qui attendent, au
  * centre de l'écran de la table, que le MJ les ait lus. « Vu » les retire.
  *
@@ -289,6 +339,18 @@ export function EcouteDesPortables(): null {
           ]
         }))
         /* Six secondes : le temps de lever les yeux si on regardait ailleurs. */
+        setTimeout(
+          () => useStore.setState((e) => ({ mobileRolls: e.mobileRolls.filter((x) => x.id !== id) })),
+          6000
+        )
+        void s.refreshRolls()
+      }),
+      /* Un jet retiré par son joueur : le journal se relit, et le MJ le sait. */
+      api.onJetRetire((r) => {
+        const id = ++suite
+        useStore.setState((e) => ({
+          mobileRolls: [...e.mobileRolls, { id, nom: r.playerName, texte: 'retire un jet', couleur: r.color }]
+        }))
         setTimeout(
           () => useStore.setState((e) => ({ mobileRolls: e.mobileRolls.filter((x) => x.id !== id) })),
           6000

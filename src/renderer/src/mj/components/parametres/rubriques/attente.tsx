@@ -4,7 +4,7 @@ import type { Reglage } from '../registre'
 
 /* ============================================================
    Écran d'attente — « Ça commence bientôt », réglé une fois ici.
-   La fenêtre de la Régie reste la commande rapide : elle part de
+   La fenêtre du Paravent reste la commande rapide : elle part de
    ces mêmes valeurs et les réécrit au lancement.
    ============================================================ */
 

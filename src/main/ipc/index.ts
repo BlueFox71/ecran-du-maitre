@@ -1,4 +1,4 @@
-import { BrowserWindow, app, dialog, ipcMain, shell } from 'electron'
+import { BrowserWindow, app, clipboard, dialog, ipcMain, nativeImage, shell } from 'electron'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
 import { extname, join } from 'node:path'
 import { activeCampaignId, activeSessionId, dataRoot, getDb, isDbOpen } from '../db'
@@ -34,6 +34,7 @@ import * as regieSon from '../sons'
 import * as sons from '../db/repos/sons'
 import * as defaire from '../defaire'
 import * as fsLib from '../library'
+import { MARQUE } from '@shared/dossierDeLApp'
 import * as examen from '../examen'
 import * as lieuxTexte from '../lieuxTexte'
 import { synchroniserPnjBientot } from '../pnjTexte'
@@ -44,9 +45,10 @@ import { monnaiesActives } from '@shared/monnaies'
 import { apresLeCombat, apresUnTour, type Modif } from '@shared/modifs'
 import { noterJet } from '../jetDuPerso'
 import { reinitialiser } from '../reinitialiser'
-import type { ChoixReinit } from '@shared/types'
+import type { ChoixReinit, EffetSurEntite } from '@shared/types'
 import type { Cible, Plage } from '@shared/surlignage'
 import { estFenetreSuivie, zoomer } from '../zoom'
+import { basculerModePortable, modePortable } from '../modePortable'
 
 /** Des bonus ont vieilli tout seuls : la fiche du MJ et les téléphones relisent. */
 function modifsVieillis(): void {
@@ -55,7 +57,6 @@ function modifsVieillis(): void {
 }
 import type {
   Astre,
-  CollageLayout,
   ExamenFait,
   Frame,
   Item,
@@ -65,7 +66,8 @@ import type {
   SlidePayload,
   PointMur,
   TextOverlay,
-  Transition
+  Transition,
+  StatsEcran
 } from '@shared/types'
 
 /**
@@ -120,6 +122,8 @@ export function registerIpc(): void {
       display.calqueABouge()
       /* Une apparence rendue ou reprise : la carte à l'écran la suit. */
       display.rehabiller()
+      /* Un onglet de la Pochette rendu : les téléphones le retrouvent. */
+      mobile.broadcast()
     }
     return libelle
   }
@@ -201,6 +205,10 @@ export function registerIpc(): void {
       case 'quitter': app.quit(); break
     }
   })
+
+  // Menu Mode développeur : la fenêtre du MJ à la taille du portable. Null une fois installé : pas de menu.
+  on('app:modePortable', () => (app.isPackaged ? null : modePortable()))
+  on('app:basculerModePortable', () => basculerModePortable())
 
   /* ---------------- les réglages ---------------- */
 
@@ -663,12 +671,17 @@ export function registerIpc(): void {
     const o = ouvertures.updateOuverture(id, patch)
     /* Ouvrir une porte change ce que les joueurs voient : on le leur dit. */
     display.calqueABouge()
+    mobile.revoirDemandesPorte()
     return o
   })
-  on('ouvertures:remove', (id: number) => ouvertures.removeOuverture(id))
+  on('ouvertures:remove', (id: number) => {
+    ouvertures.removeOuverture(id)
+    mobile.revoirDemandesPorte()
+  })
   on('ouvertures:fermerPortes', (placeId: number) => {
     const n = ouvertures.fermerLesPortes(placeId)
     display.calqueABouge()
+    mobile.revoirDemandesPorte()
     return n
   })
 
@@ -743,8 +756,22 @@ export function registerIpc(): void {
 
   /* ---------------- chronologie ---------------- */
 
-  on('timeline:sessions', () => timeline.listSessions())
-  on('timeline:currentSession', () => timeline.currentSession())
+  /* La séance « Référence dev — … » est un banc d'essai pour le mode dev :
+     l'application installée ne la montre pas, et n'y reste pas si elle
+     était la séance en cours à la fermeture du dev. */
+  const estReferenceDev = (s: { label: string }): boolean => s.label.startsWith('Référence dev')
+  on('timeline:sessions', () =>
+    app.isPackaged ? timeline.listSessions().filter((s) => !estReferenceDev(s)) : timeline.listSessions()
+  )
+  on('timeline:currentSession', () => {
+    const c = timeline.currentSession()
+    if (!app.isPackaged || !c || !estReferenceDev(c)) return c
+    const vraie = timeline.listSessions().filter((s) => !estReferenceDev(s)).pop()
+    if (!vraie) return c
+    timeline.setActiveSession(vraie.id)
+    entrerDansLaSeance(vraie.id)
+    return timeline.currentSession()
+  })
   /* Entrer dans une séance, c'est y faire entrer les joueurs : chacun y reçoit
      son état de la séance d'avant, et l'écran comme les téléphones changent de
      fiche avec le MJ. */
@@ -771,7 +798,7 @@ export function registerIpc(): void {
      et la fenêtre suit sa progression —, puis la base, en une transaction. */
   ipcMain.handle(
     'timeline:dupliquerSeance',
-    async (e, srcId: number, label: string, dossier: string | null, nomDossier: string) => {
+    async (e, srcId: number, label: string, dossier: string | null, nomDossier: string, suite = false) => {
       const dire = (etape: string, fait: number, total: number): void => {
         if (!e.sender.isDestroyed()) e.sender.send('timeline:progression', { etape, fait, total })
       }
@@ -785,7 +812,17 @@ export function registerIpc(): void {
         jumeaux = copie.jumeaux
       }
       dire('seance', 0, 1)
-      const s = timeline.dupliquerSeance(srcId, label, rel, jumeaux)
+      let s: ReturnType<typeof timeline.dupliquerSeance>
+      try {
+        s = timeline.dupliquerSeance(srcId, label, rel, jumeaux, suite)
+      } catch (err) {
+        /* La base a tout annulé : le dossier recopié (et son double dans le
+           dossier de l'app) part à la corbeille, pour ne pas laisser d'orphelin. */
+        if (rel)
+          for (const r of [`${MARQUE}/${rel}`, rel])
+            if (existsSync(fsLib.absOf(r))) await fsLib.trashEntry(r).catch(() => undefined)
+        throw err
+      }
       entrerDansLaSeance(s.id)
       dire('seance', 1, 1)
       return s
@@ -935,6 +972,10 @@ export function registerIpc(): void {
     pochette.renameOnglet(id, name)
     return pocheEtPousse()
   })
+  on('pochette:couleurOnglet', (id: number, couleur: string | null) => {
+    pochette.setCouleurOnglet(id, couleur)
+    return pocheEtPousse()
+  })
   on('pochette:removeOnglet', (id: number) => {
     pochette.removeOnglet(id)
     return pocheEtPousse()
@@ -991,9 +1032,16 @@ export function registerIpc(): void {
   /* ---------------- le portable des joueurs ---------------- */
 
   on('mobile:info', () => mobile.info())
+  /* Les statistiques révélées, laissées aux joueurs pour qu'ils en fassent une image. */
+  on('mobile:partagerStats', (stats: StatsEcran | null) => mobile.partagerStats(stats))
+  on('mobile:statsPartagees', () => mobile.statsSontPartagees())
   on('mobile:open', () => mobile.open())
   on('mobile:closeInvite', () => mobile.closeInvite())
   on('mobile:show', (on2: boolean) => mobile.showOnPlayers(on2))
+  on('mobile:portes', () => mobile.demandesDePorte())
+  on('mobile:repondrePorte', (playerId: number, ouvrir: boolean) =>
+    mobile.repondrePorte(playerId, !!ouvrir)
+  )
   on('mobile:revoke', (id: number) => {
     mobile.revokeDevice(id)
     return mobile.info()
@@ -1129,6 +1177,11 @@ export function registerIpc(): void {
     mobile.broadcast()
     return c
   })
+  /* Ce que des objets lui font : au MJ seul, rien ne part vers les téléphones. */
+  on('characters:setEffetsObjets', (id: number, effets: EffetSurEntite[]) => chars.setEffetsObjets(id, effets))
+  on('characters:copierEffetsObjets', (effets: EffetSurEntite[], cibles: number[]) =>
+    chars.copierEffetsObjets(effets, cibles)
+  )
   /* Les mêmes, posés par le jeu (malus de palier, nausée) : hors du Ctrl+Z, voir `CANAUX_HORS`. */
   on('characters:setModifsJeu', (id: number, modifs: Modif[]) => {
     const c = chars.setModifs(id, modifs)
@@ -1186,6 +1239,40 @@ export function registerIpc(): void {
     if (pochette.suivreInventaires()) display.versMj('pochette:changee', null)
     mobile.broadcast()
     return r
+  })
+  /* Les statistiques en image : l'interface capture sa page morceau par morceau
+     (une zone de la fenêtre, en pixels CSS), assemble, puis fait enregistrer. */
+  ipcMain.handle(
+    'app:capturerZone',
+    async (e, zone: { x: number; y: number; width: number; height: number }) => {
+      const z = e.sender.getZoomFactor()
+      const img = await e.sender.capturePage({
+        x: Math.round(zone.x * z),
+        y: Math.round(zone.y * z),
+        width: Math.max(1, Math.round(zone.width * z)),
+        height: Math.max(1, Math.round(zone.height * z))
+      })
+      /* Les octets du PNG, pas une data URL : pas de base64 à fabriquer ni à relire. */
+      return img.toPNG()
+    }
+  )
+  on('rolls:exportImage', async (png: Uint8Array) => {
+    const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
+    const session = timeline.currentSession()
+    const safe = session.label.replace(/[^\p{L}\p{N}\-_ ]/gu, '').trim() || 'seance'
+    const res = await dialog.showSaveDialog(win, {
+      title: 'Exporter les statistiques en image',
+      defaultPath: join(app.getPath('documents'), `statistiques-${safe}.png`),
+      filters: [{ name: 'Image PNG', extensions: ['png'] }]
+    })
+    if (res.canceled || !res.filePath) return null
+    writeFileSync(res.filePath, Buffer.from(png))
+    return res.filePath
+  })
+  /* Les statistiques dans le presse-papiers : on les colle ensuite dans un message. */
+  on('rolls:copierImage', (png: Uint8Array) => {
+    clipboard.writeImage(nativeImage.createFromBuffer(Buffer.from(png)))
+    return true
   })
   on('rolls:exportCsv', async () => {
     const win = BrowserWindow.getFocusedWindow() ?? BrowserWindow.getAllWindows()[0]
@@ -1288,7 +1375,6 @@ export function registerIpc(): void {
 
   /* ---- collages : plusieurs images sur le même écran ---- */
 
-  on('display:prepareLayout', (layout: CollageLayout) => display.prepareLayout(layout))
   /* Écrire dans une case : sa légende sous l'image, ou son texte si elle n'en
      porte pas. La temporisation de la frappe est côté régie. */
   on('display:cellCaption', (index: number, caption: string) =>

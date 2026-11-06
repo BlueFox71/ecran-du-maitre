@@ -332,6 +332,9 @@ export interface ObjetVu {
   y: number
   nom: string
   qte: number
+  /** Son image, telle que l'interface la sert, et son cadrage carré ; null sans image. */
+  image?: string | null
+  cadre?: CadreCarre | null
 }
 
 /**
@@ -724,6 +727,19 @@ export interface CharacterData {
    * Absents, aucun ; ceux de ses objets portés ne s'y écrivent pas.
    */
   modifs?: Modif[]
+  /**
+   * Ce que des objets lui font — une entité, un fantôme : le crucifix le fait
+   * reculer, le sel l'arrête. Écrit par le MJ, lu au Paravent, **jamais
+   * diffusé**. Absent, aucun.
+   */
+  effetsObjets?: EffetSurEntite[]
+}
+
+/** Un objet de la campagne, et ce qu'il fait à ce personnage-là. */
+export interface EffetSurEntite {
+  objetId: number
+  /** Texte libre : « recule de trois pas », « ne lui fait rien ». */
+  effet: string
 }
 
 /**
@@ -1044,6 +1060,34 @@ export const UNITE_VALEUR_PAR_DEFAUT = 'pièces'
  */
 export type PortObjet = 'lieu' | 'pnj' | 'pj' | 'inventaire' | 'corbeille'
 
+/**
+ * Ce que la table sait d'un exemplaire. `masque` : trouvé puis retiré de la
+ * vue — il ne s'affiche plus sur aucune carte, ni celle du MJ ni celle des
+ * joueurs, mais reste dans la fiche du lieu.
+ */
+export type EtatObjet = 'cache' | 'trouve' | 'porte' | 'masque'
+
+/** Un objet posé dans un lieu passe de l'un à l'autre : caché → trouvé → masqué → caché. */
+export function etatSuivant(e: EtatObjet): 'cache' | 'trouve' | 'masque' {
+  return e === 'cache' ? 'trouve' : e === 'trouve' ? 'masque' : 'cache'
+}
+
+/** Le mot de chaque état, tel qu'on le lit sur la pastille. */
+export const ETAT_OBJET_DIT: Record<EtatObjet, string> = {
+  cache: 'caché',
+  trouve: 'trouvé',
+  masque: 'masqué',
+  porte: 'porté'
+}
+
+/** Ce que fait le prochain clic sur la pastille. */
+export const ETAT_OBJET_AIDE: Record<EtatObjet, string> = {
+  cache: 'Pas encore découvert — clic quand ils mettent la main dessus',
+  trouve: 'Ils savent qu’il est là — clic pour le masquer : il quitte la carte, la tienne et celle des joueurs',
+  masque: 'Masqué : plus sur aucune carte — clic pour le remettre à couvert',
+  porte: 'Quelqu’un l’a sur lui'
+}
+
 /** Là où un exemplaire a été rangé au départ, et où « Ranger » le remet. */
 export interface EmplacementInitial {
   port: PortObjet
@@ -1051,7 +1095,7 @@ export interface EmplacementInitial {
   characterId: number | null
   inventaireId: number | null
   emplacement: string | null
-  etat: 'cache' | 'trouve' | 'porte'
+  etat: EtatObjet
   /** Le nom du lieu, du personnage ou de l'inventaire. */
   cible: string
 }
@@ -1083,7 +1127,7 @@ export interface ObjetPlacement {
   /** Le lieu d'où il est parti la première fois qu'on l'a donné : sa fiche s'en souvient. */
   origineLieuId: number | null
   qte: number
-  etat: 'cache' | 'trouve' | 'porte'
+  etat: EtatObjet
   /** Où il a été rangé au départ ; `null` si sa cible a disparu depuis. */
   initial: EmplacementInitial | null
   /** Il n'est plus là où on l'avait rangé — corbeille comprise. */
@@ -1619,6 +1663,62 @@ export interface PreparationEtat {
   }[]
 }
 
+/** Un joueur tel que les statistiques le montrent : son nom, son portrait, sa couleur. */
+export interface VisageStats {
+  nom: string
+  url: string | null
+  /** Le jeton de couleur (`c-<couleur>`). */
+  color: string
+}
+
+/** Les icônes des faits, dessinées par l'écran des statistiques. */
+export type IconeFait = 'recommencer' | 'balance' | 'trophee' | 'chute' | 'trefle' | 'people' | 'sliders'
+
+/**
+ * Les statistiques de la séance, prêtes à montrer à la table : tout est
+ * calculé côté MJ, l'écran des joueurs ne fait que dessiner.
+ */
+export interface StatsEcran {
+  /** Le nom de la séance. */
+  seance: string | null
+  mesure: 'de' | 'total'
+  humeur: 'chaud' | 'froid' | 'norme'
+  n: number
+  /** Jets par heure ; nul sur une séance trop courte. */
+  rythme: number | null
+  moyenne: number
+  attendu: number
+  reussite: { taux: number; juges: number } | null
+  critiques: number
+  maladresses: number
+  /** Celui à qui la chance a souri, au dé nu. */
+  chanceux: string | null
+  histo: {
+    min: number
+    comptes: number[]
+    mode: number
+    modeN: number
+    /** Ce qu'un dé honnête donnerait par face — au dé seul seulement. */
+    honnete: number | null
+  }
+  faits: { icone: IconeFait; lib: string; val: string; det: string; visage: VisageStats | null }[]
+  /** Du dernier au meilleur : l'ordre où on les révèle. */
+  joueurs: (VisageStats & {
+    id: number
+    perso: string | null
+    moyenne: number
+    attendu: number
+    titre: string | null
+    emojis: string[]
+    /** Sa répartition, sur le même axe que `histo`. */
+    comptes: number[]
+    /** Ses jets, ses 20 et ses 1 naturels. Absents des statistiques plus anciennes. */
+    n?: number
+    critiques?: number
+    maladresses?: number
+  })[]
+}
+
 export type SlidePayload = (
   | { type: 'black' }
   | {
@@ -1657,6 +1757,17 @@ export type SlidePayload = (
       /** Nom du jeton de couleur du personnage — il borde le portrait. */
       color: string | null
       emojis: string[]
+    }
+  | {
+      /**
+       * Les statistiques de la séance, montrées à la table une étape à la fois
+       * (voir `etapesStats`). Les chiffres sont figés au lancement.
+       */
+      type: 'statistiques'
+      etape: number
+      /** Faux quand on revient en arrière : l'étape se pose sans rejouer son entrée. */
+      anime: boolean
+      stats: StatsEcran
     }
   | {
       /** La préparation des personnages, en direct : qui met ses points où. */
@@ -2372,6 +2483,8 @@ export interface MobileDevice {
   lastSeen: string | null
   /** Un flux ouvert en ce moment — pas « il s'est connecté un jour ». */
   online: boolean
+  /** Un spectateur : il suit ce joueur en lecture seule, ce n'est pas son téléphone. */
+  spectateur: boolean
 }
 
 export interface MobileInfo {
@@ -2413,6 +2526,24 @@ export interface MobileNudge {
   playerName: string
 }
 
+/**
+ * « Alexis est devant la Porte de la cave : l'ouvrir ? »
+ *
+ * Un pion poussé depuis un téléphone arrive au ras d'une porte fermée : le MJ
+ * est averti et choisit d'ouvrir ou non. Le nom de la porte reste chez lui —
+ * le joueur, lui, ne voit qu'« une porte ».
+ */
+export interface DemandePorte {
+  playerId: number
+  /** Le personnage dont le pion attend. */
+  nom: string
+  couleur: string | null
+  ouvertureId: number
+  /** Le nom de la porte, ou « Porte » si elle n'en a pas. */
+  porte: string
+  verrouillee: boolean
+}
+
 /* ============================================================
    La pochette — ce que les joueurs ont en main
    ============================================================ */
@@ -2422,6 +2553,8 @@ export interface PochetteOnglet {
   id: number
   name: string
   ord: number
+  /** La clé d'une teinte de `PION_COULEURS`, ou nulle : pas de couleur. */
+  couleur: string | null
   /** Combien de documents y sont rangés — pour le compte de la barre. */
   count: number
 }

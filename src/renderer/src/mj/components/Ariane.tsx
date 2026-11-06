@@ -17,7 +17,6 @@ interface Maillon {
 }
 
 const PAGES: Record<Exclude<ViewId, 'editor'>, Maillon[]> = {
-  regie: [{ label: 'Diffusion' }, { label: 'Régie' }],
   pupitre: [{ label: 'Diffusion' }, { label: 'Paravent' }],
   timeline: [
     { label: 'Matière' },

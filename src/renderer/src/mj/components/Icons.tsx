@@ -694,3 +694,112 @@ export const IconSablier = (p: P = {}): JSX.Element =>
     </>,
     p
   )
+
+
+/* ---------- Les tuiles des statistiques de jets ---------- */
+
+/** Une cible : la moyenne, là où le dé tombe en moyenne. */
+export const IconCible = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="4.5" />
+      <circle cx="12" cy="12" r="0.8" fill="currentColor" />
+    </>,
+    p
+  )
+
+/** Une balance : la médiane, le milieu des jets. */
+export const IconBalance = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M12 4v16M8 20h8M5 7h14" />
+      <path d="M5 7l-2.5 6a2.5 2.5 0 0 0 5 0L5 7zM19 7l-2.5 6a2.5 2.5 0 0 0 5 0L19 7z" />
+    </>,
+    p
+  )
+
+/** Une étoile : le 20 naturel. */
+export const IconEtoile = (p: P = {}): JSX.Element =>
+  box(<path d="M12 3.5l2.6 5.4 5.9.8-4.3 4.1 1 5.8L12 16.9l-5.2 2.7 1-5.8-4.3-4.1 5.9-.8z" strokeLinejoin="round" />, p)
+
+/**
+ * Des étincelles — une grande étoile à quatre branches et une petite : ce
+ * qu'un objet fait aux PNJ. Pleines, pour se lire même toutes petites.
+ */
+export const IconEtincelles = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path
+        d="M10 1.5c.7 5 3.3 7.6 8.3 8.3-5 .7-7.6 3.3-8.3 8.3-.7-5-3.3-7.6-8.3-8.3 5-.7 7.6-3.3 8.3-8.3z"
+        fill="currentColor"
+        stroke="none"
+      />
+      <path
+        d="M19 13c.4 2.4 1.5 3.5 3.8 3.8-2.3.4-3.4 1.5-3.8 3.8-.4-2.3-1.5-3.4-3.8-3.8 2.3-.3 3.4-1.4 3.8-3.8z"
+        fill="currentColor"
+        stroke="none"
+      />
+    </>,
+    p
+  )
+
+/** Un crâne stylisé : le 1 naturel. */
+export const IconCrane = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M6 15.5V11a6 6 0 0 1 12 0v4.5l-2 1V20H8v-3.5z" strokeLinejoin="round" />
+      <circle cx="9.5" cy="11.5" r="1.4" />
+      <circle cx="14.5" cy="11.5" r="1.4" />
+      <path d="M11 17v3M13 17v3" />
+    </>,
+    p
+  )
+
+/** Une flèche qui monte : les jets hauts. */
+export const IconHausse = (p: P = {}): JSX.Element =>
+  box(<path d="M4 17l6-6 4 4 6-7M15 8h5v5" strokeLinecap="round" strokeLinejoin="round" />, p)
+
+/** Une flèche qui descend : les jets bas. */
+export const IconBaisse = (p: P = {}): JSX.Element =>
+  box(<path d="M4 7l6 6 4-4 6 7M15 16h5v-5" strokeLinecap="round" strokeLinejoin="round" />, p)
+
+/** Un trophée : le plus haut total. */
+export const IconTrophee = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M8 4h8v5a4 4 0 0 1-8 0z" strokeLinejoin="round" />
+      <path d="M8 6H5a3 3 0 0 0 3 4M16 6h3a3 3 0 0 1-3 4M12 13v4M8.5 20h7M10 17h4v3h-4z" />
+    </>,
+    p
+  )
+
+/** Une flèche qui tombe sur le sol : le plus bas total. */
+export const IconChute = (p: P = {}): JSX.Element =>
+  box(<path d="M12 4v11M7.5 10.5L12 15l4.5-4.5M5 20h14" strokeLinecap="round" strokeLinejoin="round" />, p)
+
+/** Un trèfle : le joueur le plus chanceux. */
+export const IconTrefle = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M12 12a3.2 3.2 0 1 1 0-4.6A3.2 3.2 0 1 1 12 12z" />
+      <path d="M12 12a3.2 3.2 0 1 1-4.6 0A3.2 3.2 0 1 1 12 12z" />
+      <path d="M12 12a3.2 3.2 0 1 1 4.6 0A3.2 3.2 0 1 1 12 12z" />
+      <path d="M12 12c0 4 1 6 3 8" strokeLinecap="round" />
+    </>,
+    p
+  )
+
+/** Un éclair : le rythme des jets. */
+export const IconEclair = (p: P = {}): JSX.Element =>
+  box(<path d="M13 3L5 13.5h6L10 21l8-10.5h-6z" strokeLinejoin="round" />, p)
+
+/** Deux feuilles l'une sur l'autre : copier. */
+export const IconCopier = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <rect x="8.5" y="8.5" width="11" height="12" rx="1.5" />
+      <path d="M15.5 8.5V5a1.5 1.5 0 0 0-1.5-1.5H6A1.5 1.5 0 0 0 4.5 5v10A1.5 1.5 0 0 0 6 16.5h2.5" />
+    </>,
+    p
+  )

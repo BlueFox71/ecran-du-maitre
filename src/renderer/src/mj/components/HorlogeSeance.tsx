@@ -3,12 +3,13 @@ import { useStore } from '../store'
 import { Minuteries, useMinuteries } from './Minuteries'
 import { ChronosHorloge } from '../santeMentale/ChronosHorloge'
 import { ReinitSeance } from './ReinitSeance'
-import { IconRecommencer } from './Icons'
+import { IconClose, IconPen, IconRecommencer } from './Icons'
 
 /**
  * L'horloge de la séance, au pied du rail : on la commence en début de soirée,
  * on la met en pause pour manger, on la reprend, on la finit. Une fin n'est
- * pas définitive — « Reprendre » la rouvre, et le temps écoulé depuis compte
+ * pas définitive — finie pendant une pause, elle s'arrête à l'heure de la
+ * pause —, et « Reprendre » la rouvre, et le temps écoulé depuis compte
  * comme une pause : on rectifie un clic trop tôt sans rien perdre.
  *
  * Ce qu'on garde, c'est la suite des gestes et leur heure, une liste par
@@ -23,6 +24,58 @@ interface Evenement {
 type Etat = 'avant' | 'en-cours' | 'pause' | 'finie'
 
 const cle = (sessionId: number): string => `seance.horloge.${sessionId}`
+
+/**
+ * Une séance finie pendant une pause s'est arrêtée à la pause : on ne revient
+ * pas de table pour cliquer « Fin ». La fin prend l'heure de la pause, qui
+ * disparaît. Vaut aussi pour les heures notées avant cette règle.
+ */
+function finALaPause(evs: Evenement[]): Evenement[] {
+  const n = evs.length
+  if (n < 2 || evs[n - 1].t !== 'fin' || evs[n - 2].t !== 'pause') return evs
+  return [...evs.slice(0, n - 2), { t: 'fin', at: evs[n - 2].at }]
+}
+
+/**
+ * Corriger l'heure d'un geste — une séance commencée en retard, une fin
+ * cliquée après coup. L'heure saisie se pose sur le jour du geste ; si elle
+ * tombe après le geste suivant ou avant le précédent, c'est qu'elle passe
+ * minuit, et l'on change de jour. Les gestes gardent leur ordre.
+ */
+function corrigerHeure(evs: Evenement[], i: number, hhmm: string, maintenant: number): Evenement[] {
+  const [h, m] = hhmm.split(':').map(Number)
+  if (!Number.isFinite(h) || !Number.isFinite(m)) return evs
+  const bas = i > 0 ? evs[i - 1].at : -Infinity
+  const haut = i < evs.length - 1 ? evs[i + 1].at : maintenant
+  const d = new Date(evs[i].at)
+  d.setHours(h, m, 0, 0)
+  let at = d.getTime()
+  const JOUR = 86400000
+  if (at > haut && at - JOUR >= bas) at -= JOUR
+  else if (at < bas && at + JOUR <= haut) at += JOUR
+  at = Math.min(haut, Math.max(bas, at))
+  return evs.map((e, j) => (j === i ? { ...e, at } : e))
+}
+
+/**
+ * Effacer un geste cliqué par erreur. Une pause et la reprise qui la suit
+ * vont ensemble : supprimer l'une emporte l'autre, et le temps entre les deux
+ * redevient du temps joué. Le début ne s'efface pas ici (« Remettre à zéro »).
+ */
+function effacerGeste(evs: Evenement[], i: number): Evenement[] {
+  const e = evs[i]
+  if (!e || e.t === 'debut') return evs
+  let de = i
+  let a = i
+  if (e.t === 'pause' && evs[i + 1]?.t === 'reprise') a = i + 1
+  if (e.t === 'reprise' && evs[i - 1]?.t === 'pause') de = i - 1
+  return evs.filter((_, j) => j < de || j > a)
+}
+
+const enHHMM = (ms: number): string => {
+  const d = new Date(ms)
+  return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`
+}
 
 function etatDe(evs: Evenement[]): Etat {
   const dernier = evs[evs.length - 1]
@@ -71,17 +124,25 @@ export function HorlogeSeance(): JSX.Element | null {
   const [maintenant, setMaintenant] = useState(Date.now())
   const minuteries = useMinuteries(sessionId)
   const [reinit, setReinit] = useState(false)
+  /* Corriger les heures : on travaille sur un brouillon, posé par « Enregistrer ».
+     Recliquer le crayon l'abandonne. */
+  const [brouillon, setBrouillon] = useState<Evenement[] | null>(null)
+  const corriger = brouillon !== null
 
   // La séance change : on relit sa liste.
   useEffect(() => {
     setEvs([])
+    setBrouillon(null)
     if (sessionId === null) return
     let vivant = true
     void window.jdr.reglages.campagne().then((brut) => {
       if (!vivant) return
       try {
         const lu = JSON.parse(brut[cle(sessionId)] ?? '[]')
-        setEvs(Array.isArray(lu) ? lu : [])
+        const liste: Evenement[] = Array.isArray(lu) ? lu : []
+        const juste = finALaPause(liste)
+        setEvs(juste)
+        if (juste !== liste) void window.jdr.reglages.poserCampagne(cle(sessionId), JSON.stringify(juste))
       } catch {
         setEvs([])
       }
@@ -103,7 +164,7 @@ export function HorlogeSeance(): JSX.Element | null {
   if (sessionId === null) return null
 
   const noter = (t: Geste): void => {
-    const suite = [...evs, { t, at: Date.now() }]
+    const suite = finALaPause([...evs, { t, at: Date.now() }])
     setEvs(suite)
     setMaintenant(Date.now())
     void window.jdr.reglages.poserCampagne(cle(sessionId), JSON.stringify(suite))
@@ -112,9 +173,24 @@ export function HorlogeSeance(): JSX.Element | null {
     if (t === 'reprise') minuteries.relancer()
   }
 
-  const debut = evs.find((e) => e.t === 'debut')?.at
-  const dernier = evs[evs.length - 1]
-  const joue = tempsJoue(evs, maintenant)
+  const enregistrer = (): void => {
+    if (!brouillon) return
+    const avant = etatDe(evs)
+    const apres = etatDe(brouillon)
+    setEvs(brouillon)
+    setBrouillon(null)
+    void window.jdr.reglages.poserCampagne(cle(sessionId), JSON.stringify(brouillon))
+    /* Une pause ou une fin effacée relance les minuteries, et inversement. */
+    if (avant !== 'en-cours' && apres === 'en-cours') minuteries.relancer()
+    if (avant === 'en-cours' && apres !== 'en-cours') minuteries.suspendre()
+  }
+
+  /* Pendant la correction, l'affichage suit le brouillon. */
+  const vus = brouillon ?? evs
+  const etatVu = etatDe(vus)
+  const debut = vus.find((e) => e.t === 'debut')?.at
+  const dernier = vus[vus.length - 1]
+  const joue = tempsJoue(vus, maintenant)
   const journal = evs.map((e) => `${LIBELLES[e.t]} — ${heure(e.at)}`).join('\n')
 
   return (
@@ -147,11 +223,68 @@ export function HorlogeSeance(): JSX.Element | null {
           <div className="hs-temps num">{duree(joue)}</div>
           <div className="hs-detail">
             {debut ? `début ${heure(debut)}` : null}
-            {etat === 'pause' && dernier ? ` · pause depuis ${heure(dernier.at)}` : null}
-            {etat === 'finie' && dernier ? ` · fin ${heure(dernier.at)}` : null}
+            {etatVu === 'pause' && dernier ? ` · pause depuis ${heure(dernier.at)}` : null}
+            {etatVu === 'finie' && dernier ? ` · fin ${heure(dernier.at)}` : null}
+            <button
+              type="button"
+              className={`hs-corriger${corriger ? ' on' : ''}`}
+              title={
+                corriger
+                  ? 'Abandonner les corrections'
+                  : 'Corriger les heures — une séance commencée ou finie sans cliquer à temps'
+              }
+              aria-label="Corriger les heures"
+              aria-pressed={corriger}
+              onClick={() => setBrouillon(corriger ? null : evs)}
+            >
+              <IconPen />
+            </button>
           </div>
+          {corriger ? (
+            <ul className="hs-journal">
+              {brouillon.map((e, i) => (
+                <li key={i}>
+                  <span>{LIBELLES[e.t]}</span>
+                  <input
+                    type="time"
+                    className="num"
+                    value={enHHMM(e.at)}
+                    onChange={(ev) => setBrouillon(corrigerHeure(brouillon, i, ev.target.value, Date.now()))}
+                  />
+                  {e.t !== 'debut' ? (
+                    <button
+                      type="button"
+                      className="hs-effacer"
+                      title={
+                        e.t === 'pause' && brouillon[i + 1]?.t === 'reprise'
+                          ? 'Supprimer cette pause et sa reprise'
+                          : e.t === 'reprise' && brouillon[i - 1]?.t === 'pause'
+                            ? 'Supprimer cette reprise et sa pause'
+                            : `Supprimer : ${LIBELLES[e.t]}`
+                      }
+                      aria-label={`Supprimer : ${LIBELLES[e.t]}`}
+                      onClick={() => setBrouillon(effacerGeste(brouillon, i))}
+                    >
+                      <IconClose />
+                    </button>
+                  ) : (
+                    <span className="hs-effacer" aria-hidden />
+                  )}
+                </li>
+              ))}
+            </ul>
+          ) : null}
           <div className="hs-gestes">
-            {etat === 'en-cours' ? (
+            {corriger ? (
+              <>
+                <button className="btn btn-sm" onClick={enregistrer}>
+                  Enregistrer
+                </button>
+                <button className="btn btn-ghost btn-sm" onClick={() => setBrouillon(null)}>
+                  Annuler
+                </button>
+              </>
+            ) : etat === 'en-cours' ? (
               <button className="btn btn-sm" onClick={() => noter('pause')}>
                 Pause
               </button>
@@ -168,7 +301,7 @@ export function HorlogeSeance(): JSX.Element | null {
                 Reprendre
               </button>
             )}
-            {etat !== 'finie' ? (
+            {corriger ? null : etat !== 'finie' ? (
               <button className="btn btn-ghost btn-sm" onClick={() => noter('fin')}>
                 Fin de séance
               </button>

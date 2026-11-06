@@ -3,10 +3,13 @@ import { naturel } from '@shared/jet'
 import './d20.css'
 
 /** Le temps que met le dé à tomber, rebondir et se poser. */
-export const CHUTE_MS = 1600
+export const CHUTE_MS = 1800
 
 /**
  * Un d20 à facettes qui tombe du coin, rebondit et se pose sur sa face.
+ *
+ * Il prend la couleur du joueur : `--pion-ring` (les classes `c-*`) ou
+ * `--d20-couleur` posés par qui l'affiche ; l'or à défaut.
  *
  * Le même dé sert au téléphone du joueur et à l'écran de la table : la table
  * voit tomber exactement ce que le joueur a vu tomber. Les faces défilent
@@ -69,24 +72,35 @@ export function D20({
       role="img"
       aria-label={pose ? `d20 : ${valeur}` : 'd20 qui roule'}
     >
-      <svg viewBox="0 0 100 100" aria-hidden="true">
-        <polygon className="d20-corps" points="50,3 93,27 93,73 50,97 7,73 7,27" />
-        <polygon className="d20-face" points="50,22 78,68 22,68" />
-        <g className="d20-aretes">
-          <line x1="50" y1="3" x2="50" y2="22" />
-          <line x1="93" y1="27" x2="78" y2="68" />
-          <line x1="7" y1="27" x2="22" y2="68" />
-          <line x1="93" y1="73" x2="78" y2="68" />
-          <line x1="7" y1="73" x2="22" y2="68" />
-          <line x1="50" y1="97" x2="22" y2="68" />
-          <line x1="50" y1="97" x2="78" y2="68" />
-          <line x1="50" y1="3" x2="93" y2="27" />
-          <line x1="50" y1="3" x2="7" y2="27" />
-        </g>
-        <text x="50" y="60" textAnchor="middle">
-          {face}
-        </text>
-      </svg>
+      {/* L'ombre au sol : petite et pâle quand le dé est haut, nette quand il touche. */}
+      <span className="d20-ombre" aria-hidden="true" />
+      {/* L'onde du choc, à la couleur du joueur, quand il se pose. */}
+      <span className="d20-onde" aria-hidden="true" />
+      {/* Deux étages : le vol porte l'avancée de gauche à droite, le saut la
+          hauteur, la rotation et l'écrasement. Séparés, ils dessinent un arc
+          — ensemble, le dé filait en ligne droite. */}
+      <div className="d20-vol">
+        <div className="d20-saut">
+        <svg viewBox="0 0 100 100" aria-hidden="true">
+          {/* Les facettes autour de la face : plus claires en haut, plus sombres
+              en bas — la lumière vient d'en haut à gauche. */}
+          <polygon className="d20-f d20-f-hg" points="50,3 50,22 22,68 7,27" />
+          <polygon className="d20-f d20-f-hd" points="50,3 93,27 78,68 50,22" />
+          <polygon className="d20-f d20-f-g" points="7,27 22,68 7,73" />
+          <polygon className="d20-f d20-f-d" points="93,27 93,73 78,68" />
+          <polygon className="d20-f d20-f-bg" points="7,73 22,68 50,97" />
+          <polygon className="d20-f d20-f-bd" points="93,73 50,97 78,68" />
+          <polygon className="d20-f d20-f-b" points="22,68 78,68 50,97" />
+          <polygon className="d20-face" points="50,22 78,68 22,68" />
+          <polygon className="d20-contour" points="50,3 93,27 93,73 50,97 7,73 7,27" />
+          {/* Un reflet sur l'arête haute. */}
+          <polyline className="d20-reflet" points="12,29 50,7 88,29" />
+          <text x="50" y="60" textAnchor="middle">
+            {face}
+          </text>
+        </svg>
+        </div>
+      </div>
     </div>
   )
 }

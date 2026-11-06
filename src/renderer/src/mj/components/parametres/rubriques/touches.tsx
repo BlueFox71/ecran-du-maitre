@@ -13,7 +13,7 @@ const TOUCHES: { touches: string[]; quoi: string; ou: string }[] = [
     ou: 'système'
   },
   { touches: ['Ctrl', 'K'], quoi: 'Aller à la recherche', ou: 'partout' },
-  { touches: ['P'], quoi: 'Le pointeur — ou Ctrl maintenu, le temps d’un geste', ou: 'Régie' },
+  { touches: ['P'], quoi: 'Le pointeur — ou Ctrl maintenu, le temps d’un geste', ou: 'Paravent' },
   { touches: ['Suppr'], quoi: 'Effacer le trait choisi', ou: 'Murs' },
   { touches: ['Échap'], quoi: 'Refermer un menu, une fenêtre, un outil armé', ou: 'partout' },
   { touches: ['Ctrl', 'N'], quoi: 'Nouvelle campagne', ou: 'menu Fichier' },

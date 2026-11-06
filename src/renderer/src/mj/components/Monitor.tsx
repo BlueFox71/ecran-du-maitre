@@ -3,6 +3,7 @@ import { useStore } from '../store'
 import { Slide } from '../../shared/Slide'
 import { Pings, usePings } from '../../shared/Pings'
 import { BandeauTour } from '../../shared/BandeauTour'
+import { DesSurTable } from '../../shared/DesSurTable'
 import { montreLaCarte } from '@shared/scene'
 import { IconEyeOff, IconExpand, IconQr } from './Icons'
 import type { CalqueBrouillard, CollageCell, Pointer } from '@shared/types'
@@ -80,8 +81,8 @@ export function Monitor(): JSX.Element {
     <div className="monitor-zone">
       <button
         className="monitor"
-        onClick={() => setView('regie')}
-        title="Ouvrir la régie de l'écran joueurs"
+        onClick={() => setView('pupitre')}
+        title="Ouvrir le Paravent"
       >
         <span className="mon-frame">
           <Slide
@@ -107,6 +108,8 @@ export function Monitor(): JSX.Element {
           {/* Pendant un gel, rien ne part vers les joueurs : une onde n'aurait
               pas lieu d'apparaître sur ce qu'ils voient encore. */}
           {!frozen ? <Pings pings={ondes.pings} /> : null}
+          {/* Les d20 des joueurs, qui tombent ici comme sur l'écran de la table. */}
+          <DesSurTable des={display?.des ?? []} />
           {/* « Au tour de … », comme en haut de leur écran. */}
           {!frozen && display?.tour ? <BandeauTour tour={display.tour} /> : null}
           {/* Le QR des portables, comme les joueurs le voient : par-dessus la
@@ -129,7 +132,7 @@ export function Monitor(): JSX.Element {
           <span className="mon-name">
             {display?.qr ? `QR des portables · ${slideLabel(slide)}` : slideLabel(slide)}
           </span>
-          <span className="mon-open">Régie ›</span>
+          <span className="mon-open">Paravent ›</span>
         </span>
       </button>
 
@@ -155,7 +158,7 @@ export function Monitor(): JSX.Element {
           {open ? 'Fermer' : 'Projeter'}
         </button>
         {/* Le raccourci du QR des portables : tendu à la table d'un clic, accès
-            ouvert au passage s'il ne l'était pas. Le reste vit en Régie. */}
+            ouvert au passage s'il ne l'était pas. Le reste vit au Paravent, onglet Portables. */}
         <button
           className={`btn btn-sm btn-c${display?.qr ? ' btn-on' : ''}`}
           disabled={frozen}
@@ -198,6 +201,7 @@ export function slideLabel(slide: {
   if (slide.type === 'presentation') return `Présentation · ${slide.name ?? ''}`
   if (slide.type === 'attente') return slide.titre ?? 'Ça commence bientôt'
   if (slide.type === 'preparation') return 'Préparation des personnages'
+  if (slide.type === 'statistiques') return 'Statistiques de la séance'
   if (slide.type === 'collage') {
     const pleines = (slide.cells ?? []).filter(Boolean) as CollageCell[]
     if (!pleines.length) return 'Collage vide'

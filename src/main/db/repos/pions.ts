@@ -185,10 +185,17 @@ export function addPion(input: {
     const ord =
       ((db.prepare(`SELECT MAX(ord) AS m FROM pion WHERE place_id = ?`).get(input.placeId) as any)
         ?.m ?? -1) + 1
+    /* Un pion neuf arrive **sans nom** : les joueurs voient un jeton, pas
+       qui c'est, tant que le MJ ne l'a pas présenté. Sauf le pion d'un joueur
+       — toute la table sait qui il est. */
+    const pj =
+      input.characterId != null &&
+      (db.prepare(`SELECT kind FROM character WHERE id = ?`).get(input.characterId) as { kind: string } | undefined)
+        ?.kind === 'pj'
     const info = db
       .prepare(
-        `INSERT INTO pion (place_id, character_id, item_id, label, x, y, ord, hidden)
-         VALUES (@placeId, @characterId, @itemId, @label, @x, @y, @ord, @hidden)`
+        `INSERT INTO pion (place_id, character_id, item_id, label, x, y, ord, hidden, anonyme)
+         VALUES (@placeId, @characterId, @itemId, @label, @x, @y, @ord, @hidden, @anonyme)`
       )
       .run({
         placeId: input.placeId,
@@ -198,7 +205,8 @@ export function addPion(input: {
         x: clamp(input.x),
         y: clamp(input.y),
         ord,
-        hidden: input.cache ? 1 : 0
+        hidden: input.cache ? 1 : 0,
+        anonyme: pj ? 0 : 1
       })
     return Number(info.lastInsertRowid)
   })

@@ -19,6 +19,7 @@ import { IconAlerte, IconClose, IconDonner, IconPlus, glypheObjet } from './Icon
 import { Pop } from './Pop'
 import { MenuDonner } from './MenuDonner'
 import type { Objet, ObjetPlacement } from '@shared/types'
+import { ETAT_OBJET_AIDE, etatSuivant } from '@shared/types'
 
 /**
  * Les lieux où l'objet est posé, sauf celui qu'on regarde.
@@ -105,19 +106,13 @@ export function ObjetsDuLieu({ placeId }: { placeId: number }): JSX.Element {
                 {x.p.qte > 1 ? <span className="q num">×{x.p.qte}</span> : <span />}
                 <button
                   className={`ou-etat ${x.p.etat}`}
-                  title={
-                    x.p.etat === 'cache'
-                      ? 'Les joueurs ne l’ont pas trouvé — clic quand ils mettent la main dessus'
-                      : 'Ils savent qu’il est là — clic pour le remettre à couvert'
-                  }
+                  title={ETAT_OBJET_AIDE[x.p.etat]}
                   onClick={async () => {
-                    await window.jdr.objets.placement(x.p.id, {
-                      etat: x.p.etat === 'cache' ? 'trouve' : 'cache'
-                    })
+                    await window.jdr.objets.placement(x.p.id, { etat: etatSuivant(x.p.etat) })
                     await relire()
                   }}
                 >
-                  {x.p.etat === 'cache' ? 'pas découvert' : 'sur place'}
+                  {x.p.etat === 'cache' ? 'pas découvert' : x.p.etat === 'masque' ? 'masqué' : 'sur place'}
                 </button>
                 <button
                   className="ol-donner"

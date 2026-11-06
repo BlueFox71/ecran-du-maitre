@@ -1,5 +1,5 @@
 import { useStore } from '../store'
-import { useSaisieJet, VALEURS } from '../modules/jet'
+import { joueursDuJet, useSaisieJet, VALEURS } from '../modules/jet'
 import { IconTrash } from './Icons'
 import { signe } from '@shared/jet'
 import { heureLocale } from '@shared/heure'
@@ -33,7 +33,7 @@ export function JetRapide(): JSX.Element {
 
   /* Ce bloc dit « Joueur », et il le dit exprès : un jet de PNJ se tiendrait
      ailleurs, et Jules a laissé la question ouverte. */
-  const joueurs = s.characters.filter((c) => c.kind !== 'pnj' && c.present)
+  const joueurs = joueursDuJet(s.characters)
   if (joueurs.length === 0) {
     return (
       <div className="jet-rapide vide" id="jet-rapide">

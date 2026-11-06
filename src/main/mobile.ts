@@ -32,8 +32,10 @@ import * as players from './db/repos/players'
 import { listPionsVus, movePion, tournerPion } from './db/repos/pions'
 import { calqueDe } from './db/repos/murs'
 import { echelleDe, planDe } from './db/repos/echelle'
-import { barrieres, pasContraint, type Pt } from '@shared/murs'
-import type { PointMur } from '@shared/types'
+import { barrieres, cheminContraint, distanceAuSegment, RAYON_PION, type Pt } from '@shared/murs'
+import { bordsOuverture } from '@shared/ouvertures'
+import { porteFranchissable, type DemandePorte, type Ouverture, type PointMur } from '@shared/types'
+import * as ouvertures from './db/repos/ouvertures'
 import * as poche from './db/repos/pochette'
 import * as motsRepo from './db/repos/mots'
 import * as objets from './db/repos/objets'
@@ -46,8 +48,10 @@ import * as reglagesCampagne from './db/repos/reglages'
 import * as display from './display'
 import * as prepa from './preparation'
 import { bonusParCarac, noterJet } from './jetDuPerso'
-import { EMPLACEMENTS_OBJET, etatDeVie } from '@shared/types'
-import type { MobileInfo, MobileDevice, MobileNudge, MobilePing } from '@shared/types'
+import * as rolls from './db/repos/rolls'
+import { bonusDuPerso } from '@shared/modifs'
+import { EMPLACEMENTS_OBJET, PION_COULEURS, etatDeVie } from '@shared/types'
+import type { CadreCarre, MobileInfo, MobileDevice, MobileNudge, MobilePing, StatsEcran } from '@shared/types'
 
 /**
  * Le port et le nombre d'appareils sont des réglages du poste : ils se lisent
@@ -78,6 +82,36 @@ let mj: BrowserWindow | null = null
 
 /** Les flux ouverts vers les téléphones, par jeton d'appareil. */
 const flux = new Map<string, ServerResponse[]>()
+
+/*
+ * Les statistiques de la séance que le MJ laisse emporter aux joueurs : une
+ * fois révélées à l'écran, il coche « Enregistrables par les joueurs », et
+ * chaque téléphone peut en faire une image — celle du groupe, et la sienne.
+ * Gardées le temps que l'application tourne ; décocher les reprend.
+ */
+let statsPartagees: StatsEcran | null = null
+
+export function partagerStats(stats: StatsEcran | null): boolean {
+  statsPartagees = stats
+  broadcast()
+  return statsPartagees !== null
+}
+
+export function statsSontPartagees(): boolean {
+  return statsPartagees !== null
+}
+
+/** Les statistiques telles qu'un téléphone les reçoit : les portraits en adresse du réseau. */
+function statsPourTelephone(): StatsEcran | null {
+  if (!statsPartagees) return null
+  const s = statsPartagees
+  const visage = <V extends { url: string | null }>(v: V): V => ({ ...v, url: httpMedia(relDeUrl(v.url)) })
+  return {
+    ...s,
+    faits: s.faits.map((f) => ({ ...f, visage: f.visage ? visage(f.visage) : null })),
+    joueurs: s.joueurs.map(visage)
+  }
+}
 /** Qui remue son pion en ce moment, et jusqu'à quand. */
 const remuent = new Map<number, { nom: string; jusqua: number; minuteur: NodeJS.Timeout }>()
 
@@ -149,7 +183,8 @@ function toDevice(r: any): MobileDevice {
     pairedAt: r.paired_at,
     lastSeen: r.last_seen,
     /* « En ligne » ne se devine pas : c'est un flux ouvert, ou rien. */
-    online: flux.has(r.token) && (flux.get(r.token)?.length ?? 0) > 0
+    online: flux.has(r.token) && (flux.get(r.token)?.length ?? 0) > 0,
+    spectateur: !!r.spectateur
   }
 }
 
@@ -158,7 +193,7 @@ export function listDevices(): MobileDevice[] {
   return (
     getDb()
       .prepare(
-        `SELECT d.id, d.player_id, d.token, d.label, d.paired_at, d.last_seen,
+        `SELECT d.id, d.player_id, d.token, d.label, d.paired_at, d.last_seen, d.spectateur,
                 p.name AS player_name, p.color AS player_color, c.name AS character_name
            FROM mobile_device d
            JOIN player p ON p.id = d.player_id
@@ -195,19 +230,26 @@ export function revokeDevice(id: number): void {
 }
 
 /** Le jeton présenté par un téléphone, s'il vaut encore quelque chose. */
-function appareilDe(token: string | null): { id: number; playerId: number } | null {
+function appareilDe(
+  token: string | null
+): { id: number; playerId: number; spectateur: boolean } | null {
   if (!token || !isDbOpen()) return null
   const r = getDb()
     .prepare(
-      `SELECT d.id, d.player_id AS playerId FROM mobile_device d
+      `SELECT d.id, d.player_id AS playerId, d.spectateur FROM mobile_device d
          JOIN player p ON p.id = d.player_id
         WHERE d.token = ? AND p.campaign_id = ?`
     )
-    .get(token, activeCampaignId()) as { id: number; playerId: number } | undefined
+    .get(token, activeCampaignId()) as { id: number; playerId: number; spectateur: number } | undefined
   if (r) {
     getDb().prepare(`UPDATE mobile_device SET last_seen = datetime('now') WHERE id = ?`).run(r.id)
   }
-  return r ?? null
+  return r ? { id: r.id, playerId: r.playerId, spectateur: !!r.spectateur } : null
+}
+
+/** L'état poussé à un appareil : celui du joueur suivi, et s'il ne fait que regarder. */
+function etatPour(ap: { playerId: number; spectateur: boolean }) {
+  return { ...etatJoueur(ap.playerId), spectateur: ap.spectateur }
 }
 
 /**
@@ -417,6 +459,120 @@ const nudges = (): MobileNudge[] =>
   [...remuent.entries()].map(([playerId, r]) => ({ playerId, playerName: r.nom }))
 
 /* ============================================================
+   « Il est devant la porte : l'ouvrir ? »
+   ============================================================ */
+
+/**
+ * Jusqu'où un pion est « devant » une porte, en part du plus grand côté du
+ * plan. Un peu plus que le contact : le pion s'arrête au ras du battant, et la
+ * question doit déjà être posée quand il y bute.
+ */
+const DEVANT_LA_PORTE = 0.035
+
+/**
+ * Une demande par joueur, au plus — son pion n'est devant qu'une porte à la
+ * fois. `refusee` : le MJ a dit non, on ne repose pas la question tant que le
+ * pion ne s'est pas éloigné de cette porte-là.
+ */
+const demandesPorte = new Map<number, DemandePorte & { refusee: boolean }>()
+
+const listeDemandesPorte = (): DemandePorte[] =>
+  [...demandesPorte.values()]
+    .filter((d) => !d.refusee)
+    .map(({ refusee: _r, ...d }) => d)
+
+const prevenirPortes = (): void => versMj('mobile:portes', listeDemandesPorte())
+
+/** La porte fermée la plus proche du pion, s'il est devant. */
+function porteDevant(placeId: number, pion: { x: number; y: number }): Ouverture | null {
+  const cal = calqueDe(placeId)
+  if (!cal.ouvertures.length) return null
+  const { w, h } = repereDuPlan(placeId)
+  const murs = new Map(cal.murs.map((m) => [m.id, m]))
+  const p = { x: pion.x * w, y: pion.y * h }
+  const portee = Math.max(w, h) * DEVANT_LA_PORTE
+  let meilleure: { o: Ouverture; d: number } | null = null
+  for (const o of cal.ouvertures) {
+    if (o.nature !== 'porte' || porteFranchissable(o)) continue
+    const m = murs.get(o.murId)
+    if (!m) continue
+    const { a, b } = bordsOuverture(m, o)
+    const d = distanceAuSegment(p, { x: a[0] * w, y: a[1] * h }, { x: b[0] * w, y: b[1] * h })
+    if (d <= portee && (!meilleure || d < meilleure.d)) meilleure = { o, d }
+  }
+  return meilleure?.o ?? null
+}
+
+/** Le pion d'un joueur vient de bouger : est-il arrivé devant une porte close ? */
+function surveillerPorte(
+  placeId: number,
+  joueur: { id: number; color: string | null },
+  perso: { name: string },
+  pion: { x: number; y: number }
+): void {
+  const o = porteDevant(placeId, pion)
+  const avant = demandesPorte.get(joueur.id)
+  if (!o) {
+    if (avant) {
+      demandesPorte.delete(joueur.id)
+      if (!avant.refusee) prevenirPortes()
+    }
+    return
+  }
+  if (avant?.ouvertureId === o.id && avant.verrouillee === o.verrouillee) return
+  demandesPorte.set(joueur.id, {
+    playerId: joueur.id,
+    nom: perso.name,
+    couleur: joueur.color,
+    ouvertureId: o.id,
+    porte: o.nom?.trim() || 'Porte',
+    verrouillee: o.verrouillee,
+    /* Toujours la même porte : un refus tient, même si on l'a verrouillée depuis. */
+    refusee: avant?.ouvertureId === o.id ? avant.refusee : false
+  })
+  prevenirPortes()
+}
+
+/**
+ * La réponse du MJ. Ouvrir, c'est aussi déverrouiller : s'il dit oui à une
+ * porte fermée à clé, c'est qu'il la laisse passer.
+ */
+export function repondrePorte(playerId: number, ouvrir: boolean): void {
+  const d = demandesPorte.get(playerId)
+  if (!d) return
+  if (ouvrir) {
+    ouvertures.updateOuverture(d.ouvertureId, { ouverte: true, verrouillee: false })
+    demandesPorte.delete(playerId)
+    display.calqueABouge()
+    revoirDemandesPorte()
+  } else d.refusee = true
+  prevenirPortes()
+}
+
+/**
+ * Une porte s'est ouverte ailleurs — à la Régie, ou par la réponse à un autre
+ * joueur : les demandes qui l'attendaient n'ont plus d'objet.
+ */
+export function revoirDemandesPorte(): void {
+  let change = false
+  for (const [id, d] of demandesPorte) {
+    const o = ouvertures.getOuverture(d.ouvertureId)
+    if (!o || porteFranchissable(o)) {
+      demandesPorte.delete(id)
+      change = true
+    } else if (o.verrouillee !== d.verrouillee || (o.nom?.trim() || 'Porte') !== d.porte) {
+      d.verrouillee = o.verrouillee
+      d.porte = o.nom?.trim() || 'Porte'
+      change = true
+    }
+  }
+  if (change) prevenirPortes()
+}
+
+/** Ce que le MJ doit trancher, à l'instant — relu à l'ouverture de sa fenêtre. */
+export const demandesDePorte = (): DemandePorte[] => listeDemandesPorte()
+
+/* ============================================================
    Ce que les téléphones apprennent du PC
    ============================================================ */
 
@@ -426,7 +582,7 @@ export function broadcast(): void {
   for (const [token, liste] of flux) {
     const ap = appareilDe(token)
     if (!ap) continue
-    const charge = JSON.stringify(etatJoueur(ap.playerId))
+    const charge = JSON.stringify(etatPour(ap))
     for (const res of liste) res.write(`event: state\ndata: ${charge}\n\n`)
   }
 }
@@ -466,6 +622,10 @@ function etatJoueur(playerId: number) {
           nom: perso.name,
           occupation: perso.occupation,
           age: perso.age,
+          /* Son histoire, que le MJ a écrite sur sa fiche : à lui seul, comme le reste. */
+          biographie: perso.biographie,
+          lieuNaissance: perso.lieuNaissance,
+          ville: perso.ville,
           portrait: httpMedia(portraitDe(perso.portraitItemId)),
           cadre: perso.portraitCadre,
           jauges: fiche.spec.gauges.map((g) => ({
@@ -484,6 +644,9 @@ function etatJoueur(playerId: number) {
             /* Ses bonus et malus sur cette carac, chacun avec sa raison. */
             bonus: bonusCaracs[st.key] ?? []
           })),
+          /* Tous ses bonus et malus d'un coup, pour la fiche : ce qu'ils
+             touchent, et combien de temps ils durent. */
+          bonus: bonusDuPerso(perso.data.modifs, objets.listObjets(), perso.id, fiche.spec.stats),
           /* null : la campagne ne se sert pas des compétences, la rubrique disparaît. */
           comps: fiche.spec.sansCompetences
             ? null
@@ -512,7 +675,12 @@ function etatJoueur(playerId: number) {
      * montrer ou non, selon qu'il a de quoi en remplir plus d'un.
      */
     pochette: {
-      onglets: poche.listOnglets().map((o) => ({ id: o.id, nom: o.name })),
+      onglets: poche.listOnglets().map((o) => ({
+        id: o.id,
+        nom: o.name,
+        /* La teinte voyage en code : le téléphone n'a pas la palette. */
+        couleur: PION_COULEURS.find((c) => c.key === o.couleur)?.hex ?? null
+      })),
       docs: poche.pochetteDe(playerId).map((x) => ({
         id: x.id,
         /* L'image d'un objet se nomme comme lui : « Spirit box », pas le
@@ -558,7 +726,7 @@ function etatJoueur(playerId: number) {
      * personnage, comme la pochette part de lui. Un téléphone ne voit jamais
      * le sac du voisin.
      */
-    objets: perso ? objets.objetsDe(perso.id) : [],
+    objets: perso ? objets.objetsDe(perso.id).map(avecImage) : [],
     /* Ce que tient son sac, pour qu'il sache avant de piocher s'il a la place. */
     sac: perso ? sacDe(perso.id) : null,
     /* Les inventaires que le MJ a ouverts à la table, et ce qu'ils contiennent :
@@ -567,7 +735,7 @@ function etatJoueur(playerId: number) {
       ? objets
           .listInventaires()
           .filter((i) => i.ouvert)
-          .map((i) => ({ id: i.id, nom: i.nom, contenu: objets.contenuInventaire(i.id) }))
+          .map((i) => ({ id: i.id, nom: i.nom, contenu: objets.contenuInventaire(i.id).map(avecImage) }))
       : [],
     emplacements: EMPLACEMENTS_OBJET.map((e) => ({ cle: e.cle, nom: e.nom })),
 
@@ -634,7 +802,9 @@ function etatJoueur(playerId: number) {
     /* Le pion qui joue porte un halo sur le plan du téléphone aussi. */
     pionEnJeuId: d.frozen ? null : (d.tour?.pionEnJeuId ?? null),
     /* Le MJ a invité à préparer son personnage : la règle, et où il en est. */
-    preparation: perso ? prepa.pourTelephone(perso.id) : null
+    preparation: perso ? prepa.pourTelephone(perso.id) : null,
+    /* Les statistiques de la séance, quand le MJ les a laissées emporter. */
+    stats: statsPourTelephone()
   }
 }
 
@@ -736,6 +906,14 @@ function relDeUrl(url: string | null): string | null {
 const httpMedia = (rel: string | null): string | null =>
   rel ? `/media/${rel.split('/').map(encodeURIComponent).join('/')}` : null
 
+/** Un objet tel que le téléphone l'affiche : son image en adresse http, pas en numéro d'item. */
+function avecImage<T extends { imageItemId: number | null; imageCadre: CadreCarre | null }>(
+  o: T
+): Omit<T, 'imageItemId' | 'imageCadre'> & { image: string | null; cadre: CadreCarre | null } {
+  const { imageItemId, imageCadre, ...reste } = o
+  return { ...reste, image: httpMedia(portraitDe(imageItemId)), cadre: imageCadre }
+}
+
 /**
  * La vignette gravée d'un document, pour le téléphone.
  *
@@ -782,6 +960,7 @@ function router(req: IncomingMessage, res: ServerResponse): void {
     if (chemin === '/api/pair') return void lireJson(req, res, (b) => pair(res, url, b))
     if (chemin === '/api/stream') return stream(req, res, url)
     if (chemin === '/api/roll') return void lireJson(req, res, (b) => roll(res, url, b))
+    if (chemin === '/api/roll/supprimer') return void lireJson(req, res, (b) => supprimerJet(res, url, b))
     if (chemin === '/api/preparation') return void lireJson(req, res, (b) => preparer(res, url, b))
     if (chemin === '/api/calque') return calque(res, url)
     if (chemin === '/api/pion') return void lireJson(req, res, (b) => pion(res, url, b))
@@ -836,10 +1015,23 @@ function lireJson(
 
 const jeton = (url: URL): string | null => url.searchParams.get('t')
 
-function exige(res: ServerResponse, url: URL): { id: number; playerId: number } | null {
+/**
+ * L'appareil qui appelle, s'il est reconnu. Un spectateur ne passe que là où
+ * l'on lit (`lecture`) : partout ailleurs — jet, pion, sac, couleur, « lu » —
+ * il est refusé, quoi que son écran ait laissé passer.
+ */
+function exige(
+  res: ServerResponse,
+  url: URL,
+  lecture = false
+): { id: number; playerId: number; spectateur: boolean } | null {
   const ap = appareilDe(jeton(url))
   if (!ap) {
     json(res, 401, { erreur: 'Cet appareil n’est plus reconnu.' })
+    return null
+  }
+  if (ap.spectateur && !lecture) {
+    json(res, 403, { erreur: 'Spectateur : lecture seule.' })
     return null
   }
   return ap
@@ -1009,7 +1201,7 @@ function table(res: ServerResponse, url: URL): void {
 
   /* Un appareil déjà appairé n'a pas à repasser par le QR. */
   const ap = appareilDe(jeton(url))
-  if (ap) return json(res, 200, { appaire: true, etat: etatJoueur(ap.playerId) })
+  if (ap) return json(res, 200, { appaire: true, etat: etatPour(ap) })
 
   if (!invite || url.searchParams.get('i') !== invite) {
     return json(res, 403, { erreur: 'ferme' })
@@ -1025,7 +1217,7 @@ function table(res: ServerResponse, url: URL): void {
         nom: p.name,
         couleur: p.color,
         perso: perso?.name ?? null,
-        appareils: listDevices().filter((d2) => d2.playerId === p.id).length
+        appareils: listDevices().filter((d2) => d2.playerId === p.id && !d2.spectateur).length
       }
     })
   })
@@ -1038,6 +1230,8 @@ function pair(res: ServerResponse, url: URL, corps: any): void {
   const playerId = Number(corps.playerId)
   const joueur = players.getPlayer(playerId)
   if (!joueur) return json(res, 404, { erreur: 'Ce joueur n’existe plus.' })
+  /* Un spectateur suit ce joueur sans jouer : il ne prend pas l'une de ses places. */
+  const spectateur = corps.spectateur === true
 
   /* Le même téléphone qui revient ne compte pas deux fois. Changer de joueur,
      c'est oublier son jeton — sa ligne, elle, doit céder la place à la
@@ -1046,23 +1240,23 @@ function pair(res: ServerResponse, url: URL, corps: any): void {
   const revenant = cle ? appareilParCle(cle) : null
   if (revenant) supprimerAppareil(revenant.id)
 
-  const siens = listDevices().filter((d) => d.playerId === playerId)
-  if (siens.length >= MAX_APPAREILS()) {
+  const siens = listDevices().filter((d) => d.playerId === playerId && !d.spectateur)
+  if (!spectateur && siens.length >= MAX_APPAREILS()) {
     return json(res, 409, {
       erreur: `${joueur.name} a déjà ses ${MAX_APPAREILS()} appareils. Déconnecte-en un, ou demande au MJ.`
     })
   }
 
   const token = randomUUID().replace(/-/g, '') + randomBytes(8).toString('hex')
-  const label = siens.length === 0 ? 'téléphone' : 'tablette'
+  const label = spectateur ? 'spectateur' : siens.length === 0 ? 'téléphone' : 'tablette'
   getDb()
     .prepare(
-      `INSERT INTO mobile_device (player_id, token, label, device_key) VALUES (?, ?, ?, ?)`
+      `INSERT INTO mobile_device (player_id, token, label, device_key, spectateur) VALUES (?, ?, ?, ?, ?)`
     )
-    .run(playerId, token, label, cle)
+    .run(playerId, token, label, cle, spectateur ? 1 : 0)
 
   prevenirMj()
-  json(res, 200, { token, etat: etatJoueur(playerId) })
+  json(res, 200, { token, etat: etatPour({ playerId, spectateur }) })
 }
 
 /**
@@ -1117,7 +1311,7 @@ function oublier(res: ServerResponse, url: URL): void {
 /* ---------------- le flux ---------------- */
 
 function stream(req: IncomingMessage, res: ServerResponse, url: URL): void {
-  const ap = exige(res, url)
+  const ap = exige(res, url, true)
   if (!ap) return
   const token = jeton(url)!
 
@@ -1126,7 +1320,7 @@ function stream(req: IncomingMessage, res: ServerResponse, url: URL): void {
     'cache-control': 'no-store',
     connection: 'keep-alive'
   })
-  res.write(`event: state\ndata: ${JSON.stringify(etatJoueur(ap.playerId))}\n\n`)
+  res.write(`event: state\ndata: ${JSON.stringify(etatPour(ap))}\n\n`)
 
   const liste = flux.get(token) ?? []
   liste.push(res)
@@ -1355,6 +1549,9 @@ function roll(res: ServerResponse, url: URL, corps: any): void {
      un 1 ou un 20 naturel dit tel quel — sinon « 17 » passait pour une réussite. */
   json(res, 200, {
     ok: true,
+    /* Son numéro et son heure au journal : le joueur la voit, et peut le retirer. */
+    id: fait.roll.id,
+    at: fait.roll.at,
     de,
     bonus: fait.bonus,
     mod: fait.mod,
@@ -1363,6 +1560,33 @@ function roll(res: ServerResponse, url: URL, corps: any): void {
     naturel: naturel(de),
     lance
   })
+}
+
+/**
+ * Le joueur retire un de ses jets — une valeur mal recopiée, un jet parti sur
+ * la mauvaise caractéristique. Comme au poste du MJ, la ligne passe à la
+ * corbeille du journal, d'où le MJ peut la rappeler.
+ *
+ * **Seulement ses jets à lui**, ceux de son personnage : le serveur le
+ * revérifie, un téléphone ne retire pas le jet du voisin.
+ */
+function supprimerJet(res: ServerResponse, url: URL, corps: any): void {
+  const ap = exige(res, url)
+  if (!ap) return
+  const joueur = players.getPlayer(ap.playerId)
+  const id = Number(corps.id)
+  const sien =
+    joueur?.characterId != null &&
+    Number.isInteger(id) &&
+    !!getDb()
+      .prepare(
+        `SELECT 1 FROM roll WHERE id = ? AND campaign_id = ? AND character_id = ? AND trashed_at IS NULL`
+      )
+      .get(id, activeCampaignId(), joueur.characterId)
+  if (!sien) return json(res, 404, { erreur: 'Ce jet n’est plus au journal.' })
+  rolls.trashRoll(id)
+  versMj('mobile:jetRetire', { playerName: joueur!.name, color: joueur!.color })
+  json(res, 200, { ok: true })
 }
 
 /**
@@ -1399,11 +1623,19 @@ function preparer(res: ServerResponse, url: URL, corps: any): void {
 }
 
 function calque(res: ServerResponse, url: URL): void {
-  const ap = exige(res, url)
+  const ap = exige(res, url, true)
   if (!ap) return
   const d = display.getState()
   if (d.frozen || d.placeId == null) return json(res, 200, null)
-  json(res, 200, { placeId: d.placeId, ...calqueDe(d.placeId) })
+  const cal = calqueDe(d.placeId)
+  /* Le nom d'une porte est une note du MJ (« Porte de la crypte ») : il ne
+     part pas vers le téléphone, qui n'y verrait qu'une porte. */
+  json(res, 200, {
+    placeId: d.placeId,
+    ...cal,
+    ouvertures: cal.ouvertures.map((o) => ({ ...o, nom: null })),
+    objets: cal.objets.map((o) => ({ ...o, image: httpMedia(relDeUrl(o.image ?? null)) }))
+  })
 }
 
 /**
@@ -1444,11 +1676,20 @@ function pion(res: ServerResponse, url: URL, corps: any): void {
     const y = Number(corps.y)
     if (!Number.isFinite(x) || !Number.isFinite(y))
       return json(res, 400, { erreur: 'Position illisible.' })
-    const arrive = retenuParLesMurs(d.placeId, mien, {
-      x: Math.max(0, Math.min(1, x)),
-      y: Math.max(0, Math.min(1, y))
-    })
+    const borne = (v: number): number => Math.max(0, Math.min(1, v))
+    /* Les points par où il est passé depuis le dernier envoi : on suit le
+       même chemin que le téléphone, au lieu de couper les angles. Bornés, pour
+       qu'un appareil bavard ne fasse pas tourner le PC pour rien. */
+    const chemin: { x: number; y: number }[] = Array.isArray(corps.chemin)
+      ? (corps.chemin as unknown[])
+          .slice(0, 240)
+          .filter((q): q is [number, number] => Array.isArray(q) && Number.isFinite(q[0]) && Number.isFinite(q[1]))
+          .map(([qx, qy]) => ({ x: borne(qx), y: borne(qy) }))
+      : []
+    chemin.push({ x: borne(x), y: borne(y) })
+    const arrive = retenuParLesMurs(d.placeId, mien, chemin)
     movePion(mien.id, arrive.x, arrive.y)
+    surveillerPorte(d.placeId, joueur!, perso, arrive)
   }
 
   if (!veutMarcher && !veutTourner) return json(res, 400, { erreur: 'Rien à faire.' })
@@ -1474,18 +1715,20 @@ function pion(res: ServerResponse, url: URL, corps: any): void {
 export function retenuParLesMurs(
   placeId: number,
   pion: { x: number; y: number },
-  vers: { x: number; y: number }
+  vers: { x: number; y: number } | { x: number; y: number }[]
 ): { x: number; y: number } {
+  const chemin = Array.isArray(vers) ? vers : [vers]
   const cal = calqueDe(placeId)
-  if (!cal.murs.length) return vers
+  if (!cal.murs.length) return chemin[chemin.length - 1] ?? pion
   const { w, h } = repereDuPlan(placeId)
   const enPx = (q: PointMur): Pt => ({ x: q[0] * w, y: q[1] * h })
-  const arrive = pasContraint(
+  const arrive = cheminContraint(
     barrieres(cal.murs, 'pas', enPx, cal.ouvertures),
     { x: pion.x * w, y: pion.y * h },
-    { x: vers.x * w, y: vers.y * h },
+    chemin.map((q) => ({ x: q.x * w, y: q.y * h })),
     { w, h },
-    2
+    2,
+    Math.max(w, h) * RAYON_PION
   )
   return { x: arrive.x / w, y: arrive.y / h }
 }

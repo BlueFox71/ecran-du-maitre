@@ -1,12 +1,37 @@
-<!-- version: 1.5.4 -->
+<!-- version: 1.6.0 -->
 ### Nouveautés
-- **Lancer le d20 depuis son téléphone.** Dans l'onglet Jet, un nouveau bouton « Lancer le d20 » : le dé à facettes tombe, rebondit et se pose, puis le calcul s'affiche (dé + bonus = total). La saisie d'un vrai dé reste possible juste en dessous. Le d20 est tiré par le poste du MJ : personne ne choisit son résultat.
-- **Le dé tombe aussi sur l'écran de la table et dans la Régie**, au centre, avec le nom du personnage et sa carac. Un 20 naturel s'allume d'or, un 1 vire au rouge. Il reste affiché jusqu'à ce que le MJ clique « Vu » : sur le dé dans la Régie, ou dans l'encadré « Sur l'écran de la table » en bas à droite, présent sur toutes les pages.
-- **Au tour d'un joueur, la Régie se met sur son lieu.** S'il est dans le lieu à l'écran, la Régie revient au direct ; sinon, la carte de son lieu se prépare dans le visuel libre. L'écran de la table et le son ne bougent pas.
-- **Les objets trouvés se voient sur le plan.** Un objet posé par terre et trouvé apparaît sur la carte des joueurs, avec son nom (jamais sa fiche). Au Paravent, un clic droit sur le plan pose ici l'objet d'un joueur ; un clic sur un objet le montre ou le cache à la table ; on le déplace en le faisant glisser.
+- **Le Paravent remplace la Régie.** La page Régie disparaît : tout se joue au Paravent, qui reçoit en plus le bouton « Attente » (l'écran « Ça commence bientôt ») et un bouton **Images** pour chercher n'importe quelle image de la campagne par son nom ou son dossier.
+- **Statistiques de la soirée.** Dans Jets de dés, une page « La soirée en dés » : jets, dé chaud ou froid, taux de réussite, 20 et 1 naturels, histogramme, faits marquants et une carte par joueur avec un titre décerné. Elle se copie ou s'enregistre en image, se **présente à la table** étape par étape (flèches ← →), et peut être enregistrée par les joueurs depuis leur téléphone.
+- **Effets des objets sur les PNJ.** Sur la fiche d'un PNJ (une entité, un fantôme), on choisit des objets et on écrit l'effet de chacun (« recule de trois pas »). On peut copier ces effets sur d'autres PNJ d'un coup. Au Paravent, le détail du pion montre ces objets en images, et un bouton ✦ sur chaque objet (volet Objets, fiche d'un joueur) liste les PNJ concernés, regroupés quand l'effet est le même.
+- **Un nouvel état « masqué » pour les objets.** Caché → trouvé → masqué : un objet masqué quitte toutes les cartes (la tienne et celle des joueurs) mais reste dans la fiche du lieu.
+- **Cliquer un élément du plan ouvre sa fiche.** Au Paravent, un clic sur un scénario, une découverte, un déclencheur ou un objet du visuel ouvre la fiche de son lieu, déplie l'élément et l'encadre.
+- **Tout allumer ou éteindre dans tout le bâtiment.** Dans « Portes et lumières », un choix « Ce plan / Tout le bâtiment » : les deux boutons agissent alors sur les lampes de tous les niveaux.
+- **Mode Spectateur sur téléphone** : un appareil suit un joueur sans jouer, en lecture seule.
+- **Dupliquer une séance** : « Repartir du début » ou « Reprendre où on en était » (lieux découverts, objets trouvés, sons joués, trame cochée et pions gardés ; portes refermées).
+- **Sur le téléphone et la tablette** :
+  - **la couleur du pion devient la couleur de l'interface** ;
+  - **le Sac en grille** (4 objets par ligne, 8 sur tablette) avec l'image de chaque objet et une couleur par famille : porté, dans le sac, dans un inventaire ;
+  - **les bonus et malus** du personnage sur sa fiche, avec ce qu'ils touchent et combien de temps ils durent ;
+  - **« Voir votre biographie »** sur la fiche ;
+  - **« Sous vos yeux »** sur la page Pion : les PNJ que les joueurs regardent, avec leur image (agrandie d'un toucher) et qui les regarde ;
+  - **l'heure de chaque jet**, et la possibilité de **retirer un jet** (il part à la corbeille du journal du MJ, d'où on le rappelle).
 
 ### Améliorations
-- **Le bouton retour du téléphone** revient à l'onglet précédent au lieu de quitter l'Écran, et referme d'abord ce qui est ouvert par-dessus (document, mot du MJ, dé, objet).
+- **Un pion ajouté arrive « sans nom »** : les joueurs voient le jeton, pas qui c'est. Le pion d'un joueur garde son nom.
+- **Les objets posés s'affichent avec leur image** sur le plan (Paravent, écran des joueurs, téléphones).
+- **Au Paravent, les découvertes, déclencheurs et scénarios faits** quittent le visuel du MJ.
+- **Les jauges se tapent directement** dans le détail d'un pion (le changement reste journalisé).
+- **Fiche du lieu** : le PNJ déplié règle son pion (Montré / Au regard / Caché, Sans nom) au lieu des boutons « Ouvrir sa fiche » et « Portrait à l'écran ».
+- **Le dé du téléphone tombe en arc, sans à-coup**, et un 20 naturel brille à nouveau.
+- **« Regarder où je marche »** devient un levier à côté du disque, activé par défaut.
+- **Pochette** : plusieurs cartes à la fois (case au coin ou Ctrl + clic), onglets colorés et déplaçables, renommer un document, l'ouvrir dans l'explorateur ou le regarder en grand.
+- **Horloge de séance** : on corrige les heures et on efface un geste cliqué par erreur.
+- **« Donner à… » et « Poser… »** partagent le même menu, avec recherche et quantité.
+- **Menu Affichage** : masquer Préparation, Bibliothèque ou Sons dans la colonne de gauche.
+- **Jets** : seuls les joueurs présents sont proposés.
 
 ### Corrections
-- **Sur iPad**, le bas de chaque onglet est de nouveau accessible : la page se cale sur la hauteur réellement visible, sous les barres de Safari. Une image ouverte depuis la Pochette tient entière dans l'écran.
+- **Les pions ne passent plus entre deux murs mal jointés**, arrivent au contact du mur et ne rebondissent plus de l'autre côté d'une porte franchie.
+- **Sur le téléphone, l'image du pion d'un PNJ** n'est plus déformée en ovale.
+- **La fiche d'un PNJ dépliée dans un plan** tient dans la largeur du panneau.
+- **Sur iPad**, l'aperçu d'un document garde son bouton « Fermer » sous les barres de Safari.

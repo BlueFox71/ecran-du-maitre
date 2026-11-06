@@ -1,6 +1,7 @@
 import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { getItem } from './library'
 import type { Item, PochetteDoc, PochetteOnglet } from '@shared/types'
+import { PION_COULEURS } from '@shared/types'
 
 /**
  * La pochette : ce que les joueurs ont en main sur leur téléphone.
@@ -30,7 +31,7 @@ import type { Item, PochetteDoc, PochetteOnglet } from '@shared/types'
 export function listOnglets(): PochetteOnglet[] {
   return getDb()
     .prepare(
-      `SELECT o.id, o.name, o.ord,
+      `SELECT o.id, o.name, o.ord, o.couleur,
               (SELECT COUNT(*) FROM pochette p WHERE p.onglet_id = o.id) AS count
          FROM pochette_onglet o
         WHERE o.campaign_id = ?
@@ -66,6 +67,15 @@ export function renameOnglet(id: number, name: string): PochetteOnglet[] {
   getDb()
     .prepare(`UPDATE pochette_onglet SET name = ? WHERE id = ? AND campaign_id = ?`)
     .run(name.trim() || 'Sans titre', id, activeCampaignId())
+  return listOnglets()
+}
+
+/** Colorier un onglet — `null` lui retire sa couleur. */
+export function setCouleurOnglet(id: number, couleur: string | null): PochetteOnglet[] {
+  const cle = couleur && PION_COULEURS.some((c) => c.key === couleur) ? couleur : null
+  getDb()
+    .prepare(`UPDATE pochette_onglet SET couleur = ? WHERE id = ? AND campaign_id = ?`)
+    .run(cle, id, activeCampaignId())
   return listOnglets()
 }
 

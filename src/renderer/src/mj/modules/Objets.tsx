@@ -44,6 +44,7 @@ import { Valeur } from '../components/Valeur'
 import { CLAIR_DE_TORCHE } from '../../shared/Lueur'
 import { champDeVision, polygone, type Barriere } from '@shared/murs'
 import { MenuDonner } from '../components/MenuDonner'
+import { ChoixDestination, type Destination } from '../components/ChoixDestination'
 import { BandeJoueurs, TYPE_EXEMPLAIRE, TYPE_OBJET } from '../components/BandeJoueurs'
 import { AlerteLieux, lieuxDe } from '../components/ObjetsDuLieu'
 import { ModaleNouvelObjet } from '../components/NouvelObjet'
@@ -81,6 +82,7 @@ import type {
   PortObjet
 } from '@shared/types'
 import { useEchap } from '../echap'
+import { ETAT_OBJET_AIDE, etatSuivant } from '@shared/types'
 
 /** Le rayon des objets qu'aucune famille ne réclame. */
 const SANS_FAMILLE = -1
@@ -1737,7 +1739,8 @@ function LignePlacement({ o, p }: { o: Objet; p: ObjetPlacement }): JSX.Element 
     await s.refreshObjets()
   }
 
-  const dit = p.etat === 'cache' ? 'pas découvert' : p.etat === 'trouve' ? 'sur place' : 'porté'
+  const dit =
+    p.etat === 'cache' ? 'pas découvert' : p.etat === 'trouve' ? 'sur place' : p.etat === 'masque' ? 'masqué' : 'porté'
 
   return (
     <div className="ou-ligne">
@@ -1819,12 +1822,8 @@ function LignePlacement({ o, p }: { o: Objet; p: ObjetPlacement }): JSX.Element 
       {p.port === 'lieu' ? (
         <button
           className={`ou-etat ${p.etat}`}
-          title={
-            p.etat === 'cache'
-              ? 'Les joueurs ne l’ont pas trouvé — clic quand ils mettent la main dessus'
-              : 'Ils savent qu’il est là — clic pour le remettre à couvert'
-          }
-          onClick={() => void maj({ etat: p.etat === 'cache' ? 'trouve' : 'cache' })}
+          title={ETAT_OBJET_AIDE[p.etat]}
+          onClick={() => void maj({ etat: etatSuivant(p.etat) })}
         >
           {dit}
         </button>
@@ -1882,7 +1881,12 @@ function LignePlacement({ o, p }: { o: Objet; p: ObjetPlacement }): JSX.Element 
    Les panneaux posés au curseur
    ============================================================ */
 
-/** Où poser un exemplaire : un lieu, un PNJ, le sac d'un joueur. */
+/**
+ * « Poser… » un exemplaire neuf, sorti de la réserve : dans les mains d'un
+ * joueur, sur un PNJ, dans un lieu, dans un inventaire partagé — ou
+ * directement à la corbeille. La liste
+ * est celle de « Donner à… » (ChoixDestination).
+ */
 function PanneauPoser({
   x,
   y,
@@ -1895,149 +1899,24 @@ function PanneauPoser({
   onClose: () => void
 }): JSX.Element {
   const s = useStore()
-  const [q, setQ] = useState('')
   const objet = s.objets.find((o) => o.id === objetId) ?? null
   /* Un objet qui se compte : on choisit d'abord où, puis combien. */
-  const [cible, setCible] = useState<{
-    port: PortObjet
-    placeId: number | null
-    characterId: number | null
-    nom: string
-  } | null>(null)
-  const [combien, setCombien] = useState(objet?.qte ?? 1)
-  const max = Math.max(1, objet?.qte ?? 1)
+  const max = objet && !objet.unique ? Math.max(1, objet.qte) : 1
 
-  /* On cherche comme on parle : sans les accents ni les majuscules —
-     « cave » trouve « Cave à vin », « Caveau ». */
-  const plat = (t: string): string =>
-    t.normalize('NFD').replace(/\p{Diacritic}/gu, '').toLocaleLowerCase('fr-FR')
-  const mot = plat(q.trim())
-  const garde = (nom: string): boolean => mot === '' || plat(nom).includes(mot)
-
-  const lieux = s.places.filter((l) => garde(l.name))
-  const pnjs = s.characters.filter((c) => c.kind === 'pnj' && garde(c.name))
-  const pjs = s.characters.filter((c) => c.kind !== 'pnj' && c.present && garde(c.name))
-
-  const poserVraiment = async (
-    port: PortObjet,
-    placeId: number | null,
-    characterId: number | null,
-    qte?: number
-  ): Promise<void> => {
-    onClose()
-    await window.jdr.objets.poser({ objetId, port, placeId, characterId, qte })
+  const poser = async (d: Destination, qte?: number): Promise<void> => {
+    await window.jdr.objets.poser({
+      objetId,
+      port: d.port,
+      placeId: d.port === 'lieu' ? d.placeId : null,
+      characterId: d.port === 'pj' || d.port === 'pnj' ? d.characterId : null,
+      inventaireId: d.port === 'inventaire' ? d.inventaireId : null,
+      qte
+    })
     await s.refreshObjets()
   }
-  const poser = (
-    port: PortObjet,
-    placeId: number | null,
-    characterId: number | null,
-    nom: string
-  ): void => {
-    if (objet && !objet.unique && max > 1) {
-      setCombien(max)
-      setCible({ port, placeId, characterId, nom })
-    } else void poserVraiment(port, placeId, characterId)
-  }
-
-  /* Entrée pose dans le premier qui répond : un mot, Entrée, c'est posé. */
-  const premier = (): void => {
-    if (lieux[0]) poser('lieu', lieux[0].id, null, lieux[0].name)
-    else if (pnjs[0]) poser('pnj', null, pnjs[0].id, pnjs[0].name)
-    else if (pjs[0]) poser('pj', null, pjs[0].id, pjs[0].name)
-  }
-
-  if (cible) {
-    const n = Math.min(max, Math.max(1, combien || 1))
-    const valider = (): void => void poserVraiment(cible.port, cible.placeId, cible.characterId, n)
-    return (
-      <Pop x={x} y={y} onClose={onClose} className="poser-combien">
-        <span className="eyebrow">
-          {cible.port === 'lieu' ? 'Dans' : cible.port === 'pnj' ? 'Butin de' : 'Sac de'} {cible.nom}
-        </span>
-        <label className="pc-ligne">
-          <span>Combien&nbsp;?</span>
-          <span className="inv-qte">
-            <button disabled={n <= 1} onClick={() => setCombien(n - 1)} aria-label="Un de moins">
-              −
-            </button>
-            <input
-              className="num"
-              type="number"
-              min={1}
-              max={max}
-              autoFocus
-              value={combien}
-              onFocus={(e) => e.currentTarget.select()}
-              onChange={(e) => setCombien(Math.trunc(Number(e.target.value)) || 0)}
-              onKeyDown={(e) => e.key === 'Enter' && valider()}
-              aria-label="Combien en poser"
-            />
-            <button disabled={n >= max} onClick={() => setCombien(n + 1)} aria-label="Un de plus">
-              +
-            </button>
-          </span>
-          <span className="pc-sur num">sur {max}</span>
-        </label>
-        <div className="pc-pied">
-          <button className="btn btn-sm btn-ghost" onClick={() => setCible(null)}>
-            Retour
-          </button>
-          <div className="spacer" />
-          <button className="btn btn-sm btn-brass" onClick={valider}>
-            <IconPoser />
-            Poser {n}
-          </button>
-        </div>
-      </Pop>
-    )
-  }
-
-  const rien = (quoi: string): JSX.Element => (
-    <p className="pop-rien">{mot ? 'Aucun nom ne correspond.' : quoi}</p>
-  )
 
   return (
-    <Pop x={x} y={y} onClose={onClose}>
-      <label className="filtre-inline pop-cherche">
-        <IconSearch />
-        <input
-          type="text"
-          autoFocus
-          value={q}
-          placeholder="Chercher un lieu, un PNJ, un joueur"
-          aria-label="Chercher où poser"
-          onChange={(e) => setQ(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && premier()}
-        />
-      </label>
-
-      <span className="eyebrow">Dans un lieu</span>
-      {lieux.length === 0 ? rien('Aucun lieu dans la campagne.') : null}
-      {lieux.map((l) => (
-        <button key={l.id} className="opt" onClick={() => poser('lieu', l.id, null, l.name)}>
-          {l.name}
-        </button>
-      ))}
-
-      <hr />
-      <span className="eyebrow">Dans le butin d’un PNJ</span>
-      {pnjs.length === 0 ? rien('Aucun PNJ.') : null}
-      {pnjs.map((c) => (
-        <button key={c.id} className="opt" onClick={() => poser('pnj', null, c.id, c.name)}>
-          {c.name}
-        </button>
-      ))}
-
-      <hr />
-      <span className="eyebrow">Dans le sac d’un joueur</span>
-      {pjs.length === 0 ? rien('Aucun personnage joueur.') : null}
-      {pjs.map((c) => (
-        <button key={c.id} className="opt" onClick={() => poser('pj', null, c.id, c.name)}>
-          {c.name}
-        </button>
-      ))}
-    </Pop>
+    <ChoixDestination x={x} y={y} verbe="poser" max={max} inventaires onChoisir={poser} onClose={onClose} />
   )
 }
 

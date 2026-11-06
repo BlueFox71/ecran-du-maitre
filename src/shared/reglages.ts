@@ -124,7 +124,17 @@ export interface ReglagesPoste {
    * `null`, un dé.
    */
   mjImage: string | null
+  /** Les entrées de « Matière » masquées dans le rail (menu Affichage). */
+  railMasques: MatiereRail[]
 }
+
+/** Les entrées de « Matière » que le menu Affichage peut masquer dans le rail. */
+export const MATIERES_RAIL = [
+  { id: 'preparation', nom: 'Préparation de la séance' },
+  { id: 'lib', nom: 'Bibliothèque' },
+  { id: 'sons', nom: 'Sons' }
+] as const
+export type MatiereRail = (typeof MATIERES_RAIL)[number]['id']
 
 export const POSTE_DEFAUT: ReglagesPoste = {
   theme: 'sombre',
@@ -136,7 +146,8 @@ export const POSTE_DEFAUT: ReglagesPoste = {
   editeurZoom: 1,
   mjPrenom: '',
   mjNom: '',
-  mjImage: null
+  mjImage: null,
+  railMasques: []
 }
 
 /** Les bornes de la loupe du texte : en deçà on ne lit plus, au-delà une ligne ne tient plus. */
@@ -154,7 +165,10 @@ export function lirePoste(b: Brut): ReglagesPoste {
     editeurZoom: nombre(b, 'editeur.zoom', POSTE_DEFAUT.editeurZoom, ZOOM_MIN, ZOOM_MAX),
     mjPrenom: b['mj.prenom']?.trim() ?? '',
     mjNom: b['mj.nom']?.trim() ?? '',
-    mjImage: /^(avatar:[a-z-]+|jdr:\/\/profil\/.+)$/.test(b['mj.image'] ?? '') ? b['mj.image'] : null
+    mjImage: /^(avatar:[a-z-]+|jdr:\/\/profil\/.+)$/.test(b['mj.image'] ?? '') ? b['mj.image'] : null,
+    railMasques: (b['rail.masques'] ?? '')
+      .split(',')
+      .filter((x): x is MatiereRail => MATIERES_RAIL.some((m) => m.id === x))
   }
 }
 

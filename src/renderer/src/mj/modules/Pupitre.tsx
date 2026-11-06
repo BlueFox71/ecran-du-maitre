@@ -12,7 +12,7 @@ import { MenuImage, type CibleImage } from '../components/MenuImage'
 import { ARTICLES_SITUES, FicheCompacte } from '../components/FicheDuLieu'
 import { BoutonSurligneur, EffacerSurlignage, Surlignable, Surligneur } from '../surligneur'
 import { cible, type Cible } from '@shared/surlignage'
-import { useViseCarte } from '../viseCarte'
+import { montrerDansFiche, useViseCarte } from '../viseCarte'
 import type { ArticleSurCarte } from '../../shared/Slide'
 import { Slide } from '../../shared/Slide'
 import { BoutonTours, Tours, pionEnJeu } from '../components/Tours'
@@ -20,12 +20,12 @@ import { TrameEnJeu } from '../components/PlanTrame'
 import { Valeur } from '../components/Valeur'
 import { Visage } from '../../shared/Visage'
 import { Pings, usePings } from '../../shared/Pings'
+import { DesSurTable } from '../../shared/DesSurTable'
 import { duree } from '../../shared/mesures'
-import { accepteSi, initials, profondeur, useMontrerPieces } from './Regie'
-import { estPiece } from './Places'
+import { accepteSi, estPiece, profondeur, useMontrerPieces } from './Places'
+import { initials } from './Sheets'
 import { dansForme } from '@shared/pieces'
 import { MenuPoserIci } from '../components/MenuPoserIci'
-import { decorDossier, folderIcon } from '../components/FolderIcons'
 import { Annotations, CadreAnnote } from '../components/Annotations'
 import { TableauDeScene, type Surbrillance } from '../components/Tableau'
 import { BoutonObjets, ObjetsDeScene, usePanneauScene } from '../components/ObjetsDeScene'
@@ -33,6 +33,8 @@ import { IconPhone, Portables } from '../components/Portables'
 import { TexteCourt } from '../components/TexteCourt'
 import { MotsSecrets } from '../components/MotsSecrets'
 import { ConsoleDirect } from '../components/ConsoleDirect'
+import { BoutonAttente } from '../components/Attente'
+import { Galerie } from '../components/Galerie'
 import {
   BoutonPoserLumiere,
   BoutonTextes,
@@ -58,15 +60,14 @@ import type {
   Place,
   Pointer
 } from '@shared/types'
-import type { UiFolder, UiItem } from '../../../../preload/index'
+import type { UiItem } from '../../../../preload/index'
 import {
   IconCheck,
   IconVerrou,
-  IconChevron,
   IconClose,
   IconDoc,
   IconExpand,
-  IconFolder,
+  IconImage,
   IconPlace,
   IconPorte,
   IconScreen,
@@ -88,6 +89,7 @@ import { SelecteurApparence, porteurDe } from '../components/Apparences'
 import { estPresente, presenterLeJoueur } from '../presentation'
 import { montreLaCarte } from '@shared/scene'
 import { PanneauSons, useSonsSurCarte, useTouchesSon } from '../components/PanneauSons'
+import { etatSuivant } from '@shared/types'
 
 /* ============================================================
    Pupitre : le fil de la séance à gauche, l'écran des
@@ -95,9 +97,8 @@ import { PanneauSons, useSonsSurCarte, useTouchesSon } from '../components/Panne
    directement dans le visuel libre — on n'a pas à changer de page
    pour envoyer ce qu'on vient de lire.
 
-   Ce module ne refait pas la Régie : le recadrage, la luminosité,
-   les textes à l'écran, les annotations et les portables restent
-   là-bas. Ici on suit la partie et on diffuse.
+   Seule page de diffusion depuis le retrait de la Régie : on y suit
+   la partie, on compose l'écran des joueurs et on diffuse.
    ============================================================ */
 
 /** Ce qui va vraiment à l'écran : le reste ne produit aucune diapositive. */
@@ -105,7 +106,7 @@ const A_L_ECRAN = new Set(['image', 'video'])
 
 /*
  * Ce qu'on lisait au Paravent survit à un détour par une autre page : l'onglet,
- * le lieu, l'annexe et les dossiers ouverts. Gardé ici, hors du composant, le
+ * le lieu et l'annexe. Gardé ici, hors du composant, le
  * temps que l'application tourne — on revient où l'on était, pas au premier
  * moment.
  */
@@ -143,11 +144,16 @@ export function Pupitre(): JSX.Element {
      documents annexes : règles maison, tables, fiches qu'on garde sous la main
      toute la partie —, soit le dossier de la campagne, soit les portables. Ces
      deux derniers prennent toute la colonne : ils n'ont rien à lire à côté. */
-  const [cote, setCote] = useRetenu<'chrono' | 'lieux' | 'annexes' | 'dossier' | 'portables' | 'sons'>(
+  const [cote, setCote] = useRetenu<'chrono' | 'lieux' | 'annexes' | 'portables' | 'sons'>(
     'cote',
     'chrono'
   )
-  const plein = cote === 'dossier' || cote === 'portables' || cote === 'sons'
+  const plein = cote === 'portables' || cote === 'sons'
+  /* Un onglet retenu qui n'existe plus (l'ancien « Dossier ») : retour au fil. */
+  useEffect(() => {
+    if (!COTES.some((c) => c.id === cote)) setCote('chrono')
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cote])
   /* Les chiffres jouent les bruitages et le point fait silence, quel que soit l'onglet. */
   useTouchesSon()
   const [annexeVue, setAnnexeVue] = useRetenu<number | null>('annexe', null)
@@ -176,6 +182,7 @@ export function Pupitre(): JSX.Element {
   const [bulleLieu, setBulleLieu] = useState<{ id: number; x: number; y: number } | null>(null)
   /* Le choix qu'ouvre un clic sur une image : visuel libre, ou fenêtre sur le direct. */
   const [cibleImage, setCibleImage] = useState<CibleImage | null>(null)
+  const [galerie, setGalerie] = useState(false)
   /*
    * Les annotations du lieu qu'on arrange, comme en Régie : on les voit, on les
    * pose et on les écrit d'ici. De l'état local — la fenêtre joueurs ne peut
@@ -195,19 +202,7 @@ export function Pupitre(): JSX.Element {
   /* L'arborescence de la séance, par-dessus tout : on y coche ce qui est fait. */
   const [trameOuverte, setTrameOuverte] = useState(false)
   const basculerScene = (): void => basculerPanneau('scene')
-  const [ouverts, setOuverts] = useRetenu<Set<string>>('ouverts', new Set())
-  /* Le dossier de la séance s'ouvre de lui-même, et ceux qui y mènent : c'est
-     là qu'on va chercher pendant la partie. Les autres restent fermés. */
-  const dossierSeance = s.session?.folderRel ?? null
-  useEffect(() => {
-    if (!dossierSeance) return
-    const parts = dossierSeance.split('/').filter(Boolean)
-    setOuverts((o) => {
-      const n = new Set(o)
-      parts.forEach((_, i) => n.add(parts.slice(0, i + 1).join('/')))
-      return n
-    })
-  }, [dossierSeance])
+
 
   /* Le pointeur, comme en Régie : P le maintient, Ctrl le prête le temps d'un
      geste. Les deux se lisent ici aussi, sinon on montrerait du doigt sur une
@@ -348,10 +343,22 @@ export function Pupitre(): JSX.Element {
     const p = s.objets.flatMap((o) => o.placements).find((x) => x.id === id)
     if (!p) return
     void (async () => {
-      await window.jdr.objets.placement(id, { etat: p.etat === 'trouve' ? 'cache' : 'trouve' })
+      await window.jdr.objets.placement(id, { etat: etatSuivant(p.etat) })
       await s.refreshObjets()
     })()
   }
+  /* Un clic sur un élément du plan : la fiche de son lieu s'ouvre à côté, sur
+     sa ligne. Le lieu est le sien — l'étage ou la pièce où il est posé. */
+  const ouvrirDansFiche = (lieuId: number | null | undefined, cible: { objet: number } | { article: string }): void => {
+    setCote('lieux')
+    if (lieuId != null) setLieuVu(lieuId)
+    montrerDansFiche(cible)
+  }
+  const choisirObjet = (id: number): void => {
+    const p = s.objets.flatMap((o) => o.placements).find((x) => x.id === id)
+    ouvrirDansFiche(p?.placeId ?? editPlaceId, { objet: id })
+  }
+  const choisirArticle = (a: ArticleSurCarte): void => ouvrirDansFiche(a.lieuId ?? editPlaceId, { article: a.cle })
   /* Le MJ reprend un objet du plan à la main et le pose ailleurs — dans une
      autre pièce de l'étage s'il le lâche dedans. */
   const deplacerObjet = (id: number, x: number, y: number): void => {
@@ -377,10 +384,12 @@ export function Pupitre(): JSX.Element {
           x: x.pos!.x,
           y: x.pos!.y,
           nom: x.qte > 1 ? `${o.nom} ×${x.qte}` : o.nom,
-          etat: x.etat
+          etat: x.etat,
+          image: o.imageItemId != null ? (s.allItems.find((i) => i.id === o.imageItemId)?.url ?? null) : null,
+          cadre: o.imageCadre
         }))
     )
-  }, [s.objets, s.places, editPlaceId])
+  }, [s.objets, s.places, s.allItems, editPlaceId])
   /* Ce qui peut arriver, posé sur le plan : de l'étage même, ou de l'une de
      ses pièces (cases « Découvertes », « Déclencheurs », « Scénarios »
      d'Affichage). Relu quand un article bouge, se coche ou s'écrit. */
@@ -684,89 +693,6 @@ export function Pupitre(): JSX.Element {
 
   const placedChars = new Set(edit.pions.map((p) => p.characterId).filter(Boolean))
 
-  /* ---------------- la source : lieux et dossier ---------------- */
-
-  /** Ce qui peut aller à l'écran, d'une façon ou d'une autre. */
-  const diffusable = (i: UiItem): boolean => i.kind !== 'other'
-  const fichiers = useMemo(() => s.fichiers.filter(diffusable), [s.fichiers])
-  const vuItemId = 'itemId' in slide ? slide.itemId : null
-
-  /**
-   * Un fichier est une vignette, pas une ligne de texte : en pleine partie on
-   * reconnaît une carte à son image, jamais à son nom de fichier.
-   */
-  const fileTile = (i: UiItem): JSX.Element => (
-    <button
-      key={i.id}
-      className={`vig k-${i.kind}${vuItemId === i.id ? ' on' : ''}`}
-      draggable
-      onDragStart={(e) => {
-        e.dataTransfer.setData('text/media-item', String(i.id))
-        if (i.kind === 'image') e.dataTransfer.setData('text/pion-item', String(i.id))
-        e.dataTransfer.effectAllowed = 'copy'
-      }}
-      /* Une image demande où aller — visuel libre, ou fenêtre sur le direct —,
-         comme celles d'un moment ; le reste se prépare tout de suite. */
-      onClick={(e) =>
-        i.kind === 'image'
-          ? setCibleImage({ item: i, titre: i.title, x: e.clientX, y: e.clientY })
-          : void poser(i)
-      }
-      title={
-        i.kind === 'image'
-          ? `${i.title}\nClic : visuel libre ou fenêtre sur le direct · glisser : sur une case, ou en faire un pion`
-          : `${i.title}\nClic : préparer`
-      }
-    >
-      {/* La vignette gravée par l'examen d'abord : elle pèse quarante kilos,
-          là où la carte entière en pèse dix mille. Une vidéo la porte aussi,
-          avec sa marque par-dessus pour rester reconnaissable. */}
-      {i.kind === 'image' && (i.poster || i.url) ? (
-        <img src={i.poster ?? i.url!} alt="" loading="lazy" draggable={false} />
-      ) : i.poster ? (
-        <>
-          <img src={i.poster} alt="" loading="lazy" draggable={false} />
-          <span className="g vig-marque">{kindIcon(i.kind, 'ico')}</span>
-        </>
-      ) : (
-        <span className="g">{kindIcon(i.kind, 'ico')}</span>
-      )}
-      <span className="nm">{i.title}</span>
-    </button>
-  )
-
-  const folderRow = (f: UiFolder): JSX.Element => {
-    const isOpen = ouverts.has(f.relPath)
-    const files = f.items.filter(diffusable)
-    return (
-      <div key={f.relPath}>
-        <div
-          className={`row folder${isOpen ? ' open' : ''}`}
-          onClick={() =>
-            setOuverts((o) => {
-              const n = new Set(o)
-              n.has(f.relPath) ? n.delete(f.relPath) : n.add(f.relPath)
-              return n
-            })
-          }
-        >
-          <IconChevron className="caret" />
-          <span className="fico" style={decorDossier(f.icon)}>
-            {folderIcon(f.icon, 'ico')}
-          </span>
-          <span className="name">{f.name}</span>
-          <span className="go num">{files.length || ''}</span>
-        </div>
-        {isOpen ? (
-          <div className="kids">
-            {f.children.map(folderRow)}
-            {files.length ? <div className="vigs">{files.map(fileTile)}</div> : null}
-          </div>
-        ) : null}
-      </div>
-    )
-  }
-
   /* ---------------- la matière de ce moment ---------------- */
 
   const lieu = s.places.find((p) => p.id === beat?.placeId) ?? null
@@ -1004,7 +930,7 @@ export function Pupitre(): JSX.Element {
         <div className={`pu-chrono${plein ? ' plein' : ''}`}>
           <aside className="pane">
             <div className="pane-head pu-cote-tete">
-              {/* Six onglets dans la largeur du fil : des icônes de même
+              {/* Les onglets dans la largeur du fil : des icônes de même
                   largeur, et le nom de celui qu'on lit écrit dessous. */}
               <div className="seg pu-cote" role="tablist" aria-label="Ce qu’on lit">
                 {COTES.map((c) => (
@@ -1030,9 +956,7 @@ export function Pupitre(): JSX.Element {
                       ? `${s.places.length} lieux`
                       : cote === 'annexes'
                         ? `${s.annexes.length} documents`
-                        : cote === 'dossier'
-                          ? `${fichiers.length} fichiers`
-                          : cote === 'sons'
+                        : cote === 'sons'
                             ? 'touches 1 à 9 · « . » : silence'
                             : `${s.mobile?.devices.length ?? 0} appareils`}
                 </span>
@@ -1049,15 +973,6 @@ export function Pupitre(): JSX.Element {
                 </>
               ) : cote === 'sons' ? (
                 <PanneauSons />
-              ) : cote === 'dossier' ? (
-                /* `regieview` n'est pas décoratif : l'arborescence, ses vignettes
-                   et les lignes de dossier ne sont stylées que sous cette classe. */
-                <div className="regieview pu-dossier">
-                  <div className="tree">
-                    {s.tree.map(folderRow)}
-                    <div className="vigs">{s.orphans.filter(diffusable).map(fileTile)}</div>
-                  </div>
-                </div>
               ) : cote === 'lieux' ? (
                 <div className="fil">
                   <label className="lieux-filtre pu-filtre">
@@ -1504,8 +1419,6 @@ export function Pupitre(): JSX.Element {
               ))}
             </div>
 
-            {/* Pas de dispositions au Paravent : on y joue un plan, pas un
-                collage. Elles restent à la Régie. */}
             <button
               className={`btn btn-sm${voirScene ? ' btn-on' : ''}`}
               onClick={basculerScene}
@@ -1674,6 +1587,14 @@ export function Pupitre(): JSX.Element {
                 {/* Les ondes ne se voient que sur l'écran qu'on regarde vraiment :
                     sur la préparation, elles désigneraient une autre image. */}
                 {onLive ? <Pings pings={ondes.pings} /> : null}
+                {/* Les d20 des joueurs tombent ici comme sur l'écran de la table ;
+                    « Vu » sur le dé les retire de partout. */}
+                {onLive ? (
+                  <DesSurTable
+                    des={display?.des ?? []}
+                    onVu={(id) => void window.jdr.display.retirerDe(id)}
+                  />
+                ) : null}
                 <Slide
                   slide={slideVu}
                   /* Le calque est toujours donné : les murs retiennent les pions.
@@ -1741,6 +1662,8 @@ export function Pupitre(): JSX.Element {
                   objetsMj={objetsVises}
                   onDeplacerObjet={editPlaceId != null ? deplacerObjet : undefined}
                   onBasculerObjet={editPlaceId != null ? basculerObjet : undefined}
+                  onChoisirObjet={editPlaceId != null ? choisirObjet : undefined}
+                  onChoisirArticle={choisirArticle}
                   articlesMj={articlesScene}
                 />
                 {/* Par-dessus la scène, jamais dedans : le calque du MJ ne fait
@@ -1771,10 +1694,13 @@ export function Pupitre(): JSX.Element {
               <span className="dot" />
               Visuel {visuel + 1} — {onLive ? pillText : 'libre, invisible des joueurs'}
             </span>
-            {/* Les outils de la carte, posés sur elle : ils changent ce que fait
-                la souris sur la scène ou ce qu'on y voit. Nommés, en colonne
-                (choix de Jules, 17 oct.) ; la bascule et le voile restent dans
-                la console. */}
+          </div>
+            {/* Les outils de la carte : ils changent ce que fait la souris sur la
+                scène ou ce qu'on y voit. Nommés, en colonne (choix de Jules,
+                17 oct.) ; la bascule et le voile restent dans la console.
+                Hors du cadre de la scène, qui rogne ce qui dépasse : sans volet,
+                ils se rangent dans la place libre à droite du visuel ; avec un
+                volet, ils se posent sur le coin de la carte. */}
             <div className="pu-outils" role="toolbar" aria-label="Outils de la carte">
               {/* Le pointeur avait son raccourci, pas son bouton : on doit
                   pouvoir l'allumer sans connaître la touche. */}
@@ -1821,6 +1747,15 @@ export function Pupitre(): JSX.Element {
                 <IconPen />
                 Annoter
               </button>
+              <button
+                className={`btn btn-sm${galerie ? ' btn-on' : ''}`}
+                aria-pressed={galerie}
+                onClick={() => setGalerie(true)}
+                title="Toutes les images de la campagne, à chercher par nom ou par dossier"
+              >
+                <IconImage />
+                Images
+              </button>
               <BoutonTextes t={textes} petit />
               <BoutonPoserLumiere p={lampe} petit court />
               <span className="pu-outils-sep" />
@@ -1838,8 +1773,10 @@ export function Pupitre(): JSX.Element {
                 <IconVerrou />
                 Zoom MJ
               </button>
+              <span className="pu-outils-sep" />
+              {/* Avant la partie : l'écran qu'on laisse pendant qu'ils s'installent. */}
+              <BoutonAttente petit />
             </div>
-          </div>
           </div>
 
           {/* ---- les volets, sous la scène, quand on les demande ---- */}
@@ -2028,6 +1965,15 @@ export function Pupitre(): JSX.Element {
           }}
         />
       ) : null}
+      {galerie ? (
+        <Galerie
+          onClose={() => setGalerie(false)}
+          onChoisir={(item, x, y) => {
+            setGalerie(false)
+            setCibleImage({ item, titre: item.title, x, y })
+          }}
+        />
+      ) : null}
       <MenuImage
         cible={cibleImage}
         onFerme={() => setCibleImage(null)}
@@ -2115,7 +2061,6 @@ const COTES = [
   { id: 'chrono', nom: 'Chronologie', aide: 'le fil de la séance', Icone: IconTimeline },
   { id: 'lieux', nom: 'Lieux', aide: 'ce que voient les joueurs, qui est où, et le visuel', Icone: IconPlace },
   { id: 'annexes', nom: 'Annexes', aide: 'les documents gardés sous la main', Icone: IconDoc },
-  { id: 'dossier', nom: 'Dossier', aide: 'les fichiers de la campagne', Icone: IconFolder },
   { id: 'portables', nom: 'Portables', aide: 'fiches, jets et pions depuis le téléphone', Icone: IconPhone },
   { id: 'sons', nom: 'Sons', aide: 'ambiance, nappes, bruitages et sons posés sur le plan', Icone: IconNote }
 ] as const
@@ -2159,12 +2104,13 @@ function useArticlesSurCarte(placeId: number | null, lieux: number[]): ArticleSu
       const fiches = await Promise.all(lieux.map((id) => window.jdr.fiche.lire(id)))
       if (!vivant) return
       setArticles(
-        fiches.flatMap((f): ArticleSurCarte[] => [
+        fiches.flatMap((f, k): ArticleSurCarte[] => [
           ...f.cartes.flatMap((c): ArticleSurCarte[] =>
             c.pos
               ? [
                   {
                     cle: `c${c.id}`,
+                    lieuId: lieux[k],
                     x: c.pos.x,
                     y: c.pos.y,
                     genre: c.sorte,
@@ -2181,6 +2127,7 @@ function useArticlesSurCarte(placeId: number | null, lieux: number[]): ArticleSu
               ? [
                   {
                     cle: `s${sc.id}`,
+                    lieuId: lieux[k],
                     x: sc.pos.x,
                     y: sc.pos.y,
                     genre: 'scenario',

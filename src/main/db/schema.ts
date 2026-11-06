@@ -1993,5 +1993,22 @@ export const MIGRATIONS: { id: number; sql: string }[] = [
        l'outil. « Réinitialiser la séance » (case Sons) le réarme. */
     ALTER TABLE son_zone ADD COLUMN joue INTEGER NOT NULL DEFAULT 0;
     `
+  },
+  {
+    id: 91,
+    sql: `
+    /* Un spectateur : un appareil qui suit un joueur sans jouer. Il voit tout
+       ce que ce joueur voit, et ne touche à rien — ni jet, ni pion, ni sac. */
+    ALTER TABLE mobile_device ADD COLUMN spectateur INTEGER NOT NULL DEFAULT 0;
+    `
+  },
+  {
+    id: 92,
+    sql: `
+    /* La couleur d'un onglet de la pochette : la clé d'une teinte des pions
+       (« brass », « blood »…), jamais un code — la palette reste maîtresse.
+       Nulle : l'onglet n'en a pas. */
+    ALTER TABLE pochette_onglet ADD COLUMN couleur TEXT;
+    `
   }
 ]

@@ -335,14 +335,16 @@ export function poserFicheTexte(placeId: number, f: FicheTexte): void {
 
 /**
  * La fiche d'un lieu suit sa copie. Les cartes repartent à jouer : rien n'y
- * est coché. PNJ et moment gardent leurs identifiants ; quand une séance
+ * est coché — sauf pour la suite d'une séance (`suite`), qui garde ce qui
+ * était joué. PNJ et moment gardent leurs identifiants ; quand une séance
  * entière se recopie, `raccrocherFiches` les remet sur leurs doubles.
  */
-export function copierFiche(de: number, vers: number): void {
+export function copierFiche(de: number, vers: number, suite = false): void {
+  const fait: Record<string, number> = suite ? {} : { fait: 0 }
   const db = getDb()
   const ids = (sql: string): number[] => (db.prepare(sql).all(de) as { id: number }[]).map((r) => r.id)
   for (const s of ids(`SELECT id FROM lieu_scenario WHERE place_id = ?`)) {
-    const n = copierLigne('lieu_scenario', s, { place_id: vers, fait: 0 })
+    const n = copierLigne('lieu_scenario', s, { place_id: vers, ...fait })
     db.prepare(
       `INSERT INTO lieu_scenario_objet (scenario_id, objet_id) SELECT ?, objet_id FROM lieu_scenario_objet WHERE scenario_id = ?`
     ).run(n, s)
@@ -351,7 +353,7 @@ export function copierFiche(de: number, vers: number): void {
     ).run(n, s)
   }
   for (const c of ids(`SELECT id FROM lieu_carte WHERE place_id = ?`)) {
-    const n = copierLigne('lieu_carte', c, { place_id: vers, fait: 0 })
+    const n = copierLigne('lieu_carte', c, { place_id: vers, ...fait })
     db.prepare(
       `INSERT INTO lieu_carte_objet (carte_id, objet_id) SELECT ?, objet_id FROM lieu_carte_objet WHERE carte_id = ?`
     ).run(n, c)

@@ -17,9 +17,9 @@ import { Ident } from './components/Ident'
 import { CacheMJ } from './components/CacheMJ'
 import { Home } from './components/Home'
 import { Toasts } from './components/Toasts'
-import { Annonces, DesALaTable, EcouteDesPortables } from './components/Portables'
+import { PupitreStats } from './components/PupitreStats'
+import { Annonces, DemandesDePorte, DesALaTable, EcouteDesPortables } from './components/Portables'
 import { JetRapide } from './components/JetRapide'
-import { Regie } from './modules/Regie'
 import { Pupitre } from './modules/Pupitre'
 import { Pochette } from './modules/Pochette'
 import { Library } from './modules/Library'
@@ -49,7 +49,6 @@ import {
   IconPupitre,
   IconPochette,
   IconRouage,
-  IconScreen,
   IconSearch,
   IconTimeline,
   IconTrame
@@ -191,6 +190,7 @@ export function App(): JSX.Element {
       {fiche === 'dupliquer' ? <DupliquerSeance onClose={() => setFiche(null)} /> : null}
       {fiche === 'fiche' ? <FicheDeCampagne onClose={() => setFiche(null)} /> : null}
       {params ? <Parametres depart={params.depart} cible={params.cible} demande={params.n} onClose={() => setParams(null)} /> : null}
+      <PupitreStats />
       <Toasts />
     </>
   )
@@ -220,12 +220,14 @@ export function App(): JSX.Element {
                 joueurs sur la même page, pour jouer sans quitter le moment en cours.
                 Premier du groupe : c'est là qu'on passe la soirée. */}
             <NavItem id="pupitre" label="Paravent" icon={<IconPupitre />} />
-            <NavItem id="regie" label="Régie" count={diffusableCount(s)} icon={<IconScreen />} />
           </Group>
           <Group label="Matière">
-            {/* La Préparation de la séance (Chronologie et annexes) ; le Paravent la joue. */}
-            <Preparation />
-            <NavItem id="lib" label="Bibliothèque" count={s.fichiers.length} icon={<IconFolder />} />
+            {/* La Préparation de la séance (Chronologie et annexes) ; le Paravent la joue.
+                Préparation, Bibliothèque et Sons se masquent depuis le menu Affichage. */}
+            {s.poste.railMasques.includes('preparation') ? null : <Preparation />}
+            {s.poste.railMasques.includes('lib') ? null : (
+              <NavItem id="lib" label="Bibliothèque" count={s.fichiers.length} icon={<IconFolder />} />
+            )}
             {/* Ce qu'on se note en écrivant la séance — les TODO, les idées en
                 vrac. Un seul pour toute la campagne. */}
             <NavItem id="notes" label="Bloc-notes" icon={<IconNotes />} />
@@ -242,7 +244,9 @@ export function App(): JSX.Element {
             <NavItem id="objets" label="Objets" count={s.objets.length} icon={<IconCoffre />} />
             {/* La sonothèque : les sons de la campagne, rangés en planches,
                 qu'on pose ensuite sur les plans et qu'on joue au Paravent. */}
-            <NavItem id="sons" label="Sons" count={nbSons} icon={<IconNote />} />
+            {s.poste.railMasques.includes('sons') ? null : (
+              <NavItem id="sons" label="Sons" count={nbSons} icon={<IconNote />} />
+            )}
           </Group>
           <Group label="Table">
             <NavItem id="sheets" label="Fiches" count={s.characters.length} icon={<IconPeople />} />
@@ -284,6 +288,7 @@ export function App(): JSX.Element {
       <EcouteDesPortables />
       <Annonces />
       <DesALaTable />
+      <DemandesDePorte />
 
       <div className="stage">
         <header className="topbar">
@@ -330,7 +335,6 @@ export function App(): JSX.Element {
             </div>
           ) : (
             <>
-              {s.view === 'regie' && <Regie />}
               {s.view === 'pupitre' && <Pupitre />}
               {s.view === 'lib' && <Library />}
               {s.view === 'editor' && <Editor />}
@@ -490,20 +494,12 @@ function Preparation(): JSX.Element {
 
 /* ---------------- sous-titres de la barre du haut ---------------- */
 
-function diffusableCount(s: ReturnType<typeof useStore.getState>): number {
-  return s.fichiers.filter((i) => i.kind !== 'other').length
-}
 function docCount(s: ReturnType<typeof useStore.getState>): number {
   return s.fichiers.filter((i) => i.kind === 'doc').length
 }
 
 function subtitle(s: ReturnType<typeof useStore.getState>): string {
   switch (s.view) {
-    case 'regie': {
-      const out = s.screens.find((x) => x.id === s.display?.outputDisplayId)
-      const label = out ? out.label : s.screens.length > 1 ? 'écran secondaire' : 'écran principal'
-      return `${label} · ${diffusableCount(s)} médias diffusables`
-    }
     case 'lib':
       return s.root?.path
         ? `${s.root.folders} dossiers · ${s.root.files} fichiers`

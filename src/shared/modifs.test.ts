@@ -1,5 +1,14 @@
 import { expect, it } from 'vitest'
-import { apresLeCombat, apresUnJet, apresUnTour, bonusDuJet, sommeBonus, valeurEffet, type Modif } from './modifs'
+import {
+  apresLeCombat,
+  apresUnJet,
+  apresUnTour,
+  bonusDuJet,
+  bonusDuPerso,
+  sommeBonus,
+  valeurEffet,
+  type Modif
+} from './modifs'
 import type { Objet } from './types'
 
 const FOR = { key: 'for', label: 'Force', code: 'FOR' }
@@ -59,4 +68,19 @@ it('fait vieillir les tours, et la fin du combat les efface', () => {
   expect(un[0].duree).toEqual({ genre: 'tours', reste: 1 })
   expect(apresUnTour(un).map((x) => x.id)).toEqual(['b'])
   expect(apresLeCombat(modifs).map((x) => x.id)).toEqual(['b'])
+})
+
+it('liste tous ses bonus et malus une seule fois, avec leur cible et leur durée', () => {
+  const modifs = [m('Béni', 1, null, { genre: 'jets', reste: 1 }), m('Blessé', -2, 'dex', { genre: 'retrait' })]
+  const objets = [
+    objet('Gants', [['+1', 'FOR']], 'mains'),
+    objet('Talisman', [['+2', 'tous les jets']], 'cou'),
+    objet('Dans le sac', [['+5', '']], null)
+  ]
+  expect(bonusDuPerso(modifs, objets, 1, [FOR, DEX])).toEqual([
+    { valeur: 1, raison: 'Béni', source: 'modif', cible: 'tous les jets', duree: 'prochain jet' },
+    { valeur: -2, raison: 'Blessé', source: 'modif', cible: 'Dextérité', duree: 'jusqu’au retrait' },
+    { valeur: 1, raison: 'Gants', source: 'objet', cible: 'Force', duree: 'tant qu’il le porte' },
+    { valeur: 2, raison: 'Talisman', source: 'objet', cible: 'tous les jets', duree: 'tant qu’il le porte' }
+  ])
 })

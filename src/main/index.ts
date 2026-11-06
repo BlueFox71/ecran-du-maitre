@@ -11,6 +11,7 @@ import * as projet from './project'
 import { registerMediaProtocol, registerProtocolScheme } from './vault'
 import * as examen from './examen'
 import { suivreZoom, zoomer } from './zoom'
+import { TAILLE_PORTABLE, suivreModePortable } from './modePortable'
 import { synchroniserBientot } from './lieuxTexte'
 import { synchroniserPnjBientot } from './pnjTexte'
 import { synchroniserArborescencesBientot } from './arborescenceTexte'
@@ -23,9 +24,11 @@ registerProtocolScheme()
 let mainWindow: BrowserWindow | null = null
 
 function createMainWindow(): void {
+  // En développement, la fenêtre s'ouvre en « mode ordi portable » (modePortable.ts).
+  const dev = !app.isPackaged
   mainWindow = new BrowserWindow({
-    width: 1480,
-    height: 940,
+    ...(dev ? TAILLE_PORTABLE : { width: 1480, height: 940 }),
+    useContentSize: dev,
     minWidth: 1080,
     minHeight: 680,
     show: false,
@@ -48,9 +51,10 @@ function createMainWindow(): void {
      exclusif : la barre de titre et la barre des tâches restent accessibles.
      Les dimensions ci-dessus servent alors de taille restaurée. */
   suivreZoom(mainWindow)
+  suivreModePortable(mainWindow, dev)
 
   mainWindow.on('ready-to-show', () => {
-    mainWindow?.maximize()
+    if (!dev) mainWindow?.maximize()
     mainWindow?.show()
   })
 

@@ -1,11 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { PION_COULEURS, porteFranchissable } from '@shared/types'
 import { Pings, usePings } from '../shared/Pings'
 import { Brouillard, regardsDes, sousUnRegard } from '../shared/Brouillard'
 import { Visage } from '../shared/Visage'
 import { Piece } from '../shared/Piece'
 import { D20 } from '../shared/D20'
-import { barrieres, pasContraint, seCroisent, type Pt } from '@shared/murs'
+import { barrieres, pasContraint, RAYON_PION, seCroisent, type Pt } from '@shared/murs'
 import { bordsOuverture } from '@shared/ouvertures'
 import { modificateur, naturel, signe, type Naturel } from '@shared/jet'
 import {
@@ -15,10 +16,11 @@ import {
   type Exigence,
   type ReglePreparation
 } from '@shared/preparation'
-import type { CadreCarre, CalqueBrouillard, MobilePing, Ouverture, PointMur } from '@shared/types'
+import type { CadreCarre, CalqueBrouillard, MobilePing, Ouverture, PointMur, StatsEcran } from '@shared/types'
+import { imageDuGroupe, imageDuJoueur } from './imageStats'
 import { heureLocale } from '@shared/heure'
 import { ditSac, sacPlein } from '@shared/sac'
-import { sommeBonus, type LigneBonus } from '@shared/modifs'
+import { sommeBonus, type BonusDuPerso, type LigneBonus } from '@shared/modifs'
 
 /**
  * L'application du joueur, sur son téléphone.
@@ -138,16 +140,29 @@ interface ObjetTel {
   /** Une lampe : elle s'allume et s'éteint, et n'éclaire que portée. */
   lampe?: boolean
   allumee?: boolean
+  /** Son image, en adresse du serveur, et son cadrage carré. Absents d'un serveur plus ancien. */
+  image?: string | null
+  cadre?: CadreCarre | null
 }
 
 /** Un inventaire que le MJ a ouvert à la table : le camion, la malle. */
 interface InventaireTel {
   id: number
   nom: string
-  contenu: { placementId: number; objetId: number; nom: string; qte: number; teinte: string | null }[]
+  contenu: {
+    placementId: number
+    objetId: number
+    nom: string
+    qte: number
+    teinte: string | null
+    image?: string | null
+    cadre?: CadreCarre | null
+  }[]
 }
 
 interface Etat {
+  /** Un spectateur : il suit ce joueur en lecture seule. Absent d'un serveur plus ancien. */
+  spectateur?: boolean
   campagne: string | null
   joueur: { id: number; nom: string; couleur: string | null } | null
   /** Les couleurs des autres joueurs. Absent d'un serveur plus ancien. */
@@ -157,17 +172,25 @@ interface Etat {
     nom: string
     occupation: string | null
     age: string | null
+    /** Son histoire, écrite par le MJ. Absents d'un serveur plus ancien. */
+    biographie?: string | null
+    lieuNaissance?: string | null
+    ville?: string | null
     portrait: string | null
     cadre: CadreCarre | null
     jauges: Jauge[]
     caracs: Carac[]
+    /** Tous ses bonus et malus, posés par le MJ ou venus d'un objet porté. Absent d'un serveur plus ancien. */
+    bonus?: BonusDuPerso[]
     /** null : la campagne ne se sert pas des compétences. */
     comps: Comp[] | null
     /** Sa bourse, une ligne par monnaie. Absente d'un serveur plus ancien. */
     bourse?: { key: string; nom: string; abbr: string; teinte: string; image: string | null; valeur: number }[]
   } | null
+  /** Les statistiques de la séance, quand le MJ les laisse emporter. Absentes sinon. */
+  stats?: StatsEcran | null
   /** Ce qu'on lui a mis en main. Jamais ce qu'un autre a reçu. */
-  pochette: { onglets: { id: number; nom: string }[]; docs: DocPoche[] }
+  pochette: { onglets: { id: number; nom: string; couleur?: string | null }[]; docs: DocPoche[] }
   /** Les mots du MJ, le plus récent d'abord. Absents d'un serveur plus ancien. */
   mots?: MotTel[]
   /** Ses affaires à lui, et les endroits du corps où les mettre. */
@@ -465,12 +488,12 @@ export function Mobile(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jeton, etat !== null])
 
-  const appairer = async (playerId: number): Promise<void> => {
+  const appairer = async (playerId: number, spectateur = false): Promise<void> => {
     setErreur(null)
     const r = await fetch(`${API}/api/pair?i=${encodeURIComponent(invitation ?? '')}`, {
       method: 'POST',
       headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({ playerId, appareil: cleAppareil() })
+      body: JSON.stringify({ playerId, appareil: cleAppareil(), spectateur })
     })
     const d = await r.json()
     if (!r.ok) return setErreur(d.erreur)
@@ -487,7 +510,7 @@ export function Mobile(): JSX.Element {
 
   /* ---------------- les écrans ---------------- */
 
-  if (etat?.preparation && etat.perso && prepaRangee !== etat.preparation.depuis) {
+  if (etat?.preparation && etat.perso && !etat.spectateur && prepaRangee !== etat.preparation.depuis) {
     const depuis = etat.preparation.depuis
     return (
       <Preparation
@@ -515,7 +538,7 @@ export function Mobile(): JSX.Element {
         ondes={ondes.pings}
         onglet={onglet}
         setOnglet={setOnglet}
-        onPreparer={etat.preparation && etat.perso ? () => setPrepaRangee(null) : null}
+        onPreparer={etat.preparation && etat.perso && !etat.spectateur ? () => setPrepaRangee(null) : null}
         onOublier={() => {
           /* On prévient le poste du MJ : sans cela sa ligne resterait en base,
              et l'appareil se compterait deux fois au prochain appairage. On ne
@@ -543,7 +566,7 @@ export function Mobile(): JSX.Element {
       <QuiEtesVous
         convives={convives}
         erreur={erreur}
-        onChoix={(id) => void appairer(id)}
+        onChoix={(id, spectateur) => void appairer(id, spectateur)}
       />
     )
   }
@@ -554,7 +577,7 @@ export function Mobile(): JSX.Element {
       {ferme ? (
         <p>
           Le maître du jeu n’a pas ouvert l’accès. Demande-lui d’afficher le QR&nbsp;code depuis
-          la&nbsp;Régie, puis scanne-le de nouveau.
+          le&nbsp;Paravent, puis scanne-le de nouveau.
         </p>
       ) : (
         <p>{erreur ?? 'Connexion…'}</p>
@@ -655,13 +678,16 @@ function QuiEtesVous({
 }: {
   convives: Convive[]
   erreur: string | null
-  onChoix: (id: number) => void
+  onChoix: (id: number, spectateur: boolean) => void
 }): JSX.Element {
+  /* Spectateur : on choisit ensuite qui suivre, en lecture seule. Il ne prend
+     pas de place au joueur — pas de « 2/2 » qui tienne. */
+  const [spectateur, setSpectateur] = useState(false)
   return (
     <div className="m-accueil">
       <div className="m-marque">
         <IconeApp taille={84} />
-        <span>Quel joueur êtes-vous ?</span>
+        <span>{spectateur ? 'Qui veux-tu suivre ?' : 'Quel joueur êtes-vous ?'}</span>
       </div>
 
       <PoserSurAccueil />
@@ -670,14 +696,14 @@ function QuiEtesVous({
 
       <div className="m-choix">
         {convives.map((c) => {
-          const plein = c.appareils >= 2
+          const plein = !spectateur && c.appareils >= 2
           return (
             <button
               key={c.id}
               className="m-joueur"
               disabled={plein}
               style={teinte(c.couleur)}
-              onClick={() => onChoix(c.id)}
+              onClick={() => onChoix(c.id, spectateur)}
             >
               <span className="m-pastille" />
               <span className="m-qui">
@@ -688,11 +714,29 @@ function QuiEtesVous({
             </button>
           )
         })}
+        {spectateur ? (
+          <button className="m-joueur m-spectateur" onClick={() => setSpectateur(false)}>
+            <span className="m-pastille" />
+            <span className="m-qui">
+              <span className="m-nom">‹ Retour</span>
+              <span className="m-perso">je suis un joueur</span>
+            </span>
+          </button>
+        ) : (
+          <button className="m-joueur m-spectateur" onClick={() => setSpectateur(true)}>
+            <span className="m-pastille" />
+            <span className="m-qui">
+              <span className="m-nom">Spectateur</span>
+              <span className="m-perso">suivre un joueur, sans jouer</span>
+            </span>
+          </button>
+        )}
       </div>
 
       <p className="m-note">
-        Ce téléphone s’en souviendra : tu n’auras plus à scanner. Deux appareils au plus par
-        joueur.
+        {spectateur
+          ? 'Tu verras tout ce que ce joueur voit — fiche, plan, sac, pochette — sans rien pouvoir toucher.'
+          : 'Ce téléphone s’en souviendra : tu n’auras plus à scanner. Deux appareils au plus par joueur.'}
       </p>
     </div>
   )
@@ -701,6 +745,30 @@ function QuiEtesVous({
 /* ============================================================
    La table — fiche, jet, pion
    ============================================================ */
+
+/**
+ * La couleur de son pion devient celle de son téléphone : le laiton de
+ * l'interface (`--brass` et ses nuances) prend sa teinte. Posée sur la racine
+ * du document, pour que les feuilles ouvertes par-dessus la suivent aussi.
+ * Sans couleur choisie, le laiton d'origine reste.
+ */
+function useCouleurDuJoueur(couleur: string | null): void {
+  useEffect(() => {
+    const r = document.documentElement.style
+    const noms = ['--brass', '--brass-ink', '--brass-wash', '--brass-line', '--label']
+    if (!couleur || couleur === 'neutral' || couleur === 'brass') {
+      noms.forEach((n) => r.removeProperty(n))
+      return
+    }
+    r.setProperty('--brass', `var(--${couleur})`)
+    /* L'encre, plus claire, se lit sur le fond sombre ; le trait, plus sombre, borde. */
+    r.setProperty('--brass-ink', `color-mix(in srgb, var(--${couleur}) 60%, white)`)
+    r.setProperty('--brass-wash', `var(--${couleur}-wash)`)
+    r.setProperty('--brass-line', `color-mix(in srgb, var(--${couleur}) 50%, black)`)
+    r.setProperty('--label', `color-mix(in srgb, var(--${couleur}) 65%, var(--text-faint))`)
+    return () => noms.forEach((n) => r.removeProperty(n))
+  }, [couleur])
+}
 
 function Table({
   etat,
@@ -720,6 +788,7 @@ function Table({
   onPreparer: (() => void) | null
   onOublier: () => void
 }): JSX.Element {
+  useCouleurDuJoueur(etat.joueur?.couleur ?? null)
   const mots = etat.mots ?? []
   const [motOuvert, setMotOuvert] = useState<number | null>(null)
   const mot = mots.find((m) => m.id === motOuvert) ?? null
@@ -748,6 +817,11 @@ function Table({
           changer
         </button>
       </header>
+      {etat.spectateur ? (
+        <p className="m-spectateur-bande" role="status">
+          Spectateur · lecture seule
+        </p>
+      ) : null}
 
       {etat.tour ? <BandeauTour tour={etat.tour} /> : null}
       {/* Le bandeau ne dit rien du contenu : le voisin peut voir l'écran. */}
@@ -772,7 +846,7 @@ function Table({
 
       <main className="m-corps">
         {onglet === 'fiche' && <Fiche etat={etat} jeton={jeton} />}
-        {onglet === 'jet' && <Jet etat={etat} jeton={jeton} />}
+        {onglet === 'jet' && !etat.spectateur && <Jet etat={etat} jeton={jeton} />}
         {onglet === 'pion' && <Plan etat={etat} jeton={jeton} ondes={ondes} />}
         {onglet === 'sac' && <Sac etat={etat} jeton={jeton} />}
         {onglet === 'poche' && <Poche etat={etat} jeton={jeton} onMot={ouvrirMot} />}
@@ -781,7 +855,11 @@ function Table({
       {mot ? <LireMot mot={mot} onClose={() => setMotOuvert(null)} /> : null}
 
       <nav className="m-onglets" role="tablist">
-        {(['fiche', 'jet', 'pion', 'sac', 'poche'] as Onglet[]).map((o) => (
+        {/* Un spectateur ne jette pas de dés : pas d'onglet Jet. */}
+        {(etat.spectateur
+          ? (['fiche', 'pion', 'sac', 'poche'] as Onglet[])
+          : (['fiche', 'jet', 'pion', 'sac', 'poche'] as Onglet[])
+        ).map((o) => (
           <button key={o} role="tab" aria-selected={onglet === o} onClick={() => setOnglet(o)}>
             <span className="m-ic" aria-hidden="true">
               {{ fiche: '▤', jet: '⬢', pion: '◉', sac: '▦', poche: '✉' }[o]}
@@ -1138,6 +1216,9 @@ function BandeauTour({ tour }: { tour: TourTel }): JSX.Element {
 function Fiche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
   const p = etat.perso
   const [refus, setRefus] = useState<string | null>(null)
+  /* Sa biographie, ouverte par-dessus la fiche ; le bouton retour la referme. */
+  const [bio, setBio] = useState(false)
+  useRetourFerme(bio, () => setBio(false))
 
   const changerCouleur = async (cle: string): Promise<void> => {
     setRefus(null)
@@ -1178,6 +1259,42 @@ function Fiche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
         </span>
       </div>
 
+      {/* Son histoire : un bouton sous son nom, la lecture par-dessus la fiche. */}
+      {p.biographie?.trim() || p.lieuNaissance || p.ville ? (
+        <button className="m-bio-bouton" onClick={() => setBio(true)}>
+          <svg viewBox="0 0 24 24" aria-hidden="true">
+            <path d="M5 4.5h9.5L19 9v10.5H5z" />
+            <path d="M14.5 4.5V9H19M8 12.5h8M8 15.5h8M8 18.5h5" />
+          </svg>
+          Voir votre biographie
+        </button>
+      ) : null}
+      {bio ? (
+        <div className="m-bio-fond" onClick={() => setBio(false)}>
+          <article className="m-bio" onClick={(e) => e.stopPropagation()} aria-label={`Biographie de ${p.nom}`}>
+            <header className="m-bio-tete">
+              <span>
+                <span className="m-eyebrow">Biographie</span>
+                <h2>{p.nom}</h2>
+                {p.lieuNaissance || p.ville ? (
+                  <span className="m-bio-origine">
+                    {[p.lieuNaissance ? `Né·e à ${p.lieuNaissance}` : null, p.ville ? `vit à ${p.ville}` : null]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                ) : null}
+              </span>
+              <button className="m-bio-fermer" onClick={() => setBio(false)} aria-label="Fermer">
+                ✕
+              </button>
+            </header>
+            <div className="m-bio-texte">
+              {p.biographie?.trim() || <em>Le maître du jeu n’a pas encore écrit ton histoire.</em>}
+            </div>
+          </article>
+        </div>
+      ) : null}
+
       {p.jauges.length > 0 && (
         <div className="m-jauges">
           {p.jauges.map((g) => (
@@ -1197,16 +1314,47 @@ function Fiche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
         </div>
       )}
 
+      {/* Ses bonus et malus d'abord : c'est ce qui change d'une scène à
+          l'autre, et ce qu'il doit annoncer en lançant. */}
+      {p.bonus && p.bonus.length > 0 ? (
+        <section>
+          <span className="m-eyebrow">Bonus et malus</span>
+          <ul className="m-effets">
+            {p.bonus.map((b, i) => (
+              <li key={i} className={b.valeur > 0 ? 'plus' : 'moins'}>
+                <b className="m-ef-val">{signe(b.valeur)}</b>
+                <span className="m-ef-texte">
+                  <span className="m-ef-raison">
+                    {b.raison}
+                    {b.source === 'objet' ? <i className="m-ef-objet">objet</i> : null}
+                  </span>
+                  <span className="m-ef-detail">
+                    {b.cible} · {b.duree}
+                  </span>
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      ) : null}
+
       <section>
         <span className="m-eyebrow">Caractéristiques</span>
         <div className="m-caracs">
-          {p.caracs.map((c) => (
-            <div className="m-cc" key={c.key} title={c.label}>
-              <b>{c.valeur}</b>
-              <em>{signe(modDe(c))}</em>
-              <span>{c.code ?? abrege(c.label)}</span>
-            </div>
-          ))}
+          {p.caracs.map((c) => {
+            /* Le modificateur, et ce que ses bonus et malus y ajoutent : la
+               tuile dit ce qu'un jet sur cette carac ajoutera vraiment. */
+            const plus = sommeBonus(c.bonus ?? [])
+            return (
+              <div className="m-cc" key={c.key} title={c.label}>
+                <b>{c.valeur}</b>
+                <em className={plus > 0 ? 'm-cc-plus' : plus < 0 ? 'm-cc-moins' : undefined}>
+                  {signe(modDe(c) + plus)}
+                </em>
+                <span>{c.code ?? abrege(c.label)}</span>
+              </div>
+            )
+          })}
         </div>
       </section>
 
@@ -1362,39 +1510,55 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
     )
   }
 
-  /* Une lampe en main : la ligne s'ouvre comme les autres, et l'interrupteur
-     est à côté, sous le pouce. Dans le sac, elle n'éclaire pas : pas
-     d'interrupteur. */
+  /**
+   * Une affaire en vignette : son image, son nom, et le geste qu'elle propose.
+   * Sans image, ses initiales sur la teinte de sa famille — on la reconnaît
+   * encore d'un coup d'œil.
+   */
+  const carte = (
+    genre: 'porte' | 'sac' | 'inv',
+    o: { placementId: number; nom: string; qte: number; teinte: string | null; image?: string | null; cadre?: CadreCarre | null },
+    sous: string | null,
+    action: JSX.Element,
+    ouvrir?: () => void
+  ): JSX.Element => (
+    <div key={o.placementId} className={`m-carte m-c-${genre}`} style={teinte(o.teinte)}>
+      <button className="m-carte-img" onClick={ouvrir} disabled={!ouvrir} tabIndex={ouvrir ? 0 : -1}>
+        {o.image ? (
+          <Visage url={API + o.image} cadre={o.cadre} alt={o.nom} />
+        ) : (
+          <span className="m-carte-init">{initiales(o.nom)}</span>
+        )}
+        {o.qte > 1 ? <b className="m-carte-qte">×{o.qte}</b> : null}
+      </button>
+      <span className="m-carte-nom">{o.nom}</span>
+      {sous ? <span className="m-carte-ou">{sous}</span> : null}
+      {action}
+    </div>
+  )
+
+  /* Une lampe en main : le bouton l'allume ou l'éteint, l'image ouvre la
+     feuille pour la ranger. Dans le sac, elle n'éclaire pas : pas
+     d'interrupteur, on la range comme le reste. */
   const ligne = (o: ObjetTel): JSX.Element =>
-    o.lampe && o.emplacement ? (
-      <div key={o.placementId} className="m-objet porte m-lampe" style={teinte(o.teinte)}>
-        <span className="m-o-pastille" />
-        <button className="m-lampe-ouvrir" onClick={() => setOuvert(o.placementId)}>
-          <span className="m-o-nom">{o.nom}</span>
-          <span className="m-o-ou">{nomDe(o.emplacement)}</span>
-        </button>
+    carte(
+      o.emplacement ? 'porte' : 'sac',
+      o,
+      o.emplacement ? nomDe(o.emplacement) : null,
+      o.lampe && o.emplacement ? (
         <button
-          className={`m-lampe-bouton${o.allumee ? ' on' : ''}`}
+          className={`m-carte-action m-lampe-bouton${o.allumee ? ' on' : ''}`}
           aria-pressed={!!o.allumee}
           onClick={() => void allumer(o.placementId, !o.allumee)}
         >
           {o.allumee ? 'Allumée' : 'Éteinte'}
         </button>
-      </div>
-    ) : (
-      <button
-        key={o.placementId}
-        className={`m-objet${o.emplacement ? ' porte' : ''}`}
-        style={teinte(o.teinte)}
-        onClick={() => setOuvert(o.placementId)}
-      >
-        <span className="m-o-pastille" />
-        <span className="m-o-nom">
-          {o.nom}
-          {o.qte > 1 ? <b> ×{o.qte}</b> : null}
-        </span>
-        <span className="m-o-ou">{o.emplacement ? nomDe(o.emplacement) : 'inventaire'}</span>
-      </button>
+      ) : (
+        <button className="m-carte-action" onClick={() => setOuvert(o.placementId)}>
+          {o.emplacement ? 'Ranger' : 'Équiper'}
+        </button>
+      ),
+      () => setOuvert(o.placementId)
     )
 
   const enChoix = objets.find((o) => o.placementId === ouvert) ?? null
@@ -1415,14 +1579,14 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
     <div className="m-vue">
       {erreur ? <p className="m-erreur">{erreur}</p> : null}
 
-      <h2 className="m-titre">Ce que je porte</h2>
+      <h2 className="m-titre m-t-porte">Ce que je porte</h2>
       {portes.length === 0 ? (
         <p className="m-note">Rien sur toi pour l’instant.</p>
       ) : (
-        <div className="m-objets">{portes.map(ligne)}</div>
+        <div className="m-grille">{portes.map(ligne)}</div>
       )}
 
-      <h2 className="m-titre">
+      <h2 className="m-titre m-t-sac">
         Dans mon sac
         {etat.sac && etat.sac.capacite !== null ? (
           <span className={`m-sac-compte${sacPlein(etat.sac) ? ' plein' : ''}`}>{ditSac(etat.sac)}</span>
@@ -1431,7 +1595,7 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
       {sac.length === 0 ? (
         <p className="m-note">Ton sac est vide.</p>
       ) : (
-        <div className="m-objets">{sac.map(ligne)}</div>
+        <div className="m-grille">{sac.map(ligne)}</div>
       )}
 
       {objets.length === 0 && inventaires.length === 0 ? (
@@ -1461,23 +1625,21 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
             {liste.length === 0 ? (
               <p className="m-note">{inv.contenu.length ? 'Rien ne correspond.' : 'Plus rien dedans.'}</p>
             ) : (
-              <div className="m-objets">
-                {liste.map((c) => (
-                  <div key={c.placementId} className="m-objet m-inv-ligne" style={teinte(c.teinte)}>
-                    <span className="m-o-pastille" />
-                    <span className="m-o-nom">
-                      {c.nom}
-                      {c.qte > 1 ? <b> ×{c.qte}</b> : null}
-                    </span>
+              <div className="m-grille">
+                {liste.map((c) =>
+                  carte(
+                    'inv',
+                    c,
+                    null,
                     <button
-                      className="m-inv-prendre"
+                      className="m-carte-action"
                       disabled={envoi === c.placementId}
                       onClick={() => void geste('prendre', { placementId: c.placementId })}
                     >
                       Prendre
                     </button>
-                  </div>
-                ))}
+                  )
+                )}
               </div>
             )}
           </section>
@@ -1620,12 +1782,22 @@ function Poche({
 
       {bande ? (
         <div className="m-rangs" role="tablist" aria-label="Rangements">
-          {([{ id: 'tout' as const, nom: 'Tout' }] as { id: number | 'tout'; nom: string }[])
-            .concat(siens.map((o) => ({ id: o.id as number | 'tout', nom: o.nom })))
+          {(
+            [{ id: 'tout' as const, nom: 'Tout' }] as {
+              id: number | 'tout'
+              nom: string
+              couleur?: string | null
+            }[]
+          )
+            .concat(
+              siens.map((o) => ({ id: o.id as number | 'tout', nom: o.nom, couleur: o.couleur }))
+            )
             .map((o) => (
               <button
                 key={String(o.id)}
-                className="m-rang"
+                className={o.couleur ? 'm-rang colorie' : 'm-rang'}
+                /* La couleur que le MJ a donnée à l'onglet teint l'onglet entier. */
+                style={o.couleur ? { ['--onglet' as string]: o.couleur } : undefined}
                 role="tab"
                 aria-selected={rang === o.id}
                 onClick={() => setRang(o.id)}
@@ -1700,7 +1872,6 @@ function Poche({
                   </span>
                 ) : null}
                 {!d.lu ? <span className="point" /> : null}
-                <span className="h">{heureLocale(d.donneA)}</span>
               </span>
             </span>
           </Cadre>
@@ -1721,15 +1892,130 @@ function Poche({
 }
 
 /**
+ * Les statistiques de la séance, que le MJ a laissées emporter : une image du
+ * groupe, et une de soi. L'image se fait sur le téléphone, puis se partage
+ * (feuille de partage du téléphone, quand le navigateur l'offre) ou
+ * s'enregistre — un appui long sur l'aperçu marche partout.
+ */
+function StatsAEmporter({
+  stats,
+  persoId,
+  campagne
+}: {
+  stats: StatsEcran
+  persoId: number | null
+  campagne: string | null
+}): JSX.Element {
+  const [enCours, setEnCours] = useState<'groupe' | 'moi' | null>(null)
+  const [apercu, setApercu] = useState<{ url: string; fichier: File } | null>(null)
+  const [erreur, setErreur] = useState<string | null>(null)
+  const fermer = useCallback(() => {
+    setApercu((a) => {
+      if (a) URL.revokeObjectURL(a.url)
+      return null
+    })
+  }, [])
+  useRetourFerme(!!apercu, fermer)
+  const moi = persoId != null && stats.joueurs.some((j) => j.id === persoId)
+
+  const faire = async (quoi: 'groupe' | 'moi'): Promise<void> => {
+    if (enCours) return
+    setEnCours(quoi)
+    setErreur(null)
+    try {
+      const blob =
+        quoi === 'groupe'
+          ? await imageDuGroupe(stats, campagne)
+          : persoId != null
+            ? await imageDuJoueur(stats, persoId, campagne)
+            : null
+      if (!blob) return
+      const base = (quoi === 'groupe' ? 'statistiques-groupe' : 'mes-statistiques') +
+        (stats.seance ? '-' + stats.seance.toLowerCase().replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '') : '')
+      const fichier = new File([blob], `${base}.png`, { type: 'image/png' })
+      setApercu({ url: URL.createObjectURL(blob), fichier })
+    } catch (e) {
+      console.error('[statistiques] image', e)
+      setErreur('L’image n’a pas pu être faite.')
+    } finally {
+      setEnCours(null)
+    }
+  }
+
+  /* La feuille de partage du téléphone, quand le navigateur la prête : elle
+     enregistre dans les photos ou envoie dans une discussion d'un geste. */
+  const peutPartager =
+    !!apercu && typeof navigator.canShare === 'function' && navigator.canShare({ files: [apercu.fichier] })
+  const partager = async (): Promise<void> => {
+    if (!apercu) return
+    try {
+      await navigator.share({ files: [apercu.fichier] })
+    } catch {
+      /* Annulé : rien à dire. */
+    }
+  }
+
+  return (
+    <section className="m-stats">
+      <span className="m-eyebrow">Statistiques de la séance</span>
+      <p className="m-note">Le maître du jeu te laisse les garder en image.</p>
+      <div className="m-stats-boutons">
+        <button className="m-stats-btn" disabled={!!enCours} onClick={() => void faire('groupe')}>
+          {enCours === 'groupe' ? 'Image en cours…' : 'Image du groupe'}
+        </button>
+        {moi ? (
+          <button className="m-stats-btn" disabled={!!enCours} onClick={() => void faire('moi')}>
+            {enCours === 'moi' ? 'Image en cours…' : 'Mes statistiques'}
+          </button>
+        ) : null}
+      </div>
+      {erreur ? <p className="m-erreur">{erreur}</p> : null}
+
+      {apercu
+        ? createPortal(
+            <div className="m-lire">
+              <div className="m-lire-tete">
+                <span className="t">{apercu.fichier.name}</span>
+                <button className="m-lire-fermer" onClick={fermer} aria-label="Fermer">
+                  <span aria-hidden="true">✕</span> Fermer
+                </button>
+              </div>
+              <div className="m-lire-corps m-stats-apercu">
+                <img src={apercu.url} alt="Statistiques de la séance" />
+              </div>
+              <div className="m-lire-pied m-stats-pied">
+                {peutPartager ? (
+                  <button className="m-stats-btn plein" onClick={() => void partager()}>
+                    Partager ou enregistrer
+                  </button>
+                ) : null}
+                <a className="m-stats-btn" href={apercu.url} download={apercu.fichier.name}>
+                  Télécharger
+                </a>
+                <span className="dit">Ou appuie longuement sur l’image pour l’enregistrer.</span>
+              </div>
+            </div>,
+            document.body
+          )
+        : null}
+    </section>
+  )
+}
+
+/**
  * Un mot du MJ, déplié par-dessus tout le reste — le même cadre qu'un
  * document, du texte au lieu d'une image.
  */
 function LireMot({ mot, onClose }: { mot: MotTel; onClose: () => void }): JSX.Element {
-  return (
+  return createPortal(
     <div className="m-lire">
       <div className="m-lire-tete">
         <span className="t">Un mot du MJ</span>
-        <button onClick={onClose}>fermer</button>
+        {/* Un vrai bouton, rouge, avec sa croix : le petit mot gris d'avant ne
+            se voyait pas, et on restait coincé dans l'aperçu. */}
+        <button className="m-lire-fermer" onClick={onClose} aria-label="Fermer">
+          <span aria-hidden="true">✕</span> Fermer
+        </button>
       </div>
       <div className="m-lire-corps m-mot-corps">
         <p>{mot.texte}</p>
@@ -1737,7 +2023,8 @@ function LireMot({ mot, onClose }: { mot: MotTel; onClose: () => void }): JSX.El
       <div className="m-lire-pied">
         <span className="dit">Envoyé à {heureLocale(mot.envoyeA)} — garde-le pour toi.</span>
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -1771,7 +2058,11 @@ function Lire({
     const d = sens > 0 ? apres : avant
     if (d) onAller(d)
   }
-  return (
+  /* Posé sur `body`, hors de la zone qui défile : sur iPad, Safari enfermait
+     l'aperçu dans le cadre défilant de la page (son propre plan, sous la
+     barre du haut), et l'en-tête avec son bouton « Fermer » n'apparaissait
+     pas — on restait coincé sur l'image. */
+  return createPortal(
     <div className="m-lire">
       <div className="m-lire-tete">
         <span className="t">{doc.titre}</span>
@@ -1780,7 +2071,11 @@ function Lire({
             {i + 1} / {suite.length}
           </span>
         ) : null}
-        <button onClick={onClose}>fermer</button>
+        {/* Un vrai bouton, rouge, avec sa croix : le petit mot gris d'avant ne
+            se voyait pas, et on restait coincé dans l'aperçu. */}
+        <button className="m-lire-fermer" onClick={onClose} aria-label="Fermer">
+          <span aria-hidden="true">✕</span> Fermer
+        </button>
       </div>
       <div className="m-lire-corps m-lire-doc">
         {/* `API` est vide en production — la page vient du même serveur — et
@@ -1818,7 +2113,8 @@ function Lire({
           </button>
         ) : null}
       </div>
-    </div>
+    </div>,
+    document.body
   )
 }
 
@@ -1983,6 +2279,10 @@ const bonusDe = (c: Carac): number => modDe(c) + sommeBonus(c.bonus ?? [])
 /** Un jet envoyé, tel que le serveur l'a compté. */
 interface JetFait {
   n: number
+  /** Son numéro au journal du MJ : sans lui (serveur plus ancien), il ne se retire pas. */
+  id?: number
+  /** Son heure au journal ; à défaut, celle du téléphone au moment de l'envoi. */
+  at: string
   carac: string
   de: number
   bonus: number
@@ -2010,6 +2310,11 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
   const [envoi, setEnvoi] = useState<'non' | 'encours' | 'fait'>('non')
   const [erreur, setErreur] = useState<string | null>(null)
   const [faits, setFaits] = useState<JetFait[]>(mesJets)
+  /* Retirer se fait en deux touchers : le premier demande, le second retire.
+     Un jet effacé d'un pouce maladroit ne reviendrait pas tout seul. */
+  const [aRetirer, setARetirer] = useState<number | null>(null)
+  const delaiRetrait = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => () => void (delaiRetrait.current && clearTimeout(delaiRetrait.current)), [])
   /* Le d20 lancé par l'application, déplié par-dessus l'onglet le temps qu'il tombe. */
   const [lance, setLance] = useState<JetFait | null>(null)
   useRetourFerme(!!lance, () => setLance(null))
@@ -2053,6 +2358,8 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
     const valeur = rep.de ?? de ?? 0
     const fait: JetFait = {
       n: (mesJets[0]?.n ?? 0) + 1,
+      id: rep.id,
+      at: rep.at ?? new Date().toISOString(),
       carac: carac.code ?? abrege(carac.label),
       de: valeur,
       bonus: rep.bonus ?? bonus,
@@ -2067,6 +2374,39 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
     setEnvoi('fait')
     if (minuteur.current) clearTimeout(minuteur.current)
     minuteur.current = setTimeout(() => setEnvoi('non'), 2600)
+  }
+
+  /**
+   * Retirer un jet : il quitte le journal du MJ (sa corbeille, d'où le MJ peut
+   * le rappeler) et cette liste. Premier toucher : on demande ; le second,
+   * dans les trois secondes, retire.
+   */
+  const retirer = async (f: JetFait): Promise<void> => {
+    if (f.id == null) return
+    if (delaiRetrait.current) clearTimeout(delaiRetrait.current)
+    if (aRetirer !== f.n) {
+      setARetirer(f.n)
+      delaiRetrait.current = setTimeout(() => setARetirer(null), 3000)
+      return
+    }
+    setARetirer(null)
+    setErreur(null)
+    try {
+      const r = await fetch(`${API}/api/roll/supprimer?t=${encodeURIComponent(jeton)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ id: f.id })
+      })
+      /* Déjà parti du journal (le MJ l'a retiré) : il quitte aussi la liste. */
+      if (!r.ok && r.status !== 404) {
+        setErreur((await r.json().catch(() => ({}))).erreur ?? 'Impossible de retirer ce jet.')
+        return
+      }
+      mesJets = mesJets.filter((x) => x.n !== f.n)
+      setFaits(mesJets)
+    } catch {
+      setErreur('Le maître du jeu ne répond pas.')
+    }
   }
 
   if (!etat.perso) {
@@ -2172,7 +2512,13 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
         </button>
       )}
 
-      {lance ? <DeLance fait={lance} onClose={() => setLance(null)} /> : null}
+      {lance ? (
+        <DeLance fait={lance} couleur={etat.joueur?.couleur ?? null} onClose={() => setLance(null)} />
+      ) : null}
+
+      {etat.stats ? (
+        <StatsAEmporter stats={etat.stats} persoId={etat.perso?.id ?? null} campagne={etat.campagne} />
+      ) : null}
 
       {faits.length ? (
         <section className="m-mesjets">
@@ -2180,12 +2526,22 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
           <ol>
             {faits.map((f) => (
               <li key={f.n} className={f.naturel ? `m-nat-${f.naturel}` : undefined}>
+                <time className="m-mj-heure">{heureLocale(f.at)}</time>
                 <span>{f.carac}</span>
                 <span className="m-mj-calc">
                   {f.de} {signe(f.bonus)}
                 </span>
                 <b>{f.total}</b>
                 {f.naturel ? <em>{NATUREL_DIT[f.naturel]}</em> : null}
+                {f.id != null && !etat.spectateur ? (
+                  <button
+                    className={`m-mj-retirer${aRetirer === f.n ? ' armer' : ''}`}
+                    onClick={() => void retirer(f)}
+                    aria-label={aRetirer === f.n ? 'Confirmer : retirer ce jet' : 'Retirer ce jet'}
+                  >
+                    {aRetirer === f.n ? 'Retirer ?' : '✕'}
+                  </button>
+                ) : null}
               </li>
             ))}
           </ol>
@@ -2199,10 +2555,24 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
  * Le d20 qui tombe dans la main du joueur, au moment où il tombe sur l'écran
  * de la table. Une fois posé, le calcul ; un toucher referme.
  */
-function DeLance({ fait, onClose }: { fait: JetFait; onClose: () => void }): JSX.Element {
+function DeLance({
+  fait,
+  couleur,
+  onClose
+}: {
+  fait: JetFait
+  /** La couleur du joueur : le dé la prend. */
+  couleur: string | null
+  onClose: () => void
+}): JSX.Element {
   const [pose, setPose] = useState(false)
   return (
-    <button className="m-lancer" onClick={() => pose && onClose()} aria-label="Fermer le dé">
+    <button
+      className="m-lancer"
+      style={teinte(couleur)}
+      onClick={() => pose && onClose()}
+      aria-label="Fermer le dé"
+    >
       <D20 valeur={fait.de} onPose={() => setPose(true)} />
       <span className={`m-lancer-calc${pose ? ' vu' : ''}`}>
         {fait.carac} · {fait.de} {signe(fait.bonus)} = <b>{fait.total}</b>
@@ -2248,14 +2618,18 @@ const CADENCE_MS = 50
  */
 const MENE_MS = 550
 
-/** Sa préférence à lui : son pion se tourne-t-il là où il marche ? */
+/**
+ * Sa préférence à lui : son pion se tourne-t-il là où il marche ? Oui par
+ * défaut — on regarde où l'on va ; seul un « non » choisi sur ce téléphone
+ * le garde fixe.
+ */
 const CLE_SUIVRE = 'ecran-du-maitre/suivre'
 
 const litSuivre = (): boolean => {
   try {
-    return localStorage.getItem(CLE_SUIVRE) === 'oui'
+    return localStorage.getItem(CLE_SUIVRE) !== 'non'
   } catch {
-    return false
+    return true
   }
 }
 
@@ -2271,6 +2645,9 @@ function Plan({
   const [refus, setRefus] = useState<string | null>(null)
   const [calque, setCalque] = useState<CalqueBrouillard | null>(null)
   const [suivre, setSuivre] = useState(litSuivre)
+  /* Le PNJ regardé qu'on agrandit d'un toucher ; le bouton retour le referme. */
+  const [zoomPnj, setZoomPnj] = useState<{ url: string; nom: string; par: string[] } | null>(null)
+  useRetourFerme(!!zoomPnj, () => setZoomPnj(null))
   const cadre = useRef<HTMLDivElement>(null)
   /* La dernière tape : deux coups rapprochés au même endroit font un ping. */
   const tape = useRef<{ t: number; x: number; y: number }>({ t: 0, x: 0, y: 0 })
@@ -2327,6 +2704,16 @@ function Plan({
   /* L'angle que l'anneau (ou la marche) réclame ; `null` quand on y est. */
   const capVise = useRef<number | null>(null)
   const aEnvoyer = useRef(false)
+  /*
+   * Les points par où le pion est passé depuis le dernier envoi. Le poste les
+   * vérifie un à un : sans eux, il ne voyait que la corde entre deux envois,
+   * qui coupe l'angle du chambranle — il refusait le pas, et le pion revenait
+   * en arrière devant la porte.
+   */
+  const chemin = useRef<[number, number][]>([])
+  /* Un seul envoi à la fois : sur le Wi-Fi, deux requêtes se doublent, et le
+     poste rejouait un pas ancien par-dessus un plus récent. */
+  const enVol = useRef(false)
   const [pouce, setPouce] = useState({ x: 0, y: 0 })
 
   /* Ce que dit la table, quand la main est retombée. */
@@ -2371,15 +2758,24 @@ function Plan({
   const buteRef = useRef<{ texte: string | null; t: number }>({ texte: null, t: 0 })
 
   const pousser = async (q: { x: number; y: number; cap: number }): Promise<void> => {
-    const r = await fetch(`${API}/api/pion?t=${encodeURIComponent(jeton)}`, {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify(q)
-    })
-    if (!r.ok) {
-      const d = await r.json()
-      setRefus(d.erreur === 'gele' ? 'L’écran est figé : ton pion ne bouge plus.' : d.erreur)
-    } else setRefus(null)
+    const passe = chemin.current
+    chemin.current = []
+    enVol.current = true
+    try {
+      const r = await fetch(`${API}/api/pion?t=${encodeURIComponent(jeton)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ ...q, chemin: passe })
+      })
+      if (!r.ok) {
+        const d = await r.json()
+        setRefus(d.erreur === 'gele' ? 'L’écran est figé : ton pion ne bouge plus.' : d.erreur)
+      } else setRefus(null)
+    } catch {
+      /* Le réseau a hoqueté : le prochain envoi repartira de la position du moment. */
+    } finally {
+      enVol.current = false
+    }
   }
 
   /** L'allure du pouce sur ce plan, réglée par le MJ ; sinon celle d'usine. */
@@ -2424,7 +2820,7 @@ function Plan({
         if (barrieresPas) {
           const de = { x: q.x * w, y: q.y * h }
           const voulu = { x: vise.x * w, y: vise.y * h }
-          const a = pasContraint(barrieresPas, de, voulu, { w, h }, 2)
+          const a = pasContraint(barrieresPas, de, voulu, { w, h }, 2, Math.max(w, h) * RAYON_PION)
           vise = { x: a.x / w, y: a.y / h }
           /* Moins de la moitié du pas : on bute. Une porte close droit devant ? */
           const fait = Math.hypot(a.x - de.x, a.y - de.y)
@@ -2439,10 +2835,11 @@ function Plan({
               (d) => !porteFranchissable(d.o) && seCroisent(de, sonde, d.a, d.b)
             )
             if (porte) {
-              const nom = porte.o.nom?.trim() || 'Porte'
+              /* Jamais son nom : c'est une note du MJ, et le joueur n'y voit
+                 qu'une porte. Le MJ, lui, est déjà prévenu. */
               texte = porte.o.verrouillee
-                ? `${nom} verrouillée : il faut que le maître du jeu l’ouvre.`
-                : `${nom} fermée : demande au maître du jeu de l’ouvrir.`
+                ? 'Porte verrouillée : le maître du jeu est prévenu.'
+                : 'Porte fermée : le maître du jeu est prévenu.'
             }
           }
           const r = buteRef.current
@@ -2454,6 +2851,8 @@ function Plan({
         }
         if (suivre) capVise.current = (Math.atan2(p.x, -p.y) * 180) / Math.PI
         if (vise.x !== q.x || vise.y !== q.y) {
+          /* Le point qu'on quitte : le poste refera le même chemin. */
+          if (chemin.current.length < 240) chemin.current.push([q.x, q.y])
           poseRef.current = { x: vise.x, y: vise.y, cap: q.cap }
           geste.current = Date.now()
           aEnvoyer.current = true
@@ -2506,7 +2905,7 @@ function Plan({
         affiche = poseRef.current
         setPose(affiche)
       }
-      if (aEnvoyer.current) {
+      if (aEnvoyer.current && !enVol.current) {
         aEnvoyer.current = false
         void pousser(poseRef.current)
       }
@@ -2656,6 +3055,30 @@ function Plan({
     )
   }, [etat.pions, etat.jour, calque, nat, yeux])
 
+  /*
+   * Les PNJ qu'un joueur regarde : ceux qui tombent dans le champ de vision
+   * d'au moins un personnage de la table — le même calcul que l'ombre (murs,
+   * portée, lampes). Pour chacun, qui le regarde. Ils se montrent en bas de
+   * la page, avec leur image : on voit qui l'on a devant soi.
+   */
+  const regardes = useMemo(() => {
+    if (!calque || !nat) return []
+    /* Tout pion qui n'est pas un joueur : un PNJ, ou un pion sans fiche (une silhouette). */
+    const pnj = etat.pions.filter((p) => (p.pnj || p.characterId == null) && !horsDeVue.has(p.id))
+    if (!pnj.length) return []
+    const parOeil = yeux.map((o) => ({
+      o,
+      nom: etat.pions.find((p) => p.characterId === o.characterId && !p.pnj)?.label ?? '',
+      zones: regardsDes(calque, [o], nat.w, nat.h)
+    }))
+    return pnj
+      .map((p) => ({
+        p,
+        par: parOeil.filter((x) => sousUnRegard(x.zones, p.x * nat.w, p.y * nat.h)).map((x) => x.nom)
+      }))
+      .filter((x) => x.par.length)
+  }, [etat.pions, calque, nat, yeux, horsDeVue])
+
   if (etat.gele || !etat.lieu) {
     return (
       <div className="m-vue">
@@ -2678,7 +3101,7 @@ function Plan({
       <div
         className="m-plan"
         ref={cadre}
-        onPointerDown={tapoter}
+        onPointerDown={etat.spectateur ? undefined : tapoter}
         style={{
           aspectRatio: nat ? `${nat.w} / ${nat.h}` : '16 / 10',
           ['--ratio' as string]: nat ? nat.w / nat.h : 1.6
@@ -2739,9 +3162,18 @@ function Plan({
               const r = Math.max(nat.w, nat.h) * 0.008
               return (
                 <g key={o.id} transform={`translate(${o.x * nat.w} ${o.y * nat.h})`}>
-                  <path d={`M0 ${-r}L${r} 0L0 ${r}L${-r} 0Z`} strokeWidth={r * 0.25} />
+                  {/* Son image s'il en a une, comme à l'écran de la table ; sinon le losange. */}
+                  {o.image ? (
+                    <foreignObject x={-r * 2.6} y={-r * 2.6} width={r * 5.2} height={r * 5.2}>
+                      <div className="m-objet-img">
+                        <Visage url={API + o.image} cadre={o.cadre ?? null} />
+                      </div>
+                    </foreignObject>
+                  ) : (
+                    <path d={`M0 ${-r}L${r} 0L0 ${r}L${-r} 0Z`} strokeWidth={r * 0.25} />
+                  )}
                   <text
-                    y={r * 1.4}
+                    y={o.image ? r * 2.9 : r * 1.4}
                     textAnchor="middle"
                     dominantBaseline="hanging"
                     fontSize={r * 1.6}
@@ -2791,7 +3223,9 @@ function Plan({
 
       {refus ? <p className="m-erreur">{refus}</p> : null}
 
-      {mien ? (
+      {etat.spectateur ? (
+        <p className="m-note">Spectateur : tu suis le plan, sans bouger de pion ni montrer de point.</p>
+      ) : mien ? (
         <>
           <div className="m-pupitre">
             <div
@@ -2836,6 +3270,30 @@ function Plan({
                 </span>
               </div>
             </div>
+            {/* Le regard suit la marche ? Un levier vertical collé au disque :
+                on le voit en jouant, sans une ligne de plus sous le pouce. */}
+            <label
+              className={`m-levier${suivre ? ' on' : ''}`}
+              title={
+                suivre
+                  ? 'Regarder où je marche : ton personnage se tourne vers là où tu le pousses'
+                  : 'Regard fixe : il garde son regard en marchant, l’anneau le tourne'
+              }
+            >
+              <svg className="m-levier-icone" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="12" cy="12" r="8.5" />
+                <path d="M12 6.5l2.6 6.6L12 11.6l-2.6 1.5z" />
+              </svg>
+              <input
+                type="checkbox"
+                role="switch"
+                className="m-levier-switch"
+                aria-label="Regarder où je marche"
+                checked={suivre}
+                onChange={(e) => reglerSuivre(e.target.checked)}
+              />
+              <span className="m-levier-dit">{suivre ? 'suit' : 'fixe'}</span>
+            </label>
           </div>
 
           <p className="m-note">
@@ -2843,20 +3301,50 @@ function Plan({
             plan montrent un point à la table.
           </p>
 
-          <label className="m-coche">
-            <input
-              type="checkbox"
-              checked={suivre}
-              onChange={(e) => reglerSuivre(e.target.checked)}
-            />
-            <span>Se tourner en marchant</span>
-          </label>
         </>
       ) : (
         <p className="m-note">
           Tapote deux fois pour montrer un point. Ton pion, lui, n’est pas sur ce lieu.
         </p>
       )}
+
+      {regardes.length ? (
+        <section className="m-regardes">
+          <span className="m-eyebrow">Sous vos yeux</span>
+          <div className="m-regardes-liste">
+            {regardes.map(({ p, par }) => (
+              <div key={p.id} className={`m-regarde c-${p.color}`}>
+                {p.url ? (
+                  /* Un toucher agrandit l'image entière, non recadrée. */
+                  <button
+                    className="m-regarde-img"
+                    aria-label={`Agrandir l’image de ${p.label || 'ce PNJ'}`}
+                    onClick={() => setZoomPnj({ url: API + p.url, nom: p.label || 'Inconnu', par })}
+                  >
+                    <Visage url={API + p.url} cadre={p.cadre} alt={p.label} />
+                  </button>
+                ) : (
+                  <span className="m-regarde-img">{p.initials}</span>
+                )}
+                <span className="m-regarde-texte">
+                  <b>{p.label || 'Inconnu'}</b>
+                  <span>regardé par {par.join(', ')}</span>
+                </span>
+              </div>
+            ))}
+          </div>
+        </section>
+      ) : null}
+
+      {zoomPnj ? (
+        <button className="m-zoom-pnj" onClick={() => setZoomPnj(null)} aria-label="Fermer l’image">
+          <img src={zoomPnj.url} alt={zoomPnj.nom} />
+          <span className="m-zoom-pnj-nom">
+            <b>{zoomPnj.nom}</b>
+            <span>regardé par {zoomPnj.par.join(', ')} · touche pour fermer</span>
+          </span>
+        </button>
+      ) : null}
     </div>
   )
 }
