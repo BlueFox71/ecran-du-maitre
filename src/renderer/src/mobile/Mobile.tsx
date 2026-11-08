@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { PION_COULEURS, porteFranchissable } from '@shared/types'
 import { Pings, usePings } from '../shared/Pings'
@@ -747,16 +747,54 @@ function QuiEtesVous({
    ============================================================ */
 
 /**
+ * Sa préférence à lui : garder le laiton de l'application plutôt que la couleur
+ * de son pion. Propre à ce téléphone ; non par défaut. Partagée entre la case
+ * de la fiche et la table, qui la lisent toutes deux.
+ */
+const CLE_COULEUR_DISTINCTE = 'ecran-du-maitre/couleur-distincte'
+const abonnesCouleurDistincte = new Set<() => void>()
+
+const litCouleurDistincte = (): boolean => {
+  try {
+    return localStorage.getItem(CLE_COULEUR_DISTINCTE) === 'oui'
+  } catch {
+    return false
+  }
+}
+let couleurDistincte = litCouleurDistincte()
+
+const reglerCouleurDistincte = (v: boolean): void => {
+  couleurDistincte = v
+  try {
+    localStorage.setItem(CLE_COULEUR_DISTINCTE, v ? 'oui' : 'non')
+  } catch {
+    /* navigation privée : le réglage tiendra le temps de l'onglet */
+  }
+  abonnesCouleurDistincte.forEach((f) => f())
+}
+
+const useCouleurDistincte = (): boolean =>
+  useSyncExternalStore(
+    (f) => {
+      abonnesCouleurDistincte.add(f)
+      return () => abonnesCouleurDistincte.delete(f)
+    },
+    () => couleurDistincte
+  )
+
+/**
  * La couleur de son pion devient celle de son téléphone : le laiton de
  * l'interface (`--brass` et ses nuances) prend sa teinte. Posée sur la racine
  * du document, pour que les feuilles ouvertes par-dessus la suivent aussi.
- * Sans couleur choisie, le laiton d'origine reste.
+ * Sans couleur choisie — ou s'il a coché « couleur distincte de
+ * l'application » —, le laiton d'origine reste.
  */
 function useCouleurDuJoueur(couleur: string | null): void {
+  const distincte = useCouleurDistincte()
   useEffect(() => {
     const r = document.documentElement.style
     const noms = ['--brass', '--brass-ink', '--brass-wash', '--brass-line', '--label']
-    if (!couleur || couleur === 'neutral' || couleur === 'brass') {
+    if (distincte || !couleur || couleur === 'neutral' || couleur === 'brass') {
       noms.forEach((n) => r.removeProperty(n))
       return
     }
@@ -767,7 +805,7 @@ function useCouleurDuJoueur(couleur: string | null): void {
     r.setProperty('--brass-line', `color-mix(in srgb, var(--${couleur}) 50%, black)`)
     r.setProperty('--label', `color-mix(in srgb, var(--${couleur}) 65%, var(--text-faint))`)
     return () => noms.forEach((n) => r.removeProperty(n))
-  }, [couleur])
+  }, [couleur, distincte])
 }
 
 function Table({
@@ -1216,6 +1254,7 @@ function BandeauTour({ tour }: { tour: TourTel }): JSX.Element {
 function Fiche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
   const p = etat.perso
   const [refus, setRefus] = useState<string | null>(null)
+  const distincte = useCouleurDistincte()
   /* Sa biographie, ouverte par-dessus la fiche ; le bouton retour la referme. */
   const [bio, setBio] = useState(false)
   useRetourFerme(bio, () => setBio(false))
@@ -1416,6 +1455,17 @@ function Fiche({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
         <p className="m-note m-gauche">
           Celle de ton pion à l’écran et de ton nom dans le journal du maître du jeu.
         </p>
+        <label className="m-case">
+          <input
+            type="checkbox"
+            checked={distincte}
+            onChange={(e) => reglerCouleurDistincte(e.target.checked)}
+          />
+          <span>
+            Couleur distincte de l’application
+            <small>Le téléphone garde son laiton ; seul ton pion prend ta couleur.</small>
+          </span>
+        </label>
       </section>
 
       <p className="m-lecture">
