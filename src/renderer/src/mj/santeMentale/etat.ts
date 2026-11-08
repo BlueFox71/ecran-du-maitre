@@ -402,6 +402,20 @@ export const useSm: UseBoundStore<StoreApi<EtatSm>> = create<EtatSm>((set, get) 
         /* Le main a borné : on raisonne sur ce qui est vraiment écrit. */
         const apres = character.data.gauges[cle]?.value ?? avant
         const perteReelle = avant - apres
+        /* La table l'apprend comme un dé — sauf le goutte-à-goutte d'un chrono,
+           qui couvrirait l'écran d'une annonce par minute. */
+        if (!auto && apres !== avant) {
+          try {
+            await window.jdr.display?.annoncerSm?.({
+              perso: character.name,
+              couleur: character.color ?? null,
+              delta: apres - avant,
+              raison
+            })
+          } catch {
+            /* L'annonce n'est qu'un affichage : la santé mentale, elle, est écrite. */
+          }
+        }
         if (auto && perteReelle > 0) signalerPerte(characterId, perteReelle, raison, apres)
         if (delta < 0 && estFolie(perteReelle, r)) ouvrirAttente(`Folie passagère — ${raison}`, perteReelle, 'folie', [characterId])
         try {
@@ -612,6 +626,32 @@ export function suivreCampagne(): () => void {
   })
 }
 
+/**
+ * Chaque joueur dont le jet de Volonté est attendu le voit réclamé sur son
+ * téléphone. On ne prévient le main que si la liste a changé : l'horloge des
+ * chronos remue l'état chaque seconde.
+ */
+function annoncerJetsAttendus(): void {
+  let dernier = ''
+  const envoyer = (): void => {
+    const carac = useStore.getState().reglages.sm.carac
+    const liste = useSm
+      .getState()
+      .attentes.flatMap((a) =>
+        a.joueurs.filter((j) => !j.resultat).map((j) => ({ characterId: j.characterId, titre: a.titre, caracKey: carac }))
+      )
+    /* Le plus ancien d'abord : c'est lui que le prochain jet résoudra. */
+    const vus = new Set<number>()
+    const uniques = liste.filter((j) => !vus.has(j.characterId) && vus.add(j.characterId))
+    const cle = JSON.stringify(uniques)
+    if (cle === dernier) return
+    dernier = cle
+    void window.jdr.sm.jetsAttendus?.(uniques)?.catch(() => undefined)
+  }
+  useSm.subscribe(envoyer)
+  envoyer()
+}
+
 let demarre = false
 
 /** Pose une seule fois l'écoute des jets et l'horloge des chronos ; appelé au montage du MJ. */
@@ -620,5 +660,6 @@ export function demarrerSm(): void {
   demarre = true
   window.jdr.sm.onJet((j) => void useSm.getState().recevoirJet(j))
   suivreCampagne()
+  annoncerJetsAttendus()
   setInterval(() => void useSm.getState().tick(monde.maintenant()), 1000)
 }

@@ -20,6 +20,7 @@ import {
   type CalqueBrouillard,
   type Mur,
   type NatureMur,
+  type PieceVue,
   type PointMur
 } from '@shared/types'
 
@@ -221,6 +222,21 @@ export function calqueDe(placeId: number | null): CalqueBrouillard {
     regardOuverture: lireCampagne(reglages.tous()).mursAngle,
     porteurs: lumieres.porteursDeLumiere(placeId == null ? null : echelleDe(placeId).metres),
     astre: placeId == null ? null : places.cielDe(placeId).astre,
-    objets: objetsVus(placeId)
+    objets: objetsVus(placeId),
+    pieces: placeId == null ? [] : piecesVues(placeId)
   }
+}
+
+/**
+ * Les pièces de ce plan dont le MJ montre le nom : là où il les a nommées,
+ * ou, à défaut, au cœur de leur contour.
+ */
+function piecesVues(placeId: number): PieceVue[] {
+  const out: PieceVue[] = []
+  for (const p of places.listPlaces()) {
+    if (p.parentId !== placeId || !p.nomMontre) continue
+    const pt = p.ancre ?? (p.zone ? pointInterieur(p.zone) : null)
+    if (pt) out.push({ id: p.id, nom: p.name, x: pt[0], y: pt[1] })
+  }
+  return out
 }

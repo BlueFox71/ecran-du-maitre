@@ -24,6 +24,12 @@ export interface EtatSac {
   charge: number
   /** Les places qu'il a ; `null`, sans limite. */
   capacite: number | null
+  /**
+   * Parmi les places prises, celles des sacs à dos rangés dans le sac — des
+   * objets qui en donnent une fois portés. Un sac plein n'en refuse pas un :
+   * c'est justement ce qui va le désengorger.
+   */
+  chargeSacs?: number
 }
 
 /** Sous ce seuil, deux places sont les mêmes : 0,1 + 0,2 n'excède pas 0,3. */
@@ -31,12 +37,27 @@ export const EPSILON_SAC = 1e-6
 
 export function etatSac(lignes: LigneSac[], base: number): EtatSac {
   let charge = 0
+  let chargeSacs = 0
   let bonus = 0
   for (const l of lignes) {
     if (l.emplacement) bonus += Math.max(0, l.bonusSac)
-    else charge += Math.max(0, l.places) * l.qte
+    else {
+      const p = Math.max(0, l.places) * l.qte
+      charge += p
+      if (l.bonusSac > 0) chargeSacs += p
+    }
   }
-  return { charge, capacite: base > 0 ? base + bonus : null }
+  return { charge, capacite: base > 0 ? base + bonus : null, chargeSacs }
+}
+
+/**
+ * Ce qu'un geste a ajouté au sac, sans compter les sacs à dos : c'est ce
+ * poids-là qu'un sac plein refuse. Un sac à dos qu'on lui tend passe, même
+ * plafonné — une fois sur le dos, il fait la place qu'il prenait.
+ */
+export function alourdi(avant: EtatSac | undefined, apres: EtatSac): number {
+  const net = (e: EtatSac): number => e.charge - (e.chargeSacs ?? 0)
+  return net(apres) - (avant ? net(avant) : 0)
 }
 
 export const sacPlein = (e: EtatSac): boolean =>

@@ -16,7 +16,7 @@ import { copierLigne } from '../copie'
 import { mediaUrl } from '../../vault'
 import { UNITE_VALEUR_PAR_DEFAUT, eclaire, lisCadreCarre } from '@shared/types'
 import { lireCampagne } from '@shared/reglages'
-import { EPSILON_SAC, REFUS_SAC, ditPlaces, etatSac, sacPlein } from '@shared/sac'
+import { EPSILON_SAC, REFUS_SAC, alourdi, ditPlaces, etatSac, sacPlein } from '@shared/sac'
 import type { EtatSac, LigneSac } from '@shared/sac'
 import * as reglages from './reglages'
 import type {
@@ -631,6 +631,8 @@ export function objetsDe(characterId: number): {
   /** C'est une lampe : elle s'allume et s'éteint. */
   lampe: boolean
   allumee: boolean
+  /** Les places qu'il ajoute au sac une fois porté — un sac à dos ; 0, aucune. */
+  bonusSac: number
   /** L'image de l'objet (un item de la bibliothèque) et son cadrage carré. */
   imageItemId: number | null
   imageCadre: CadreCarre | null
@@ -639,7 +641,7 @@ export function objetsDe(characterId: number): {
     getDb()
       .prepare(
         `SELECT p.id AS placementId, o.id AS objetId, o.nom, p.emplacement, o.emplacements,
-                p.qte, f.teinte, o.effets, p.eteinte,
+                p.qte, f.teinte, o.effets, p.eteinte, o.bonus_sac AS bonusSac,
                 o.image_item_id AS imageItemId, o.image_cadre AS imageCadre
            FROM objet_placement p
            JOIN objet o ON o.id = p.objet_id
@@ -658,6 +660,7 @@ export function objetsDe(characterId: number): {
     teinte: r.teinte ?? null,
     lampe: eclaire({ effets: lireEffets(r.effets) }),
     allumee: !r.eteinte,
+    bonusSac: Math.max(0, r.bonusSac ?? 0),
     imageItemId: r.imageItemId ?? null,
     imageCadre: lisCadreCarre(r.imageCadre)
   }))
@@ -1396,7 +1399,8 @@ export function sacs(): Map<number, EtatSac & { nom: string }> {
  * finit au-delà de ce qu'il tient **et** que le geste a alourdi — ou privé de
  * place, en lui ôtant son sac à dos — annule tout. Un sac qui débordait déjà
  * (le MJ a baissé la capacité en cours de route) n'empêche que ce qui
- * l'alourdit : on peut toujours le vider.
+ * l'alourdit : on peut toujours le vider. Un sac à dos ne compte pas dans
+ * ce poids : plafonné ou non, on peut toujours en recevoir un pour le porter.
  *
  * Le refus est une exception marquée de `REFUS_SAC` : elle traverse l'IPC et
  * l'interface en montre le texte.
@@ -1410,13 +1414,15 @@ function gardeSac<T>(geste: () => T): T {
     for (const [id, apres] of sacs()) {
       if (!sacPlein(apres)) continue
       const a = avant.get(id)
-      const alourdi = !a || apres.charge > a.charge + EPSILON_SAC
+      /* Un sac à dos tendu à un sac plein passe : il ne l'alourdit que le
+         temps qu'on le mette sur le dos. */
+      const plusLourd = alourdi(a, apres) > EPSILON_SAC
       const retreci = !!a && a.capacite !== null && apres.capacite! < a.capacite - EPSILON_SAC
       if (retreci)
         throw new Error(
           `${REFUS_SAC}Le sac de ${apres.nom} ne tiendrait plus : ${ditPlaces(apres.charge)} places pour ${ditPlaces(apres.capacite!)}. Qu’il se déleste d’abord.`
         )
-      if (alourdi)
+      if (plusLourd)
         throw new Error(
           `${REFUS_SAC}Le sac de ${apres.nom} est plein : ${ditPlaces(a?.charge ?? 0)} / ${ditPlaces(apres.capacite!)} places, il en faudrait ${ditPlaces(apres.charge - (a?.charge ?? 0))} de plus.`
         )

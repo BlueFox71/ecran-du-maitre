@@ -62,6 +62,8 @@ const NATURES: { cle: Nature; label: string; icone: JSX.Element }[] = [
 interface Salle {
   cle: string
   nom: string
+  /** Le lieu qui la nomme ; `null`, un contour encore sans nom. */
+  lieu: Place | null
   forme: Forme | null
   lumieres: Lumiere[]
   portes: Ouverture[]
@@ -207,23 +209,26 @@ export function TableauDeScene({
 
   const salles = useMemo<Salle[]>(() => {
     const formes = formesDesMurs(calque.murs)
-    const nomDe = (f: Forme): string => {
-      const l = lieux.find((p) => p.ancre && dansForme(p.ancre, f.pts))
-      return l?.name ?? 'Sans nom'
-    }
+    const lieuDe = (f: Forme): Place | null =>
+      lieux.find((p) => p.ancre && dansForme(p.ancre, f.pts)) ?? null
 
-    const base: Salle[] = formes.map((f, i) => ({
-      cle: `f${i}`,
-      nom: nomDe(f),
-      forme: f,
-      lumieres: [],
-      portes: [],
-      rideaux: [],
-      fenetres: []
-    }))
+    const base: Salle[] = formes.map((f, i) => {
+      const lieu = lieuDe(f)
+      return {
+        cle: `f${i}`,
+        nom: lieu?.name ?? 'Sans nom',
+        lieu,
+        forme: f,
+        lumieres: [],
+        portes: [],
+        rideaux: [],
+        fenetres: []
+      }
+    })
     const ailleurs: Salle = {
       cle: 'ailleurs',
       nom: 'Hors des pièces',
+      lieu: null,
       forme: null,
       lumieres: [],
       portes: [],
@@ -265,7 +270,8 @@ export function TableauDeScene({
     for (const m of calque.murs.filter((x) => x.nature === 'rideau'))
       poser(milieuEtNormaleDuMur(m), (s) => s.rideaux.push(m))
 
-    const pleines = base.filter((s) => !vide(s))
+    /* Une pièce nommée se montre même vide : on y règle au moins son nom. */
+    const pleines = base.filter((s) => !vide(s) || s.lieu)
     pleines.sort((a, b) => (b.forme?.aire ?? 0) - (a.forme?.aire ?? 0))
     if (!vide(ailleurs)) pleines.push(ailleurs)
     return pleines
@@ -319,7 +325,14 @@ export function TableauDeScene({
 
   /* Une pièce dont le filtre ne laisse rien s'en va avec son titre : mieux
      vaut une colonne courte qu'une liste de noms sans rien dessous. */
+  const refreshPlaces = useStore((s) => s.refreshPlaces)
+  const nomMontre = async (l: Place): Promise<void> => {
+    await window.jdr.places.nomMontre(l.id, !l.nomMontre)
+    await refreshPlaces()
+  }
+
   const montre = (s: Salle): boolean =>
+    !!s.lieu ||
     (voit('eclairage') && s.lumieres.length > 0) ||
     (voit('porte') && s.portes.length > 0) ||
     (voit('rideau') && s.rideaux.length > 0)
@@ -428,7 +441,25 @@ export function TableauDeScene({
               onMouseEnter={() => onSurvol(s.forme ? { quoi: 'piece', pts: s.forme.pts } : null)}
             >
               <div className="tb-salle-tete">
-                <b>{s.nom}</b>
+                <span className="tb-salle-nom">
+                  <b>{s.nom}</b>
+                  {/* Son nom sur le plan des joueurs — l'écran de la table et
+                      les téléphones —, même tant qu'elle reste dans le noir. */}
+                  {s.lieu ? (
+                    <button
+                      className={`tb-b${s.lieu.nomMontre ? ' on' : ''}`}
+                      aria-pressed={s.lieu.nomMontre}
+                      title={
+                        s.lieu.nomMontre
+                          ? 'Les joueurs lisent son nom sur le plan — cliquer pour le cacher'
+                          : 'Écrire son nom sur le plan des joueurs (écran de la table et téléphones)'
+                      }
+                      onClick={() => void nomMontre(s.lieu!)}
+                    >
+                      {s.lieu.nomMontre ? 'Nom affiché' : 'Afficher le nom'}
+                    </button>
+                  ) : null}
+                </span>
                 {voit('eclairage') && s.lumieres.length ? (
                   <span className="tb-mini">
                     <button

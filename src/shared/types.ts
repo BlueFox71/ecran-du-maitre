@@ -174,6 +174,8 @@ export interface Place {
    * chacun de ses niveaux et de ses pièces, marqués de son nom.
    */
   epingleArrivees: boolean
+  /** Son nom s'écrit sur le plan des joueurs — une pièce seulement, au choix du MJ. */
+  nomMontre: boolean
   /**
    * Jusqu'où un regard porte sur cette carte, en part de sa largeur.
    *
@@ -321,6 +323,20 @@ export interface CalqueBrouillard {
    * reste au MJ : seuls voyagent son nom et sa place.
    */
   objets: ObjetVu[]
+  /**
+   * Les pièces de ce plan dont le MJ montre le nom, là où il les a nommées.
+   * Absent d'un poste plus ancien.
+   */
+  pieces?: PieceVue[]
+}
+
+/** Le nom d'une pièce, écrit sur le plan des joueurs. */
+export interface PieceVue {
+  id: number
+  nom: string
+  /** En fractions de la carte. */
+  x: number
+  y: number
 }
 
 /** Un objet posé sur le plan, tel que les joueurs le voient. */
@@ -2363,6 +2379,12 @@ export interface DisplayState {
    * pas eu le temps de lire ne s'efface pas tout seul.
    */
   des: DeSurTable[]
+  /**
+   * Ce qu'un joueur vient de gagner ou de perdre en santé mentale, posé sur
+   * l'écran de la table comme un dé — jusqu'au « Vu » du MJ. Absent d'un
+   * état plus ancien.
+   */
+  annoncesSm?: AnnonceSm[]
 }
 
 /** Un d20 lancé par l'application, tel que la table le voit tomber. */
@@ -2378,6 +2400,17 @@ export interface DeSurTable {
   /** Tout ce qui s'ajoute au dé : modificateur et bonus. */
   bonus: number
   total: number
+}
+
+/** Un gain ou une perte de santé mentale, annoncé à la table. */
+export interface AnnonceSm {
+  id: number
+  perso: string
+  couleur: string | null
+  /** Ce qui a vraiment changé : négatif, une perte ; positif, un gain. */
+  delta: number
+  /** Ce qui l'a causé : « Les yeux verts », « Repos »… */
+  raison: string
 }
 
 export interface ScreenInfo {

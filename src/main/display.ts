@@ -24,7 +24,8 @@ import type {
   SlidePayload,
   TextOverlay,
   MobilePing,
-  DeSurTable
+  DeSurTable,
+  AnnonceSm
 } from '@shared/types'
 
 const BLACK: SlidePayload = { type: 'black' }
@@ -65,7 +66,8 @@ const state: DisplayState = {
   pionSize: 6,
   focusPionId: null,
   pointer: null,
-  des: []
+  des: [],
+  annoncesSm: []
 }
 
 let playerWindow: BrowserWindow | null = null
@@ -790,6 +792,25 @@ export function poserDe(d: Omit<DeSurTable, 'id'>): DeSurTable {
   state.des = [...state.des, de]
   broadcast()
   return de
+}
+
+/**
+ * Un gain ou une perte de santé mentale, annoncé à la table comme un dé :
+ * au centre de l'écran, jusqu'au « Vu » du MJ.
+ */
+let suiteAnnonces = 0
+export function annoncerSm(a: Omit<AnnonceSm, 'id'>): AnnonceSm {
+  const annonce = { ...a, id: ++suiteAnnonces }
+  state.annoncesSm = [...(state.annoncesSm ?? []), annonce]
+  broadcast()
+  return annonce
+}
+
+/** « Vu » : retire cette annonce, ou toutes sans identifiant. */
+export function retirerAnnonceSm(id?: number): DisplayState {
+  state.annoncesSm = id == null ? [] : (state.annoncesSm ?? []).filter((a) => a.id !== id)
+  broadcast()
+  return state
 }
 
 /** « Vu » : retire ce dé de l'écran de la table, ou tous sans identifiant. */

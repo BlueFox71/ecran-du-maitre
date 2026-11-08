@@ -19,7 +19,7 @@ import {
 import type { CadreCarre, CalqueBrouillard, MobilePing, Ouverture, PointMur, StatsEcran } from '@shared/types'
 import { imageDuGroupe, imageDuJoueur } from './imageStats'
 import { heureLocale } from '@shared/heure'
-import { ditSac, sacPlein } from '@shared/sac'
+import { ditPlaces, ditSac, sacPlein } from '@shared/sac'
 import { sommeBonus, type BonusDuPerso, type LigneBonus } from '@shared/modifs'
 
 /**
@@ -140,6 +140,8 @@ interface ObjetTel {
   /** Une lampe : elle s'allume et s'éteint, et n'éclaire que portée. */
   lampe?: boolean
   allumee?: boolean
+  /** Les places qu'il ajoute au sac une fois porté — un sac à dos. Absent d'un serveur plus ancien. */
+  bonusSac?: number
   /** Son image, en adresse du serveur, et son cadrage carré. Absents d'un serveur plus ancien. */
   image?: string | null
   cadre?: CadreCarre | null
@@ -200,6 +202,8 @@ interface Etat {
   inventaires?: InventaireTel[]
   /** Ce que tient son sac ; `capacite` nulle, sans limite. Absent d'un serveur plus ancien. */
   sac?: { charge: number; capacite: number | null } | null
+  /** Le jet de Volonté que le MJ attend de lui. Absent d'un serveur plus ancien. */
+  jetAttendu?: { titre: string; caracKey: string } | null
   gele: boolean
   /** Plein jour : la carte entière, sans ombre. */
   jour?: boolean
@@ -452,8 +456,22 @@ export function Mobile(): JSX.Element {
 
     const brancher = (): void => {
       if (!vivant) return
-      source = new EventSource(`${API}/api/stream?t=${encodeURIComponent(jeton)}`)
+      /* `v=2` : on sait recevoir les seules rubriques qui changent — un pas
+         de pion ne fait plus voyager la pochette entière. */
+      source = new EventSource(`${API}/api/stream?t=${encodeURIComponent(jeton)}&v=2`)
       source.addEventListener('state', (e) => setEtat(JSON.parse((e as MessageEvent).data)))
+      source.addEventListener('patch', (e) => {
+        const { set, del } = JSON.parse((e as MessageEvent).data) as {
+          set: Partial<Etat>
+          del: (keyof Etat)[]
+        }
+        setEtat((avant) => {
+          if (!avant) return avant
+          const apres = { ...avant, ...set }
+          for (const k of del) delete apres[k]
+          return apres
+        })
+      })
       source.addEventListener('ping', (e) => onde(JSON.parse((e as MessageEvent).data)))
       /* Un bruitage du MJ se sent dans la main. Android obéit ; Safari, sur
          iPhone, n'a pas `vibrate` — et rien ne doit casser pour autant. */
@@ -870,6 +888,16 @@ function Table({
             ? `Le MJ t’a passé ${enAttente.length} mots`
             : 'Le MJ t’a passé un mot'}
           <span className="lire">lire ›</span>
+        </button>
+      ) : null}
+      {/* Le MJ attend son jet de Volonté : l'invite mène à l'onglet Jet, la
+          bonne carac déjà choisie. Sur l'onglet Jet, c'est l'encart qui le dit. */}
+      {etat.jetAttendu && !etat.spectateur && onglet !== 'jet' ? (
+        <button className="m-prp-rappel m-jet-attendu" onClick={() => setOnglet('jet')}>
+          <span className="m-ja-texte">
+            <b>Jet de {nomCaracAttendue(etat)} attendu</b> — {etat.jetAttendu.titre}
+          </span>
+          <span aria-hidden="true">›</span>
         </button>
       ) : null}
       {onPreparer ? (
@@ -1529,6 +1557,23 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
   const nomDe = (cle: string | null): string =>
     etat.emplacements.find((e) => e.cle === cle)?.nom ?? 'Dans le sac'
 
+  /*
+   * Un sac à dos qui arrive dans le sac — pris dans un inventaire, tendu par
+   * le MJ — ouvre aussitôt le choix : il ne sert à rien tant qu'on ne le porte
+   * pas. Ceux qui y étaient déjà à l'ouverture de l'onglet ne s'imposent pas.
+   */
+  const connus = useRef<Set<number> | null>(null)
+  useEffect(() => {
+    const ids = new Set(objets.map((o) => o.placementId))
+    const avant = connus.current
+    connus.current = ids
+    if (!avant || ouvert !== null) return
+    const nouveau = objets.find(
+      (o) => !avant.has(o.placementId) && !o.emplacement && (o.bonusSac ?? 0) > 0
+    )
+    if (nouveau) setOuvert(nouveau.placementId)
+  }, [objets, ouvert])
+
   /** Ranger : sur le corps, ou dans le sac. L'état revient par le flux. */
   const ranger = async (placementId: number, emplacement: string | null): Promise<void> => {
     setOuvert(null)
@@ -1624,6 +1669,10 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
      choisir cette place-là déplacera l'autre, autant le savoir avant. */
   const occupant = (cle: string): ObjetTel | undefined =>
     objets.find((o) => o.emplacement === cle && o.placementId !== enChoix?.placementId)
+  /* Un sac à dos dans le sac : on propose de le porter d'un geste, à la
+     première place libre qui lui convient — à défaut, la première tout court. */
+  const bonusEnChoix = enChoix && !enChoix.emplacement ? enChoix.bonusSac ?? 0 : 0
+  const ouPorter = bonusEnChoix > 0 ? possibles.find((e) => !occupant(e.cle)) ?? possibles[0] ?? null : null
 
   return (
     <div className="m-vue">
@@ -1696,49 +1745,65 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
         )
       })}
 
-      {/* La feuille qui monte du bas : le pouce y arrive, et la liste des
-          endroits du corps tient en un écran. */}
-      {enChoix ? (
+      {/* La fenêtre du choix, au milieu de l'écran. Rendue dans le corps du
+          document, hors de la page qui défile : rien autour ne la rogne. */}
+      {enChoix ? createPortal(
         <div className="m-feuille-fond" onClick={() => setOuvert(null)}>
           <div className="m-feuille" onClick={(e) => e.stopPropagation()}>
             <div className="m-f-tete">
               <b>{enChoix.nom}</b>
               <span>où le porter ?</span>
             </div>
-            <div className="m-f-choix">
-              {possibles.map((e) => {
-                const pris = occupant(e.cle)
-                return (
-                  <button
-                    key={e.cle}
-                    className={enChoix.emplacement === e.cle ? 'on' : ''}
-                    onClick={() => void ranger(enChoix.placementId, e.cle)}
-                  >
-                    {e.nom}
-                    {pris ? <i>{pris.nom}</i> : null}
-                  </button>
-                )
-              })}
+            {ouPorter ? (
               <button
-                className={`m-f-sac${enChoix.emplacement === null ? ' on' : ''}`}
-                onClick={() => void ranger(enChoix.placementId, null)}
+                className="m-f-porter"
+                onClick={() => void ranger(enChoix.placementId, ouPorter.cle)}
               >
-                Dans le sac
-                <i>ne rien occuper</i>
+                Le porter — {ouPorter.nom.toLowerCase()}
+                <i>
+                  +{ditPlaces(bonusEnChoix)} place{bonusEnChoix > 1 ? 's' : ''} dans le sac
+                  {occupant(ouPorter.cle) ? ` · remplace ${occupant(ouPorter.cle)!.nom}` : ''}
+                </i>
               </button>
+            ) : null}
+            {/* L'en-tête reste, la liste défile sous le doigt. */}
+            <div className="m-f-defile">
+              <div className="m-f-choix">
+                {possibles.map((e) => {
+                  const pris = occupant(e.cle)
+                  return (
+                    <button
+                      key={e.cle}
+                      className={enChoix.emplacement === e.cle ? 'on' : ''}
+                      onClick={() => void ranger(enChoix.placementId, e.cle)}
+                    >
+                      {e.nom}
+                      {pris ? <i>{pris.nom}</i> : null}
+                    </button>
+                  )
+                })}
+                <button
+                  className={`m-f-sac${enChoix.emplacement === null ? ' on' : ''}`}
+                  onClick={() => void ranger(enChoix.placementId, null)}
+                >
+                  Dans le sac
+                  <i>ne rien occuper</i>
+                </button>
+              </div>
+              {/* Le rendre : il quitte le sac et retourne dans l'inventaire. */}
+              {inventaires.map((inv) => (
+                <button
+                  key={inv.id}
+                  className="m-f-remettre"
+                  onClick={() => void geste('remettre', { placementId: enChoix.placementId, inventaireId: inv.id })}
+                >
+                  Remettre dans {inv.nom}
+                </button>
+              ))}
             </div>
-            {/* Le rendre : il quitte le sac et retourne dans l'inventaire. */}
-            {inventaires.map((inv) => (
-              <button
-                key={inv.id}
-                className="m-f-remettre"
-                onClick={() => void geste('remettre', { placementId: enChoix.placementId, inventaireId: inv.id })}
-              >
-                Remettre dans {inv.nom}
-              </button>
-            ))}
           </div>
-        </div>
+        </div>,
+        document.body
       ) : null}
     </div>
   )
@@ -2353,9 +2418,25 @@ const NATUREL_DIT: Record<'critique' | 'maladresse', string> = {
   maladresse: '1 naturel'
 }
 
+/** « Volonté » : la carac que le MJ attend, telle que la fiche la nomme. */
+function nomCaracAttendue(etat: Etat): string {
+  const k = etat.jetAttendu?.caracKey
+  const c = etat.perso?.caracs.find((x) => x.key === k)
+  return c?.label ?? 'Volonté'
+}
+
 function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
   const caracs = etat.perso?.caracs ?? []
-  const [cle, setCle] = useState<string>(caracs[0]?.key ?? '')
+  const attendu = etat.jetAttendu ?? null
+  const [cle, setCle] = useState<string>(
+    attendu && caracs.some((c) => c.key === attendu.caracKey) ? attendu.caracKey : (caracs[0]?.key ?? '')
+  )
+  /* Un jet attendu qui arrive pendant qu'on est là : la bonne carac se choisit seule. */
+  const attenduCle = attendu ? `${attendu.caracKey}|${attendu.titre}` : ''
+  useEffect(() => {
+    if (attendu && caracs.some((c) => c.key === attendu.caracKey)) setCle(attendu.caracKey)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [attenduCle])
   const [de, setDe] = useState<number | null>(null)
   const [envoi, setEnvoi] = useState<'non' | 'encours' | 'fait'>('non')
   const [erreur, setErreur] = useState<string | null>(null)
@@ -2469,6 +2550,17 @@ function Jet({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
 
   return (
     <div className="m-vue m-vue-jet">
+      {attendu ? (
+        <div className="m-ja-encart" role="status">
+          <b>Le MJ attend ton jet de {nomCaracAttendue(etat)}</b>
+          <span>{attendu.titre} — lance ton d20 ou saisis ton dé ci-dessous.</span>
+          {cle !== attendu.caracKey && caracs.some((c) => c.key === attendu.caracKey) ? (
+            <button className="m-ja-choisir" onClick={() => setCle(attendu.caracKey)}>
+              Choisir {nomCaracAttendue(etat)}
+            </button>
+          ) : null}
+        </div>
+      ) : null}
       <section>
         <span className="m-eyebrow">Sur quelle caractéristique</span>
         <div className="m-surquoi">
@@ -3240,6 +3332,33 @@ function Plan({
           <div className="m-ombre">
             <Brouillard calque={calque} yeux={yeux} w={nat.w} h={nat.h} />
           </div>
+        ) : null}
+        {/* Le nom des pièces que le MJ montre : par-dessus l'ombre, comme à
+            l'écran de la table — il a choisi de le dire. */}
+        {calque?.pieces?.length && nat ? (
+          <svg
+            className="m-objets m-pieces"
+            viewBox={`0 0 ${nat.w} ${nat.h}`}
+            preserveAspectRatio="none"
+            aria-hidden="true"
+          >
+            {calque.pieces.map((p) => {
+              const r = Math.max(nat.w, nat.h) * 0.008
+              return (
+                <text
+                  key={p.id}
+                  x={p.x * nat.w}
+                  y={p.y * nat.h}
+                  textAnchor="middle"
+                  dominantBaseline="central"
+                  fontSize={r * 2.2}
+                  strokeWidth={r * 0.5}
+                >
+                  {p.nom}
+                </text>
+              )
+            })}
+          </svg>
         ) : null}
         <Pings pings={ondes} />
         {bute ? (

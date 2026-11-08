@@ -22,6 +22,7 @@ const SELECT = `
          p.zone_pts AS zonePts, p.ancre_x AS ancreX, p.ancre_y AS ancreY,
          p.seen, p.ouv_largeur AS ouvLargeur, p.lum_garde AS lumGarde,
          p.piece_unique AS pieceUnique, p.epingle_arrivees AS epingleArrivees,
+         p.nom_montre AS nomMontre,
          p.regard_portee AS regardPortee, p.astre, p.astre_cap AS astreCap,
          p.nord, p.ciel, p.ciel_cap AS cielCap, p.apparence_id AS apparenceId,
          (SELECT COUNT(*) FROM item i WHERE i.place_id = p.id) AS docCount
@@ -79,6 +80,7 @@ function toPlace(r: any): Place {
     lumGarde: !!r.lumGarde,
     pieceUnique: !!r.pieceUnique,
     epingleArrivees: !!r.epingleArrivees,
+    nomMontre: !!r.nomMontre,
     regardPortee:
       r.regardPortee === null || r.regardPortee === undefined ? null : Number(r.regardPortee),
     astre: versAstre(r.astre, r.astreCap),
@@ -483,6 +485,12 @@ export function setLumGarde(id: number, garde: boolean): Place | null {
 /** Ce lieu n'est qu'une pièce : ses murs le referment, il ne se découpe pas. */
 export function setPieceUnique(id: number, unique: boolean): Place | null {
   getDb().prepare(`UPDATE place SET piece_unique = ? WHERE id = ?`).run(unique ? 1 : 0, id)
+  return getPlace(id)
+}
+
+/** Le nom de cette pièce s'écrit-il sur le plan des joueurs ? */
+export function setNomMontre(id: number, oui: boolean): Place | null {
+  getDb().prepare(`UPDATE place SET nom_montre = ? WHERE id = ?`).run(oui ? 1 : 0, id)
   return getPlace(id)
 }
 

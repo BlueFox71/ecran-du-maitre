@@ -347,6 +347,7 @@ function suivreLeLieuDuTour(): void {
   const cle = e?.cle ?? null
   if (cle === enMain) return
   enMain = cle
+  suivreCeluiQuiJoue(e)
   if (!e || e.kind === 'pnj' || e.characterId == null) return
 
   const ecran = display.getState()
@@ -362,6 +363,22 @@ function suivreLeLieuDuTour(): void {
     preparerCarte?.(lieu)
   }
   display.versMj('tours:lieu', 'libre')
+}
+
+/**
+ * L'écran suivait un pion : quand la main passe, il suit celui qui la prend.
+ *
+ * Seulement si la caméra suivait déjà quelqu'un — c'est le MJ qui a choisi ce
+ * plan serré, on ne l'impose pas. Et seulement si le nouveau venu est sur le
+ * lieu à l'écran et montré aux joueurs : `state.pions` ne tient que les pions
+ * vus, on ne zoome donc jamais sur un pion caché. Sinon, la caméra reste où
+ * elle est.
+ */
+function suivreCeluiQuiJoue(e: EntrantTour | undefined): void {
+  const ecran = display.getState()
+  if (!e || !e.montre || ecran.focusPionId == null) return
+  const pion = pionDe(e, ecran.pions)
+  if (pion && pion.id !== ecran.focusPionId) display.setFocusPion(pion.id)
 }
 
 /** Le lieu d'un personnage : là où se tient son pion (le plus récent s'il en a plusieurs). */

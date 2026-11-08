@@ -1,5 +1,5 @@
-import { useCallback, useEffect, useMemo, useState } from 'react'
-import { activiteDe, cibleDesEntites, palierDe, type EvenementSm } from '@shared/santeMentale'
+import { useEffect, useMemo, useState } from 'react'
+import { activiteDe, cibleDesEntites, palierDe } from '@shared/santeMentale'
 import { jaugeSanite } from '@shared/types'
 import { useStore } from '../store'
 import { ouvrirParametres } from '../components/parametres/registre'
@@ -16,25 +16,6 @@ import { Bandeaux, Lignes, type JoueurSm } from './Joueurs'
  * personne de coché, l'entrée vaut pour tous les joueurs présents.
  */
 
-/** Les événements de la séance active, relus après un défaire ou une retouche dans les Paramètres. */
-function useEvenements(sessionId: number | null): EvenementSm[] {
-  const [liste, setListe] = useState<EvenementSm[]>([])
-  const relire = useCallback(async (): Promise<void> => {
-    setListe(sessionId === null ? [] : await window.jdr.sm.evenements(sessionId))
-  }, [sessionId])
-  useEffect(() => {
-    void relire()
-    const f = (): void => void relire()
-    window.addEventListener('jdr:defait', f)
-    window.addEventListener('jdr:sm-evenements', f)
-    return () => {
-      window.removeEventListener('jdr:defait', f)
-      window.removeEventListener('jdr:sm-evenements', f)
-    }
-  }, [relire])
-  return liste
-}
-
 /** L'heure, à la seconde : les comptes à rebours s'affichent sans attendre un changement d'état. */
 function useMaintenant(): number {
   const [t, setT] = useState(() => Date.now())
@@ -49,9 +30,7 @@ export function VueSm({ onFerme }: { onFerme: () => void }): JSX.Element {
   const r = useStore((s) => s.reglages.sm)
   const spec = useStore((s) => s.sheet?.spec)
   const characters = useStore((s) => s.characters)
-  const sessionId = useStore((s) => s.session?.id ?? null)
   const sm = useSm()
-  const evenements = useEvenements(sessionId)
   const maintenant = useMaintenant()
   /* L'entrée cliquée, en attendant qu'on dise à qui elle s'applique. */
   const [choix, setChoix] = useState<{
@@ -129,13 +108,11 @@ export function VueSm({ onFerme }: { onFerme: () => void }): JSX.Element {
       <div className="sm-cols">
         <Bareme
           r={r}
-          evenements={evenements}
           presents={presents}
           recupsFaites={sm.recupsFaites}
           onChoc={(c, ou) =>
             demander(false, `${c.nom} — qui le subit ?`, ou, (ids) => sm.declarerChoc(c.nom, c.perte, ids))
           }
-          onEvenement={(e, ou) => demander(e.tous, `${e.nom} — qui le subit ?`, ou, (ids) => sm.declarerPrix(e, ids))}
           onPrix={(p, ou) => demander(p.tous, `${p.nom} — qui le paie ?`, ou, (ids) => sm.declarerPrix(p, ids))}
           onRecup={(rec, ou) =>
             demander(

@@ -1752,6 +1752,37 @@ export function Framed({
   })()
 
   /*
+   * Le nom des pièces que le MJ montre aux joueurs. Peint **par-dessus**
+   * l'ombre : c'est lui qui a choisi de le dire, la pièce fût-elle encore dans
+   * le noir. Chez le MJ, ses propres traits nomment déjà toutes les pièces.
+   */
+  const piecesVues = ((): JSX.Element | null => {
+    if (traitsMj || !brouillard?.pieces?.length || !nat || !repere) return null
+    const w = nat.w
+    const h = nat.h
+    return (
+      <div className="brouillard-cadre pieces-vues" style={{ ...repere.cadre, transform: repere.transform }}>
+        <svg className="brouillard" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
+          {brouillard.pieces.map((p) => (
+            <text
+              key={p.id}
+              className="piece-vue"
+              x={p.x * w}
+              y={p.y * h}
+              textAnchor="middle"
+              dominantBaseline="central"
+              fontSize={Math.max(11, w * 0.017)}
+              strokeWidth={Math.max(2, w * 0.004)}
+            >
+              {p.nom}
+            </text>
+          ))}
+        </svg>
+      </div>
+    )
+  })()
+
+  /*
    * Le calque, dessiné pour le MJ seul : les murs, les portes et les fenêtres
    * qu'il a tracés, et d'où vient le soleil ou la lune. Ces traits ne passent
    * que par `traitsMj`, que la fenêtre des joueurs ne reçoit jamais.
@@ -2189,6 +2220,7 @@ export function Framed({
           pas. C'est le genre de détail qui ne se trouve qu'à l'écran. */}
       {objetsVus}
       {ombre}
+      {piecesVues}
       {traits}
       {/* La case décochée, l'article parti : sa bulle part avec lui. */}
       {survolArticle && traitsMj && articlesMj?.some((a) => a.cle === survolArticle.a.cle) ? (

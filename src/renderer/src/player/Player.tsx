@@ -138,7 +138,7 @@ export function Player(): JSX.Element {
             <Pings pings={ondes.pings} />
 
             {/* Les d20 lancés depuis un téléphone, au centre, jusqu'au « Vu » du MJ. */}
-            <DesSurTable des={state.des ?? []} />
+            <DesSurTable des={state.des ?? []} annonces={state.annoncesSm ?? []} />
 
             {state.qr ? (
               <div className="pv-qr">

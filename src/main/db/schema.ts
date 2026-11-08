@@ -2010,5 +2010,13 @@ export const MIGRATIONS: { id: number; sql: string }[] = [
        Nulle : l'onglet n'en a pas. */
     ALTER TABLE pochette_onglet ADD COLUMN couleur TEXT;
     `
+  },
+  {
+    id: 93,
+    sql: `
+    /* Le nom d'une pièce, écrit sur le plan des joueurs — l'écran de la table
+       et les téléphones. Le MJ le montre pièce par pièce ; caché d'office. */
+    ALTER TABLE place ADD COLUMN nom_montre INTEGER NOT NULL DEFAULT 0;
+    `
   }
 ]

@@ -1425,14 +1425,14 @@ export function Pupitre(): JSX.Element {
               aria-pressed={voirScene}
               title={
                 !calque?.murs.length
-                  ? 'Portes, fenêtres et lumières — ce lieu n’a pas de murs.'
+                  ? 'Gestion des pièces — ce lieu n’a pas de murs.'
                   : voirScene
                     ? 'Refermer le tiroir — Échap'
-                    : 'Ouvrir par-dessus la carte les portes, fenêtres et lumières du lieu'
+                    : 'Ouvrir par-dessus la carte les pièces du lieu : leurs portes, fenêtres et lumières, et leur nom pour les joueurs'
               }
             >
               <IconPorte />
-              Portes et lumières
+              Gestion des pièces
             </button>
             <BoutonObjets
               on={panneau === 'objets'}
@@ -1593,6 +1593,8 @@ export function Pupitre(): JSX.Element {
                   <DesSurTable
                     des={display?.des ?? []}
                     onVu={(id) => void window.jdr.display.retirerDe(id)}
+                    annonces={display?.annoncesSm ?? []}
+                    onVuAnnonce={(id) => void window.jdr.display.retirerAnnonceSm(id)}
                   />
                 ) : null}
                 <Slide

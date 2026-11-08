@@ -109,7 +109,7 @@ export function Monitor(): JSX.Element {
               pas lieu d'apparaître sur ce qu'ils voient encore. */}
           {!frozen ? <Pings pings={ondes.pings} /> : null}
           {/* Les d20 des joueurs, qui tombent ici comme sur l'écran de la table. */}
-          <DesSurTable des={display?.des ?? []} />
+          <DesSurTable des={display?.des ?? []} annonces={display?.annoncesSm ?? []} />
           {/* « Au tour de … », comme en haut de leur écran. */}
           {!frozen && display?.tour ? <BandeauTour tour={display.tour} /> : null}
           {/* Le QR des portables, comme les joueurs le voient : par-dessus la

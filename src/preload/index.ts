@@ -34,6 +34,7 @@ import type {
   CharacterKind,
   CharacterLogEntry,
   DisplayState,
+  AnnonceSm,
   EchellePlan,
   EntrantTour,
   ToursMj,
@@ -250,6 +251,9 @@ const api = {
     dupliquer: (id: number, versSessionId: number) => call<void>('sm:dupliquer', id, versSessionId),
     /** Les événements du barème sous la séance active, si la campagne n'en a aucun. */
     semer: () => call<void>('sm:semer'),
+    /** Les jets de Volonté attendus, pour que les téléphones les réclament. */
+    jetsAttendus: (liste: { characterId: number; titre: string; caracKey: string }[]) =>
+      call<void>('sm:jetsAttendus', liste),
     /** Un jet de personnage vient d'être noté (téléphone ou saisie du MJ). */
     onJet: (cb: (j: JetSm) => void) => {
       const h = (_: unknown, j: JetSm): void => cb(j)
@@ -530,6 +534,8 @@ const api = {
     /** Ce qui peut arriver dans ce bâtiment se montre aussi sur tous ses lieux. */
     epingleArrivees: (id: number, oui: boolean) =>
       call<Place | null>('places:epingleArrivees', id, oui),
+    /** Le nom de cette pièce s'écrit sur le plan des joueurs. */
+    nomMontre: (id: number, oui: boolean) => call<Place | null>('places:nomMontre', id, oui),
     /** Le soleil ou la lune, et d'où vient sa lumière ; `null`, aucun. */
     astre: (id: number, astre: Astre | null) => call<Place | null>('places:astre', id, astre),
     cielEspace: (id: number, astre: Astre | null) =>
@@ -1258,6 +1264,9 @@ const api = {
     fermerFenetre: (itemId?: number) => call<DisplayState>('display:fermerFenetre', itemId),
     /** « Vu » : retire un d20 de l'écran de la table, ou tous sans identifiant. */
     retirerDe: (id?: number) => call<DisplayState>('display:retirerDe', id),
+    /** Un gain ou une perte de santé mentale, posé sur l'écran de la table. */
+    annoncerSm: (a: Omit<AnnonceSm, 'id'>) => call<AnnonceSm>('display:annoncerSm', a),
+    retirerAnnonceSm: (id?: number) => call<DisplayState>('display:retirerAnnonceSm', id),
     setOutput: (displayId: number | null) => call<DisplayState>('display:setOutput', displayId),
     openPlayer: () => call<DisplayState>('display:openPlayer'),
     closePlayer: () => call<DisplayState>('display:closePlayer'),

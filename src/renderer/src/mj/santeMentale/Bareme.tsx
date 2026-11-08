@@ -1,14 +1,11 @@
 import { useState } from 'react'
-import type { Choc, EvenementSm, Prix, Recup, ReglageSm } from '@shared/santeMentale'
+import type { Choc, Prix, Recup, ReglageSm } from '@shared/santeMentale'
 import { normaliser } from '../components/parametres/chercher'
 
 /**
  * La colonne gauche de la vue SM : ce qui peut arriver. Un clic déclare
  * l'entrée sur les joueurs cochés à droite — ou sur tous, si personne ne l'est.
  */
-
-/** Les événements montrés avant « N autres… ». */
-const VISIBLES = 6
 
 /** « −5 », avec le vrai signe moins. */
 export const moins = (n: number): string => `−${n}`
@@ -43,12 +40,10 @@ const sous = (ev: React.MouseEvent<HTMLElement>): Ou => {
 
 interface Props {
   r: ReglageSm
-  evenements: EvenementSm[]
   /** Les joueurs présents : un remède limité que tous ont déjà pris se grise. */
   presents: number[]
   recupsFaites: Record<string, number[]>
   onChoc: (c: Choc, ou: Ou) => void
-  onEvenement: (e: EvenementSm, ou: Ou) => void
   onPrix: (p: Prix, ou: Ou) => void
   onRecup: (rec: Recup, ou: Ou) => void
   onScene: () => void
@@ -65,24 +60,19 @@ function correspond(requete: string[], ...textes: (string | null | undefined)[])
 }
 
 export function Bareme(p: Props): JSX.Element {
-  const [deplie, setDeplie] = useState(false)
   const [q, setQ] = useState('')
   const requete = normaliser(q)
   const cherche = requete.length > 0
 
-  const evenements = cherche ? p.evenements.filter((e) => correspond(requete, e.nom, e.note)) : p.evenements
   const prix = cherche ? p.r.prix.filter((x) => correspond(requete, x.nom)) : p.r.prix
   const recups = cherche ? p.r.recups.filter((x) => correspond(requete, x.nom)) : p.r.recups
-  /* Une recherche montre tout ce qu'elle trouve : pas de « N autres… » à déplier. */
-  const evts = deplie || cherche ? evenements : evenements.slice(0, VISIBLES)
-  const caches = cherche ? 0 : evenements.length - VISIBLES
 
   return (
     <div className="sm-bareme">
       <input
         type="search"
         className="sm-chercher"
-        placeholder="Chercher un événement, un prix…"
+        placeholder="Chercher un prix, une récupération…"
         aria-label="Chercher dans le barème"
         value={q}
         onChange={(e) => setQ(e.target.value)}
@@ -94,7 +84,7 @@ export function Bareme(p: Props): JSX.Element {
           }
         }}
       />
-      {cherche && !evenements.length && !prix.length && !recups.length ? (
+      {cherche && !prix.length && !recups.length ? (
         <p className="sm-vide">Rien pour « {q} ».</p>
       ) : null}
 
@@ -110,32 +100,6 @@ export function Bareme(p: Props): JSX.Element {
           </div>
         </>
       )}
-
-      {cherche && !evenements.length ? null : <span className="eyebrow sm-groupe">Événements de la séance</span>}
-      {!cherche && p.evenements.length === 0 ? <p className="sm-vide">Aucun événement pour cette séance.</p> : null}
-      {evts.map((e) => (
-        <button
-          key={e.id}
-          type="button"
-          className="sm-it"
-          title={[e.note, e.jet ? 'Avec jet de Volonté' : 'Sans jet : la perte est retirée tout de suite']
-            .filter(Boolean)
-            .join(' — ')}
-          onClick={(ev) => p.onEvenement(e, sous(ev))}
-        >
-          <span>{e.nom}</span>
-          <span className="sm-perte">
-            {e.tous ? <Tous /> : null}
-            {moins(e.perte)}
-            {e.jet ? ' 🎲' : ''}
-          </span>
-        </button>
-      ))}
-      {caches > 0 ? (
-        <button type="button" className="sm-it sm-plus" onClick={() => setDeplie((d) => !d)}>
-          <span>{deplie ? 'Replier' : `${caches} autre${caches > 1 ? 's' : ''}…`}</span>
-        </button>
-      ) : null}
 
       {cherche && !prix.length ? null : <span className="eyebrow sm-groupe">Prix (sans jet)</span>}
       {prix.map((x) => (

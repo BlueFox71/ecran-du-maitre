@@ -2146,8 +2146,20 @@ text.trait-son.repos.fait {
   filter: drop-shadow(0 0 6px rgba(216, 169, 74, 0.9));
 }
 /* L'objet trouvé, posé sur la carte des joueurs. */
-.objets-vus {
+.objets-vus,
+.pieces-vues {
   pointer-events: none;
+}
+/* Le nom d'une pièce que le MJ montre : clair, cerné de sombre, lisible sur
+   l'image comme dans le noir. */
+.piece-vue {
+  fill: #f0e8d6;
+  stroke: rgba(10, 16, 19, 0.85);
+  paint-order: stroke;
+  stroke-linejoin: round;
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 .objet-vu path {
   fill: #d8a94a;

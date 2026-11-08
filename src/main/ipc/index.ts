@@ -45,7 +45,7 @@ import { monnaiesActives } from '@shared/monnaies'
 import { apresLeCombat, apresUnTour, type Modif } from '@shared/modifs'
 import { noterJet } from '../jetDuPerso'
 import { reinitialiser } from '../reinitialiser'
-import type { ChoixReinit, EffetSurEntite } from '@shared/types'
+import type { AnnonceSm, ChoixReinit, EffetSurEntite } from '@shared/types'
 import type { Cible, Plage } from '@shared/surlignage'
 import { estFenetreSuivie, zoomer } from '../zoom'
 import { basculerModePortable, modePortable } from '../modePortable'
@@ -465,6 +465,12 @@ export function registerIpc(): void {
   on('places:lumGarde', (id: number, garde: boolean) => places.setLumGarde(id, garde))
   on('places:pieceUnique', (id: number, unique: boolean) => places.setPieceUnique(id, unique))
   on('places:epingleArrivees', (id: number, oui: boolean) => places.setEpingleArrivees(id, oui))
+  /* Le nom d'une pièce sur le plan des joueurs : leurs écrans relisent le calque. */
+  on('places:nomMontre', (id: number, oui: boolean) => {
+    const p = places.setNomMontre(id, oui)
+    display.calqueABouge()
+    return p
+  })
   /* Le soleil ou la lune change ce que les joueurs voient : on le leur dit. */
   on('places:astre', (id: number, astre: Astre | null) => {
     const p = places.setAstre(id, astre)
@@ -1407,6 +1413,11 @@ export function registerIpc(): void {
   on('display:reglerFenetre', (itemId: number, patch: any) => display.reglerFenetre(itemId, patch))
   on('display:fermerFenetre', (itemId?: number) => display.fermerFenetre(itemId))
   on('display:retirerDe', (id?: number) => display.retirerDe(id))
+  on('sm:jetsAttendus', (liste: { characterId: number; titre: string; caracKey: string }[]) =>
+    mobile.poserJetsAttendus(liste)
+  )
+  on('display:annoncerSm', (a: Omit<AnnonceSm, 'id'>) => display.annoncerSm(a))
+  on('display:retirerAnnonceSm', (id?: number) => display.retirerAnnonceSm(id))
   on('display:setOutput', (id: number | null) => display.setOutput(id))
   on('display:openPlayer', () => display.openPlayer())
   on('display:closePlayer', () => display.closePlayer())

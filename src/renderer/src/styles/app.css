@@ -10697,21 +10697,30 @@ input[type='range']::-webkit-slider-thumb {
   align-items: center;
   gap: 2px 4px;
 }
-/* Les lampes et les portes en grille, deux tuiles par rang : la pastille et
-   le nom en haut, les boutons dessous. La croix qui retire une lampe se pose
-   dans le coin, au survol. */
+/* Les lampes et les portes en vraie grille, deux tuiles par rang, toutes de
+   la même hauteur : la pastille et le nom en haut, l'état dessous. Une tuile
+   seule garde sa demi-largeur au lieu de s'étirer — les rangs s'alignent
+   d'une pièce à l'autre. La croix qui retire une lampe se pose dans le coin,
+   au survol. */
 .pupitre .pu-avec-tableau .tb-salle {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: stretch;
   gap: 4px;
 }
 .pupitre .pu-avec-tableau .tb-salle-tete {
-  flex-basis: 100%;
+  grid-column: 1 / -1;
 }
 .pupitre .pu-avec-tableau .tb-ligne {
   position: relative;
-  flex: 1 1 calc(50% - 2px);
   min-width: 0;
+  /* Deux lignes de nom et l'état : la hauteur de la plus haute tuile possible. */
+  min-height: 58px;
   flex-wrap: wrap;
-  align-content: flex-start;
+  /* Le texte au milieu de la tuile : un nom d'une ligne ne reste pas collé
+     en haut d'une case faite pour trois. */
+  align-content: center;
+  align-items: center;
   gap: 4px;
   padding: 5px 6px;
   border: 1px solid var(--line-soft);
@@ -10720,9 +10729,19 @@ input[type='range']::-webkit-slider-thumb {
 }
 .pupitre .pu-avec-tableau .tb-ligne .tb-nom {
   flex: 1 1 calc(100% - 24px);
-  flex-wrap: wrap;
-  row-gap: 0;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0;
   padding-right: 14px;
+  line-height: 1.3;
+  /* Un nom trop long tient en deux lignes ; le reste se lit au survol. */
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.pupitre .pu-avec-tableau .tb-ligne .tb-nom em {
+  display: block;
 }
 .pupitre .pu-avec-tableau .tb-ligne .tb-oter {
   position: absolute;
@@ -10734,7 +10753,8 @@ input[type='range']::-webkit-slider-thumb {
 }
 /* Une fenêtre ne se manœuvre pas : une petite pastille, pas une tuile. */
 .pupitre .pu-avec-tableau .tb-ligne:has(.tb-pastille.fenetre) {
-  flex: none;
+  min-height: 0;
+  justify-self: start;
   padding: 3px;
 }
 .pupitre .pu-avec-tableau .tb-ligne:has(.tb-pastille.fenetre) .tb-nom {
@@ -12295,6 +12315,33 @@ input[type='range']::-webkit-slider-thumb {
   align-items: baseline;
   justify-content: space-between;
   gap: 8px;
+}
+.tb-salle-nom {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+}
+/* Le nom de la pièce se lit en entier, sur une ligne : faute de place, ce
+   sont « Tout » et « Rien » qui passent dessous — il ne s'abrège qu'en
+   dernier recours. */
+.tb-salle-tete {
+  flex-wrap: wrap;
+  row-gap: 3px;
+}
+.tb-salle-nom {
+  max-width: 100%;
+}
+.tb-salle-nom b {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* « Afficher le nom », « Tout », « Rien » : sur une ligne, jamais coupés. */
+.tb-salle-tete .tb-b {
+  flex: none;
+  white-space: nowrap;
 }
 .tb-salle-tete b {
   font-family: 'Fraunces Variable', Georgia, serif;
@@ -15595,6 +15642,14 @@ button.ou-etat:hover {
 }
 .bj-ligne:first-child {
   border-top: 0;
+}
+.bj-ligne:hover .nm {
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/* L'objet dont la fiche est ouverte, au-dessus. */
+.bj-ligne.on {
+  box-shadow: inset 2px 0 0 var(--brass);
 }
 .bj-ligne:active {
   cursor: grabbing;
@@ -26175,7 +26230,7 @@ body.surligneur-actif [data-cible] {
 }
 /* Ouverte, la tuile de l'objet prend toute la largeur du volet. */
 .pupitre .pu-avec-tableau .tb-ligne.os-ouvert {
-  flex-basis: 100%;
+  grid-column: 1 / -1;
 }
 .os-effets-bouton {
   justify-self: start;
@@ -26277,7 +26332,7 @@ body.surligneur-actif [data-cible] {
   white-space: pre-line;
 }
 
-/* Portes et lumières : allumer sur ce plan, ou sur tout le bâtiment. */
+/* Gestion des pièces : allumer sur ce plan, ou sur tout le bâtiment. */
 .tb-portee {
   /* À sa taille, calée à gauche : l'en-tête est une grille qui étire tout. */
   justify-self: start;

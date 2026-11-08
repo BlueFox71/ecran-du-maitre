@@ -373,8 +373,40 @@
 .des-table-vu:hover {
   background: #4a3c1c;
 }
+/* Un gain ou une perte de santé mentale, à la place du dé : le nombre en
+   grand, à la taille d'un d20, rouge pour une perte, vert pour un gain. */
+.sm-annonce-nb {
+  display: grid;
+  place-items: center;
+  min-width: calc(var(--d20-taille) * 0.9);
+  height: calc(var(--d20-taille) * 0.75);
+  padding: 0 3cqmin;
+  border-radius: 2.4cqmin;
+  background: rgba(10, 16, 19, 0.85);
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-size: calc(var(--d20-taille) * 0.42);
+  font-weight: 700;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+  animation: sm-annonce-parait 0.45s cubic-bezier(0.2, 1.4, 0.4, 1);
+}
+.sm-annonce-nb.perte {
+  color: #e2766a;
+  border: 0.4cqmin solid #b4483d;
+}
+.sm-annonce-nb.gain {
+  color: #8fcf8a;
+  border: 0.4cqmin solid #4f8f4a;
+}
+@keyframes sm-annonce-parait {
+  from {
+    opacity: 0;
+    transform: scale(0.6);
+  }
+}
 @media (prefers-reduced-motion: reduce) {
-  .des-table {
+  .des-table,
+  .sm-annonce-nb {
     animation: none;
   }
 }

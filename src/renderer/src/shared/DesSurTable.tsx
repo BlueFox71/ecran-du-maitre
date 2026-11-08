@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { signe } from '@shared/jet'
-import type { DeSurTable } from '@shared/types'
+import type { AnnonceSm, DeSurTable } from '@shared/types'
 import { D20 } from './D20'
 
 /**
@@ -18,18 +18,51 @@ const vus = new Set<number>()
  */
 export function DesSurTable({
   des,
-  onVu
+  onVu,
+  annonces = [],
+  onVuAnnonce
 }: {
   des: DeSurTable[]
   /** Chez le MJ seulement : « Vu » sur le dé lui-même. */
   onVu?: (id: number) => void
+  /** Les gains et pertes de santé mentale, posés à côté des dés. */
+  annonces?: AnnonceSm[]
+  /** Chez le MJ seulement : « Vu » sur l'annonce. */
+  onVuAnnonce?: (id: number) => void
 }): JSX.Element | null {
-  if (des.length === 0) return null
+  if (des.length === 0 && annonces.length === 0) return null
   return (
-    <div className={`des-table${des.length > 2 ? ' nombreux' : ''}`}>
+    <div className={`des-table${des.length + annonces.length > 2 ? ' nombreux' : ''}`}>
       {des.map((d) => (
         <DeTombe key={d.id} d={d} onVu={onVu} />
       ))}
+      {annonces.map((a) => (
+        <CarteSm key={a.id} a={a} onVu={onVuAnnonce} />
+      ))}
+    </div>
+  )
+}
+
+/**
+ * Ce qu'un joueur gagne ou perd en santé mentale, lu de loin : son nom, le
+ * nombre en grand — rouge une perte, vert un gain —, et ce qui l'a causé.
+ */
+function CarteSm({ a, onVu }: { a: AnnonceSm; onVu?: (id: number) => void }): JSX.Element {
+  const perte = a.delta < 0
+  return (
+    <div className={`des-table-de sm-annonce c-${a.couleur ?? 'neutral'}`}>
+      <span className="des-table-qui">
+        <b>{a.perso}</b> · santé mentale
+      </span>
+      <span className={`sm-annonce-nb ${perte ? 'perte' : 'gain'}`}>
+        {perte ? `−${-a.delta}` : `+${a.delta}`}
+      </span>
+      <span className="des-table-calc vu">{a.raison}</span>
+      {onVu ? (
+        <button className="des-table-vu" onClick={() => onVu(a.id)}>
+          Vu
+        </button>
+      ) : null}
     </div>
   )
 }

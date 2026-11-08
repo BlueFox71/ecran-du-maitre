@@ -180,16 +180,34 @@ function LigneAvoir({ a }: { a: Avoir }): JSX.Element {
   const f = s.objetFamilles.find((x) => x.id === a.o.familleId) ?? null
   const porte = !!a.p.emplacement
 
+  /* Un clic ouvre la fiche de l'objet, au-dessus de la bande : on la fait
+     venir sous les yeux, la bande pouvant être tout en bas. */
+  const ouvrirFiche = (): void => {
+    s.setCurrentObjet(a.o.id)
+    requestAnimationFrame(() =>
+      document.querySelector('.fiche-objet')?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
+    )
+  }
+
   return (
     <div
-      className={`bj-ligne${porte ? ' porte' : ''}`}
+      className={`bj-ligne${porte ? ' porte' : ''}${s.currentObjetId === a.o.id ? ' on' : ''}`}
+      role="button"
+      tabIndex={0}
+      onClick={ouvrirFiche}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          ouvrirFiche()
+        }
+      }}
       draggable
       onDragStart={(e) => {
         e.dataTransfer.setData(TYPE_EXEMPLAIRE, String(a.p.id))
         e.dataTransfer.setData('text/plain', `jdr:exemplaire:${a.p.id}`)
         e.dataTransfer.effectAllowed = 'move'
       }}
-      title={`${a.o.nom} — ${porte ? nomEmplacement(a.p.emplacement) : 'dans son inventaire'}`}
+      title={`${a.o.nom} — ${porte ? nomEmplacement(a.p.emplacement) : 'dans son inventaire'} · clic : ouvrir sa fiche`}
     >
       <span className={`g c-${f?.teinte ?? 'neutral'}`}>
         {glypheObjet(f?.glyphe ?? 'outils', 'glyphe')}
@@ -203,7 +221,9 @@ function LigneAvoir({ a }: { a: Avoir }): JSX.Element {
         className="bj-retire"
         title="Le lui retirer — il part à la corbeille"
         aria-label={`Reprendre ${a.o.nom}`}
-        onClick={async () => {
+        onClick={async (e) => {
+          /* La croix reprend l'objet ; elle n'ouvre pas sa fiche. */
+          e.stopPropagation()
           await window.jdr.objets.jeter(a.p.id)
           await s.refreshObjets()
         }}

@@ -34,6 +34,7 @@ import { calqueDe } from './db/repos/murs'
 import { echelleDe, planDe } from './db/repos/echelle'
 import { barrieres, cheminContraint, distanceAuSegment, RAYON_PION, type Pt } from '@shared/murs'
 import { bordsOuverture } from '@shared/ouvertures'
+import { classerAdresses } from '@shared/adresses'
 import { porteFranchissable, type DemandePorte, type Ouverture, type PointMur } from '@shared/types'
 import * as ouvertures from './db/repos/ouvertures'
 import * as poche from './db/repos/pochette'
@@ -51,6 +52,7 @@ import { bonusParCarac, noterJet } from './jetDuPerso'
 import * as rolls from './db/repos/rolls'
 import { bonusDuPerso } from '@shared/modifs'
 import { EMPLACEMENTS_OBJET, PION_COULEURS, etatDeVie } from '@shared/types'
+import { AbonneSse } from './fluxSse'
 import type { CadreCarre, MobileInfo, MobileDevice, MobileNudge, MobilePing, StatsEcran } from '@shared/types'
 
 /**
@@ -80,8 +82,11 @@ let invite: string | null = null
 let qrImage: string | null = null
 let mj: BrowserWindow | null = null
 
-/** Les flux ouverts vers les téléphones, par jeton d'appareil. */
-const flux = new Map<string, ServerResponse[]>()
+/**
+ * Les flux ouverts vers les téléphones, par jeton d'appareil. On n'y écrit
+ * jamais directement : `abonne` tient la contre-pression (voir `fluxSse.ts`).
+ */
+const flux = new Map<string, { res: ServerResponse; abonne: AbonneSse }[]>()
 
 /*
  * Les statistiques de la séance que le MJ laisse emporter aux joueurs : une
@@ -131,7 +136,6 @@ export function bindMjWindow(w: BrowserWindow): void {
  * joindre : les proposer enverrait le joueur sur une page qui ne répond pas.
  */
 export function adresses(): { nom: string; ip: string }[] {
-  const suspectes = /(virtual|vmware|vethernet|wsl|docker|loopback|hyper-v|bluetooth)/i
   const candidates: { nom: string; ip: string }[] = []
 
   for (const [nom, liste] of Object.entries(networkInterfaces())) {
@@ -141,12 +145,8 @@ export function adresses(): { nom: string; ip: string }[] {
     }
   }
 
-  const vraies = candidates.filter((c) => !suspectes.test(c.nom))
-  /* Le Wi-Fi d'abord : c'est par lui que passent les téléphones. */
-  const wifi = vraies.filter((c) => /(wi-?fi|wlan|sans fil|wireless)/i.test(c.nom))
-  const reste = vraies.filter((c) => !wifi.includes(c))
-  const douteuses = candidates.filter((c) => !vraies.includes(c))
-  return [...wifi, ...reste, ...douteuses]
+  /* Le Wi-Fi d'abord, les réseaux internes et le 169.254 en dernier (voir `classerAdresses`). */
+  return classerAdresses(candidates)
 }
 
 /**
@@ -219,7 +219,7 @@ function supprimerAppareil(id: number): boolean {
     | { token: string }
     | undefined
   if (!r) return false
-  for (const res of flux.get(r.token) ?? []) res.end()
+  for (const { res } of flux.get(r.token) ?? []) res.end()
   flux.delete(r.token)
   db.prepare(`DELETE FROM mobile_device WHERE id = ?`).run(id)
   return true
@@ -417,7 +417,7 @@ export function stop(): void {
   invite = null
   qrImage = null
   if (isDbOpen()) display.setQr(null)
-  for (const liste of flux.values()) for (const res of liste) res.end()
+  for (const liste of flux.values()) for (const { res } of liste) res.end()
   flux.clear()
   for (const r of remuent.values()) clearTimeout(r.minuteur)
   remuent.clear()
@@ -576,14 +576,25 @@ export const demandesDePorte = (): DemandePorte[] => listeDemandesPorte()
    Ce que les téléphones apprennent du PC
    ============================================================ */
 
+/**
+ * Les jets de Volonté que le MJ attend, par personnage — tenus par la vue SM
+ * du poste, qui les pose ici à chaque changement. Le téléphone en fait une
+ * invite ; le jet envoyé sur cette carac résout l'attente côté MJ.
+ */
+let jetsAttendus = new Map<number, { titre: string; caracKey: string }>()
+export function poserJetsAttendus(liste: { characterId: number; titre: string; caracKey: string }[]): void {
+  jetsAttendus = new Map(liste.map((j) => [j.characterId, { titre: j.titre, caracKey: j.caracKey }]))
+  broadcast()
+}
+
 /** Pousse l'état à tous les téléphones. Appelé quand le PC change quelque chose. */
 export function broadcast(): void {
   if (flux.size === 0 || !isDbOpen()) return
   for (const [token, liste] of flux) {
     const ap = appareilDe(token)
     if (!ap) continue
-    const charge = JSON.stringify(etatPour(ap))
-    for (const res of liste) res.write(`event: state\ndata: ${charge}\n\n`)
+    const etat = etatPour(ap)
+    for (const { abonne } of liste) abonne.etat(etat)
   }
 }
 
@@ -729,6 +740,8 @@ function etatJoueur(playerId: number) {
     objets: perso ? objets.objetsDe(perso.id).map(avecImage) : [],
     /* Ce que tient son sac, pour qu'il sache avant de piocher s'il a la place. */
     sac: perso ? sacDe(perso.id) : null,
+    /* Le jet de Volonté que le MJ attend de lui ; le spectateur, lui, ne l’affiche pas. */
+    jetAttendu: perso ? (jetsAttendus.get(perso.id) ?? null) : null,
     /* Les inventaires que le MJ a ouverts à la table, et ce qu'ils contiennent :
        chacun y pioche. Fermés, ils n'existent pas pour le téléphone. */
     inventaires: perso
@@ -1320,24 +1333,38 @@ function stream(req: IncomingMessage, res: ServerResponse, url: URL): void {
     'cache-control': 'no-store',
     connection: 'keep-alive'
   })
-  res.write(`event: state\ndata: ${JSON.stringify(etatPour(ap))}\n\n`)
+  /* `v=2` : la page sait recevoir les seules rubriques qui changent. Une page
+     plus ancienne, restée ouverte sur un téléphone, reçoit l'état entier. */
+  const abonne = new AbonneSse(res, { patchs: url.searchParams.get('v') === '2' })
+  abonne.etat(etatPour(ap))
 
+  const branche = { res, abonne }
   const liste = flux.get(token) ?? []
-  liste.push(res)
+  liste.push(branche)
   flux.set(token, liste)
   prevenirMj()
 
   /* Un commentaire toutes les vingt-cinq secondes : sans lui, le téléphone en
-     veille ou un routeur bavard coupe la connexion sans prévenir. */
-  const battement = setInterval(() => res.write(': .\n\n'), 25000)
+     veille ou un routeur bavard coupe la connexion sans prévenir. Il passe
+     par l'abonné : c'est aussi lui qui coupe un téléphone bloqué trop
+     longtemps, même quand plus rien d'autre ne lui est envoyé. */
+  const battement = setInterval(() => abonne.evenement(': .\n\n'), 25000)
 
-  req.on('close', () => {
+  /* La requête ou la réponse : l'une ou l'autre peut se fermer la première —
+     la réponse, notamment, quand l'abonné coupe un téléphone bloqué. */
+  let fini = false
+  const fermer = (): void => {
+    if (fini) return
+    fini = true
     clearInterval(battement)
-    const reste = (flux.get(token) ?? []).filter((x) => x !== res)
+    const reste = (flux.get(token) ?? []).filter((x) => x !== branche)
     if (reste.length) flux.set(token, reste)
     else flux.delete(token)
     prevenirMj()
-  })
+  }
+  req.on('close', fermer)
+  res.on('close', fermer)
+  res.on('error', fermer)
 }
 
 /* ---------------- les trois gestes du joueur ---------------- */
@@ -1797,7 +1824,7 @@ export function vibrer(characterIds: number[] | 'tous', motif: number[]): number
       const ap = appareilDe(token)
       if (!ap || !vises.has(ap.playerId)) continue
     }
-    for (const res of liste) res.write(`event: vibre\ndata: ${charge}\n\n`)
+    for (const { abonne } of liste) abonne.evenement(`event: vibre\ndata: ${charge}\n\n`)
     if (liste.length) n++
   }
   return n
@@ -1806,7 +1833,7 @@ export function vibrer(characterIds: number[] | 'tous', motif: number[]): number
 function diffuserPing(onde: MobilePing): void {
   const charge = JSON.stringify(onde)
   for (const liste of flux.values()) {
-    for (const res of liste) res.write(`event: ping\ndata: ${charge}\n\n`)
+    for (const { abonne } of liste) abonne.evenement(`event: ping\ndata: ${charge}\n\n`)
   }
 }
 

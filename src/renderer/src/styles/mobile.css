@@ -955,6 +955,10 @@ img {
   object-fit: cover;
   display: block;
 }
+.m-pieces text {
+  font-family: 'Fraunces Variable', Georgia, serif;
+  letter-spacing: 0.02em;
+}
 .m-objets text {
   fill: #f0e8d6;
   stroke: rgba(10, 16, 19, 0.85);
@@ -1893,26 +1897,61 @@ img {
 .m-feuille-fond {
   position: fixed;
   inset: 0;
+  /* Calé sur ce qu'on voit vraiment (main.tsx), comme la lecture : sur iPad,
+     Safari fait glisser la page sous ses barres, et le bas de la feuille —
+     « Dans le sac », « Remettre » — tombait hors de vue. */
+  top: var(--haut-debut, 0px);
   bottom: auto;
   height: var(--haut, 100dvh);
   z-index: 40;
   background: rgba(5, 8, 10, 0.72);
+  /* Au milieu de ce qu'on voit, avec de l'air tout autour : ni la barre du
+     navigateur ni le bas de l'écran ne la mordent. */
   display: flex;
-  align-items: flex-end;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  box-sizing: border-box;
 }
 .m-feuille {
   width: 100%;
-  max-height: 78vh;
-  /* `vh` compte la place sous la barre du navigateur, qui cachait le bas de la
-     feuille : on prend la hauteur visible mesurée. */
-  max-height: calc(var(--haut, 100dvh) * 0.78);
-  overflow: auto;
+  max-width: 480px;
   background: var(--surface);
-  border-top: 1px solid var(--line);
-  border-radius: 14px 14px 0 0;
-  padding: 14px 14px calc(18px + env(safe-area-inset-bottom, 0px));
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55);
+  padding: 14px;
+  box-sizing: border-box;
   display: grid;
   gap: 12px;
+}
+/* L'en-tête reste, la liste défile. La borne est posée sur la liste
+   elle-même, pas déduite d'une colonne souple : Safari y tassait la liste
+   au point de couper sa première rangée. 78 % de ce qu'on voit vraiment,
+   moins l'en-tête et les marges de la feuille. */
+.m-f-defile {
+  /* Ce qu'on voit, moins l'air autour, l'en-tête et les marges de la fenêtre. */
+  max-height: calc(var(--haut, 100dvh) - 32px - 90px);
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  touch-action: pan-y;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  /* Les bords des boutons ne se rognent pas contre le bord qui défile. */
+  padding-bottom: 2px;
+}
+/* Sur une tablette, la feuille ne barre pas tout l'écran, et les endroits du
+   corps se rangent sur plusieurs colonnes : la liste tient le plus souvent
+   sans défiler. */
+@media (min-width: 700px) {
+  .m-feuille {
+    max-width: 760px;
+  }
+  .m-f-choix {
+    grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+  }
 }
 .m-f-tete {
   display: grid;
@@ -1963,6 +2002,26 @@ img {
   border-style: dashed !important;
 }
 /* Le rendre à l'inventaire : en dessous des endroits du corps, à part. */
+/* Un sac à dos dans le sac : le porter d'un geste, en tête de la fenêtre. */
+.m-f-porter {
+  display: grid;
+  gap: 2px;
+  width: 100%;
+  padding: 13px 14px;
+  border: 1px solid var(--brass);
+  border-radius: 9px;
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+  font-size: 15px;
+  font-weight: 600;
+  text-align: left;
+}
+.m-f-porter i {
+  font-style: normal;
+  font-weight: 400;
+  font-size: 12px;
+  color: var(--text-dim);
+}
 .m-f-remettre {
   width: 100%;
   padding: 12px 14px;
@@ -2583,6 +2642,42 @@ body.m-frisson .m-app {
 }
 .m-prp-rappel span {
   font-size: 20px;
+}
+/* Le jet de Volonté que le MJ attend : en sang, il presse plus qu'une invite. */
+.m-jet-attendu {
+  border-bottom-color: color-mix(in srgb, var(--blood) 60%, transparent);
+  background: color-mix(in srgb, var(--blood) 18%, var(--surface));
+  color: var(--text);
+}
+.m-jet-attendu .m-ja-texte {
+  font-size: 13.5px;
+}
+.m-ja-encart {
+  display: grid;
+  gap: 4px;
+  padding: 12px 14px;
+  border: 1px solid color-mix(in srgb, var(--blood) 60%, transparent);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--blood) 14%, var(--surface));
+}
+.m-ja-encart b {
+  font-size: 15px;
+}
+.m-ja-encart span {
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.m-ja-choisir {
+  justify-self: start;
+  margin-top: 4px;
+  padding: 7px 14px;
+  border-radius: 99px;
+  border: 1px solid var(--blood);
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
 }
 
 /* Le fond du sac, à côté de son titre : discret tant qu'il reste de la place. */
