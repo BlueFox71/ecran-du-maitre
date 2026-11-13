@@ -187,7 +187,9 @@ function Chantier({ place }: { place: Place }): JSX.Element {
       const t = e.key.toLowerCase()
       if (t === 'z' && !e.shiftKey) co.annuler()
       else if (t === 'y' || (t === 'z' && e.shiftKey)) co.retablir()
-      else if (t === 's') void enregistrer()
+      else if (t === 's') {
+        if (co.sale) void enregistrer()
+      }
       else return
       e.preventDefault()
     }

@@ -135,7 +135,9 @@ export function App(): JSX.Element {
 
       /* Ctrl+Z, Ctrl+Y (ou Ctrl+Maj+Z) : la préparation se défait et se refait.
          Dans un champ ou un texte, ils restent ceux du texte. */
-      if ((e.ctrlKey || e.metaKey) && !e.altKey && !inField) {
+      /* L'atelier a son propre historique, local au chantier : son Ctrl+Z ne
+         doit pas défaire en même temps un geste fait ailleurs dans la base. */
+      if ((e.ctrlKey || e.metaKey) && !e.altKey && !inField && useStore.getState().view !== 'atelier') {
         const k = e.key.toLowerCase()
         if (k === 'z' && !e.shiftKey) {
           e.preventDefault()

@@ -138,21 +138,37 @@ export function useConstruction(
     []
   )
 
+  const enCours = useRef(false)
   const enregistrer = useCallback(async (): Promise<boolean> => {
     const cur = courant.current
-    if (placeId == null || !cur) return false
+    /* Un seul enregistrement à la fois : deux envois du même cadre
+       recaleraient deux fois tout ce qui est posé sur le lieu. */
+    if (placeId == null || !cur || enCours.current) return false
+    enCours.current = true
+    /* Le cadre part avec cette construction-ci ; un agrandissement fait
+       pendant l'envoi repart de zéro, par rapport à elle. */
+    const envoye = cadre.current
+    cadre.current = null
     setEnregistrement(true)
     try {
       const png = await exporterPng(cur, assets, images)
-      await window.jdr.atelier.enregistrer(placeId, cur, png, cadre.current)
-      cadre.current = null
-      brouillons.delete(placeId)
-      setSale(false)
+      await window.jdr.atelier.enregistrer(placeId, cur, png, envoye)
+      /* Ce qu'on a modifié pendant l'export n'est pas enregistré, lui. */
+      if (courant.current === cur) {
+        brouillons.delete(placeId)
+        setSale(false)
+      }
       return true
     } catch (e) {
+      cadre.current = envoye
+        ? cadre.current
+          ? composerCadres(envoye, cadre.current)
+          : envoye
+        : cadre.current
       surErreur(e instanceof Error ? e.message : String(e))
       return false
     } finally {
+      enCours.current = false
       setEnregistrement(false)
     }
   }, [placeId, assets, images, surErreur])

@@ -62,8 +62,10 @@ export function barrieres(
   const out: Barriere[] = []
   for (const m of murs) {
     if (quoi === 'pieces') {
-      /* Un seuil reste un seuil : pour découper en pièces, on ne perce rien. */
-      if (MUR_NATURES[m.nature].pas) out.push(...segmentsDuMur(m, enPx))
+      /* Un seuil reste un seuil : pour découper en pièces, on ne perce rien.
+         Seul un mur découpe : un meuble de l'atelier arrête le pas mais ne
+         fait pas d'une chambre deux pièces. */
+      if (m.nature === 'mur') out.push(...segmentsDuMur(m, enPx))
       continue
     }
     if (!garde(m)) continue

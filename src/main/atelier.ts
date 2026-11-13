@@ -49,6 +49,25 @@ export function de(placeId: number): Construction | null {
 const CADRE_IDENTITE: Cadre = { x: 0, y: 0, w: 1, h: 1 }
 
 /**
+ * Ce document sert-il encore quelque part ? Une copie du lieu dans une autre
+ * séance, une image attachée, un moment, la Pochette… On le demande à la base
+ * elle-même : toute colonne qui déclare pointer vers `item`, plus les deux
+ * colonnes de lieu qui ne le déclarent pas.
+ */
+function itemEncoreUtilise(itemId: number): boolean {
+  const db = getDb()
+  const n = (sql: string, ...v: number[]): number => (db.prepare(sql).get(...v) as { n: number }).n
+  if (n(`SELECT COUNT(*) AS n FROM place WHERE map_item_id = ? OR ambience_item_id = ?`, itemId, itemId)) return true
+  const tables = db.prepare(`SELECT name FROM sqlite_master WHERE type = 'table'`).all() as { name: string }[]
+  for (const { name } of tables) {
+    const fks = db.prepare(`PRAGMA foreign_key_list("${name}")`).all() as { table: string; from: string }[]
+    for (const fk of fks)
+      if (fk.table === 'item' && n(`SELECT COUNT(*) AS n FROM "${name}" WHERE "${fk.from}" = ?`, itemId)) return true
+  }
+  return false
+}
+
+/**
  * Enregistrer : l'image devient la carte, la construction est retenue, le
  * calque en dérive.
  *
@@ -79,19 +98,38 @@ export function enregistrer(
   const ancienne = p.mapItemId
   const ancienItem = ancienne ? lib.getItem(ancienne) : null
   const db = getDb()
-  if (ancienne) places.recalerApresRognage(placeId, ancienne, neuf.id, cadre ?? CADRE_IDENTITE)
-  else db.prepare(`UPDATE place SET map_item_id = ? WHERE id = ?`).run(neuf.id, placeId)
+  /* Tout ou rien : un recalage écrit sans la construction qui va avec serait
+     rejoué au prochain essai, et tout ce qui est posé se décalerait deux fois. */
+  try {
+    db.transaction(() => {
+      if (ancienne) places.recalerApresRognage(placeId, ancienne, neuf.id, cadre ?? CADRE_IDENTITE)
+      else db.prepare(`UPDATE place SET map_item_id = ? WHERE id = ?`).run(neuf.id, placeId)
 
-  /* L'échelle se lit dans la construction : on sait combien mesure une case.
-     Le recalage vient d'y toucher ; c'est celle-ci qui fait foi. */
-  db.prepare(`UPDATE place SET echelle = ? WHERE id = ?`).run(c.largeur * c.metresParCase, placeId)
+      /* L'échelle se lit dans la construction : on sait combien mesure une case.
+         Le recalage vient d'y toucher ; c'est celle-ci qui fait foi. */
+      db.prepare(`UPDATE place SET echelle = ? WHERE id = ?`).run(c.largeur * c.metresParCase, placeId)
 
-  setConstruction(placeId, c)
-  synchroniserCalque(placeId, deriverCalque(c))
+      setConstruction(placeId, c)
+      synchroniserCalque(placeId, deriverCalque(c))
+    })()
+  } catch (e) {
+    /* La nouvelle image ne sert à rien : on ne la laisse pas traîner. */
+    try {
+      fsLib.effacerDeLApp(rel)
+    } catch {
+      /* sans conséquence */
+    }
+    throw e
+  }
 
   /* L'ancienne image n'était qu'un tirage de la construction : on ne la garde
      que si elle n'est pas de nous. */
-  if (ancienItem?.relPath && ancienItem.id !== neuf.id && ancienItem.relPath.includes(DOSSIER_PLANS_BATIS))
+  if (
+    ancienItem?.relPath &&
+    ancienItem.id !== neuf.id &&
+    ancienItem.relPath.includes(DOSSIER_PLANS_BATIS) &&
+    !itemEncoreUtilise(ancienItem.id)
+  )
     try {
       fsLib.effacerDeLApp(ancienItem.relPath)
     } catch {

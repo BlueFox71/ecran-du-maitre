@@ -132,3 +132,21 @@ describe('les obstacles', () => {
     expect(NATURES_TRACABLES).toEqual(['mur', 'rideau'])
   })
 })
+
+describe('les pièces révélées derrière une porte', () => {
+  it('un meuble ne coupe pas la pièce : barrieres(…, "pieces") ne retient que les murs', async () => {
+    const { barrieres } = await import('./murs')
+    const enPx = (p: [number, number]): { x: number; y: number } => ({ x: p[0] * 100, y: p[1] * 100 })
+    const tous = barrieres(
+      [
+        trait('mur', [[0, 0], [1, 0]]),
+        trait('obstacle', [[0.4, 0.4], [0.6, 0.4]]),
+        trait('obstacle-bas', [[0.4, 0.5], [0.6, 0.5]]),
+        trait('rideau', [[0.2, 0.2], [0.3, 0.3]])
+      ],
+      'pieces',
+      enPx
+    )
+    expect(tous).toHaveLength(1)
+  })
+})

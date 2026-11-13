@@ -742,6 +742,9 @@ export function copierLieu(
         /* Reprise : les portes repartent fermées (les verrous préparés restent). */
         copierLigne('ouverture', o, { mur_id: mur, ...(suite ? {} : { ouverte: 0 }) })
     }
+    /* Un lieu bâti part avec sa construction : sans elle, ses murs de
+       l'atelier seraient verrouillés et plus rien ne pourrait les retoucher. */
+    db.prepare(`INSERT OR IGNORE INTO construction (place_id, data) SELECT ?, data FROM construction WHERE place_id = ?`).run(neuf, p.id)
     for (const l of ids(`SELECT id FROM lumiere WHERE place_id = ?`, p.id))
       copierLigne('lumiere', l, { place_id: neuf })
     for (const z of ids(`SELECT id FROM son_zone WHERE place_id = ?`, p.id))
