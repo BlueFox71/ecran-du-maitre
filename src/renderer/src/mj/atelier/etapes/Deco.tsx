@@ -406,7 +406,7 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
           </div>
           <ul className="at-raccourcis">
             <li>
-              <kbd>Ctrl</kbd> <span className="geste">+ clic</span> : ajouter ou retirer de la sélection
+              <kbd>Ctrl</kbd> <span className="at-geste">+ clic</span> : ajouter ou retirer de la sélection
             </li>
             <li>Glisser : déplacer {seul ? 'l’objet' : 'le groupe'} (<kbd>Ctrl</kbd> : centrer sur la case)</li>
             {seul ? (
@@ -428,7 +428,7 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
             <kbd>Maj</kbd> : poser plusieurs fois
           </li>
           <li>
-            <kbd>Ctrl</kbd> <span className="geste">+ clic sur un objet</span> : sélection multiple
+            <kbd>Ctrl</kbd> <span className="at-geste">+ clic sur un objet</span> : sélection multiple
           </li>
         </ul>
       )}
