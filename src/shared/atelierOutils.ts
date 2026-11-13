@@ -2,7 +2,7 @@
  * Ce que les outils de l'atelier demandent à la géométrie : un rectangle
  * tiré à la souris, le sol sous le curseur, la pièce qu'on veut paver.
  */
-import type { Construction, PointCase, SolPeint } from './atelier'
+import { placeOuverture, type Construction, type OuvertureBatie, type PointCase, type SolPeint } from './atelier'
 import { dansForme, formesDesMurs } from './pieces'
 import type { Mur, PointMur } from './types'
 
@@ -101,4 +101,20 @@ export function murSous(
   const r = meilleur as { murId: string; sommet: number | null; d: number } | null
   if (!r) return null
   return avecD ? { murId: r.murId, sommet: r.sommet, d: r.d } : { murId: r.murId, sommet: r.sommet }
+}
+
+/** L'ouverture sous un point : dans son rectangle (sa largeur le long du mur, l'épaisseur du mur en travers). */
+export function ouvertureSous(c: Construction, p: PointCase): OuvertureBatie | null {
+  for (let i = c.ouvertures.length - 1; i >= 0; i--) {
+    const o = c.ouvertures[i]
+    const m = c.murs.find((x) => x.id === o.murId)
+    if (!m) continue
+    const { centre, angle, largeur } = placeOuverture(m, o)
+    const dx = p[0] - centre[0]
+    const dy = p[1] - centre[1]
+    const le = dx * Math.cos(angle) + dy * Math.sin(angle)
+    const tr = -dx * Math.sin(angle) + dy * Math.cos(angle)
+    if (Math.abs(le) <= largeur / 2 && Math.abs(tr) <= Math.max(m.epaisseur, 0.3)) return o
+  }
+  return null
 }

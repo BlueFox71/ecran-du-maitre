@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { constructionVide, type Construction } from './atelier'
-import { murSous, pieceSous, rectangle, solSous } from './atelierOutils'
+import { murSous, ouvertureSous, pieceSous, rectangle, solSous } from './atelierOutils'
 
 const terrain = (): Construction => ({ ...constructionVide(), largeur: 20, hauteur: 10 })
 
@@ -74,5 +74,18 @@ describe('murSous', () => {
     const r = murSous(c, [9.2, 7], 0.5, true)!
     expect(r.murId).toBe('b')
     expect(r.d).toBeCloseTo((8 + 2) / 12, 6)
+  })
+})
+
+describe('ouvertureSous', () => {
+  const c = terrain()
+  c.murs.push({ id: 'm', assetId: 'x', pts: [[0, 2], [10, 2]], epaisseur: 0.4 })
+  c.ouvertures.push({ id: 'p', murId: 'm', nature: 'porte', assetId: 'y', d: 0.5, largeur: 2 })
+  it('trouve l’ouverture sous le point, sur toute sa largeur', () => {
+    expect(ouvertureSous(c, [5.9, 2.1])?.id).toBe('p')
+  })
+  it('à côté de l’ouverture, rien', () => {
+    expect(ouvertureSous(c, [7, 2])).toBeNull()
+    expect(ouvertureSous(c, [5, 3])).toBeNull()
   })
 })
