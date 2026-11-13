@@ -1156,6 +1156,132 @@
       "fichier": "ouvertures/fenetre-baie.png"
     },
     {
+      "id": "ouvertures/porte-service",
+      "type": "porte",
+      "nom": "Porte de service",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-service.png"
+    },
+    {
+      "id": "ouvertures/porte-entree",
+      "type": "porte",
+      "nom": "Porte d’entrée",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-entree.png"
+    },
+    {
+      "id": "ouvertures/porte-acajou",
+      "type": "porte",
+      "nom": "Porte en acajou",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-acajou.png"
+    },
+    {
+      "id": "ouvertures/porte-brisee",
+      "type": "porte",
+      "nom": "Porte brisée",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-brisee.png"
+    },
+    {
+      "id": "ouvertures/porte-chapelle",
+      "type": "porte",
+      "nom": "Porte de chapelle",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-chapelle.png"
+    },
+    {
+      "id": "ouvertures/porte-grange",
+      "type": "porte",
+      "nom": "Porte de grange",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-grange.png"
+    },
+    {
+      "id": "ouvertures/porte-coffre",
+      "type": "porte",
+      "nom": "Porte de coffre-fort",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-coffre.png"
+    },
+    {
+      "id": "ouvertures/porte-cellule",
+      "type": "porte",
+      "nom": "Porte de cellule",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-cellule.png"
+    },
+    {
+      "id": "ouvertures/porte-secrete",
+      "type": "porte",
+      "nom": "Porte secrète",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-secrete.png"
+    },
+    {
+      "id": "ouvertures/porte-fenetre",
+      "type": "porte",
+      "nom": "Porte-fenêtre",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-fenetre.png"
+    },
+    {
+      "id": "ouvertures/rideau-velours",
+      "type": "porte",
+      "nom": "Rideau de velours",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/rideau-velours.png"
+    },
+    {
+      "id": "ouvertures/herse",
+      "type": "porte",
+      "nom": "Herse en bois",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/herse.png"
+    },
+    {
+      "id": "ouvertures/porte-blanche",
+      "type": "porte",
+      "nom": "Porte blanche",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-blanche.png"
+    },
+    {
+      "id": "ouvertures/porte-coupe-feu",
+      "type": "porte",
+      "nom": "Porte coupe-feu",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-coupe-feu.png"
+    },
+    {
+      "id": "ouvertures/porte-bureau",
+      "type": "porte",
+      "nom": "Porte de bureau",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-bureau.png"
+    },
+    {
+      "id": "ouvertures/porte-verre-depoli",
+      "type": "porte",
+      "nom": "Porte en verre dépoli",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-verre-depoli.png"
+    },
+    {
+      "id": "ouvertures/porte-automatique",
+      "type": "porte",
+      "nom": "Porte automatique",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-automatique.png"
+    },
+    {
+      "id": "ouvertures/porte-blindee",
+      "type": "porte",
+      "nom": "Porte blindée",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-blindee.png"
+    },
+    {
       "id": "murs/uni-blanc",
       "type": "mur",
       "nom": "Mur uni (à colorer)",

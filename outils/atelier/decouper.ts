@@ -1325,6 +1325,57 @@ const PLANCHES: Planche[] = [
     ]
   },
   {
+    fichier: 'planches/ouvertures 2.png',
+    fond: 'magenta',
+    cols: 2,
+    rows: 3,
+    type: 'porte',
+    categorie: 'Portes et fenêtres',
+    dossier: 'ouvertures',
+    cases: [
+      { id: 'porte-service', nom: 'Porte de service' },
+      { id: 'porte-entree', nom: 'Porte d’entrée' },
+      { id: 'porte-acajou', nom: 'Porte en acajou' },
+      { id: 'porte-brisee', nom: 'Porte brisée' },
+      { id: 'porte-chapelle', nom: 'Porte de chapelle' },
+      { id: 'porte-grange', nom: 'Porte de grange' }
+    ]
+  },
+  {
+    fichier: 'planches/ouvertures 3.png',
+    fond: 'magenta',
+    cols: 2,
+    rows: 3,
+    type: 'porte',
+    categorie: 'Portes et fenêtres',
+    dossier: 'ouvertures',
+    cases: [
+      { id: 'porte-coffre', nom: 'Porte de coffre-fort' },
+      { id: 'porte-cellule', nom: 'Porte de cellule' },
+      { id: 'porte-secrete', nom: 'Porte secrète' },
+      { id: 'porte-fenetre', nom: 'Porte-fenêtre' },
+      { id: 'rideau-velours', nom: 'Rideau de velours' },
+      { id: 'herse', nom: 'Herse en bois' }
+    ]
+  },
+  {
+    fichier: 'planches/ouvertures 4.png',
+    fond: 'magenta',
+    cols: 2,
+    rows: 3,
+    type: 'porte',
+    categorie: 'Portes et fenêtres',
+    dossier: 'ouvertures',
+    cases: [
+      { id: 'porte-blanche', nom: 'Porte blanche' },
+      { id: 'porte-coupe-feu', nom: 'Porte coupe-feu' },
+      { id: 'porte-bureau', nom: 'Porte de bureau' },
+      { id: 'porte-verre-depoli', nom: 'Porte en verre dépoli' },
+      { id: 'porte-automatique', nom: 'Porte automatique' },
+      { id: 'porte-blindee', nom: 'Porte blindée' }
+    ]
+  },
+  {
     fichier: 'planches/icones 1.png',
     fond: 'magenta',
     icones: true,
