@@ -233,3 +233,12 @@ describe('objetsDansRectangle', () => {
     expect(objetsDansRectangle(objs, [5.5, 5], [6, 6])).toEqual([])
   })
 })
+
+describe('tirerObjet, variations au choix', () => {
+  it('sans rotation variée : droit ; sans taille variée : taille réelle', () => {
+    const r = tirerObjet(['a', 'b'], () => 0.7, { rotation: false, taille: false })!
+    expect(r.angle).toBe(0)
+    expect(r.echelle).toBe(1)
+    expect(r.id).toBe('b')
+  })
+})

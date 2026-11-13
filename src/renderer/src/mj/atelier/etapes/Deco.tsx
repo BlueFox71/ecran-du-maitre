@@ -94,7 +94,8 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
   const [hasard, setHasard] = useState(false)
   const [lot, setLot] = useState<string[]>([])
   const [prochain, setProchain] = useState<{ id: string; angle: number; echelle: number } | null>(null)
-  const tirer = (ids: string[]): void => setProchain(tirerObjet(ids, Math.random))
+  const [varier, setVarier] = useState({ rotation: true, taille: true })
+  const tirer = (ids: string[], v = varier): void => setProchain(tirerObjet(ids, Math.random, v))
   /* Ce que le prochain clic posera : la vignette armée, ou le tirage du mode aléatoire. */
   const aPoser: { asset: AssetAtelier; angle: number; echelle: number } | null = (() => {
     if (hasard && prochain) {
@@ -432,7 +433,8 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
           <li>Glisser depuis le vide : sélectionner tout ce que le rectangle touche</li>
         </ul>
       )}
-      <div className="at-section at-outils">
+      <div className="at-section">
+        <div className="at-outils">
         <button
           className="btn btn-sm"
           aria-pressed={hasard}
@@ -446,12 +448,39 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
         >
           🎲 Mode aléatoire
         </button>
+        </div>
         {hasard ? (
+          <>
+            <label className="at-case">
+              <input
+                type="checkbox"
+                checked={varier.rotation}
+                onChange={(e) => {
+                  const v = { ...varier, rotation: e.target.checked }
+                  setVarier(v)
+                  tirer(lot, v)
+                }}
+              />
+              Rotation variée
+            </label>
+            <label className="at-case">
+              <input
+                type="checkbox"
+                checked={varier.taille}
+                onChange={(e) => {
+                  const v = { ...varier, taille: e.target.checked }
+                  setVarier(v)
+                  tirer(lot, v)
+                }}
+              />
+              Taille variée
+            </label>
           <p className="at-aide">
             {lot.length
               ? `${lot.length} vignette${lot.length > 1 ? 's' : ''} cochée${lot.length > 1 ? 's' : ''} : clique sur le plan pour en semer. Clic droit ou Échap pour arrêter.`
               : 'Coche les vignettes à semer, puis clique sur le plan.'}
           </p>
+          </>
         ) : null}
       </div>
       <Palette

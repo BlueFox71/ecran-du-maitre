@@ -236,13 +236,14 @@ export const ECHELLE_HASARD = { min: 0.8, max: 1.2 }
  */
 export function tirerObjet(
   ids: string[],
-  hasard: () => number
+  hasard: () => number,
+  varier: { rotation: boolean; taille: boolean } = { rotation: true, taille: true }
 ): { id: string; angle: number; echelle: number } | null {
   if (!ids.length) return null
   const id = ids[Math.min(ids.length - 1, Math.floor(hasard() * ids.length))]
   const angle = hasard() * 360
   const echelle = ECHELLE_HASARD.min + hasard() * (ECHELLE_HASARD.max - ECHELLE_HASARD.min)
-  return { id, angle, echelle }
+  return { id, angle: varier.rotation ? angle : 0, echelle: varier.taille ? echelle : 1 }
 }
 
 /** Les objets que touche un rectangle tiré entre deux points (leur boîte le chevauche). */
