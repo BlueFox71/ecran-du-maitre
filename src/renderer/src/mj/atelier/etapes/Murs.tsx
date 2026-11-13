@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { inverserCotes, nouvelId, type MurBati, type PointCase } from '@shared/atelier'
-import { habillageSous, murSous, pieceSous, rectangle } from '@shared/atelierOutils'
+import { appliquerHabillage, habillageSous, murSous, pieceSous, rectangle } from '@shared/atelierOutils'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
 import { ImportAsset } from '../ImportAsset'
@@ -124,11 +124,9 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
             if (_e.altKey) {
               if (deja) co.modifier((c) => ({ ...c, habillages: (c.habillages ?? []).filter((h) => h.id !== deja.id) }))
             } else if (matiereSure) {
-              const h = { id: deja?.id ?? nouvelId(), pt, assetId: matiereSure, ...(teinte ? { teinte } : {}) }
-              co.modifier((c) => ({
-                ...c,
-                habillages: [...(c.habillages ?? []).filter((x) => x.id !== h.id), h]
-              }))
+              /* Les murs de la pièce passent à deux côtés, la face tournée vers elle habillée. */
+              const face = { assetId: matiereSure, ...(teinte ? { teinte } : {}) }
+              co.modifier((c) => appliquerHabillage(c, pt, face))
             }
           }
         } else {

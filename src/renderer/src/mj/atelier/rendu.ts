@@ -18,7 +18,7 @@ import {
   type PointCase
 } from '@shared/atelier'
 import type { AssetAtelier } from '@shared/atelierAssets'
-import { pieceSous } from '@shared/atelierOutils'
+import { cotesDeLaPiece, pieceSous } from '@shared/atelierOutils'
 import type { ImagesAtelier } from './images'
 
 const FOND = '#0b1014'
@@ -203,8 +203,12 @@ function dessinerMurs(
      Un mur à deux côtés pose chaque face sur sa moitié : le côté 1 à gauche du
      sens de tracé (y < 0), le côté 2 à droite. */
   type Face = { assetId: string; teinte?: string; y0: number; y1: number }
-  const peindre = (facesDe: (m: (typeof morceaux)[number]['m']) => Face[]): void => {
+  const peindre = (
+    facesDe: (m: (typeof morceaux)[number]['m']) => Face[],
+    garder: (m: (typeof morceaux)[number]['m']) => boolean = () => true
+  ): void => {
     for (const { m, parts } of morceaux) {
+      if (!garder(m)) continue
       const faces = facesDe(m)
       for (const p of parts)
         pourChaqueSegment(p, m, px, (x, y, angle, l, ep) => {
@@ -260,7 +264,13 @@ function dessinerMurs(
     chemin(ctx, piece, px)
     ctx.closePath()
     ctx.clip()
-    peindre(() => [{ assetId: h.assetId, teinte: h.teinte, y0: -0.5, y1: 0.5 }])
+    /* Les murs qui bordent la pièce sur toute leur longueur ont déjà leur face
+       réglée (deux côtés) : on ne les repeint pas, une retouche y resterait cachée. */
+    const cotes = cotesDeLaPiece(c, piece)
+    peindre(
+      () => [{ assetId: h.assetId, teinte: h.teinte, y0: -0.5, y1: 0.5 }],
+      (m) => !cotes.get(m.id)
+    )
     ctx.restore()
   }
 }

@@ -269,3 +269,72 @@ export function habillageSous(c: Construction, p: PointCase): Habillage | null {
   if (!piece) return null
   return c.habillages?.find((h) => dansForme(h.pt, piece) && pieceSous(c, h.pt)?.length === piece.length) ?? null
 }
+
+/**
+ * Comment chaque mur borde une pièce : `1` ou `2`, le côté tourné vers elle
+ * quand il la longe sur toute sa longueur ; `null` quand il ne la longe qu'en
+ * partie (le mur extérieur d'une maison, qui borde plusieurs pièces). Les murs
+ * qui ne la touchent pas sont absents.
+ *
+ * On sonde de part et d'autre de chaque segment, en plusieurs points : le
+ * côté 1 est à gauche du sens de tracé (comme au rendu).
+ */
+export function cotesDeLaPiece(c: Construction, piece: PointCase[]): Map<string, 1 | 2 | null> {
+  const out = new Map<string, 1 | 2 | null>()
+  const EPS = 0.05
+  for (const m of c.murs) {
+    let cote: 1 | 2 | null | undefined
+    let touche = false
+    let entier = true
+    for (let i = 0; i + 1 < m.pts.length; i++) {
+      const [ax, ay] = m.pts[i]
+      const [bx, by] = m.pts[i + 1]
+      const l = Math.hypot(bx - ax, by - ay)
+      if (l < 1e-9) continue
+      const nx = (by - ay) / l
+      const ny = -(bx - ax) / l
+      for (const t of [0.1, 0.3, 0.5, 0.7, 0.9]) {
+        const px = ax + (bx - ax) * t
+        const py = ay + (by - ay) * t
+        const gauche = dansForme([px + nx * EPS, py + ny * EPS], piece)
+        const droite = dansForme([px - nx * EPS, py - ny * EPS], piece)
+        if (gauche === droite) {
+          entier = false
+          continue
+        }
+        touche = true
+        const k: 1 | 2 = gauche ? 1 : 2
+        if (cote === undefined) cote = k
+        else if (cote !== k) entier = false
+      }
+    }
+    if (touche) out.set(m.id, entier && cote ? cote : null)
+  }
+  return out
+}
+
+/**
+ * Habiller une pièce : les murs qui la bordent sur toute leur longueur passent
+ * à deux côtés, la face tournée vers elle prend la matière ; l'habillage est
+ * retenu pour les murs qui ne la longent qu'en partie.
+ */
+export function appliquerHabillage(
+  c: Construction,
+  pt: PointCase,
+  face: { assetId: string; teinte?: string }
+): Construction {
+  const piece = pieceSous(c, pt)
+  if (!piece) return c
+  const cotes = cotesDeLaPiece(c, piece)
+  const deja = habillageSous(c, pt)
+  const murs = c.murs.map((m) => {
+    const k = cotes.get(m.id)
+    if (!k) return m
+    const cote2 = m.cote2 ?? { assetId: m.assetId, ...(m.teinte ? { teinte: m.teinte } : {}) }
+    if (k === 2) return { ...m, cote2: { ...face } }
+    const { teinte: _t, ...reste } = m
+    return { ...reste, assetId: face.assetId, ...(face.teinte ? { teinte: face.teinte } : {}), cote2 }
+  })
+  const h = { id: deja?.id ?? crypto.randomUUID(), pt, ...face }
+  return { ...c, murs, habillages: [...(c.habillages ?? []).filter((x) => x.id !== h.id), h] }
+}

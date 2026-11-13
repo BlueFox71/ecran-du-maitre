@@ -8,6 +8,7 @@ import {
   rectangle,
   redimensionner,
   solSous,
+  appliquerHabillage,
   centreDeCase,
   habillageSous,
   objetsDansRectangle,
@@ -271,5 +272,41 @@ describe('habillageSous, deux pièces de même forme', () => {
     )
     c.habillages = [{ id: 'g', pt: [3, 5], assetId: 'bois' }]
     expect(habillageSous(c, [9, 5])).toBeNull()
+  })
+})
+
+describe('appliquerHabillage', () => {
+  const maison = (): Construction => {
+    const c = terrain()
+    c.murs.push(
+      { id: 'ext', assetId: 'pierre', pts: [[1, 1], [11, 1], [11, 9], [1, 9], [1, 1]], epaisseur: 0.4 },
+      { id: 'refend', assetId: 'pierre', pts: [[6, 1], [6, 9]], epaisseur: 0.4 },
+      { id: 'loin', assetId: 'pierre', pts: [[14, 1], [18, 1]], epaisseur: 0.4 }
+    )
+    return c
+  }
+  it('le mur qui borde toute la pièce passe à deux côtés, la face tournée vers la pièce prend la matière', () => {
+    const c = appliquerHabillage(maison(), [3, 5], { assetId: 'bois', teinte: '#4a5e3e' })
+    const refend = c.murs.find((m) => m.id === 'refend')!
+    /* Tracé vers le bas, sa gauche est à l'est : la pièce de gauche est côté 2. */
+    expect(refend.assetId).toBe('pierre')
+    expect(refend.cote2).toEqual({ assetId: 'bois', teinte: '#4a5e3e' })
+  })
+  it('le mur extérieur, qui longe deux pièces, garde sa matière ; l’habillage est enregistré', () => {
+    const c = appliquerHabillage(maison(), [3, 5], { assetId: 'bois' })
+    const ext = c.murs.find((m) => m.id === 'ext')!
+    expect(ext.assetId).toBe('pierre')
+    expect(ext.cote2).toBeUndefined()
+    expect(c.habillages).toHaveLength(1)
+    expect(c.murs.find((m) => m.id === 'loin')!.cote2).toBeUndefined()
+  })
+  it('une pièce tracée seule : tout son mur passe à deux côtés', () => {
+    const c = terrain()
+    c.murs.push({ id: 'p', assetId: 'pierre', pts: [[2, 2], [6, 2], [6, 6], [2, 6], [2, 2]], epaisseur: 0.4 })
+    const r = appliquerHabillage(c, [4, 4], { assetId: 'bois' })
+    const m = r.murs[0]
+    /* Tracée dans le sens des aiguilles d'une montre (y vers le bas) : l'intérieur est à droite. */
+    expect(m.cote2).toEqual({ assetId: 'bois' })
+    expect(m.assetId).toBe('pierre')
   })
 })
