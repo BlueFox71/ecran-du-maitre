@@ -10,7 +10,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import type { AssetAtelier } from '@shared/atelierAssets'
 import type { Place } from '@shared/types'
-import { bordsPourTaille, tailleMinimale, type Ancre, type Construction } from '@shared/atelier'
+import { bordsPourTaille, niveauxDuLieu, tailleMinimale, type Ancre, type Construction } from '@shared/atelier'
 import { chargerImages, type ImagesAtelier } from '../atelier/images'
 import { useConstruction, type ConstructionOuverte } from '../atelier/useConstruction'
 import { Toile, type Outil } from '../atelier/Toile'
@@ -247,6 +247,16 @@ function Chantier({ place }: { place: Place }): JSX.Element {
     }
   }
 
+  /* Passer d'un niveau à l'autre : ce qui est en cours est enregistré d'abord. */
+  const niveaux = niveauxDuLieu(place, s.places.filter((p) => p.construit))
+  const rang = niveaux.findIndex((n) => n.id === place.id)
+  const allerAuNiveau = async (i: number): Promise<void> => {
+    const cible = niveaux[i]
+    if (!cible || doublage) return
+    if (co.sale && !(await co.enregistrer())) return
+    s.ouvrirAtelier(cible.id)
+  }
+
   const sortir = (): void => {
     if (co.sale) setQuitter(true)
     else s.ouvrirAtelier(null)
@@ -308,6 +318,27 @@ function Chantier({ place }: { place: Place }): JSX.Element {
         >
           {essai.enTest ? 'Arrêter l’essai' : 'Essayer avec un pion'}
         </button>
+        {niveaux.length > 1 ? (
+          <span className="at-niveaux" title="Les niveaux de ce lieu">
+            <button
+              className="btn btn-sm"
+              disabled={rang <= 0 || co.enregistrement}
+              onClick={() => void allerAuNiveau(rang - 1)}
+              title="Niveau précédent"
+            >
+              ‹
+            </button>
+            <span className="at-niveau">{niveaux[rang]?.n ?? '?'}</span>
+            <button
+              className="btn btn-sm"
+              disabled={rang >= niveaux.length - 1 || co.enregistrement}
+              onClick={() => void allerAuNiveau(rang + 1)}
+              title="Niveau suivant"
+            >
+              ›
+            </button>
+          </span>
+        ) : null}
         <button
           className="btn btn-sm"
           disabled={doublage || co.enregistrement}

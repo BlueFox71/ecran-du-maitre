@@ -626,3 +626,18 @@ export function nomDuNiveauSuivant(nom: string, freres: string[]): string {
   }
   return `${base} · niveau ${haut + 1}`
 }
+
+/**
+ * Les niveaux d'un lieu : lui et ses doubles rangés au même endroit, sous le
+ * même nom au « · niveau N » près. Le lieu sans numéro est le niveau 1.
+ */
+export function niveauxDuLieu(
+  lieu: { id: number; name: string; parentId: number | null },
+  tous: { id: number; name: string; parentId: number | null }[]
+): { id: number; n: number }[] {
+  const base = lieu.name.replace(NIVEAU, '')
+  return tous
+    .filter((p) => p.parentId === lieu.parentId && p.name.replace(NIVEAU, '') === base)
+    .map((p) => ({ id: p.id, n: Number(NIVEAU.exec(p.name)?.[1] ?? 1) }))
+    .sort((a, b) => a.n - b.n || a.id - b.id)
+}

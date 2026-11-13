@@ -26964,3 +26964,16 @@ button.at-titre:hover {
   opacity: 0;
   cursor: pointer;
 }
+
+/* Le sélecteur de niveau de l'atelier : ‹ 2 › */
+.at-niveaux {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.at-niveau {
+  min-width: 1.6em;
+  text-align: center;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+}

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   agrandir,
   nomDuNiveauSuivant,
+  niveauxDuLieu,
   bordsPourTaille,
   tailleMinimale,
   composerCadres,
@@ -380,5 +381,21 @@ describe('nomDuNiveauSuivant', () => {
   it('compte les niveaux déjà là, même depuis un niveau', () => {
     const freres = ['Le manoir', 'Le manoir · niveau 2', 'Le manoir · niveau 3']
     expect(nomDuNiveauSuivant('Le manoir · niveau 2', freres)).toBe('Le manoir · niveau 4')
+  })
+})
+
+describe('niveauxDuLieu', () => {
+  const p = (id: number, name: string, parentId: number | null = 1) => ({ id, name, parentId })
+  it('les niveaux d’un même lieu, du rez-de-chaussée au plus haut', () => {
+    const tous = [p(3, 'Le manoir · niveau 3'), p(1, 'Le manoir'), p(2, 'Le manoir · niveau 2'), p(4, 'La cave')]
+    expect(niveauxDuLieu(tous[2], tous)).toEqual([
+      { id: 1, n: 1 },
+      { id: 2, n: 2 },
+      { id: 3, n: 3 }
+    ])
+  })
+  it('un lieu rangé ailleurs ne compte pas', () => {
+    const tous = [p(1, 'Le manoir'), p(2, 'Le manoir · niveau 2', 9)]
+    expect(niveauxDuLieu(tous[0], tous)).toEqual([{ id: 1, n: 1 }])
   })
 })
