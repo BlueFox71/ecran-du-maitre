@@ -498,7 +498,7 @@ export type ReglageFenetre = Partial<Pick<FenetreImage, 'x' | 'y' | 'largeur'>> 
  * pose en cascade sur la précédente, à sa taille, pour ne pas la cacher tout
  * à fait.
  */
-export function ouvrirFenetre(itemId: number): DisplayState {
+export function ouvrirFenetre(itemId: number, grande = false): DisplayState {
   const deja = state.fenetres.find((f) => f.itemId === itemId)
   if (deja) {
     state.fenetres = [...state.fenetres.filter((f) => f !== deja), deja]
@@ -511,17 +511,31 @@ export function ouvrirFenetre(itemId: number): DisplayState {
   const ratio = it.width && it.height ? it.width / it.height : 4 / 3
   const avant = state.fenetres[state.fenetres.length - 1]
   const decale = (v: number): number => (v + 0.05 > 0.85 ? 0.3 : v + 0.05)
+  /* « Grande » : celle qu'on tend à la table depuis la Pochette — au centre,
+     aussi grande que l'écran le permet sans en déborder. La hauteur suit la
+     largeur au ratio de l'image ; on compte sur un écran en 16/9. */
+  const ecran = 16 / 9
   state.fenetres = [
     ...state.fenetres,
-    {
-      itemId,
-      url,
-      title: it.title,
-      x: avant ? decale(avant.x) : 0.5,
-      y: avant ? decale(avant.y) : 0.5,
-      largeur: avant?.largeur ?? 30,
-      ratio
-    }
+    grande
+      ? {
+          itemId,
+          url,
+          title: it.title,
+          x: 0.5,
+          y: 0.5,
+          largeur: Math.round(Math.min(70, (85 * ratio) / ecran)),
+          ratio
+        }
+      : {
+          itemId,
+          url,
+          title: it.title,
+          x: avant ? decale(avant.x) : 0.5,
+          y: avant ? decale(avant.y) : 0.5,
+          largeur: avant?.largeur ?? 30,
+          ratio
+        }
   ]
   broadcast()
   return state

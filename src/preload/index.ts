@@ -1253,8 +1253,12 @@ const api = {
     vision: (v: 'regards' | 'jour') => call<DisplayState>('display:vision', v),
     pionPv: (on: boolean) => call<DisplayState>('display:pionPv', on),
     encart: (patch: Partial<Encart>) => call<DisplayState>('display:encart', patch),
-    /** Pose une image en fenêtre par-dessus le direct ; déjà ouverte, la ramène devant. */
-    fenetre: (itemId: number) => call<DisplayState>('display:fenetre', itemId),
+    /**
+     * Pose une image en fenêtre par-dessus le direct ; déjà ouverte, la ramène
+     * devant. `grande` : centrée, aussi grande que l'écran le permet.
+     */
+    fenetre: (itemId: number, grande?: boolean) =>
+      call<DisplayState>('display:fenetre', itemId, grande),
     /** Déplace, retaille ou ramène devant une fenêtre : centre en fractions, largeur en %. */
     reglerFenetre: (
       itemId: number,

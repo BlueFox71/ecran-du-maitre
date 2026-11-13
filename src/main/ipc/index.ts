@@ -1409,7 +1409,9 @@ export function registerIpc(): void {
   on('display:vision', (v: 'regards' | 'jour') => display.setVision(v))
   on('display:pionPv', (on2: boolean) => display.setPionPv(on2))
   on('display:encart', (patch: any) => display.setEncart(patch))
-  on('display:fenetre', (itemId: number) => display.ouvrirFenetre(itemId))
+  on('display:fenetre', (itemId: number, grande?: boolean) =>
+    display.ouvrirFenetre(itemId, !!grande)
+  )
   on('display:reglerFenetre', (itemId: number, patch: any) => display.reglerFenetre(itemId, patch))
   on('display:fermerFenetre', (itemId?: number) => display.fermerFenetre(itemId))
   on('display:retirerDe', (id?: number) => display.retirerDe(id))

@@ -39,6 +39,7 @@ import {
   IconPeople,
   IconPlus,
   IconPochette,
+  IconScreen,
   IconTrash,
   kindIcon
 } from '../components/Icons'
@@ -630,6 +631,12 @@ function Carte({
   /* La loupe : le document en grand, pour le MJ seul. */
   const [loupe, setLoupe] = useState(false)
   const s = useStore()
+  /* Ce qui passe en ce moment à l'écran de la table : une image en fenêtre
+     libre par-dessus le visuel, ou une vidéo à la place du visuel. */
+  const slide = s.display?.slide
+  const enFenetre = !!s.display?.fenetres.some((f) => f.itemId === doc.itemId)
+  const aLEcran =
+    enFenetre || (!!slide && 'itemId' in slide && slide.itemId === doc.itemId)
   const renommer = async (v: string | null): Promise<void> => {
     setNom(null)
     const neuf = v?.trim()
@@ -803,6 +810,46 @@ function Carte({
           {doc.visible ? 'Montré' : 'Montrer'}
         </button>
         <div className="spacer" />
+        {/* L'écran de la table, sans passer par le Pupitre. Une image s'y pose
+            en fenêtre libre, par-dessus le lieu qu'on joue : le visuel reste,
+            et un second clic la referme. Une vidéo ne tient pas en fenêtre —
+            elle prend la place du visuel. Un PDF ne s'y affiche pas du tout. */}
+        <button
+          className={`ico-acte${aLEcran ? ' a-l-ecran' : ''}`}
+          title={
+            doc.item.kind === 'pdf'
+              ? 'Un PDF ne se diffuse pas à l’écran des joueurs — seulement sur leur téléphone'
+              : enFenetre
+                ? 'Refermer sa fenêtre à l’écran des joueurs'
+                : doc.item.kind === 'image'
+                  ? 'L’ouvrir en fenêtre à l’écran des joueurs — par-dessus le visuel'
+                  : aLEcran
+                    ? 'Déjà à l’écran des joueurs'
+                    : 'La diffuser à l’écran des joueurs — à la place du visuel'
+          }
+          aria-label={enFenetre ? 'Refermer sa fenêtre à l’écran' : 'Le diffuser à l’écran des joueurs'}
+          aria-pressed={aLEcran}
+          disabled={doc.item.kind === 'pdf'}
+          onClick={async () => {
+            if (enFenetre) {
+              await window.jdr.display.fermerFenetre(doc.itemId)
+              return
+            }
+            const d =
+              doc.item.kind === 'image'
+                ? await window.jdr.display.fenetre(doc.itemId, true)
+                : await window.jdr.display.showItem(doc.itemId)
+            s.toast(
+              d.frozen
+                ? `« ${doc.item.title} » est prêt — l’écran est gelé, les joueurs le verront au dégel.`
+                : doc.item.kind === 'image'
+                  ? `« ${doc.item.title} » en fenêtre à l’écran des joueurs`
+                  : `« ${doc.item.title} » à l’écran des joueurs`
+            )
+          }}
+        >
+          <IconScreen />
+        </button>
         <button
           className="ico-acte"
           title="À qui il est donné"
