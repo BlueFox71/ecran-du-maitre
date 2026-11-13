@@ -203,47 +203,61 @@ function dessinerMurs(
      Un mur à deux côtés pose chaque face sur sa moitié : le côté 1 à gauche du
      sens de tracé (y < 0), le côté 2 à droite. */
   type Face = { assetId: string; teinte?: string; y0: number; y1: number }
+  /* Trois passes, pour que les murs se fondent à leurs jonctions (un T, un
+     coin) : les surfaces, puis les arêtes sombres, puis le cœur de chaque mur
+     repeint par-dessus — il efface les arêtes d'un autre mur qui le
+     traversent, sans toucher aux siennes. */
   const peindre = (
     facesDe: (m: (typeof morceaux)[number]['m']) => Face[],
     garder: (m: (typeof morceaux)[number]['m']) => boolean = () => true
   ): void => {
-    for (const { m, parts } of morceaux) {
-      if (!garder(m)) continue
-      const faces = facesDe(m)
-      for (const p of parts)
-        pourChaqueSegment(p, m, px, (x, y, angle, l, ep) => {
-          ctx.save()
-          ctx.translate(x, y)
-          ctx.rotate(angle)
-          for (const f of faces) {
-            const img = image(images, f.assetId)
-            const fy = f.y0 * ep
-            const fh = (f.y1 - f.y0) * ep
-            if (img) {
-              const motif = ctx.createPattern(img, 'repeat-x')!
-              const e = ep / img.height
-              motif.setTransform(new DOMMatrix().translateSelf(-ep / 2, -ep / 2).scaleSelf(e))
-              ctx.fillStyle = motif
-            } else ctx.fillStyle = '#2c2c30'
-            ctx.fillRect(-ep / 2, fy, l + ep, fh)
-            /* La couleur, multipliée : le blanc la prend telle quelle, une pierre
-               ou une brique la prend en gardant ses détails. */
-            if (f.teinte) {
-              ctx.globalCompositeOperation = 'multiply'
-              ctx.fillStyle = f.teinte
-              ctx.fillRect(-ep / 2, fy, l + ep, fh)
-              ctx.globalCompositeOperation = 'source-over'
-            }
-          }
-          /* Le volume : deux arêtes sombres, un liseré clair au milieu. */
-          ctx.fillStyle = 'rgba(0, 0, 0, 0.45)'
-          ctx.fillRect(-ep / 2, -ep / 2, l + ep, Math.max(1, ep * 0.08))
-          ctx.fillRect(-ep / 2, ep / 2 - Math.max(1, ep * 0.08), l + ep, Math.max(1, ep * 0.08))
-          ctx.fillStyle = 'rgba(255, 240, 210, 0.07)'
-          ctx.fillRect(-ep / 2, -ep * 0.075, l + ep, ep * 0.15)
-          ctx.restore()
-        })
+    const remplir = (faces: Face[], ep: number, x0: number, x1: number, bande: number): void => {
+      for (const f of faces) {
+        const fy0 = Math.max(f.y0 * ep, -ep / 2 + bande)
+        const fy1 = Math.min(f.y1 * ep, ep / 2 - bande)
+        if (fy1 <= fy0) continue
+        const img = image(images, f.assetId)
+        if (img) {
+          const motif = ctx.createPattern(img, 'repeat-x')!
+          const e = ep / img.height
+          motif.setTransform(new DOMMatrix().translateSelf(-ep / 2, -ep / 2).scaleSelf(e))
+          ctx.fillStyle = motif
+        } else ctx.fillStyle = '#2c2c30'
+        ctx.fillRect(x0, fy0, x1 - x0, fy1 - fy0)
+        /* La couleur, multipliée : le blanc la prend telle quelle, une pierre
+           ou une brique la prend en gardant ses détails. */
+        if (f.teinte) {
+          ctx.globalCompositeOperation = 'multiply'
+          ctx.fillStyle = f.teinte
+          ctx.fillRect(x0, fy0, x1 - x0, fy1 - fy0)
+          ctx.globalCompositeOperation = 'source-over'
+        }
+      }
     }
+    for (const passe of ['fond', 'aretes', 'coeur'] as const)
+      for (const { m, parts } of morceaux) {
+        if (!garder(m)) continue
+        const faces = facesDe(m)
+        for (const p of parts)
+          pourChaqueSegment(p, m, px, (x, y, angle, l, ep) => {
+            const a = Math.max(1, ep * 0.08)
+            ctx.save()
+            ctx.translate(x, y)
+            ctx.rotate(angle)
+            if (passe === 'fond') remplir(faces, ep, -ep / 2, l + ep / 2, 0)
+            else if (passe === 'aretes') {
+              ctx.fillStyle = 'rgba(0, 0, 0, 0.45)'
+              ctx.fillRect(-ep / 2, -ep / 2, l + ep, a)
+              ctx.fillRect(-ep / 2, ep / 2 - a, l + ep, a)
+            } else {
+              remplir(faces, ep, -ep / 2 + a, l + ep / 2 - a, a)
+              /* Le volume : un liseré clair au milieu. */
+              ctx.fillStyle = 'rgba(255, 240, 210, 0.07)'
+              ctx.fillRect(-ep / 2 + a, -ep * 0.075, l + ep - 2 * a, ep * 0.15)
+            }
+            ctx.restore()
+          })
+      }
   }
   peindre((m) =>
     m.cote2

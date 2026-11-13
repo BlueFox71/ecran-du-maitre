@@ -305,6 +305,27 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
           <li>Clic droit : revenir à la sélection (en sélection : annuler un coin qu’on glisse, ou désélectionner)</li>
         </ul>
       </div>
+      <div className="at-outils">
+        <button
+          className="btn btn-sm"
+          title="Retire les parties de murs posées l’une sur l’autre ; une pièce fermée garde ses murs"
+          onClick={() => {
+            const c = co.c
+            if (!c) return
+            const r = fusionnerSuperpositions(c)
+            if (r === c) return void toast('Aucun mur ne se superpose.')
+            co.modifier(() => r)
+            setChoisi(null)
+          }}
+        >
+          Fusionner les murs superposés
+        </button>
+        {murChoisi ? (
+          <button className="btn btn-sm" onClick={() => effacer(murChoisi.id)}>
+            Effacer ce mur
+          </button>
+        ) : null}
+      </div>
       <label className="at-reglage">
         <span className="eyebrow">
           Épaisseur · {String(murChoisi ? murChoisi.epaisseur : epaisseur).replace('.', ',')} case
@@ -372,29 +393,6 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
         <span className="eyebrow">Matière{deux ? ` · côté ${coteActif}` : ''}</span>
         <Palette assets={murs} parCategorie cle="murs" choisi={matiereVue} onChoisir={(a) => choisirMatiere(a.id)} />
       </div>
-      <div className="at-section">
-        <button
-          className="btn btn-sm"
-          title="Retire les parties de murs posées l’une sur l’autre ; une pièce fermée garde ses murs"
-          onClick={() => {
-            const c = co.c
-            if (!c) return
-            const r = fusionnerSuperpositions(c)
-            if (r === c) return void toast('Aucun mur ne se superpose.')
-            co.modifier(() => r)
-            setChoisi(null)
-          }}
-        >
-          Fusionner les murs superposés
-        </button>
-      </div>
-      {murChoisi ? (
-        <div className="at-section">
-          <button className="btn btn-sm" onClick={() => effacer(murChoisi.id)}>
-            Effacer ce mur
-          </button>
-        </div>
-      ) : null}
       <ImportAsset {...props} typeParDefaut="mur" />
     </>
   )
