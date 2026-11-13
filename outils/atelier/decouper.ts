@@ -1387,6 +1387,46 @@ const PLANCHES: Planche[] = [
     ]
   },
   {
+    fichier: 'planches/fenetres 1.png',
+    fond: 'magenta',
+    cols: 2,
+    rows: 3,
+    /* Condamnée ou volet baissé : on ne voit pas au travers — une porte, qu'on « ouvre ». */
+    type: (c) => (c.id === 'fenetre-condamnee' || c.id === 'volet-roulant' ? 'porte' : 'vitre'),
+    categorie: 'Portes et fenêtres',
+    dossier: 'ouvertures',
+    centrerMontants: true,
+    isoler: 'case',
+    cases: [
+      { id: 'fenetre-guillotine', nom: 'Fenêtre à guillotine' },
+      { id: 'fenetre-double', nom: 'Fenêtre double' },
+      { id: 'fenetre-brisee', nom: 'Fenêtre brisée' },
+      { id: 'fenetre-condamnee', nom: 'Fenêtre condamnée' },
+      { id: 'fenetre-vitrail', nom: 'Vitrail' },
+      { id: 'fenetre-barreaux', nom: 'Fenêtre à barreaux' }
+    ]
+  },
+  {
+    fichier: 'planches/fenetres 2.png',
+    fond: 'magenta',
+    cols: 2,
+    rows: 3,
+    /* Condamnée ou volet baissé : on ne voit pas au travers — une porte, qu'on « ouvre ». */
+    type: (c) => (c.id === 'fenetre-condamnee' || c.id === 'volet-roulant' ? 'porte' : 'vitre'),
+    categorie: 'Portes et fenêtres',
+    dossier: 'ouvertures',
+    centrerMontants: true,
+    isoler: 'case',
+    cases: [
+      { id: 'fenetre-pvc', nom: 'Fenêtre PVC' },
+      { id: 'fenetre-alu', nom: 'Baie aluminium' },
+      { id: 'volet-roulant', nom: 'Volet roulant' },
+      { id: 'fenetre-coulissante', nom: 'Fenêtre coulissante' },
+      { id: 'fenetre-depolie', nom: 'Fenêtre dépolie' },
+      { id: 'vitrine', nom: 'Vitrine' }
+    ]
+  },
+  {
     fichier: 'planches/icones 1.png',
     fond: 'magenta',
     icones: true,

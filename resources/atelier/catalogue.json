@@ -1282,6 +1282,90 @@
       "fichier": "ouvertures/porte-blindee.png"
     },
     {
+      "id": "ouvertures/fenetre-guillotine",
+      "type": "vitre",
+      "nom": "Fenêtre à guillotine",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/fenetre-guillotine.png"
+    },
+    {
+      "id": "ouvertures/fenetre-double",
+      "type": "vitre",
+      "nom": "Fenêtre double",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/fenetre-double.png"
+    },
+    {
+      "id": "ouvertures/fenetre-brisee",
+      "type": "vitre",
+      "nom": "Fenêtre brisée",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/fenetre-brisee.png"
+    },
+    {
+      "id": "ouvertures/fenetre-condamnee",
+      "type": "porte",
+      "nom": "Fenêtre condamnée",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/fenetre-condamnee.png"
+    },
+    {
+      "id": "ouvertures/fenetre-vitrail",
+      "type": "vitre",
+      "nom": "Vitrail",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/fenetre-vitrail.png"
+    },
+    {
+      "id": "ouvertures/fenetre-barreaux",
+      "type": "vitre",
+      "nom": "Fenêtre à barreaux",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/fenetre-barreaux.png"
+    },
+    {
+      "id": "ouvertures/fenetre-pvc",
+      "type": "vitre",
+      "nom": "Fenêtre PVC",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/fenetre-pvc.png"
+    },
+    {
+      "id": "ouvertures/fenetre-alu",
+      "type": "vitre",
+      "nom": "Baie aluminium",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/fenetre-alu.png"
+    },
+    {
+      "id": "ouvertures/volet-roulant",
+      "type": "porte",
+      "nom": "Volet roulant",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/volet-roulant.png"
+    },
+    {
+      "id": "ouvertures/fenetre-coulissante",
+      "type": "vitre",
+      "nom": "Fenêtre coulissante",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/fenetre-coulissante.png"
+    },
+    {
+      "id": "ouvertures/fenetre-depolie",
+      "type": "vitre",
+      "nom": "Fenêtre dépolie",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/fenetre-depolie.png"
+    },
+    {
+      "id": "ouvertures/vitrine",
+      "type": "vitre",
+      "nom": "Vitrine",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/vitrine.png"
+    },
+    {
       "id": "murs/uni-blanc",
       "type": "mur",
       "nom": "Mur uni (à colorer)",
