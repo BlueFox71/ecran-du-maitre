@@ -5,11 +5,14 @@ import { urlAsset } from './images'
 export function Palette({
   assets,
   choisi,
+  choisis,
   onChoisir,
   parCategorie = false
 }: {
   assets: AssetAtelier[]
   choisi: string | null
+  /** Plusieurs vignettes cochées à la fois (le mode aléatoire de la Déco). */
+  choisis?: string[]
   onChoisir: (a: AssetAtelier) => void
   parCategorie?: boolean
 }): JSX.Element {
@@ -30,7 +33,7 @@ export function Palette({
               <button
                 key={a.id}
                 className="at-tuile"
-                aria-pressed={choisi === a.id}
+                aria-pressed={choisis ? choisis.includes(a.id) : choisi === a.id}
                 title={a.nom}
                 onClick={() => onChoisir(a)}
               >

@@ -225,3 +225,21 @@ export function tournerGroupe(objets: ObjetPose[], centre: PointCase, delta: num
     }
   })
 }
+
+/** La taille d'un objet tiré au hasard : entre 80 et 120 % de sa taille réelle. */
+export const ECHELLE_HASARD = { min: 0.8, max: 1.2 }
+
+/**
+ * Le mode aléatoire : une des vignettes choisies, un angle et une taille au
+ * hasard — de quoi semer un bois sans que deux arbres se ressemblent.
+ */
+export function tirerObjet(
+  ids: string[],
+  hasard: () => number
+): { id: string; angle: number; echelle: number } | null {
+  if (!ids.length) return null
+  const id = ids[Math.min(ids.length - 1, Math.floor(hasard() * ids.length))]
+  const angle = hasard() * 360
+  const echelle = ECHELLE_HASARD.min + hasard() * (ECHELLE_HASARD.max - ECHELLE_HASARD.min)
+  return { id, angle, echelle }
+}

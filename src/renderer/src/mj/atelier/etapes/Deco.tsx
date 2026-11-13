@@ -8,7 +8,15 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { contourDeLObjet, nouvelId, type ObjetPose, type PointCase } from '@shared/atelier'
-import { centreDeCase, mettreAuPlan, objetSous, redimensionner, tourner, tournerGroupe } from '@shared/atelierOutils'
+import {
+  centreDeCase,
+  mettreAuPlan,
+  objetSous,
+  redimensionner,
+  tirerObjet,
+  tourner,
+  tournerGroupe
+} from '@shared/atelierOutils'
 import type { AssetAtelier } from '@shared/atelierAssets'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
@@ -79,6 +87,19 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
   const { co, assets, setOutil, repeindre } = props
   const objets = assets.filter((a) => a.type === 'objet')
   const [arme, setArme] = useState<AssetAtelier | null>(null)
+  /* Le mode aléatoire : les vignettes cochées, et le prochain tirage (celui que montre l'aperçu). */
+  const [hasard, setHasard] = useState(false)
+  const [lot, setLot] = useState<string[]>([])
+  const [prochain, setProchain] = useState<{ id: string; angle: number; echelle: number } | null>(null)
+  const tirer = (ids: string[]): void => setProchain(tirerObjet(ids, Math.random))
+  /* Ce que le prochain clic posera : la vignette armée, ou le tirage du mode aléatoire. */
+  const aPoser: { asset: AssetAtelier; angle: number; echelle: number } | null = (() => {
+    if (hasard && prochain) {
+      const a = objets.find((x) => x.id === prochain.id)
+      return a ? { asset: a, angle: prochain.angle, echelle: prochain.echelle } : null
+    }
+    return arme ? { asset: arme, angle: 0, echelle: 1 } : null
+  })()
   const [choisis, setChoisis] = useState<string[]>([])
   const geste = useRef<Geste | null>(null)
   const souris = useRef<PointCase | null>(null)
@@ -96,11 +117,11 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
 
   useEffect(() => {
     setOutil({
-      curseur: arme ? 'copy' : 'default',
+      curseur: aPoser ? 'copy' : 'default',
       /* Le curseur dit ce qu'un clic ferait : tourner, retailler, déplacer. */
       curseurSous: (p, prise) => {
         const c = co.c
-        if (arme || !c) return undefined
+        if (aPoser || !c) return undefined
         if (groupe.length > 1) {
           const { poignee: pg } = poigneeDuGroupe(groupe)
           if (Math.hypot(p[0] - pg[0], p[1] - pg[1]) < prise) return 'grab'
@@ -121,7 +142,8 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
         if (!c) return
         /* Clic droit pendant une pose : on repose la vignette, rien n'est posé. */
         if (type === 'droit') {
-          if (arme) setArme(null)
+          if (hasard) setHasard(false)
+          else if (arme) setArme(null)
           else if (geste.current) {
             geste.current = null
             co.annuler()
@@ -130,20 +152,26 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
           return
         }
         if (type === 'down') {
-          if (arme) {
+          if (aPoser) {
+            const { asset: a, angle, echelle } = aPoser
             const [x, y] = e.ctrlKey ? centreDeCase(brut) : brut
             const o: ObjetPose = {
               id: nouvelId(),
-              assetId: arme.id,
+              assetId: a.id,
               x,
               y,
-              l: arme.l ?? 1,
-              h: arme.h ?? 1,
-              angle: 0,
-              bloquePas: !!arme.bloquePas,
-              bloqueVue: !!arme.bloqueVue
+              l: (a.l ?? 1) * echelle,
+              h: (a.h ?? 1) * echelle,
+              angle,
+              bloquePas: !!a.bloquePas,
+              bloqueVue: !!a.bloqueVue
             }
             co.modifier((v) => ({ ...v, objets: [...v.objets, o] }))
+            if (hasard) {
+              /* En mode aléatoire, on enchaîne : un nouveau tirage pour le clic suivant. */
+              tirer(lot)
+              return
+            }
             setChoisis([o.id])
             /* Maj : on garde la vignette pour en poser plusieurs. */
             if (!e.shiftKey) setArme(null)
@@ -229,9 +257,15 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
       dessiner: (ctx, echelle) => {
         const c = co.c
         if (!c) return
-        if (arme && souris.current) {
+        if (aPoser && souris.current) {
           const [x, y] = cale.current ? centreDeCase(souris.current) : souris.current
-          contour(ctx, contourDeLObjet({ ...({} as ObjetPose), x, y, l: arme.l ?? 1, h: arme.h ?? 1, angle: 0 }), echelle, true)
+          const { asset: a, angle, echelle: k } = aPoser
+          contour(
+            ctx,
+            contourDeLObjet({ ...({} as ObjetPose), x, y, l: (a.l ?? 1) * k, h: (a.h ?? 1) * k, angle }),
+            echelle,
+            true
+          )
         }
         for (const o of c.objets) if (choisis.includes(o.id)) contour(ctx, contourDeLObjet(o), echelle)
         const sel = c.objets.filter((o) => choisis.includes(o.id))
@@ -272,7 +306,7 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
       }
     })
     return () => setOutil(null)
-  }, [arme, choisis, co.c])
+  }, [arme, choisis, co.c, hasard, prochain, lot])
 
   useEffect(() => {
     const k = (e: KeyboardEvent): void => {
@@ -280,6 +314,7 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
       if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return
       if (e.key === 'Escape') {
         setArme(null)
+        setHasard(false)
         setChoisis([])
       }
       if ((e.key === 'Delete' || e.key === 'Backspace') && choisis.length) supprimer()
@@ -370,7 +405,40 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
           </li>
         </ul>
       )}
-      <Palette assets={objets} choisi={arme?.id ?? null} onChoisir={(a) => setArme(arme?.id === a.id ? null : a)} parCategorie />
+      <div className="at-section at-outils">
+        <button
+          className="btn btn-sm"
+          aria-pressed={hasard}
+          title="Coche plusieurs vignettes : chaque clic pose l’une d’elles au hasard, tournée et retaillée au hasard"
+          onClick={() => {
+            const v = !hasard
+            setHasard(v)
+            setArme(null)
+            if (v) tirer(lot)
+          }}
+        >
+          🎲 Mode aléatoire
+        </button>
+        {hasard ? (
+          <p className="at-aide">
+            {lot.length
+              ? `${lot.length} vignette${lot.length > 1 ? 's' : ''} cochée${lot.length > 1 ? 's' : ''} : clique sur le plan pour en semer. Clic droit ou Échap pour arrêter.`
+              : 'Coche les vignettes à semer, puis clique sur le plan.'}
+          </p>
+        ) : null}
+      </div>
+      <Palette
+        assets={objets}
+        choisi={arme?.id ?? null}
+        choisis={hasard ? lot : undefined}
+        onChoisir={(a) => {
+          if (!hasard) return setArme(arme?.id === a.id ? null : a)
+          const n = lot.includes(a.id) ? lot.filter((id) => id !== a.id) : [...lot, a.id]
+          setLot(n)
+          tirer(n)
+        }}
+        parCategorie
+      />
       <ImportAsset {...props} typeParDefaut="objet" />
     </>
   )

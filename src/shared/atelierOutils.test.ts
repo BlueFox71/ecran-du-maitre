@@ -9,6 +9,7 @@ import {
   redimensionner,
   solSous,
   centreDeCase,
+  tirerObjet,
   mettreAuPlan,
   tourner,
   tournerGroupe,
@@ -198,5 +199,22 @@ describe('tournerGroupe', () => {
     expect(r[1].x).toBeCloseTo(5, 9)
     expect(r[1].y).toBeCloseTo(6, 9)
     expect(r[1].angle).toBeCloseTo(100, 9)
+  })
+})
+
+describe('tirerObjet', () => {
+  const suite = (...v: number[]): (() => number) => {
+    let i = 0
+    return () => v[i++ % v.length]
+  }
+  it('choisit une des vignettes, un angle et une taille dans les bornes', () => {
+    const t = tirerObjet(['a', 'b', 'c'], suite(0.5, 0.25, 0))
+    expect(t).toEqual({ id: 'b', angle: 90, echelle: 0.8 })
+  })
+  it('la taille reste entre 80 et 120 %', () => {
+    expect(tirerObjet(['a'], suite(0.999, 0.5, 0.999))!.echelle).toBeLessThanOrEqual(1.2)
+  })
+  it('sans vignette, rien', () => {
+    expect(tirerObjet([], Math.random)).toBeNull()
   })
 })
