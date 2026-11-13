@@ -149,7 +149,43 @@ const RANGEMENT: Record<string, [string, string]> = {
   'escalier-lumineux': ['Architecture', 'Escaliers'],
   'escalier-metal': ['Architecture', 'Escaliers'],
   'escalier-equerre': ['Architecture', 'Escaliers'],
-  'escalier-courbe': ['Architecture', 'Escaliers']
+  'escalier-courbe': ['Architecture', 'Escaliers'],
+  'bureau-ministre': ['Mobilier', 'Tables'],
+  'table-fleurie': ['Mobilier', 'Tables'],
+  'console-roses': ['Mobilier', 'Tables'],
+  'buffet-bustes': ['Mobilier', 'Rangements'],
+  'chesterfield-plaid': ['Mobilier', 'Assises'],
+  'fauteuil-club': ['Mobilier', 'Assises'],
+  'tapis-table-basse': ['Mobilier', 'Tables'],
+  'meridienne': ['Mobilier', 'Assises'],
+  'lit-coussins': ['Mobilier', 'Lits'],
+  'armoire': ['Mobilier', 'Rangements'],
+  'coiffeuse': ['Mobilier', 'Rangements'],
+  'paravent': ['Mobilier', 'Paravents'],
+  'plan-de-travail': ['Mobilier', 'Cuisine'],
+  'cuisiniere-bois': ['Mobilier', 'Cuisine'],
+  'evier-pierre': ['Mobilier', 'Cuisine'],
+  'vaisselier': ['Mobilier', 'Cuisine'],
+  'glaciere': ['Mobilier', 'Cuisine'],
+  'table-cuisine': ['Mobilier', 'Tables'],
+  'plan-patisserie': ['Mobilier', 'Cuisine'],
+  'casseroles-suspendues': ['Mobilier', 'Cuisine'],
+  'garde-manger': ['Mobilier', 'Cuisine'],
+  'tonneau': ['Mobilier', 'Cuisine'],
+  'casier-vin': ['Mobilier', 'Cuisine'],
+  'buffet-cuisine': ['Mobilier', 'Cuisine'],
+  'baignoire-mousse': ['Mobilier', 'Bain'],
+  'double-vasque': ['Mobilier', 'Bain'],
+  'toilettes': ['Mobilier', 'Bain'],
+  'bidet': ['Mobilier', 'Bain'],
+  'douche': ['Mobilier', 'Bain'],
+  'armoire-linge': ['Mobilier', 'Bain'],
+  'coiffeuse-bain': ['Mobilier', 'Bain'],
+  'porte-serviettes': ['Mobilier', 'Bain'],
+  'panier-linge': ['Mobilier', 'Bain'],
+  'meuble-lavabo': ['Mobilier', 'Bain'],
+  'tapis-oriental-bain': ['Mobilier', 'Tapis'],
+  'desserte-bain': ['Mobilier', 'Bain']
 }
 
 interface Planche {
@@ -494,6 +530,78 @@ const PLANCHES: Planche[] = [
     ]
   },
   {
+    fichier: 'planches/lot 20.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Mobilier',
+    dossier: 'objets',
+    cases: [
+      { id: 'bureau-ministre', nom: 'Bureau de ministre', l: 1.4, pas: true },
+      { id: 'table-fleurie', nom: 'Table fleurie', l: 2, pas: true },
+      { id: 'console-roses', nom: 'Console aux roses', l: 1.3, pas: true },
+      { id: 'buffet-bustes', nom: 'Buffet aux bustes', l: 1.5, pas: true, vue: true },
+      { id: 'chesterfield-plaid', nom: 'Chesterfield au plaid', l: 1.6, pas: true },
+      { id: 'fauteuil-club', nom: 'Fauteuil club', l: 0.7, pas: true },
+      { id: 'tapis-table-basse', nom: 'Tapis et table basse', l: 1.6, pas: true },
+      { id: 'meridienne', nom: 'Méridienne', l: 1.5, pas: true },
+      { id: 'lit-coussins', nom: 'Lit aux coussins', l: 1.2, pas: true },
+      { id: 'armoire', nom: 'Armoire', l: 1.2, pas: true, vue: true },
+      { id: 'coiffeuse', nom: 'Coiffeuse', l: 1.1, pas: true },
+      { id: 'paravent', nom: 'Paravent', l: 1.2, pas: true, vue: true }
+    ]
+  },
+  {
+    fichier: 'planches/lot 21.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Mobilier',
+    dossier: 'objets',
+    cases: [
+      { id: 'plan-de-travail', nom: 'Plan de travail', l: 1.3, pas: true },
+      { id: 'cuisiniere-bois', nom: 'Cuisinière à bois', l: 1.3, pas: true },
+      { id: 'evier-pierre', nom: 'Évier de pierre', l: 1.2, pas: true },
+      { id: 'vaisselier', nom: 'Vaisselier', l: 1.3, pas: true, vue: true },
+      { id: 'glaciere', nom: 'Glacière', l: 0.7, pas: true, vue: true },
+      { id: 'table-cuisine', nom: 'Table de cuisine', l: 1.4, pas: true },
+      { id: 'plan-patisserie', nom: 'Plan de pâtisserie', l: 1.2, pas: true },
+      { id: 'casseroles-suspendues', nom: 'Casseroles suspendues', l: 1.1 },
+      { id: 'garde-manger', nom: 'Garde-manger', l: 1.3, pas: true, vue: true },
+      { id: 'tonneau', nom: 'Tonneau', l: 0.6, pas: true },
+      { id: 'casier-vin', nom: 'Casier à vin', l: 0.9, pas: true, vue: true },
+      { id: 'buffet-cuisine', nom: 'Buffet de cuisine', l: 1.3, pas: true }
+    ]
+  },
+  {
+    fichier: 'planches/lot 22.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Mobilier',
+    dossier: 'objets',
+    cases: [
+      { id: 'baignoire-mousse', nom: 'Baignoire moussante', l: 1.2, pas: true },
+      { id: 'double-vasque', nom: 'Double vasque', l: 1.4, pas: true },
+      { id: 'toilettes', nom: 'Toilettes', l: 0.5, pas: true },
+      { id: 'bidet', nom: 'Bidet', l: 0.45, pas: true },
+      { id: 'douche', nom: 'Douche', l: 0.9, pas: true },
+      { id: 'armoire-linge', nom: 'Armoire à linge', l: 0.9, pas: true, vue: true },
+      { id: 'coiffeuse-bain', nom: 'Coiffeuse de bain', l: 1, pas: true },
+      { id: 'porte-serviettes', nom: 'Porte-serviettes', l: 0.7 },
+      { id: 'panier-linge', nom: 'Panier à linge', l: 0.55, pas: true },
+      { id: 'meuble-lavabo', nom: 'Meuble lavabo', l: 1, pas: true },
+      { id: 'tapis-oriental-bain', nom: 'Tapis oriental', l: 1.4 },
+      { id: 'desserte-bain', nom: 'Desserte', l: 0.7, pas: true }
+    ]
+  },
+  {
     fichier: 'planches/planche 5.png',
     fond: 'magenta',
     cols: 2,
@@ -705,7 +813,7 @@ for (const pl of PLANCHES) {
    par catégorie et sous-catégorie, dans un ordre qui se lit. */
 const ORDRE_CATEGORIES = ['Mobilier', 'Lumière', 'Objets', 'Architecture', 'Nature', 'Macabre']
 const ORDRE_SOUS = [
-  'Lits', 'Assises', 'Tables', 'Rangements', 'Bain', 'Cheminées', 'Musique',
+  'Lits', 'Assises', 'Tables', 'Rangements', 'Cuisine', 'Bain', 'Cheminées', 'Tapis', 'Paravents', 'Musique',
   'Lampes', 'Lampadaires', 'Plafonniers', 'Appliques', 'Bougies',
   'Livres et papiers', 'Nourriture', 'Vaisselle', 'Décoration',
   'Arbres', 'Végétation', 'Rochers', 'Bois mort', 'Toiles d’araignées'
