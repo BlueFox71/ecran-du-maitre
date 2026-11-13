@@ -12,6 +12,7 @@
  * réduite (voir `PLAFONDS_COPIES`) : les interfaces n'en savent rien.
  */
 import { createReadStream, existsSync, mkdirSync, statSync } from 'node:fs'
+import { cheminAsset } from './atelierAssets'
 import { extname, join } from 'node:path'
 import { Readable } from 'node:stream'
 import { pathToFileURL } from 'node:url'
@@ -185,6 +186,14 @@ export function registerMediaProtocol(): void {
       if (!/^portrait-\d+\.[a-z0-9]+$/.test(nom)) return new Response('Introuvable', { status: 404 })
       const abs = join(profilDir(), nom)
       if (!existsSync(abs)) return new Response('Introuvable', { status: 404 })
+      return servir(abs)
+    }
+
+    /* Les assets de l'atelier : `jdr://atelier/<pack|moi>/<fichier>`. */
+    if (url.hostname === 'atelier') {
+      const [source, ...reste] = nom.split('/')
+      const abs = cheminAsset(source, reste.join('/'))
+      if (!abs || !existsSync(abs)) return new Response('Introuvable', { status: 404 })
       return servir(abs)
     }
 

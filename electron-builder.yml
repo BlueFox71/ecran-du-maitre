@@ -22,6 +22,9 @@ asarUnpack:
 extraResources:
   - from: resources/icon.ico
     to: icon.ico
+  # Le pack d'assets de l'atelier des lieux : lu à l'exécution, comme l'icône.
+  - from: resources/atelier
+    to: atelier
 win:
   target:
     - target: nsis

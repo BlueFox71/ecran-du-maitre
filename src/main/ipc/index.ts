@@ -25,6 +25,7 @@ import * as surlignage from '../db/repos/surlignage'
 import * as objets from '../db/repos/objets'
 import * as murs from '../db/repos/murs'
 import * as atelier from '../atelier'
+import * as atelierAssets from '../atelierAssets'
 import type { Cadre } from '@shared/atelier'
 import * as reglages from '../db/repos/reglages'
 import * as rolls from '../db/repos/rolls'
@@ -691,6 +692,9 @@ export function registerIpc(): void {
   on('atelier:creer', (nom: string, parentId: number | null) => atelier.creer(nom, parentId))
   on('atelier:construire', (placeId: number) => atelier.construire(placeId))
   on('atelier:de', (placeId: number) => atelier.de(placeId))
+  on('atelier:assets', () => atelierAssets.tousLesAssets())
+  on('atelier:importer', (meta: any, png: Uint8Array) => atelierAssets.importer(meta, png))
+  on('atelier:retirerAsset', (id: string) => atelierAssets.retirer(id))
   on(
     'atelier:enregistrer',
     (placeId: number, c: unknown, png: Uint8Array, cadre?: Cadre | null) => {

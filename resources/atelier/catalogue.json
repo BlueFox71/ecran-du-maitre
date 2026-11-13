@@ -1,0 +1,441 @@
+{
+  "v": 1,
+  "assets": [
+    {
+      "id": "objets/lit-double",
+      "type": "objet",
+      "nom": "Lit double",
+      "categorie": "Chambre et salon",
+      "fichier": "objets/lit-double.png",
+      "l": 1.1,
+      "h": 1.43,
+      "bloquePas": true,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/canape-chesterfield",
+      "type": "objet",
+      "nom": "Canapé Chesterfield",
+      "categorie": "Chambre et salon",
+      "fichier": "objets/canape-chesterfield.png",
+      "l": 1.4,
+      "h": 0.76,
+      "bloquePas": true,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/fauteuil",
+      "type": "objet",
+      "nom": "Fauteuil",
+      "categorie": "Chambre et salon",
+      "fichier": "objets/fauteuil.png",
+      "l": 0.6,
+      "h": 0.76,
+      "bloquePas": true,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/table-ronde",
+      "type": "objet",
+      "nom": "Table ronde",
+      "categorie": "Chambre et salon",
+      "fichier": "objets/table-ronde.png",
+      "l": 0.8,
+      "h": 0.83,
+      "bloquePas": true,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/commode",
+      "type": "objet",
+      "nom": "Commode",
+      "categorie": "Chambre et salon",
+      "fichier": "objets/commode.png",
+      "l": 1,
+      "h": 0.56,
+      "bloquePas": true,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/table-de-nuit",
+      "type": "objet",
+      "nom": "Table de nuit",
+      "categorie": "Chambre et salon",
+      "fichier": "objets/table-de-nuit.png",
+      "l": 0.5,
+      "h": 0.36,
+      "bloquePas": true,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/bougeoir",
+      "type": "objet",
+      "nom": "Bougeoir",
+      "categorie": "Petits objets",
+      "fichier": "objets/bougeoir.png",
+      "l": 0.2,
+      "h": 0.19,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/lampe-huile",
+      "type": "objet",
+      "nom": "Lampe à huile",
+      "categorie": "Petits objets",
+      "fichier": "objets/lampe-huile.png",
+      "l": 0.25,
+      "h": 0.31,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/livre-ouvert",
+      "type": "objet",
+      "nom": "Livre ouvert",
+      "categorie": "Petits objets",
+      "fichier": "objets/livre-ouvert.png",
+      "l": 0.3,
+      "h": 0.21,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/pile-livres",
+      "type": "objet",
+      "nom": "Pile de livres",
+      "categorie": "Petits objets",
+      "fichier": "objets/pile-livres.png",
+      "l": 0.25,
+      "h": 0.25,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/miroir",
+      "type": "objet",
+      "nom": "Miroir",
+      "categorie": "Petits objets",
+      "fichier": "objets/miroir.png",
+      "l": 0.25,
+      "h": 0.34,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/napperon",
+      "type": "objet",
+      "nom": "Napperon",
+      "categorie": "Petits objets",
+      "fichier": "objets/napperon.png",
+      "l": 0.4,
+      "h": 0.41,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/crane",
+      "type": "objet",
+      "nom": "Crâne",
+      "categorie": "Petits objets",
+      "fichier": "objets/crane.png",
+      "l": 0.2,
+      "h": 0.28,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/tasse",
+      "type": "objet",
+      "nom": "Tasse et soucoupe",
+      "categorie": "Petits objets",
+      "fichier": "objets/tasse.png",
+      "l": 0.18,
+      "h": 0.18,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/encrier",
+      "type": "objet",
+      "nom": "Encrier et plume",
+      "categorie": "Petits objets",
+      "fichier": "objets/encrier.png",
+      "l": 0.22,
+      "h": 0.22,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/lettres",
+      "type": "objet",
+      "nom": "Lettres",
+      "categorie": "Petits objets",
+      "fichier": "objets/lettres.png",
+      "l": 0.35,
+      "h": 0.34,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/chandelier",
+      "type": "objet",
+      "nom": "Chandelier",
+      "categorie": "Petits objets",
+      "fichier": "objets/chandelier.png",
+      "l": 0.35,
+      "h": 0.28,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/coffret",
+      "type": "objet",
+      "nom": "Coffret",
+      "categorie": "Petits objets",
+      "fichier": "objets/coffret.png",
+      "l": 0.3,
+      "h": 0.24,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/bibliotheque",
+      "type": "objet",
+      "nom": "Bibliothèque",
+      "categorie": "Bureau, bain, architecture",
+      "fichier": "objets/bibliotheque.png",
+      "l": 1.2,
+      "h": 0.41,
+      "bloquePas": true,
+      "bloqueVue": true
+    },
+    {
+      "id": "objets/bureau",
+      "type": "objet",
+      "nom": "Bureau",
+      "categorie": "Bureau, bain, architecture",
+      "fichier": "objets/bureau.png",
+      "l": 1,
+      "h": 0.63,
+      "bloquePas": true,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/chaise",
+      "type": "objet",
+      "nom": "Chaise",
+      "categorie": "Bureau, bain, architecture",
+      "fichier": "objets/chaise.png",
+      "l": 0.35,
+      "h": 0.43,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/baignoire",
+      "type": "objet",
+      "nom": "Baignoire",
+      "categorie": "Bureau, bain, architecture",
+      "fichier": "objets/baignoire.png",
+      "l": 1.1,
+      "h": 0.65,
+      "bloquePas": true,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/escalier-droit",
+      "type": "objet",
+      "nom": "Escalier droit",
+      "categorie": "Bureau, bain, architecture",
+      "fichier": "objets/escalier-droit.png",
+      "l": 0.8,
+      "h": 1.68,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/cheminee",
+      "type": "objet",
+      "nom": "Cheminée",
+      "categorie": "Bureau, bain, architecture",
+      "fichier": "objets/cheminee.png",
+      "l": 1.2,
+      "h": 0.76,
+      "bloquePas": true,
+      "bloqueVue": true
+    },
+    {
+      "id": "objets/toile-coin",
+      "type": "objet",
+      "nom": "Toile d’angle",
+      "categorie": "Horreur",
+      "fichier": "objets/toile-coin.png",
+      "l": 1,
+      "h": 1,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/toile-ronde",
+      "type": "objet",
+      "nom": "Grande toile",
+      "categorie": "Horreur",
+      "fichier": "objets/toile-ronde.png",
+      "l": 1.2,
+      "h": 1.18,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/toile-dense",
+      "type": "objet",
+      "nom": "Toiles denses",
+      "categorie": "Horreur",
+      "fichier": "objets/toile-dense.png",
+      "l": 1.2,
+      "h": 1.19,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/toile-tendue",
+      "type": "objet",
+      "nom": "Toile tendue",
+      "categorie": "Horreur",
+      "fichier": "objets/toile-tendue.png",
+      "l": 1.2,
+      "h": 0.74,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/toile-petite",
+      "type": "objet",
+      "nom": "Petite toile",
+      "categorie": "Horreur",
+      "fichier": "objets/toile-petite.png",
+      "l": 0.7,
+      "h": 0.71,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "objets/toile-eparse",
+      "type": "objet",
+      "nom": "Fils épars",
+      "categorie": "Horreur",
+      "fichier": "objets/toile-eparse.png",
+      "l": 1,
+      "h": 0.81,
+      "bloquePas": false,
+      "bloqueVue": false
+    },
+    {
+      "id": "sols/damier-use",
+      "type": "sol",
+      "nom": "Damier usé",
+      "categorie": "Sols",
+      "fichier": "sols/damier-use.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/dalles-pierre",
+      "type": "sol",
+      "nom": "Dalles de pierre",
+      "categorie": "Sols",
+      "fichier": "sols/dalles-pierre.png",
+      "tuile": 3
+    },
+    {
+      "id": "sols/parquet-vert",
+      "type": "sol",
+      "nom": "Parquet vert à chevrons",
+      "categorie": "Sols",
+      "fichier": "sols/parquet-vert.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/terre-herbe",
+      "type": "sol",
+      "nom": "Terre et herbe morte",
+      "categorie": "Sols",
+      "fichier": "sols/terre-herbe.png",
+      "tuile": 3
+    },
+    {
+      "id": "sols/parquet-sombre",
+      "type": "sol",
+      "nom": "Parquet sombre",
+      "categorie": "Sols",
+      "fichier": "sols/parquet-sombre.png",
+      "tuile": 2
+    },
+    {
+      "id": "murs/pierre-sombre",
+      "type": "mur",
+      "nom": "Pierre sombre",
+      "categorie": "Murs",
+      "fichier": "murs/pierre-sombre.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/platre-boiserie",
+      "type": "mur",
+      "nom": "Plâtre et poutre",
+      "categorie": "Murs",
+      "fichier": "murs/platre-boiserie.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/briques",
+      "type": "mur",
+      "nom": "Briques",
+      "categorie": "Murs",
+      "fichier": "murs/briques.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "ouvertures/porte-bois",
+      "type": "porte",
+      "nom": "Porte en bois",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-bois.png"
+    },
+    {
+      "id": "ouvertures/porte-double",
+      "type": "porte",
+      "nom": "Porte double",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-double.png"
+    },
+    {
+      "id": "ouvertures/porte-cave",
+      "type": "porte",
+      "nom": "Porte de cave",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/porte-cave.png"
+    },
+    {
+      "id": "ouvertures/grille",
+      "type": "porte",
+      "nom": "Grille en fer",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/grille.png"
+    },
+    {
+      "id": "ouvertures/fenetre",
+      "type": "vitre",
+      "nom": "Fenêtre",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/fenetre.png"
+    },
+    {
+      "id": "ouvertures/fenetre-baie",
+      "type": "vitre",
+      "nom": "Baie vitrée",
+      "categorie": "Portes et fenêtres",
+      "fichier": "ouvertures/fenetre-baie.png"
+    }
+  ]
+}

@@ -4,6 +4,7 @@ import type { Modif } from '@shared/modifs'
 import type { EvenementSm } from '@shared/santeMentale'
 import type { Cible, Plage } from '@shared/surlignage'
 import type { Cadre, Construction } from '@shared/atelier'
+import type { AssetAtelier } from '@shared/atelierAssets'
 import type {
   JetSm,
   ChoixReinit,
@@ -772,7 +773,14 @@ const api = {
      * l'ancienne carte dans la nouvelle, si le terrain a grandi.
      */
     enregistrer: (placeId: number, c: Construction, png: Uint8Array, cadre?: Cadre | null) =>
-      call<Place>('atelier:enregistrer', placeId, c, png, cadre ?? null)
+      call<Place>('atelier:enregistrer', placeId, c, png, cadre ?? null),
+    /** Le pack livré puis les imports du MJ. Image : `jdr://atelier/<source>/<fichier>`. */
+    assets: () => call<AssetAtelier[]>('atelier:assets'),
+    /** L'image est déjà recadrée et raccordée par l'atelier. */
+    importer: (meta: Omit<AssetAtelier, 'id' | 'source' | 'fichier'>, png: Uint8Array) =>
+      call<AssetAtelier>('atelier:importer', meta, png),
+    /** Seulement un import du MJ (`moi:…`). */
+    retirerAsset: (id: string) => call<void>('atelier:retirerAsset', id)
   },
 
   /**
