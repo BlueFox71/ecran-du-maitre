@@ -214,7 +214,6 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
                 aria-pressed={!co.c?.base}
                 onClick={() => {
                   co.modifier((c) => ({ ...c, base: null }))
-                  setBaseOuverte(false)
                 }}
               >
                 Aucune
@@ -226,8 +225,8 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
               cle="sols-base"
               choisi={co.c?.base ?? null}
               onChoisir={(a) => {
+                /* On reste ouvert : on essaie plusieurs matières avant de garder la bonne. */
                 co.modifier((c) => ({ ...c, base: a.id }))
-                setBaseOuverte(false)
               }}
             />
           </>
