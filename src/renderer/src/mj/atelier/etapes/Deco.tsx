@@ -44,6 +44,20 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
   useEffect(() => {
     setOutil({
       curseur: arme ? 'copy' : 'default',
+      /* Le curseur dit ce qu'un clic ferait : tourner, retailler, déplacer. */
+      curseurSous: (p, prise) => {
+        const c = co.c
+        if (arme || !c) return undefined
+        const sel = choisi ? c.objets.find((o) => o.id === choisi) : null
+        if (sel) {
+          const rot = poigneeRotation(sel)
+          if (Math.hypot(p[0] - rot[0], p[1] - rot[1]) < prise) return 'grab'
+          const coins = contourDeLObjet(sel).slice(0, 4)
+          const i = coins.findIndex((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < prise)
+          if (i >= 0) return i % 2 === 0 ? 'nwse-resize' : 'nesw-resize'
+        }
+        return objetSous(c, p) ? 'move' : undefined
+      },
       onPointer: (type, p, brut, e, prise) => {
         souris.current = brut
         const c = co.c

@@ -18,7 +18,7 @@ export type GestePointeur = 'down' | 'move' | 'up' | 'dbl' | 'droit'
 export interface Outil {
   curseur?: string
   /** Le curseur selon ce qu'il survole (un point en cases) ; rien : `curseur`. */
-  curseurSous?: (p: PointCase) => string | undefined
+  curseurSous?: (p: PointCase, prise: number) => string | undefined
   /**
    * `p` est aimanté à la grille (si elle est active et Maj relâché), `brut` jamais.
    * `prise` : la distance, en cases, qui fait 10 pixels à l'écran — ce qu'il
@@ -193,7 +193,8 @@ export function Toile({
           envoyer('move', e.nativeEvent)
           /* Le curseur suit ce qu'on survole, sans redessiner la toile. */
           if (outil?.curseurSous && toile.current)
-            toile.current.style.cursor = outil.curseurSous(enCases(e)) ?? outil.curseur ?? 'default'
+            toile.current.style.cursor =
+              outil.curseurSous(enCases(e), vue ? PRISE_PX / vue.echelle : 0.2) ?? outil.curseur ?? 'default'
         }}
         onPointerUp={(e) => {
           if (glisse.current) {

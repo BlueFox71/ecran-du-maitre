@@ -65,7 +65,8 @@ export function EtapeOuvertures(props: PropsEtape): JSX.Element {
         const c = co.c
         if (!c) return
         const s = murSous(c, brut, TOLERANCE, true)
-        survol.current = s && s.d !== undefined ? { murId: s.murId, d: s.d } : null
+        /* Sur une ouverture posée, on la choisit : pas d'aperçu de pose. */
+        survol.current = s && s.d !== undefined && !ouvertureSous(c, brut) ? { murId: s.murId, d: s.d } : null
         if (type === 'down') {
           const sous = ouvertureSous(c, brut)
           if (sous) {
