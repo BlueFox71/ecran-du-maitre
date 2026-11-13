@@ -185,7 +185,79 @@ const RANGEMENT: Record<string, [string, string]> = {
   'panier-linge': ['Mobilier', 'Bain'],
   'meuble-lavabo': ['Mobilier', 'Bain'],
   'tapis-oriental-bain': ['Mobilier', 'Tapis'],
-  'desserte-bain': ['Mobilier', 'Bain']
+  'desserte-bain': ['Mobilier', 'Bain'],
+  'lit-baroque': ['Mobilier', 'Lits'],
+  'lit-baldaquin': ['Mobilier', 'Lits'],
+  'coiffeuse-miroir': ['Mobilier', 'Rangements'],
+  'armoire-chambre': ['Mobilier', 'Rangements'],
+  'meridienne-plaid': ['Mobilier', 'Assises'],
+  'fauteuil-capitonne': ['Mobilier', 'Assises'],
+  'gueridon-lampe': ['Mobilier', 'Tables'],
+  'secretaire': ['Mobilier', 'Tables'],
+  'coffre-fer': ['Mobilier', 'Rangements'],
+  'chevet-lys': ['Mobilier', 'Tables'],
+  'table-ovale-noire': ['Mobilier', 'Tables'],
+  'table-ronde-marquetee': ['Mobilier', 'Tables'],
+  'table-ovale-ornee': ['Mobilier', 'Tables'],
+  'table-octogonale': ['Mobilier', 'Tables'],
+  'table-octogonale-verte': ['Mobilier', 'Tables'],
+  'gueridon-marbre': ['Mobilier', 'Tables'],
+  'table-ronde-rosace': ['Mobilier', 'Tables'],
+  'table-ovale-marbree': ['Mobilier', 'Tables'],
+  'table-planches': ['Mobilier', 'Tables'],
+  'fauteuil-rouge': ['Mobilier', 'Assises'],
+  'fauteuil-damasse': ['Mobilier', 'Assises'],
+  'chaise-gothique': ['Mobilier', 'Assises'],
+  'fauteuil-vert': ['Mobilier', 'Assises'],
+  'chaise-cannee': ['Mobilier', 'Assises'],
+  'chaise-bleue': ['Mobilier', 'Assises'],
+  'chaise-windsor': ['Mobilier', 'Assises'],
+  'chaise-fleurie': ['Mobilier', 'Assises'],
+  'tabouret-curule': ['Mobilier', 'Assises'],
+  'pouf-vert': ['Mobilier', 'Assises'],
+  'pouf-damasse': ['Mobilier', 'Assises'],
+  'tabouret-rouge': ['Mobilier', 'Assises'],
+  'canape-angle-blanc': ['Moderne', 'Assises'],
+  'meuble-tv': ['Moderne', 'Décoration'],
+  'table-bois': ['Moderne', 'Tables'],
+  'lit-moderne': ['Moderne', 'Lits'],
+  'bureau-ordinateur': ['Moderne', 'Tables'],
+  'ilot-cuisson': ['Moderne', 'Cuisine'],
+  'table-basse-bois': ['Moderne', 'Tables'],
+  'meuble-vasque': ['Moderne', 'Bain'],
+  'douche-italienne': ['Moderne', 'Bain'],
+  'canape-angle-beige': ['Moderne', 'Assises'],
+  'table-salle-a-manger': ['Moderne', 'Tables'],
+  'ilot-tabourets': ['Moderne', 'Cuisine'],
+  'baignoire-ilot': ['Moderne', 'Bain'],
+  'tapis-rond-moderne': ['Moderne', 'Décoration'],
+  'bureau-plantes': ['Moderne', 'Tables'],
+  'douche-vitree': ['Moderne', 'Bain'],
+  'toilettes-modernes': ['Moderne', 'Bain'],
+  'plante-monstera': ['Moderne', 'Décoration'],
+  'table-basse-marbre': ['Moderne', 'Tables'],
+  'fauteuil-cuir': ['Moderne', 'Assises'],
+  'canape-angle-orange': ['Moderne', 'Assises'],
+  'table-basse-galet': ['Moderne', 'Tables'],
+  'table-six-chaises': ['Moderne', 'Tables'],
+  'ilot-moderne': ['Moderne', 'Cuisine'],
+  'tapis-jute': ['Moderne', 'Décoration'],
+  'lit-chevets': ['Moderne', 'Lits'],
+  'baignoire-bois': ['Moderne', 'Bain'],
+  'bureau-portable': ['Moderne', 'Tables'],
+  'fauteuil-papasan': ['Moderne', 'Assises'],
+  'plaque-induction': ['Moderne', 'Électroménager'],
+  'evier-inox': ['Moderne', 'Cuisine'],
+  'machine-cafe': ['Moderne', 'Électroménager'],
+  'grille-pain': ['Moderne', 'Électroménager'],
+  'bouilloire': ['Moderne', 'Électroménager'],
+  'blender': ['Moderne', 'Électroménager'],
+  'robot-patissier': ['Moderne', 'Électroménager'],
+  'planche-a-decouper': ['Moderne', 'Cuisine'],
+  'pot-ustensiles': ['Moderne', 'Cuisine'],
+  'carrousel-epices': ['Moderne', 'Cuisine'],
+  'barre-ustensiles': ['Moderne', 'Cuisine'],
+  'faitout': ['Moderne', 'Cuisine']
 }
 
 interface Planche {
@@ -206,6 +278,8 @@ interface Planche {
    * on efface ce qui vient des voisins.
    */
   isoler?: boolean
+  /** Des rangées de longueurs différentes : le nombre de cases de chacune (sinon `cols` partout). */
+  lignes?: number[]
   /** Des icônes de rayons (catégories, sous-catégories) : `id` est le nom de fichier (`slug`). */
   icones?: boolean
   cases: (Case | null)[]
@@ -602,6 +676,177 @@ const PLANCHES: Planche[] = [
     ]
   },
   {
+    fichier: 'planches/lot 23.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Mobilier',
+    dossier: 'objets',
+    cases: [
+      { id: 'lit-baroque', nom: 'Lit baroque', l: 1.2, pas: true },
+      { id: 'lit-baldaquin', nom: 'Lit à baldaquin', l: 1.3, pas: true, vue: true },
+      { id: 'coiffeuse-miroir', nom: 'Coiffeuse à miroir', l: 1.1, pas: true },
+      { id: 'armoire-chambre', nom: 'Armoire de chambre', l: 1.2, pas: true, vue: true },
+      { id: 'meridienne-plaid', nom: 'Méridienne au plaid', l: 1.5, pas: true },
+      { id: 'fauteuil-capitonne', nom: 'Fauteuil capitonné', l: 0.7, pas: true },
+      { id: 'gueridon-lampe', nom: 'Guéridon à la lampe', l: 0.6, pas: true },
+      { id: 'secretaire', nom: 'Secrétaire', l: 1.2, pas: true },
+      { id: 'coffre-fer', nom: 'Coffre ferré', l: 0.9, pas: true },
+      null,
+      null,
+      { id: 'chevet-lys', nom: 'Chevet aux lys', l: 0.5, pas: true }
+    ]
+  },
+  {
+    fichier: 'planches/lot 24.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Mobilier',
+    dossier: 'objets',
+    cases: [
+      null,
+      { id: 'table-ovale-noire', nom: 'Table ovale noire', l: 1.3, pas: true },
+      { id: 'table-ronde-marquetee', nom: 'Table ronde marquetée', l: 0.9, pas: true },
+      null,
+      { id: 'table-ovale-ornee', nom: 'Table ovale ornée', l: 1.6, pas: true },
+      { id: 'table-octogonale', nom: 'Table octogonale', l: 1.1, pas: true },
+      { id: 'table-octogonale-verte', nom: 'Table octogonale verte', l: 1.2, pas: true },
+      { id: 'gueridon-marbre', nom: 'Guéridon de marbre', l: 0.8, pas: true },
+      null,
+      { id: 'table-ronde-rosace', nom: 'Table à rosace', l: 1, pas: true },
+      { id: 'table-ovale-marbree', nom: 'Table ovale marbrée', l: 1.4, pas: true },
+      { id: 'table-planches', nom: 'Table en planches', l: 1.6, pas: true }
+    ]
+  },
+  {
+    fichier: 'planches/lot 25.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Mobilier',
+    dossier: 'objets',
+    cases: [
+      { id: 'fauteuil-rouge', nom: 'Fauteuil rouge', l: 0.6, pas: true },
+      { id: 'fauteuil-damasse', nom: 'Fauteuil damassé', l: 0.6, pas: true },
+      { id: 'chaise-gothique', nom: 'Chaise gothique', l: 0.5 },
+      { id: 'fauteuil-vert', nom: 'Fauteuil vert', l: 0.6, pas: true },
+      { id: 'chaise-cannee', nom: 'Chaise cannée', l: 0.45 },
+      { id: 'chaise-bleue', nom: 'Chaise bleue', l: 0.45 },
+      { id: 'chaise-windsor', nom: 'Chaise Windsor', l: 0.45 },
+      { id: 'chaise-fleurie', nom: 'Chaise fleurie', l: 0.45 },
+      { id: 'tabouret-curule', nom: 'Tabouret curule', l: 0.45 },
+      { id: 'pouf-vert', nom: 'Pouf vert', l: 0.5 },
+      { id: 'pouf-damasse', nom: 'Pouf damassé', l: 0.5 },
+      { id: 'tabouret-rouge', nom: 'Tabouret rouge', l: 0.4 }
+    ]
+  },
+  {
+    fichier: 'planches/lot 26.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Moderne',
+    dossier: 'objets',
+    cases: [
+      { id: 'canape-angle-blanc', nom: 'Canapé d’angle blanc', l: 1.8, pas: true },
+      { id: 'meuble-tv', nom: 'Meuble télé', l: 1.2, pas: true },
+      { id: 'table-bois', nom: 'Table en bois', l: 1.4, pas: true },
+      null,
+      { id: 'lit-moderne', nom: 'Lit moderne', l: 1.3, pas: true },
+      { id: 'bureau-ordinateur', nom: 'Bureau et ordinateur', l: 1.2, pas: true },
+      { id: 'ilot-cuisson', nom: 'Îlot de cuisson', l: 1.3, pas: true },
+      null,
+      null,
+      { id: 'table-basse-bois', nom: 'Table basse en bois', l: 1.2, pas: true },
+      { id: 'meuble-vasque', nom: 'Meuble vasque', l: 1, pas: true },
+      { id: 'douche-italienne', nom: 'Douche à l’italienne', l: 0.9, pas: true }
+    ]
+  },
+  {
+    fichier: 'planches/lot 28.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Moderne',
+    dossier: 'objets',
+    cases: [
+      { id: 'canape-angle-beige', nom: 'Canapé d’angle beige', l: 1.8, pas: true },
+      { id: 'table-salle-a-manger', nom: 'Table de salle à manger', l: 1.6, pas: true },
+      { id: 'ilot-tabourets', nom: 'Îlot et tabourets', l: 1.6, pas: true },
+      { id: 'baignoire-ilot', nom: 'Baignoire îlot', l: 1.2, pas: true },
+      { id: 'tapis-rond-moderne', nom: 'Tapis rond', l: 1.6 },
+      { id: 'bureau-plantes', nom: 'Bureau aux plantes', l: 1.3, pas: true },
+      { id: 'douche-vitree', nom: 'Douche vitrée', l: 0.9, pas: true },
+      { id: 'toilettes-modernes', nom: 'Toilettes modernes', l: 0.45, pas: true },
+      null,
+      { id: 'plante-monstera', nom: 'Monstera', l: 0.6, pas: true },
+      { id: 'table-basse-marbre', nom: 'Table basse en marbre', l: 1, pas: true },
+      { id: 'fauteuil-cuir', nom: 'Fauteuil de cuir', l: 0.7, pas: true }
+    ]
+  },
+  {
+    fichier: 'planches/lot 29.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Moderne',
+    dossier: 'objets',
+    cases: [
+      { id: 'canape-angle-orange', nom: 'Canapé d’angle aux coussins', l: 1.9, pas: true },
+      { id: 'table-basse-galet', nom: 'Table basse galet', l: 1, pas: true },
+      { id: 'table-six-chaises', nom: 'Table à six chaises', l: 1.8, pas: true },
+      { id: 'ilot-moderne', nom: 'Îlot moderne', l: 1.5, pas: true },
+      { id: 'tapis-jute', nom: 'Tapis de jute', l: 1.5 },
+      { id: 'lit-chevets', nom: 'Lit et chevets', l: 1.6, pas: true },
+      { id: 'baignoire-bois', nom: 'Baignoire et planche', l: 1.2, pas: true },
+      null,
+      null,
+      { id: 'bureau-portable', nom: 'Bureau et portable', l: 1.3, pas: true },
+      null,
+      { id: 'fauteuil-papasan', nom: 'Fauteuil papasan', l: 0.8, pas: true }
+    ]
+  },
+  {
+    fichier: 'planches/lot 31.png',
+    fond: 'magenta',
+    isoler: true,
+    lignes: [4, 5, 5],
+    cols: 5,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Moderne',
+    dossier: 'objets',
+    cases: [
+      { id: 'plaque-induction', nom: 'Plaque à induction', l: 0.5 },
+      null,
+      { id: 'evier-inox', nom: 'Évier inox', l: 0.7, pas: true },
+      null,
+      { id: 'machine-cafe', nom: 'Machine à café', l: 0.3 },
+      { id: 'grille-pain', nom: 'Grille-pain', l: 0.3 },
+      { id: 'bouilloire', nom: 'Bouilloire', l: 0.25 },
+      { id: 'blender', nom: 'Blender', l: 0.2 },
+      { id: 'robot-patissier', nom: 'Robot pâtissier', l: 0.35 },
+      { id: 'planche-a-decouper', nom: 'Planche à découper', l: 0.4 },
+      { id: 'pot-ustensiles', nom: 'Pot à ustensiles', l: 0.2 },
+      { id: 'carrousel-epices', nom: 'Carrousel à épices', l: 0.25 },
+      { id: 'barre-ustensiles', nom: 'Barre à ustensiles', l: 0.5 },
+      { id: 'faitout', nom: 'Faitout', l: 0.35 }
+    ]
+  },
+  {
     fichier: 'planches/planche 5.png',
     fond: 'magenta',
     cols: 2,
@@ -739,9 +984,20 @@ for (const pl of PLANCHES) {
   const el = pl.isoler ? elements(img) : null
   pl.cases.forEach((c, i) => {
     if (!c) return
-    const cx = Math.round((i % pl.cols) * cw)
-    const cy = Math.round(Math.floor(i / pl.cols) * ch)
-    let cellule = rogner(img, cx, cy, Math.round(cw), Math.round(ch))
+    /* La case i : dans une grille régulière, ou dans des rangées de longueurs différentes. */
+    let rang = Math.floor(i / pl.cols)
+    let col = i % pl.cols
+    let cwi = cw
+    if (pl.lignes) {
+      let reste = i
+      rang = 0
+      while (reste >= pl.lignes[rang]) reste -= pl.lignes[rang++]
+      col = reste
+      cwi = img.width / pl.lignes[rang]
+    }
+    const cx = Math.round(col * cwi)
+    const cy = Math.round(rang * ch)
+    let cellule = rogner(img, cx, cy, Math.round(cwi), Math.round(ch))
     if (el) {
       /* L'élément le plus lourd dont le centre tombe dans cette case. */
       let meilleur = 0
@@ -749,7 +1005,7 @@ for (const pl of PLANCHES) {
         if (!e) return
         const mx = (f.sx / f.n + 0.5) * BLOC
         const my = (f.sy / f.n + 0.5) * BLOC
-        if (mx >= cx && mx < cx + cw && my >= cy && my < cy + ch && f.n > (el.infos[meilleur]?.n ?? 0)) meilleur = e
+        if (mx >= cx && mx < cx + cwi && my >= cy && my < cy + ch && f.n > (el.infos[meilleur]?.n ?? 0)) meilleur = e
       })
       if (!meilleur) {
         console.warn(`! ${pl.fichier} case ${i + 1} : aucun élément`)
@@ -811,11 +1067,11 @@ for (const pl of PLANCHES) {
 
 /* L'ordre de la palette : les sols, murs et ouvertures d'abord, puis les objets
    par catégorie et sous-catégorie, dans un ordre qui se lit. */
-const ORDRE_CATEGORIES = ['Mobilier', 'Lumière', 'Objets', 'Architecture', 'Nature', 'Macabre']
+const ORDRE_CATEGORIES = ['Mobilier', 'Lumière', 'Objets', 'Architecture', 'Nature', 'Macabre', 'Moderne']
 const ORDRE_SOUS = [
   'Lits', 'Assises', 'Tables', 'Rangements', 'Cuisine', 'Bain', 'Cheminées', 'Tapis', 'Paravents', 'Musique',
   'Lampes', 'Lampadaires', 'Plafonniers', 'Appliques', 'Bougies',
-  'Livres et papiers', 'Nourriture', 'Vaisselle', 'Décoration',
+  'Livres et papiers', 'Nourriture', 'Vaisselle', 'Décoration', 'Électroménager',
   'Arbres', 'Végétation', 'Rochers', 'Bois mort', 'Toiles d’araignées'
 ]
 const rang = (e: Record<string, unknown>): [number, number] => {
