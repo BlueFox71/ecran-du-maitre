@@ -4,7 +4,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { nouvelId, type PointCase } from '@shared/atelier'
-import { pieceSous, rectangle, solSous } from '@shared/atelierOutils'
+import { rectangle, solSous, zoneARemplir } from '@shared/atelierOutils'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
 import { ImportAsset } from '../ImportAsset'
@@ -15,7 +15,11 @@ type OutilSol = 'rect' | 'poly' | 'remplir' | 'choisir'
 const OUTILS: { id: OutilSol; label: string; aide: string }[] = [
   { id: 'rect', label: 'Rectangle', aide: 'Glisse pour peindre un rectangle.' },
   { id: 'poly', label: 'Polygone', aide: 'Clique chaque coin ; clic droit, double-clic ou clic sur le premier point pour fermer.' },
-  { id: 'remplir', label: 'Remplir la pièce', aide: 'Clique dans une pièce fermée par des murs : son sol est peint d’un coup.' },
+  {
+    id: 'remplir',
+    label: 'Remplir',
+    aide: 'Clique dans une pièce fermée par des murs pour peindre son sol d’un coup ; ailleurs, c’est toute la grille qui se remplit.'
+  },
   { id: 'choisir', label: 'Choisir', aide: 'Clique un sol pour le choisir ; une matière s’y applique, Suppr l’efface.' }
 ]
 
@@ -65,8 +69,7 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
           }
         } else if (outil === 'remplir') {
           if (type === 'down') {
-            const piece = co.c ? pieceSous(co.c, p) : null
-            if (piece) peindre(piece)
+            if (co.c) peindre(zoneARemplir(co.c, p))
           }
         } else if (type === 'down') setChoisi(co.c ? solSous(co.c, p)?.id ?? null : null)
         repeindre()
@@ -81,8 +84,7 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
           pointille(ctx, p ? [...points.current, p] : points.current, echelle)
         }
         if (outil === 'remplir' && p && co.c) {
-          const piece = pieceSous(co.c, p)
-          if (piece) contour(ctx, piece, echelle, true)
+          contour(ctx, zoneARemplir(co.c, p), echelle, true)
         }
         const s = choisi && co.c?.sols.find((x) => x.id === choisi)
         if (s) contour(ctx, s.pts, echelle, true)

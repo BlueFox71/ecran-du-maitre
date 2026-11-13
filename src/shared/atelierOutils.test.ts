@@ -8,7 +8,8 @@ import {
   rectangle,
   redimensionner,
   solSous,
-  tourner
+  tourner,
+  zoneARemplir
 } from './atelierOutils'
 
 const terrain = (): Construction => ({ ...constructionVide(), largeur: 20, hauteur: 10 })
@@ -140,5 +141,19 @@ describe('tourner', () => {
   })
   it('par pas de 15° quand on le demande', () => {
     expect(tourner(meuble({}), [6, 3.1], true).angle % 15).toBeCloseTo(0, 6)
+  })
+})
+
+describe('zoneARemplir', () => {
+  it('dans une pièce fermée : la pièce', () => {
+    const c = terrain()
+    c.murs.push({ id: 'ext', assetId: 'x', pts: [[1, 1], [5, 1], [5, 5], [1, 5], [1, 1]], epaisseur: 0.4 })
+    const z = zoneARemplir(c, [3, 3])
+    expect(Math.max(...z.map((q) => q[0]))).toBeCloseTo(5, 6)
+  })
+  it('hors de toute pièce : toute la grille', () => {
+    const c = terrain()
+    c.murs.push({ id: 'ext', assetId: 'x', pts: [[1, 1], [5, 1], [5, 5], [1, 5], [1, 1]], epaisseur: 0.4 })
+    expect(zoneARemplir(c, [10, 8])).toEqual([[0, 0], [20, 0], [20, 10], [0, 10]])
   })
 })

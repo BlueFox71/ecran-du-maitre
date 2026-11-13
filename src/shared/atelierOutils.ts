@@ -184,3 +184,8 @@ export function tourner(o: ObjetPose, p: PointCase, pas: boolean): ObjetPose {
   if (pas) angle = Math.round(angle / 15) * 15
   return { ...o, angle: ((angle % 360) + 360) % 360 }
 }
+
+/** Ce que l'outil Remplir peint sous un point : la pièce fermée qui l'entoure, sinon toute la grille. */
+export function zoneARemplir(c: Construction, p: PointCase): PointCase[] {
+  return pieceSous(c, p) ?? (rectangle([0, 0], [c.largeur, c.hauteur]) as PointCase[])
+}
