@@ -3504,7 +3504,20 @@ function FicheLieu({
           </button>
         ) : null}
         <div className="spacer" />
-        {plan.mapItemId ? (
+        {plan.construit ? (
+          /* Un plan bâti se retouche à l'atelier : son image, ses murs et ses
+             portes en dérivent. Rogner ou remplacer l'image ici les ferait
+             diverger. */
+          <button
+            className="btn"
+            disabled={rognage || enTest}
+            title="Ouvrir l’atelier sur ce lieu : sol, murs, portes, déco, éclairage"
+            onClick={() => useStore.getState().ouvrirAtelier(plan.id)}
+          >
+            <IconMurs />
+            Modifier la construction
+          </button>
+        ) : plan.mapItemId ? (
           <div className="pe-menu-hote">
             <button
               className="btn"

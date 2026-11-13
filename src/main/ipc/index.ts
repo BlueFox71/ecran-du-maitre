@@ -27,6 +27,7 @@ import * as murs from '../db/repos/murs'
 import * as atelier from '../atelier'
 import * as atelierAssets from '../atelierAssets'
 import type { Cadre } from '@shared/atelier'
+import { modifOuvertureAutorisee, murVerrouille } from '@shared/synchro'
 import * as reglages from '../db/repos/reglages'
 import * as rolls from '../db/repos/rolls'
 import * as pions from '../db/repos/pions'
@@ -672,7 +673,12 @@ export function registerIpc(): void {
     piecesSuivent(m?.placeId)
     return m
   })
+  /* Ce qui vient de l'atelier ne se retouche que dans l'atelier : sinon le
+     prochain enregistrement l'écraserait sans prévenir. */
+  const VERROU = 'Ce mur vient de l’atelier : il se modifie dans l’atelier'
   on('murs:update', (id: number, patch: any) => {
+    const cur = murs.getMur(id)
+    if (cur && murVerrouille(cur)) throw new Error(VERROU)
     const m = murs.updateMur(id, patch)
     if (patch && ('pts' in patch || 'nature' in patch)) piecesSuivent(m?.placeId)
     /* Tirer ou ouvrir un rideau change ce que les joueurs voient : on le leur
@@ -683,7 +689,9 @@ export function registerIpc(): void {
     return m
   })
   on('murs:remove', (id: number) => {
-    const placeId = murs.getMur(id)?.placeId
+    const cur = murs.getMur(id)
+    if (cur && murVerrouille(cur)) throw new Error(VERROU)
+    const placeId = cur?.placeId
     murs.removeMur(id)
     piecesSuivent(placeId)
   })
@@ -709,6 +717,9 @@ export function registerIpc(): void {
   on('ouvertures:of', (placeId: number | null) => ouvertures.listOuvertures(placeId))
   on('ouvertures:add', (input: any) => ouvertures.addOuverture(input))
   on('ouvertures:update', (id: number, patch: any) => {
+    const cur = ouvertures.getOuverture(id)
+    if (cur && !modifOuvertureAutorisee(cur, patch ?? {}))
+      throw new Error('Cette ouverture vient de l’atelier : on l’y déplace, ici on l’ouvre ou on la verrouille')
     const o = ouvertures.updateOuverture(id, patch)
     /* Ouvrir une porte change ce que les joueurs voient : on le leur dit. */
     display.calqueABouge()
@@ -716,6 +727,8 @@ export function registerIpc(): void {
     return o
   })
   on('ouvertures:remove', (id: number) => {
+    if (ouvertures.getOuverture(id)?.atelierId)
+      throw new Error('Cette ouverture vient de l’atelier : elle s’efface dans l’atelier')
     ouvertures.removeOuverture(id)
     mobile.revoirDemandesPorte()
   })

@@ -1,16 +1,12 @@
-<!-- version: 1.6.2 -->
+<!-- version: 1.7.0 -->
 ### Nouveautés
-- **Le nom des pièces sur le plan des joueurs.** Dans « Gestion des pièces » (l'ancien bouton « Portes et lumières » du Paravent), chaque pièce peut montrer son nom aux joueurs : il s'écrit sur l'écran de la table et sur les téléphones, là où tu l'as placé. Caché par défaut, pièce par pièce.
-- **Les gains et pertes de santé mentale annoncés à la table.** Quand un joueur gagne ou perd de la santé mentale, l'écran de la table l'affiche comme un dé : qui, combien et pourquoi, jusqu'à ce que tu cliques sur « Vu ». Le goutte-à-goutte d'un chrono ne s'annonce pas, pour ne pas couvrir l'écran.
-- **Le jet de Volonté réclamé sur le téléphone.** Quand tu attends le jet de Volonté d'un joueur, son téléphone le lui demande et, sur l'onglet Jet, la bonne caractéristique est déjà choisie.
-- **La caméra suit celui qui joue.** Si l'écran suivait déjà un pion, il passe au pion du personnage dont c'est le tour, à condition que ce pion soit sur le lieu et visible des joueurs.
+- **L'atelier des lieux : construis tes plans toi-même.** Nouvelle entrée « Atelier » sous Lieux. Plus besoin de chercher une carte qui colle à peu près au scénario : tu bâtis le lieu de A à Z, en cinq étapes. Tu peins le sol (parquet, damier, dalles, terre…), tu traces les murs épais, tu poses les portes et les fenêtres, tu meubles, puis tu éclaires. Une grille aimantée aide à tracer droit ; Maj enfoncé, tu traces librement.
+- **Un plan construit se joue aussitôt.** À l'enregistrement, l'image devient la carte du lieu et ses murs deviennent les murs du plan : le brouillard, la vue des pions et leurs déplacements suivent d'eux-mêmes. Les portes s'ouvrent et se verrouillent en séance, et une porte ouverte, verrouillée ou nommée le reste quand tu retouches la maison.
+- **Des meubles qui bloquent… ou pas.** Chaque objet posé a deux cases : « Bloque le passage » et « Bloque la vue ». Une table arrête les pions sans cacher la pièce, une bibliothèque fait les deux, un tapis ni l'un ni l'autre.
+- **Un pack de départ pour un manoir hanté.** Une quarantaine d'assets vus de dessus : lits, canapés, bibliothèques, cheminée, baignoire, escalier, toiles d'araignée, bougies, crâne, portes, fenêtres, sols et murs.
+- **Tes propres images.** « Importer une image… » ajoute un objet, un sol, un mur, une porte ou une fenêtre à ta bibliothèque, commune à toutes tes campagnes. Un fond magenta ou noir est retiré tout seul, les bords vides sont rognés et les textures se raccordent sans couture visible.
+- **Montrer un document à la table d'un clic, depuis la Pochette.** Une image s'ouvre en grand au centre de l'écran des joueurs, par-dessus le visuel, et un second clic la referme. Une vidéo prend la place du visuel.
 
 ### Améliorations
-- **Fini le ralentissement des longues séances.** Au bout de quelques heures, l'application pouvait faire ramer le PC et les animations (chute du d20…) ne se jouaient plus. En cause : un téléphone écran éteint laissait s'accumuler en mémoire tout ce que le PC lui envoyait. Le PC ne garde plus que le dernier état pour un téléphone en retard, et coupe celui qui ne répond plus depuis une minute (il se reconnecte seul au réveil). Les téléphones ne reçoivent plus que ce qui change : environ 45 fois moins de données sur le Wi-Fi.
-- **Porter un sac à dos d'un geste.** Quand un sac à dos arrive dans le sac d'un joueur, son téléphone lui propose aussitôt de le mettre sur le dos.
-- **La fiche d'un objet depuis la bande des joueurs.** Un clic sur un objet de la bande ouvre sa fiche.
-- **Le barème de santé mentale s'allège.** Il ne garde que les prix et les récupérations ; les événements de la séance se gèrent dans les Paramètres.
-
-### Corrections
-- **Un sac plein accepte toujours un sac à dos.** On ne pouvait plus tendre un sac à dos à un joueur dont le sac était plein, alors que le porter libère justement de la place.
-- **Le QR code des téléphones visait parfois le mauvais réseau.** Sur un PC équipé d'Hyper-V, le QR pouvait pointer vers un réseau interne qu'aucun téléphone ne joint. Le PC choisit maintenant la carte du vrai réseau de la maison.
+- **Agrandir un lieu sans rien déranger.** Tu peux agrandir le terrain par n'importe quel bord : pions, lampes, sons, repères et pièces restent exactement où ils étaient.
+- **Un lieu sans plan peut être construit.** Sa fiche propose « Le construire » à côté de « Choisir un plan », et l'éditeur d'un plan construit propose « Modifier la construction ».

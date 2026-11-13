@@ -26699,3 +26699,11 @@ body.surligneur-actif [data-cible] {
   color: var(--text-faint);
   font-size: 11.5px;
 }
+
+/* Un trait de l'atelier, dans l'éditeur de plan : on le voit, on ne le saisit pas. */
+.mur.atelier .trait {
+  opacity: 0.75;
+}
+.murs-layer.edit .mur.atelier {
+  cursor: not-allowed;
+}

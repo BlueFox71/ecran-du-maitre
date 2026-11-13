@@ -3389,10 +3389,12 @@ export function CalqueMurs({
           key={m.id}
           className={
             `mur n-${m.nature}` +
+            (m.atelierId ? ' atelier' : '') +
             (choisi === m.id ? ' on' : '') +
             (pourPiece?.includes(m.id) ? ' designe' : '')
           }
         >
+          {m.atelierId ? <title>Vient de l’atelier : il se modifie dans l’atelier</title> : null}
           <path d={d} className="halo" />
           <path d={d} className="trait" />
           {choisi === m.id ? <path d={d} className="liseré" /> : null}

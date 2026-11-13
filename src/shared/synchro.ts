@@ -46,3 +46,17 @@ export function planDeSynchro(derive: CalqueDerive, murs: Mur[], ouvertures: Ouv
     ouvertures: apparier(derive.ouvertures, ouvertures)
   }
 }
+
+/* ---------------- le verrou, hors de l'atelier ---------------- */
+
+/** Un mur de l'atelier ne se modifie que dans l'atelier : il serait réécrit au prochain enregistrement. */
+export function murVerrouille(m: Mur): boolean {
+  return !!m.atelierId
+}
+
+/** Ce qu'on peut changer d'une porte de l'atelier ailleurs que dans l'atelier : son état de partie, son nom. */
+const ETAT_DE_PARTIE = new Set(['ouverte', 'verrouillee', 'nom'])
+
+export function modifOuvertureAutorisee(o: Ouverture, patch: Record<string, unknown>): boolean {
+  return !o.atelierId || Object.keys(patch).every((k) => ETAT_DE_PARTIE.has(k))
+}

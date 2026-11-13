@@ -23,6 +23,7 @@ import {
   IconCheck,
   IconDonner,
   IconImage,
+  IconMurs,
   IconSearch,
   IconPen,
   IconScreen,
@@ -578,13 +579,30 @@ function PanneauLieu({
         ) : (
           <div className="fdl-plan sans">
             Pas encore de plan
+            {/* Le bâtir plutôt que le chercher : l'atelier part de zéro. */}
+            <button
+              className="btn btn-sm"
+              onClick={async () => {
+                try {
+                  await window.jdr.atelier.construire(p.id)
+                  await s.refreshPlaces()
+                  s.ouvrirAtelier(p.id)
+                } catch (e) {
+                  s.toast(e instanceof Error ? e.message : String(e), true)
+                }
+              }}
+            >
+              <IconMurs />
+              Le construire
+            </button>
             <button className="btn btn-sm" onClick={() => setChoix(true)}>
               <IconImage />
               Choisir un plan
             </button>
           </div>
         )}
-        {carte?.url ? <ApparencesDuPlan porteur={porteur} /> : null}
+        {/* Un lieu bâti n'a pas d'autres apparences : son image est le tirage de sa construction. */}
+        {carte?.url && !porteur.construit ? <ApparencesDuPlan porteur={porteur} /> : null}
         <ImagesDuLieu lieu={p} />
 
         {/* Descendre dans l'un des lieux qu'il tient ; on remonte par le chemin, en haut. */}

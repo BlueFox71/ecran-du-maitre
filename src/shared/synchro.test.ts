@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { planDeSynchro } from './synchro'
+import { modifOuvertureAutorisee, murVerrouille, planDeSynchro } from './synchro'
 import type { CalqueDerive } from './atelier'
 import type { Mur, Ouverture } from './types'
 
@@ -81,5 +81,23 @@ describe('planDeSynchro', () => {
       [ouverture(7, 3, 'o1')]
     )
     expect(plan.ouvertures.retirer).toEqual([7])
+  })
+})
+
+describe('le verrou de l’atelier', () => {
+  it('un mur de l’atelier est verrouillé, un trait fait main non', () => {
+    expect(murVerrouille(mur(1, 'm1'))).toBe(true)
+    expect(murVerrouille(mur(2, null))).toBe(false)
+  })
+  it('une porte de l’atelier s’ouvre, se verrouille et se nomme, mais ne se déplace pas', () => {
+    const o = ouverture(7, 3, 'o1')
+    expect(modifOuvertureAutorisee(o, { ouverte: true })).toBe(true)
+    expect(modifOuvertureAutorisee(o, { verrouillee: true, ouverte: false })).toBe(true)
+    expect(modifOuvertureAutorisee(o, { nom: 'Porte de la cave' })).toBe(true)
+    expect(modifOuvertureAutorisee(o, { d: 0.3 })).toBe(false)
+    expect(modifOuvertureAutorisee(o, { largeur: 0.1 })).toBe(false)
+  })
+  it('une ouverture faite main se modifie librement', () => {
+    expect(modifOuvertureAutorisee(ouverture(8, 3, null), { d: 0.3, largeur: 0.1 })).toBe(true)
   })
 })
