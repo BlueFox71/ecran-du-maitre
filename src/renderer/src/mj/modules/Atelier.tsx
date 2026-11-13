@@ -235,7 +235,7 @@ function Chantier({ place }: { place: Place }): JSX.Element {
         </button>
         <strong className="at-titre">{place.name}</strong>
         <nav className="at-etapes" role="tablist" aria-label="Les étapes de la construction">
-          {ETAPES.map((e, i) => (
+          {ETAPES.map((e) => (
             <button
               key={e.id}
               role="tab"
@@ -249,7 +249,6 @@ function Chantier({ place }: { place: Place }): JSX.Element {
                 setEtape(e.id)
               }}
             >
-              <span className="num">{i + 1}</span>
               {e.label}
             </button>
           ))}
