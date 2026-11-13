@@ -294,7 +294,11 @@ export function deriverCalque(c: Construction): CalqueDerive {
   return { murs, ouvertures }
 }
 
-/** Ce qui est construit, en cases : sols, murs (avec leur épaisseur), objets. `null` : rien. */
+/**
+ * Ce qui empêche de réduire le terrain, en cases : les murs (avec leur
+ * épaisseur) et les objets. Pas les sols — un sol se découpe au nouveau bord,
+ * un mur ou un meuble coupé n'aurait plus de sens. `null` : rien.
+ */
 export function boiteDuContenu(c: Construction): { x0: number; y0: number; x1: number; y1: number } | null {
   let x0 = Infinity
   let y0 = Infinity
@@ -308,14 +312,45 @@ export function boiteDuContenu(c: Construction): { x0: number; y0: number; x1: n
       y1 = Math.max(y1, y + marge)
     }
   }
-  for (const s of c.sols) prendre(s.pts)
   for (const m of c.murs) prendre(m.pts, m.epaisseur / 2)
   for (const o of c.objets) prendre(contourDeLObjet(o))
   return x0 === Infinity ? null : { x0, y0, x1, y1 }
 }
 
-type Bords = { gauche: number; haut: number; droite: number; bas: number }
 const EPS = 1e-9
+
+type Bords = { gauche: number; haut: number; droite: number; bas: number }
+
+/** Un polygone découpé au rectangle [0, L] × [0, H] (Sutherland–Hodgman) ; `null` s'il n'en reste rien. */
+function decouper(pts: PointCase[], L: number, H: number): PointCase[] | null {
+  const bords: [(p: PointCase) => number, (a: PointCase, b: PointCase) => PointCase][] = [
+    [(p) => p[0], (a, b) => [0, a[1] + ((b[1] - a[1]) * (0 - a[0])) / (b[0] - a[0])]],
+    [(p) => L - p[0], (a, b) => [L, a[1] + ((b[1] - a[1]) * (L - a[0])) / (b[0] - a[0])]],
+    [(p) => p[1], (a, b) => [a[0] + ((b[0] - a[0]) * (0 - a[1])) / (b[1] - a[1]), 0]],
+    [(p) => H - p[1], (a, b) => [a[0] + ((b[0] - a[0]) * (H - a[1])) / (b[1] - a[1]), H]]
+  ]
+  let poly = pts
+  for (const [dedans, couper] of bords) {
+    const out: PointCase[] = []
+    for (let i = 0; i < poly.length; i++) {
+      const a = poly[i]
+      const b = poly[(i + 1) % poly.length]
+      const ia = dedans(a) >= -EPS
+      const ib = dedans(b) >= -EPS
+      if (ia) out.push(a)
+      if (ia !== ib) out.push(couper(a, b))
+    }
+    poly = out
+    if (poly.length < 3) return null
+  }
+  let aire = 0
+  for (let i = 0; i < poly.length; i++) {
+    const a = poly[i]
+    const b = poly[(i + 1) % poly.length]
+    aire += a[0] * b[1] - b[0] * a[1]
+  }
+  return Math.abs(aire) < 1e-6 ? null : poly
+}
 
 /** Le contenu tient-il dans le terrain une fois les bords appliqués ? */
 function tient(c: Construction, b: Bords): boolean {
@@ -352,7 +387,11 @@ export function agrandir(c: Construction, bords: Bords): { construction: Constru
       ...c,
       largeur,
       hauteur,
-      sols: c.sols.map((s) => ({ ...s, pts: s.pts.map(dec) })),
+      /* Les sols se découpent au nouveau bord ; celui qui sort tout entier part. */
+      sols: c.sols.flatMap((s) => {
+        const pts = decouper(s.pts.map(dec), largeur, hauteur)
+        return pts ? [{ ...s, pts }] : []
+      }),
       murs: c.murs.map((m) => ({ ...m, pts: m.pts.map(dec) })),
       ouvertures: c.ouvertures.map((o) => ({ ...o })),
       objets: c.objets.map((o) => ({ ...o, x: o.x + gauche, y: o.y + haut }))

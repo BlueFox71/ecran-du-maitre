@@ -276,3 +276,27 @@ describe('orientation des ouvertures', () => {
     expect([o[1].retourne, o[1].miroir]).toEqual([false, false])
   })
 })
+
+describe('réduire un terrain couvert de sol', () => {
+  it('un sol qui couvre tout ne bloque pas : il est découpé au nouveau bord', () => {
+    const c = terrain(10, 10)
+    c.sols.push({ id: 's', assetId: 'x', pts: [[0, 0], [10, 0], [10, 10], [0, 10]] })
+    expect(tailleMinimale(c, [0, 0])).toEqual({ largeur: 1, hauteur: 1 })
+    const { construction } = agrandir(c, { gauche: -3, haut: 0, droite: 0, bas: -2 })
+    const xs = construction.sols[0].pts.map((p) => p[0])
+    const ys = construction.sols[0].pts.map((p) => p[1])
+    expect(Math.min(...xs)).toBeCloseTo(0, 9)
+    expect(Math.max(...xs)).toBeCloseTo(7, 9)
+    expect(Math.max(...ys)).toBeCloseTo(8, 9)
+  })
+  it('un sol entièrement retiré disparaît', () => {
+    const c = terrain(10, 10)
+    c.sols.push({ id: 's', assetId: 'x', pts: [[0, 0], [2, 0], [2, 2], [0, 2]] })
+    expect(agrandir(c, { gauche: -3, haut: 0, droite: 0, bas: 0 }).construction.sols).toEqual([])
+  })
+  it('les murs, eux, bloquent toujours', () => {
+    const c = terrain(10, 10)
+    c.murs.push({ id: 'm', assetId: 'x', pts: [[1, 1], [9, 1]], epaisseur: 0.4 })
+    expect(tailleMinimale(c, [0, 0]).largeur).toBe(10)
+  })
+})
