@@ -95,7 +95,61 @@ const RANGEMENT: Record<string, [string, string]> = {
   rochers: ['Nature', 'Rochers'],
   'gros-rocher': ['Nature', 'Rochers'],
   'tronc-couche': ['Nature', 'Bois mort'],
-  souche: ['Nature', 'Bois mort']
+  souche: ['Nature', 'Bois mort'],
+  'table-a-manger': ['Mobilier', 'Tables'],
+  'canape-bordeaux': ['Mobilier', 'Assises'],
+  'table-ovale-marbre': ['Mobilier', 'Tables'],
+  'piano-a-queue': ['Mobilier', 'Musique'],
+  'lit-damasse': ['Mobilier', 'Lits'],
+  'cheminee-marbre': ['Mobilier', 'Cheminées'],
+  'volaille-rotie': ['Objets', 'Nourriture'],
+  'roti': ['Objets', 'Nourriture'],
+  'tarte': ['Objets', 'Nourriture'],
+  'plateau-fromages': ['Objets', 'Nourriture'],
+  'poisson': ['Objets', 'Nourriture'],
+  'pain': ['Objets', 'Nourriture'],
+  'ragout': ['Objets', 'Nourriture'],
+  'soupe': ['Objets', 'Nourriture'],
+  'corbeille-fruits': ['Objets', 'Nourriture'],
+  'gateau': ['Objets', 'Nourriture'],
+  'biscuits': ['Objets', 'Nourriture'],
+  'coupe-baies': ['Objets', 'Nourriture'],
+  'lustre-bougies': ['Lumière', 'Plafonniers'],
+  'lustre-roue': ['Lumière', 'Plafonniers'],
+  'plafonnier-tulipes': ['Lumière', 'Plafonniers'],
+  'suspension-cloche': ['Lumière', 'Plafonniers'],
+  'globe-verre': ['Lumière', 'Plafonniers'],
+  'lustre-cristal': ['Lumière', 'Plafonniers'],
+  'lustre-fer': ['Lumière', 'Plafonniers'],
+  'plafonnier-vitrail': ['Lumière', 'Plafonniers'],
+  'lustre-globes': ['Lumière', 'Plafonniers'],
+  'suspension-ajouree': ['Lumière', 'Plafonniers'],
+  'plafonnier-vert': ['Lumière', 'Plafonniers'],
+  'globe-dore': ['Lumière', 'Plafonniers'],
+  'lampe-tiffany': ['Lumière', 'Lampes'],
+  'lanterne': ['Lumière', 'Lampes'],
+  'lampe-banquier': ['Lumière', 'Lampes'],
+  'lampe-petrole': ['Lumière', 'Lampes'],
+  'lanterne-gothique': ['Lumière', 'Lampes'],
+  'lanterne-noire': ['Lumière', 'Lampes'],
+  'lampe-banquier-verte': ['Lumière', 'Lampes'],
+  'lampe-huile-rose': ['Lumière', 'Lampes'],
+  'lampadaire-franges': ['Lumière', 'Lampadaires'],
+  'applique-lanterne': ['Lumière', 'Appliques'],
+  'bougeoir-laiton': ['Lumière', 'Bougies'],
+  'bougeoir-main': ['Lumière', 'Bougies'],
+  'escalier-bois': ['Architecture', 'Escaliers'],
+  'escalier-tapis-rouge': ['Architecture', 'Escaliers'],
+  'escalier-palier': ['Architecture', 'Escaliers'],
+  'escalier-demi-lune': ['Architecture', 'Escaliers'],
+  'escalier-quart-tournant': ['Architecture', 'Escaliers'],
+  'colimacon-bois': ['Architecture', 'Escaliers'],
+  'escalier-imperial': ['Architecture', 'Escaliers'],
+  'colimacon-pierre': ['Architecture', 'Escaliers'],
+  'escalier-lumineux': ['Architecture', 'Escaliers'],
+  'escalier-metal': ['Architecture', 'Escaliers'],
+  'escalier-equerre': ['Architecture', 'Escaliers'],
+  'escalier-courbe': ['Architecture', 'Escaliers']
 }
 
 interface Planche {
@@ -298,6 +352,145 @@ const PLANCHES: Planche[] = [
       { id: 'mort', nom: 'Arbre mort', l: 2.5 },
       { id: 'mort-grand', nom: 'Grand arbre mort', l: 4 },
       { id: 'mort-mousse', nom: 'Arbre mort moussu', l: 3.5 }
+    ]
+  },
+  {
+    fichier: 'planches/lot 01.png',
+    fond: 'magenta',
+    retrait: 6,
+    raccord: 'deux',
+    cols: 4,
+    rows: 3,
+    type: 'sol',
+    categorie: 'Sols',
+    dossier: 'sols',
+    cases: [
+      { id: 'herbe-verte', nom: 'Herbe verte', tuile: 2 },
+      { id: 'herbe-terre', nom: 'Herbe et terre', tuile: 2 },
+      { id: 'herbe-haute', nom: 'Herbe haute', tuile: 2 },
+      { id: 'herbe-feuilles', nom: 'Herbe et feuilles mortes', tuile: 2 },
+      { id: 'mousse', nom: 'Mousse', tuile: 2 },
+      { id: 'herbe-fleurie', nom: 'Herbe fleurie', tuile: 2 },
+      { id: 'trefle', nom: 'Trèfle', tuile: 2 },
+      { id: 'herbe-seche', nom: 'Herbe sèche', tuile: 2 },
+      { id: 'herbe-givree', nom: 'Herbe givrée', tuile: 2 },
+      { id: 'herbe-boueuse', nom: 'Herbe boueuse', tuile: 2 },
+      { id: 'herbe-violettes', nom: 'Herbe aux violettes', tuile: 2 },
+      { id: 'herbe-rase', nom: 'Herbe rase et terre', tuile: 2 }
+    ]
+  },
+  {
+    fichier: 'planches/lot 02.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 3,
+    rows: 2,
+    type: 'objet',
+    categorie: 'Mobilier',
+    dossier: 'objets',
+    cases: [
+      { id: 'table-a-manger', nom: 'Table à manger', l: 2, pas: true },
+      { id: 'canape-bordeaux', nom: 'Canapé bordeaux', l: 1.6, pas: true },
+      { id: 'table-ovale-marbre', nom: 'Table ovale en marbre', l: 1.3, pas: true },
+      { id: 'piano-a-queue', nom: 'Piano à queue', l: 1.7, pas: true },
+      { id: 'lit-damasse', nom: 'Lit damassé', l: 1.2, pas: true },
+      { id: 'cheminee-marbre', nom: 'Cheminée de marbre', l: 1.5, pas: true, vue: true }
+    ]
+  },
+  {
+    fichier: 'planches/lot 03.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Objets',
+    dossier: 'objets',
+    cases: [
+      { id: 'volaille-rotie', nom: 'Volaille rôtie', l: 0.6 },
+      { id: 'roti', nom: 'Rôti', l: 0.55 },
+      { id: 'tarte', nom: 'Tarte', l: 0.45 },
+      { id: 'plateau-fromages', nom: 'Plateau de fromages', l: 0.5 },
+      { id: 'poisson', nom: 'Poisson', l: 0.6 },
+      { id: 'pain', nom: 'Pain', l: 0.45 },
+      { id: 'ragout', nom: 'Ragoût', l: 0.5 },
+      { id: 'soupe', nom: 'Soupe', l: 0.45 },
+      { id: 'corbeille-fruits', nom: 'Corbeille de fruits', l: 0.45 },
+      { id: 'gateau', nom: 'Gâteau', l: 0.45 },
+      { id: 'biscuits', nom: 'Biscuits', l: 0.45 },
+      { id: 'coupe-baies', nom: 'Coupe de baies', l: 0.35 }
+    ]
+  },
+  {
+    fichier: 'planches/lot 04.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Lumière',
+    dossier: 'objets',
+    cases: [
+      { id: 'lustre-bougies', nom: 'Lustre à bougies', l: 1 },
+      { id: 'lustre-roue', nom: 'Lustre en roue', l: 1 },
+      { id: 'lampe-tiffany', nom: 'Lampe Tiffany', l: 0.55 },
+      { id: 'lanterne', nom: 'Lanterne', l: 0.35 },
+      { id: 'plafonnier-tulipes', nom: 'Plafonnier à tulipes', l: 0.8 },
+      { id: 'lampe-banquier', nom: 'Lampe de banquier', l: 0.45 },
+      { id: 'bougeoir-laiton', nom: 'Bougeoir en laiton', l: 0.25 },
+      { id: 'lampe-petrole', nom: 'Lampe à pétrole', l: 0.25 },
+      { id: 'lampadaire-franges', nom: 'Lampadaire à franges', l: 0.6 },
+      { id: 'lanterne-gothique', nom: 'Lanterne gothique', l: 0.35 },
+      { id: 'suspension-cloche', nom: 'Suspension en cloche', l: 0.5 },
+      { id: 'globe-verre', nom: 'Globe de verre', l: 0.4 }
+    ]
+  },
+  {
+    fichier: 'planches/lot 05.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Lumière',
+    dossier: 'objets',
+    cases: [
+      { id: 'lustre-cristal', nom: 'Lustre de cristal', l: 1.2 },
+      { id: 'lustre-fer', nom: 'Lustre en fer', l: 1 },
+      { id: 'plafonnier-vitrail', nom: 'Plafonnier à vitrail', l: 0.8 },
+      { id: 'lustre-globes', nom: 'Lustre à globes', l: 0.9 },
+      { id: 'lanterne-noire', nom: 'Lanterne noire', l: 0.35 },
+      { id: 'suspension-ajouree', nom: 'Suspension ajourée', l: 0.55 },
+      { id: 'plafonnier-vert', nom: 'Plafonnier vert', l: 0.7 },
+      { id: 'applique-lanterne', nom: 'Applique lanterne', l: 0.45 },
+      { id: 'lampe-banquier-verte', nom: 'Lampe de banquier verte', l: 0.45 },
+      { id: 'lampe-huile-rose', nom: 'Lampe à huile rose', l: 0.25 },
+      { id: 'bougeoir-main', nom: 'Bougeoir à main', l: 0.25 },
+      { id: 'globe-dore', nom: 'Globe doré', l: 0.45 }
+    ]
+  },
+  {
+    fichier: 'planches/lot 18.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Architecture',
+    dossier: 'objets',
+    cases: [
+      { id: 'escalier-bois', nom: 'Escalier en bois', l: 0.9 },
+      { id: 'escalier-tapis-rouge', nom: 'Escalier au tapis rouge', l: 0.9 },
+      { id: 'escalier-palier', nom: 'Escalier à palier', l: 2 },
+      { id: 'escalier-demi-lune', nom: 'Escalier en demi-lune', l: 2.5 },
+      { id: 'escalier-quart-tournant', nom: 'Escalier quart tournant', l: 1.5 },
+      { id: 'colimacon-bois', nom: 'Colimaçon en bois', l: 1.4 },
+      { id: 'escalier-imperial', nom: 'Escalier impérial', l: 2.6 },
+      { id: 'colimacon-pierre', nom: 'Colimaçon en pierre', l: 1.4 },
+      { id: 'escalier-lumineux', nom: 'Escalier lumineux', l: 0.9 },
+      { id: 'escalier-metal', nom: 'Escalier en métal', l: 0.8 },
+      { id: 'escalier-equerre', nom: 'Escalier en équerre', l: 1.8 },
+      { id: 'escalier-courbe', nom: 'Escalier courbe', l: 2 }
     ]
   },
   {
@@ -511,7 +704,12 @@ for (const pl of PLANCHES) {
 /* L'ordre de la palette : les sols, murs et ouvertures d'abord, puis les objets
    par catégorie et sous-catégorie, dans un ordre qui se lit. */
 const ORDRE_CATEGORIES = ['Mobilier', 'Lumière', 'Objets', 'Architecture', 'Nature', 'Macabre']
-const ORDRE_SOUS = ['Arbres', 'Végétation', 'Rochers', 'Bois mort', 'Toiles d’araignées']
+const ORDRE_SOUS = [
+  'Lits', 'Assises', 'Tables', 'Rangements', 'Bain', 'Cheminées', 'Musique',
+  'Lampes', 'Lampadaires', 'Plafonniers', 'Appliques', 'Bougies',
+  'Livres et papiers', 'Nourriture', 'Vaisselle', 'Décoration',
+  'Arbres', 'Végétation', 'Rochers', 'Bois mort', 'Toiles d’araignées'
+]
 const rang = (e: Record<string, unknown>): [number, number] => {
   if (e.type !== 'objet') return [-1, 0]
   const c = ORDRE_CATEGORIES.indexOf(String(e.categorie))
