@@ -141,6 +141,8 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
       if (e.key === 'Escape') {
         points.current = []
         depart.current = null
+        trait.current = null
+        setChoisi(null)
         repeindre()
       }
       if ((e.key === 'Delete' || e.key === 'Backspace') && choisi) {
