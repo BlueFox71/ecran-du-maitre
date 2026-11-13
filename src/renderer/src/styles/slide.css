@@ -2018,6 +2018,10 @@ ul[data-type='taskList'] li > div p {
   stroke: #a06fd0;
   stroke-dasharray: 6 5;
 }
+.trait-mur.obstacle {
+  stroke: rgba(196, 160, 110, 0.7);
+  stroke-dasharray: 3 4;
+}
 /* Les couleurs des tuiles du tableau : rouge fermée, verte ouverte. La porte
    verrouillée est rouge aussi, en tirets — fermée, et qui le restera. Un liseré
    sombre les détache du plan, clair ou sombre. */

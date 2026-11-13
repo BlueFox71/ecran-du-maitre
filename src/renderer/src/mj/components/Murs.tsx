@@ -15,6 +15,7 @@
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
 import {
   MUR_NATURES,
+  NATURES_TRACABLES,
   OUVERTURES,
   OUVERTURE_NATURES,
   OUVERTURE_REGARD,
@@ -1590,7 +1591,7 @@ export function BarreTrait({ m }: { m: ReturnType<typeof useMurs> }): JSX.Elemen
         {ouvs ? ` · ${ouvs} ouverture${ouvs > 1 ? 's' : ''}` : ''}
       </span>
       <span className="murs-sep" />
-      {(Object.keys(MUR_NATURES) as NatureMur[]).map((n) => (
+      {NATURES_TRACABLES.map((n) => (
         <button
           key={n}
           className={`murs-nat n-${n}`}
@@ -4341,7 +4342,11 @@ export function VoletMurs({
               {m.ouvertures.length ? ` · ${m.ouvertures.length} ouvertures` : ''}
             </span>
             <div className="murs-legende">
-              {(Object.keys(MUR_NATURES) as NatureMur[]).map((n) => (
+              {/* Les meubles de l'atelier n'ont de ligne que s'il y en a : on ne
+                  les trace pas d'ici, la légende n'a pas à les promettre. */}
+              {(Object.keys(MUR_NATURES) as NatureMur[])
+                .filter((n) => NATURES_TRACABLES.includes(n) || compte(n) > 0)
+                .map((n) => (
                 <div key={n} className={`lg n-${n}`}>
                   <span className="sw" />
                   <span className="nom">

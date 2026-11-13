@@ -90,3 +90,45 @@ describe('le pion et les murs', () => {
     expect(cheminContraint(chambranle, depart, chemin, cadre, 2, RAYON)).toEqual(chemin[2])
   })
 })
+
+/* ---------------- les obstacles : des meubles, pas des cloisons ---------------- */
+import { murArretePas, murArreteVue, natureObstacle, NATURES_TRACABLES, type Mur as MurT } from './types'
+import { formesDesMurs } from './pieces'
+
+const trait = (nature: MurT['nature'], pts: [number, number][]): MurT => ({
+  id: 0,
+  placeId: 1,
+  nature,
+  pts,
+  ouvert: false
+})
+
+describe('les obstacles', () => {
+  it('un obstacle arrête le pas et la vue, un obstacle bas seulement le pas, un ajouré seulement la vue', () => {
+    expect(murArretePas(trait('obstacle', []))).toBe(true)
+    expect(murArreteVue(trait('obstacle', []))).toBe(true)
+    expect(murArretePas(trait('obstacle-bas', []))).toBe(true)
+    expect(murArreteVue(trait('obstacle-bas', []))).toBe(false)
+    expect(murArretePas(trait('obstacle-voile', []))).toBe(false)
+    expect(murArreteVue(trait('obstacle-voile', []))).toBe(true)
+  })
+
+  it('un meuble bloquant dans une pièce ne crée pas de pièce et ne la troue pas', () => {
+    const piece = trait('mur', [[0.1, 0.1], [0.9, 0.1], [0.9, 0.9], [0.1, 0.9], [0.1, 0.1]])
+    const lit = trait('obstacle', [[0.4, 0.4], [0.6, 0.4], [0.6, 0.6], [0.4, 0.6], [0.4, 0.4]])
+    const formes = formesDesMurs([piece, lit])
+    expect(formes).toHaveLength(1)
+    expect(formes[0].aire).toBeCloseTo(0.64, 5)
+  })
+
+  it('natureObstacle choisit la nature selon les deux cases', () => {
+    expect(natureObstacle(false, false)).toBeNull()
+    expect(natureObstacle(true, true)).toBe('obstacle')
+    expect(natureObstacle(true, false)).toBe('obstacle-bas')
+    expect(natureObstacle(false, true)).toBe('obstacle-voile')
+  })
+
+  it('les obstacles ne se tracent pas à la main', () => {
+    expect(NATURES_TRACABLES).toEqual(['mur', 'rideau'])
+  })
+})

@@ -12186,6 +12186,18 @@ input[type='range']::-webkit-slider-thumb {
   stroke-width: 5.5;
   stroke-dasharray: 1 10;
 }
+/* L'emprise d'un meuble de l'atelier : fine, en tirets, couleur bois. */
+.mur.n-obstacle,
+.mur.n-obstacle-bas,
+.mur.n-obstacle-voile {
+  --c: #c4a06e;
+}
+.mur.n-obstacle .trait,
+.mur.n-obstacle-bas .trait,
+.mur.n-obstacle-voile .trait {
+  stroke-width: 2.5;
+  stroke-dasharray: 4 5;
+}
 
 /* ------------------------------------------------------------
    Les ouvertures, posées sur un mur
@@ -13019,6 +13031,11 @@ input[type='range']::-webkit-slider-thumb {
 }
 .murs-legende .n-rideau {
   --c: var(--mur-voile);
+}
+.murs-legende .n-obstacle,
+.murs-legende .n-obstacle-bas,
+.murs-legende .n-obstacle-voile {
+  --c: #c4a06e;
 }
 .murs-legende .n-rideau .sw {
   border-top-style: dotted;

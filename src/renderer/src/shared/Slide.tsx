@@ -1829,7 +1829,7 @@ export function Framed({
                 .map((m) => (
                   <polyline
                     key={`m${m.id}`}
-                    className={`trait-mur${m.nature === 'rideau' ? ' rideau' : ''}`}
+                    className={`trait-mur${m.nature === 'rideau' ? ' rideau' : m.nature.startsWith('obstacle') ? ' obstacle' : ''}`}
                     points={m.pts.map((p) => `${p[0] * w},${p[1] * h}`).join(' ')}
                     strokeWidth={ep}
                   />

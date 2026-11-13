@@ -1298,14 +1298,33 @@ export interface Annotation {
  * elles se posent **sur** un mur (voir `Ouverture`), justement pour que le
  * contour reste entier et qu'une pièce puisse se refermer dessus.
  */
-export type NatureMur = 'mur' | 'rideau'
+export type NatureMur = 'mur' | 'rideau' | 'obstacle' | 'obstacle-bas' | 'obstacle-voile'
 
 export const MUR_NATURES: Record<
   NatureMur,
   { label: string; quoi: string; pas: boolean; vue: boolean }
 > = {
   mur: { label: 'Mur', quoi: 'arrête le pas et la vue', pas: true, vue: true },
-  rideau: { label: 'Rideau', quoi: 'laisse passer, coupe la vue', pas: false, vue: true }
+  rideau: { label: 'Rideau', quoi: 'laisse passer, coupe la vue', pas: false, vue: true },
+  /* Les obstacles : l'emprise d'un meuble posé dans l'atelier. Ils arrêtent
+     comme des traits — tous ceux qui calculent un pas ou un regard passent
+     déjà par cette table — mais ne ferment rien : `pieces.ts` et les
+     ouvertures ne retiennent que les murs. Un lit n'est ni une pièce, ni un
+     trou dans la chambre, et on n'y perce pas de porte. */
+  obstacle: { label: 'Meuble', quoi: 'arrête le pas et la vue', pas: true, vue: true },
+  'obstacle-bas': { label: 'Meuble bas', quoi: 'arrête le pas, laisse voir', pas: true, vue: false },
+  'obstacle-voile': { label: 'Meuble ajouré', quoi: 'laisse passer, cache', pas: false, vue: true }
+}
+
+/** Ce qu'on trace à la main. Les obstacles ne naissent que de l'atelier. */
+export const NATURES_TRACABLES: NatureMur[] = ['mur', 'rideau']
+
+/** La nature de l'emprise d'un meuble, selon ses deux cases ; `null`, il ne bloque rien. */
+export function natureObstacle(pas: boolean, vue: boolean): NatureMur | null {
+  if (pas && vue) return 'obstacle'
+  if (pas) return 'obstacle-bas'
+  if (vue) return 'obstacle-voile'
+  return null
 }
 
 /** Ce qu'on perce dans un mur. */
