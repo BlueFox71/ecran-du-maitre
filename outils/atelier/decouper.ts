@@ -49,7 +49,69 @@ interface Planche {
   retrait?: number
   /** Sol : raccorder sur les deux axes ; mur : en longueur seulement. */
   raccord?: 'deux' | 'long'
+  /**
+   * Des éléments qui débordent de leur case de grille (un grand arbre) : on
+   * prend, dans chaque case, l'élément d'un seul tenant qui y a son centre, et
+   * on efface ce qui vient des voisins.
+   */
+  isoler?: boolean
   cases: (Case | null)[]
+}
+
+/** Taille des blocs pour repérer les éléments d'un seul tenant (en pixels). */
+const BLOC = 4
+
+/**
+ * Les éléments d'un seul tenant d'une image détourée : un numéro par bloc de
+ * BLOC × BLOC pixels (0 : vide), et pour chacun son poids, son centre et sa boîte.
+ */
+function elements(img: PNG): {
+  nx: number
+  etiquette: Int32Array
+  infos: { n: number; sx: number; sy: number; x0: number; y0: number; x1: number; y1: number }[]
+} {
+  const nx = Math.ceil(img.width / BLOC)
+  const ny = Math.ceil(img.height / BLOC)
+  const plein = new Uint8Array(nx * ny)
+  for (let y = 0; y < img.height; y++)
+    for (let x = 0; x < img.width; x++)
+      if (img.data[(y * img.width + x) * 4 + 3] > 40) plein[Math.floor(y / BLOC) * nx + Math.floor(x / BLOC)] = 1
+  const etiquette = new Int32Array(nx * ny)
+  const infos: { n: number; sx: number; sy: number; x0: number; y0: number; x1: number; y1: number }[] = [
+    { n: 0, sx: 0, sy: 0, x0: 0, y0: 0, x1: 0, y1: 0 }
+  ]
+  for (let d = 0; d < nx * ny; d++) {
+    if (!plein[d] || etiquette[d]) continue
+    const e = infos.length
+    const info = { n: 0, sx: 0, sy: 0, x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity }
+    const pile = [d]
+    etiquette[d] = e
+    while (pile.length) {
+      const k = pile.pop()!
+      const bx = k % nx
+      const by = Math.floor(k / nx)
+      info.n++
+      info.sx += bx
+      info.sy += by
+      info.x0 = Math.min(info.x0, bx)
+      info.y0 = Math.min(info.y0, by)
+      info.x1 = Math.max(info.x1, bx)
+      info.y1 = Math.max(info.y1, by)
+      for (let dy = -1; dy <= 1; dy++)
+        for (let dx = -1; dx <= 1; dx++) {
+          const ax = bx + dx
+          const ay = by + dy
+          if (ax < 0 || ay < 0 || ax >= nx || ay >= ny) continue
+          const v = ay * nx + ax
+          if (plein[v] && !etiquette[v]) {
+            etiquette[v] = e
+            pile.push(v)
+          }
+        }
+    }
+    infos.push(info)
+  }
+  return { nx, etiquette, infos }
 }
 
 const PLANCHES: Planche[] = [
@@ -125,6 +187,54 @@ const PLANCHES: Planche[] = [
       { id: 'toile-tendue', nom: 'Toile tendue', l: 1.2 },
       { id: 'toile-petite', nom: 'Petite toile', l: 0.7 },
       { id: 'toile-eparse', nom: 'Fils épars', l: 1 }
+    ]
+  },
+  {
+    fichier: 'planches/nature 1.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Nature',
+    dossier: 'objets',
+    cases: [
+      { id: 'chene-dense', nom: 'Chêne touffu', l: 4 },
+      { id: 'arbre-griffu', nom: 'Arbre griffu', l: 3.5 },
+      { id: 'pin', nom: 'Pin', l: 3 },
+      { id: 'saule', nom: 'Saule pleureur', l: 4 },
+      { id: 'buisson', nom: 'Buisson', l: 1.2, pas: true },
+      { id: 'ronces', nom: 'Ronces', l: 1.5 },
+      { id: 'rochers', nom: 'Rochers', l: 1.2, pas: true },
+      { id: 'gros-rocher', nom: 'Gros rocher', l: 1.6, pas: true },
+      { id: 'tronc-couche', nom: 'Tronc couché', l: 2, pas: true },
+      { id: 'souche', nom: 'Souche', l: 1, pas: true },
+      { id: 'hautes-herbes', nom: 'Hautes herbes', l: 1.2 },
+      { id: 'champignons', nom: 'Champignons', l: 0.6 }
+    ]
+  },
+  {
+    fichier: 'planches/nature 2.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Arbres',
+    dossier: 'objets',
+    cases: [
+      { id: 'chene-jeune', nom: 'Jeune chêne', l: 1.5 },
+      { id: 'chene', nom: 'Chêne', l: 3 },
+      { id: 'chene-grand', nom: 'Grand chêne', l: 4.5 },
+      { id: 'chene-degarni', nom: 'Chêne dégarni', l: 3.5 },
+      { id: 'sapin-jeune', nom: 'Jeune sapin', l: 1.2 },
+      { id: 'sapin', nom: 'Sapin', l: 2.5 },
+      { id: 'sapin-grand', nom: 'Grand sapin', l: 3.5 },
+      { id: 'sapin-roussi', nom: 'Sapin roussi', l: 3 },
+      { id: 'mort-petit', nom: 'Petit arbre mort', l: 1.2 },
+      { id: 'mort', nom: 'Arbre mort', l: 2.5 },
+      { id: 'mort-grand', nom: 'Grand arbre mort', l: 4 },
+      { id: 'mort-mousse', nom: 'Arbre mort moussu', l: 3.5 }
     ]
   },
   {
@@ -207,11 +317,38 @@ for (const pl of PLANCHES) {
 
   const cw = img.width / pl.cols
   const ch = img.height / pl.rows
+  const el = pl.isoler ? elements(img) : null
   pl.cases.forEach((c, i) => {
     if (!c) return
     const cx = Math.round((i % pl.cols) * cw)
     const cy = Math.round(Math.floor(i / pl.cols) * ch)
-    const cellule = rogner(img, cx, cy, Math.round(cw), Math.round(ch))
+    let cellule = rogner(img, cx, cy, Math.round(cw), Math.round(ch))
+    if (el) {
+      /* L'élément le plus lourd dont le centre tombe dans cette case. */
+      let meilleur = 0
+      el.infos.forEach((f, e) => {
+        if (!e) return
+        const mx = (f.sx / f.n + 0.5) * BLOC
+        const my = (f.sy / f.n + 0.5) * BLOC
+        if (mx >= cx && mx < cx + cw && my >= cy && my < cy + ch && f.n > (el.infos[meilleur]?.n ?? 0)) meilleur = e
+      })
+      if (!meilleur) {
+        console.warn(`! ${pl.fichier} case ${i + 1} : aucun élément`)
+        return
+      }
+      const f = el.infos[meilleur]
+      const x0 = f.x0 * BLOC
+      const y0 = f.y0 * BLOC
+      const w = Math.min(img.width, (f.x1 + 1) * BLOC) - x0
+      const h = Math.min(img.height, (f.y1 + 1) * BLOC) - y0
+      cellule = rogner(img, x0, y0, w, h)
+      /* Ce qui, dans la boîte, appartient à un voisin : effacé. */
+      for (let y = 0; y < h; y++)
+        for (let x = 0; x < w; x++) {
+          const b = Math.floor((y0 + y) / BLOC) * el.nx + Math.floor((x0 + x) / BLOC)
+          if (el.etiquette[b] !== meilleur) cellule.data[(y * w + x) * 4 + 3] = 0
+        }
+    }
     const cpx = new Uint8ClampedArray(cellule.data.buffer, cellule.data.byteOffset, cellule.data.length)
     const b = boiteOpaque(cpx, cellule.width, cellule.height)
     if (!b) {

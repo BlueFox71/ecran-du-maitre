@@ -163,8 +163,8 @@ export function detourerMagenta(rgba: Uint8ClampedArray): Uint8ClampedArray {
          vert de ce qu'ils ont en commun de trop. Un bois brun (bleu sous le
          vert) n'a pas de reflet et ne bouge pas. */
       if (m > 0) {
-        out[i] = r - m * 0.85
-        out[i + 2] = b - m * 0.85
+        out[i] = r - m
+        out[i + 2] = b - m
       }
       continue
     }
@@ -178,9 +178,9 @@ export function detourerMagenta(rgba: Uint8ClampedArray): Uint8ClampedArray {
     const g2 = g / reste
     const b2 = (b - k * 255) / reste
     const m2 = Math.min(r2, b2) - g2
-    out[i] = m2 > 0 ? r2 - m2 * 0.85 : r2
+    out[i] = m2 > 0 ? r2 - m2 : r2
     out[i + 1] = g2
-    out[i + 2] = m2 > 0 ? b2 - m2 * 0.85 : b2
+    out[i + 2] = m2 > 0 ? b2 - m2 : b2
     out[i + 3] = Math.round(out[i + 3] * reste)
   }
   return out
