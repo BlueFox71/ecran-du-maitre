@@ -65,6 +65,12 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
         cale.current = e.ctrlKey
         const c = co.c
         if (!c) return
+        /* Clic droit pendant une pose : on repose la vignette, rien n'est posé. */
+        if (type === 'droit' && arme) {
+          setArme(null)
+          repeindre()
+          return
+        }
         if (type === 'down') {
           if (arme) {
             const o: ObjetPose = {
