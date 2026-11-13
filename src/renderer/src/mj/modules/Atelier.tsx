@@ -13,6 +13,7 @@ import type { Place } from '@shared/types'
 import { chargerImages, type ImagesAtelier } from '../atelier/images'
 import { useConstruction, type ConstructionOuverte } from '../atelier/useConstruction'
 import { Toile, type Outil } from '../atelier/Toile'
+import { useEssaiAtelier } from '../atelier/Essai'
 import { IconMurs, IconPlus } from '../components/Icons'
 import { EtapeSol } from '../atelier/etapes/Sol'
 import { EtapeMurs } from '../atelier/etapes/Murs'
@@ -166,6 +167,7 @@ function Chantier({ place }: { place: Place }): JSX.Element {
   const [repeint, setRepeint] = useState(0)
   const [agrandir, setAgrandir] = useState(false)
   const [quitter, setQuitter] = useState(false)
+  const essai = useEssaiAtelier(place.id, co.c)
 
   const recharger = useCallback(async () => {
     const a = await window.jdr.atelier.assets()
@@ -254,6 +256,18 @@ function Chantier({ place }: { place: Place }): JSX.Element {
         <button className="btn btn-sm" aria-pressed={grille} onClick={() => setGrille(!grille)}>
           ▦ Grille
         </button>
+        <button
+          className={`btn btn-sm ${essai.enTest ? 'btn-sortie' : 'btn-essai'}`}
+          aria-pressed={essai.enTest}
+          onClick={essai.basculer}
+          title={
+            essai.enTest
+              ? 'Arrêter l’essai (Échap)'
+              : 'Poser un pion d’essai dans la construction en cours : il ne traverse pas, et il ne voit que ce que les murs et la lumière lui laissent voir'
+          }
+        >
+          {essai.enTest ? 'Arrêter l’essai' : 'Essayer avec un pion'}
+        </button>
         <button className="btn btn-sm" onClick={() => setAgrandir(!agrandir)} aria-pressed={agrandir}>
           Agrandir…
         </button>
@@ -323,15 +337,18 @@ function Chantier({ place }: { place: Place }): JSX.Element {
             assets={parId}
             images={images}
             versionImages={versionImages}
-            grille={grille}
-            outil={outil}
+            grille={grille && !essai.enTest}
+            outil={essai.enTest ? null : outil}
             repeindre={repeint}
+            calque={essai.calque}
           />
         ) : (
           <div className="at-toile" />
         )}
         <aside className="at-panneau">
-          {props ? (
+          {essai.volet ? (
+            essai.volet
+          ) : props ? (
             etape === 'sol' ? (
               <EtapeSol {...props} />
             ) : etape === 'murs' ? (

@@ -54,7 +54,8 @@ export function Toile({
   versionImages,
   grille,
   outil,
-  repeindre
+  repeindre,
+  calque
 }: {
   c: Construction
   assets: Map<string, AssetAtelier>
@@ -65,6 +66,8 @@ export function Toile({
   outil: Outil | null
   /** Change quand l'outil veut que sa couche se redessine (un aperçu qui suit la souris). */
   repeindre: number
+  /** Posé exactement sur le terrain, par-dessus la toile (le brouillard du pion d'essai). */
+  calque?: JSX.Element | null
 }): JSX.Element {
   const boite = useRef<HTMLDivElement>(null)
   const toile = useRef<HTMLCanvasElement>(null)
@@ -216,6 +219,14 @@ export function Toile({
         }}
         onContextMenu={(e) => e.preventDefault()}
       />
+      {calque && vue ? (
+        <div
+          className="at-calque"
+          style={{ left: vue.x, top: vue.y, width: c.largeur * vue.echelle, height: c.hauteur * vue.echelle }}
+        >
+          {calque}
+        </div>
+      ) : null}
     </div>
   )
 }

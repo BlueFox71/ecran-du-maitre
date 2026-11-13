@@ -26707,3 +26707,9 @@ body.surligneur-actif [data-cible] {
 .murs-layer.edit .mur.atelier {
   cursor: not-allowed;
 }
+
+/* Le brouillard du pion d'essai, posé exactement sur le terrain. */
+.at-calque {
+  position: absolute;
+  pointer-events: none;
+}
