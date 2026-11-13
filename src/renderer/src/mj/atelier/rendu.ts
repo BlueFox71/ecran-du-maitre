@@ -198,28 +198,40 @@ function dessinerMurs(
   }
   ctx.restore()
 
-  /* La maçonnerie : la texture tourne avec le segment, sa hauteur est l'épaisseur. */
+  /* La maçonnerie : la texture tourne avec le segment, sa hauteur est l'épaisseur.
+     Un mur à deux côtés pose chaque face sur sa moitié : le côté 1 à gauche du
+     sens de tracé (y < 0), le côté 2 à droite. */
   for (const { m, parts } of morceaux) {
-    const img = image(images, m.assetId)
+    const faces: { assetId: string; teinte?: string; y0: number; y1: number }[] = m.cote2
+      ? [
+          { assetId: m.assetId, teinte: m.teinte, y0: -0.5, y1: 0 },
+          { assetId: m.cote2.assetId, teinte: m.cote2.teinte, y0: 0, y1: 0.5 }
+        ]
+      : [{ assetId: m.assetId, teinte: m.teinte, y0: -0.5, y1: 0.5 }]
     for (const p of parts)
       pourChaqueSegment(p, m, px, (x, y, angle, l, ep) => {
         ctx.save()
         ctx.translate(x, y)
         ctx.rotate(angle)
-        if (img) {
-          const motif = ctx.createPattern(img, 'repeat-x')!
-          const e = ep / img.height
-          motif.setTransform(new DOMMatrix().translateSelf(-ep / 2, -ep / 2).scaleSelf(e))
-          ctx.fillStyle = motif
-        } else ctx.fillStyle = '#2c2c30'
-        ctx.fillRect(-ep / 2, -ep / 2, l + ep, ep)
-        /* La couleur du mur, multipliée : le blanc la prend telle quelle, une
-           pierre ou une brique la prend en gardant ses détails. */
-        if (m.teinte) {
-          ctx.globalCompositeOperation = 'multiply'
-          ctx.fillStyle = m.teinte
-          ctx.fillRect(-ep / 2, -ep / 2, l + ep, ep)
-          ctx.globalCompositeOperation = 'source-over'
+        for (const f of faces) {
+          const img = image(images, f.assetId)
+          const fy = f.y0 * ep
+          const fh = (f.y1 - f.y0) * ep
+          if (img) {
+            const motif = ctx.createPattern(img, 'repeat-x')!
+            const e = ep / img.height
+            motif.setTransform(new DOMMatrix().translateSelf(-ep / 2, -ep / 2).scaleSelf(e))
+            ctx.fillStyle = motif
+          } else ctx.fillStyle = '#2c2c30'
+          ctx.fillRect(-ep / 2, fy, l + ep, fh)
+          /* La couleur, multipliée : le blanc la prend telle quelle, une pierre
+             ou une brique la prend en gardant ses détails. */
+          if (f.teinte) {
+            ctx.globalCompositeOperation = 'multiply'
+            ctx.fillStyle = f.teinte
+            ctx.fillRect(-ep / 2, fy, l + ep, fh)
+            ctx.globalCompositeOperation = 'source-over'
+          }
         }
         /* Le volume : deux arêtes sombres, un liseré clair au milieu. */
         ctx.fillStyle = 'rgba(0, 0, 0, 0.45)'

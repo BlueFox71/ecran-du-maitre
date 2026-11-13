@@ -3,7 +3,7 @@
  * enregistrés, ils arrêtent les pions et les regards.
  */
 import { useEffect, useRef, useState } from 'react'
-import { nouvelId, type MurBati, type PointCase } from '@shared/atelier'
+import { inverserCotes, nouvelId, type MurBati, type PointCase } from '@shared/atelier'
 import { murSous, rectangle } from '@shared/atelierOutils'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
@@ -38,6 +38,10 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
   const [epaisseur, setEpaisseur] = useState(EPAISSEUR_DEFAUT)
   /* La couleur des prochains murs ; `null`, la matière telle quelle. */
   const [teinte, setTeinte] = useState<string | null>(null)
+  /* Le second côté des prochains murs ; `null`, un seul côté. Et le côté
+     que règlent les sections Couleur et Matière. */
+  const [cote2Neuf, setCote2Neuf] = useState<{ assetId: string; teinte?: string } | null>(null)
+  const [cote, setCote] = useState<1 | 2>(1)
   const [choisi, setChoisi] = useState<string | null>(null)
   const points = useRef<PointCase[]>([])
   const depart = useRef<PointCase | null>(null)
@@ -49,7 +53,14 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
   const poser = (pts: PointCase[]): void => {
     const net = pts.filter((p, i, t) => !i || Math.hypot(p[0] - t[i - 1][0], p[1] - t[i - 1][1]) > 1e-6)
     if (net.length < 2 || !matiereSure) return
-    const m: MurBati = { id: nouvelId(), assetId: matiereSure, pts: net, epaisseur, ...(teinte ? { teinte } : {}) }
+    const m: MurBati = {
+      id: nouvelId(),
+      assetId: matiereSure,
+      pts: net,
+      epaisseur,
+      ...(teinte ? { teinte } : {}),
+      ...(cote2Neuf ? { cote2: cote2Neuf } : {})
+    }
     co.modifier((c) => ({ ...c, murs: [...c.murs, m] }))
   }
 
@@ -144,12 +155,25 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
         }
         if (murChoisi) {
           trait(ctx, murChoisi.pts, murChoisi.epaisseur + 6 / echelle, 'rgba(232, 184, 92, 0.35)')
+          /* Un mur à deux côtés : le côté qu'on règle est surligné. */
+          if (murChoisi.cote2) {
+            const sens = cote === 1 ? 1 : -1
+            const dec = (murChoisi.epaisseur / 4) * sens
+            for (let i = 0; i + 1 < murChoisi.pts.length; i++) {
+              const [ax, ay] = murChoisi.pts[i]
+              const [bx, by] = murChoisi.pts[i + 1]
+              const l = Math.hypot(bx - ax, by - ay) || 1
+              const nx = ((by - ay) / l) * dec
+              const ny = (-(bx - ax) / l) * dec
+              trait(ctx, [[ax + nx, ay + ny], [bx + nx, by + ny]], murChoisi.epaisseur / 2, 'rgba(232, 184, 92, 0.55)')
+            }
+          }
           murChoisi.pts.forEach((q, i) => poignee(ctx, q, echelle, sommet.current?.i === i))
         }
       }
     })
     return () => setOutil(null)
-  }, [outil, matiereSure, epaisseur, teinte, choisi, co.c])
+  }, [outil, matiereSure, epaisseur, teinte, cote2Neuf, cote, choisi, co.c])
 
   useEffect(() => {
     const k = (e: KeyboardEvent): void => {
@@ -172,18 +196,59 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
     co.modifier((c) => ({ ...c, murs: c.murs.map((m) => (m.id === choisi ? { ...m, ...patch } : m)) }))
   }
 
-  const couleur = murChoisi ? (murChoisi.teinte ?? null) : teinte
+  /* Les deux côtés : celui des prochains murs, ou celui du mur choisi. */
+  const deux = murChoisi ? !!murChoisi.cote2 : !!cote2Neuf
+  const coteActif: 1 | 2 = deux ? cote : 1
+  const face2 = murChoisi ? murChoisi.cote2 : cote2Neuf
+  const couleur =
+    (coteActif === 2 ? face2?.teinte : murChoisi ? murChoisi.teinte : teinte) ?? null
+  const matiereVue = coteActif === 2 ? (face2?.assetId ?? null) : (murChoisi?.assetId ?? matiereSure)
+
+  const changerMur = (f: (m: MurBati) => MurBati): void => {
+    if (!murChoisi) return
+    co.modifier((c) => ({ ...c, murs: c.murs.map((m) => (m.id === murChoisi.id ? f(m) : m)) }))
+  }
+  const sansCle = <T extends object, K extends keyof T>(o: T, k: K): Omit<T, K> => {
+    const { [k]: _sans, ...reste } = o
+    return reste
+  }
+
   const choisirCouleur = (t: string | null): void => {
+    if (coteActif === 2) {
+      const f = (c2: { assetId: string; teinte?: string }) =>
+        t ? { ...c2, teinte: t } : sansCle(c2, 'teinte')
+      if (murChoisi) changerMur((m) => (m.cote2 ? { ...m, cote2: f(m.cote2) } : m))
+      else if (cote2Neuf) setCote2Neuf(f(cote2Neuf))
+      return
+    }
     setTeinte(t)
+    changerMur((m) => (t ? { ...m, teinte: t } : (sansCle(m, 'teinte') as MurBati)))
+  }
+  const choisirMatiere = (id: string): void => {
+    if (coteActif === 2) {
+      if (murChoisi) changerMur((m) => (m.cote2 ? { ...m, cote2: { ...m.cote2, assetId: id } } : m))
+      else if (cote2Neuf) setCote2Neuf({ ...cote2Neuf, assetId: id })
+      return
+    }
+    setMatiere(id)
+    if (murChoisi) regler({ assetId: id })
+  }
+  const basculerDeux = (v: boolean): void => {
+    setCote(v ? 2 : 1)
     if (murChoisi)
-      co.modifier((c) => ({
-        ...c,
-        murs: c.murs.map((m) => {
-          if (m.id !== murChoisi.id) return m
-          const { teinte: _sans, ...reste } = m
-          return t ? { ...reste, teinte: t } : reste
-        })
-      }))
+      changerMur((m) =>
+        v
+          ? { ...m, cote2: { assetId: m.assetId, ...(m.teinte ? { teinte: m.teinte } : {}) } }
+          : (sansCle(m, 'cote2') as MurBati)
+      )
+    else setCote2Neuf(v && matiereSure ? { assetId: matiereSure, ...(teinte ? { teinte } : {}) } : null)
+  }
+  const inverser = (): void => {
+    if (murChoisi) return changerMur(inverserCotes)
+    if (!cote2Neuf || !matiereSure) return
+    setMatiere(cote2Neuf.assetId)
+    setTeinte(cote2Neuf.teinte ?? null)
+    setCote2Neuf({ assetId: matiereSure, ...(teinte ? { teinte } : {}) })
   }
 
   return (
@@ -220,7 +285,29 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
         />
       </label>
       <div className="at-section">
-        <span className="eyebrow">Couleur{murChoisi ? ' du mur choisi' : ''}</span>
+        <label className="at-case">
+          <input type="checkbox" checked={deux} onChange={(e) => basculerDeux(e.target.checked)} />
+          Deux côtés différents{murChoisi ? '' : ' (prochains murs)'}
+        </label>
+        {deux ? (
+          <div className="at-outils">
+            <button className="btn btn-sm" aria-pressed={coteActif === 1} onClick={() => setCote(1)}>
+              Côté 1
+            </button>
+            <button className="btn btn-sm" aria-pressed={coteActif === 2} onClick={() => setCote(2)}>
+              Côté 2
+            </button>
+            <button className="btn btn-sm" title="Échanger les deux côtés" onClick={inverser}>
+              ⇄ Inverser
+            </button>
+          </div>
+        ) : null}
+      </div>
+      <div className="at-section">
+        <span className="eyebrow">
+          Couleur{deux ? ` · côté ${coteActif}` : ''}
+          {murChoisi ? ' du mur choisi' : ''}
+        </span>
         <div className="at-couleurs">
           <button
             className="at-pastille at-pastille-aucune"
@@ -244,17 +331,8 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
         </div>
       </div>
       <div className="at-section">
-        <span className="eyebrow">Matière</span>
-        <Palette
-          assets={murs}
-          parCategorie
-          cle="murs"
-          choisi={murChoisi?.assetId ?? matiereSure}
-          onChoisir={(a) => {
-            setMatiere(a.id)
-            if (murChoisi) regler({ assetId: a.id })
-          }}
-        />
+        <span className="eyebrow">Matière{deux ? ` · côté ${coteActif}` : ''}</span>
+        <Palette assets={murs} parCategorie cle="murs" choisi={matiereVue} onChoisir={(a) => choisirMatiere(a.id)} />
       </div>
       {murChoisi ? (
         <div className="at-section">

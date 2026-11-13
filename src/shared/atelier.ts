@@ -46,6 +46,23 @@ export interface MurBati {
   epaisseur: number
   /** Une couleur posée sur la matière (`#rrggbb`) : sur un mur blanc, c'est elle qu'on voit. */
   teinte?: string
+  /**
+   * L'autre face du mur, quand elle diffère : la façade en pierre, l'intérieur
+   * en bois. Le côté 1 (`assetId`, `teinte`) est à gauche du sens de tracé,
+   * le côté 2 à droite.
+   */
+  cote2?: { assetId: string; teinte?: string }
+}
+
+/** Échanger les deux faces d'un mur (le côté 1 prend la matière du côté 2, et inversement). */
+export function inverserCotes(m: MurBati): MurBati {
+  if (!m.cote2) return m
+  return {
+    ...m,
+    assetId: m.cote2.assetId,
+    teinte: m.cote2.teinte,
+    cote2: { assetId: m.assetId, ...(m.teinte ? { teinte: m.teinte } : {}) }
+  }
 }
 
 export type NatureOuvertureBatie = NatureOuverture
@@ -463,6 +480,7 @@ export function composerCadres(a: Cadre, b: Cadre): Cadre {
 
 const fini = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
 const texte = (v: unknown): v is string => typeof v === 'string' && v.length > 0
+const couleurSure = (v: unknown): v is string => typeof v === 'string' && /^#[0-9a-f]{6}$/i.test(v)
 
 function points(v: unknown, min: number): PointCase[] | null {
   if (!Array.isArray(v)) return null
@@ -508,7 +526,10 @@ export function lireConstruction(brut: unknown): Construction {
         assetId: m.assetId,
         pts,
         epaisseur: m.epaisseur,
-        ...(typeof m.teinte === 'string' && /^#[0-9a-f]{6}$/i.test(m.teinte) ? { teinte: m.teinte } : {})
+        ...(couleurSure(m.teinte) ? { teinte: m.teinte } : {}),
+        ...(texte(m.cote2?.assetId)
+          ? { cote2: { assetId: m.cote2.assetId, ...(couleurSure(m.cote2.teinte) ? { teinte: m.cote2.teinte } : {}) } }
+          : {})
       })
   }
   const ouvertures: OuvertureBatie[] = []

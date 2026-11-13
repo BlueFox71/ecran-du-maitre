@@ -4,6 +4,7 @@ import {
   bordsPourTaille,
   tailleMinimale,
   composerCadres,
+  inverserCotes,
   constructionVide,
   contourDeLObjet,
   deriverCalque,
@@ -342,5 +343,20 @@ describe('teinte des murs', () => {
     const m = lireConstruction(JSON.stringify(c)).murs
     expect(m[0].teinte).toBe('#7a2e2e')
     expect(m[1].teinte).toBeUndefined()
+  })
+})
+
+describe('mur à deux côtés', () => {
+  it('lireConstruction garde le second côté (matière et couleur)', () => {
+    const c = terrain(10, 10)
+    c.murs.push({ id: 'a', assetId: 'pierre', pts: [[0, 0], [1, 1]], epaisseur: 0.4, cote2: { assetId: 'bois', teinte: '#4a5e3e' } })
+    c.murs.push({ id: 'b', assetId: 'pierre', pts: [[0, 0], [1, 1]], epaisseur: 0.4, cote2: { assetId: '' } as never })
+    const m = lireConstruction(JSON.stringify(c)).murs
+    expect(m[0].cote2).toEqual({ assetId: 'bois', teinte: '#4a5e3e' })
+    expect(m[1].cote2).toBeUndefined()
+  })
+  it('inverserCotes échange les deux faces', () => {
+    const m = { id: 'a', assetId: 'pierre', pts: [[0, 0], [1, 1]] as [number, number][], epaisseur: 0.4, teinte: '#111111', cote2: { assetId: 'bois' } }
+    expect(inverserCotes(m)).toEqual({ ...m, assetId: 'bois', teinte: undefined, cote2: { assetId: 'pierre', teinte: '#111111' } })
   })
 })
