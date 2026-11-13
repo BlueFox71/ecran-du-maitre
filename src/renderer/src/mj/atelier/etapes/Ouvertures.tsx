@@ -59,6 +59,8 @@ export function EtapeOuvertures(props: PropsEtape): JSX.Element {
   useEffect(() => {
     setOutil({
       curseur: 'crosshair',
+      /* Sur une ouverture déjà posée : on la choisit, on ne pose pas. */
+      curseurSous: (p) => (co.c && ouvertureSous(co.c, p) ? 'pointer' : undefined),
       onPointer: (type, _p, brut) => {
         const c = co.c
         if (!c) return
