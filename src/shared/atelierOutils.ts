@@ -7,6 +7,7 @@ import {
   placeOuverture,
   type Construction,
   type Habillage,
+  type MurBati,
   type ObjetPose,
   type OuvertureBatie,
   type PointCase,
@@ -337,4 +338,112 @@ export function appliquerHabillage(
   })
   const h = { id: deja?.id ?? crypto.randomUUID(), pt, ...face }
   return { ...c, murs, habillages: [...(c.habillages ?? []).filter((x) => x.id !== h.id), h] }
+}
+
+/* ---------------- murs superposés ---------------- */
+
+const TOL_SUPERPOSE = 0.05
+
+/**
+ * Ce qui reste d'un mur une fois retirées les parties qui se superposent à
+ * d'autres murs (même ligne, au trait près). Rend des polylignes : aucune s'il
+ * est entièrement recouvert, plusieurs s'il est coupé.
+ */
+export function sansSuperposition(m: MurBati, autres: MurBati[]): PointCase[][] {
+  const out: PointCase[][] = []
+  let cours: PointCase[] = []
+  const finir = (): void => {
+    if (cours.length >= 2) out.push(cours)
+    cours = []
+  }
+  for (let i = 0; i + 1 < m.pts.length; i++) {
+    const a = m.pts[i]
+    const b = m.pts[i + 1]
+    const L = Math.hypot(b[0] - a[0], b[1] - a[1])
+    if (L < 1e-9) continue
+    const ux = (b[0] - a[0]) / L
+    const uy = (b[1] - a[1]) / L
+    const P = (t: number): PointCase => [a[0] + ux * t, a[1] + uy * t]
+    /* Les parties couvertes : segments parallèles posés sur la même ligne. */
+    const couverts: [number, number][] = []
+    for (const o of autres) {
+      if (o === m) continue
+      for (let j = 0; j + 1 < o.pts.length; j++) {
+        const c = o.pts[j]
+        const d = o.pts[j + 1]
+        const dist = (p: PointCase): number => Math.abs((p[0] - a[0]) * uy - (p[1] - a[1]) * ux)
+        if (dist(c) > TOL_SUPERPOSE || dist(d) > TOL_SUPERPOSE) continue
+        const tc = (c[0] - a[0]) * ux + (c[1] - a[1]) * uy
+        const td = (d[0] - a[0]) * ux + (d[1] - a[1]) * uy
+        const t0 = Math.max(0, Math.min(tc, td))
+        const t1 = Math.min(L, Math.max(tc, td))
+        if (t1 - t0 > TOL_SUPERPOSE) couverts.push([t0, t1])
+      }
+    }
+    couverts.sort((x, y) => x[0] - y[0])
+    /* Le complément : ce qui reste du segment. */
+    const restes: [number, number][] = []
+    let t = 0
+    for (const [t0, t1] of couverts) {
+      if (t0 - t > TOL_SUPERPOSE) restes.push([t, t0])
+      t = Math.max(t, t1)
+    }
+    if (L - t > TOL_SUPERPOSE) restes.push([t, L])
+    for (const [s, e] of restes) {
+      /* Le morceau prolonge la polyligne en cours s'il part du début du segment. */
+      if (s > 1e-9 || !cours.length) {
+        finir()
+        cours = [P(s)]
+      }
+      cours.push(e >= L - 1e-9 ? b : P(e))
+      if (e < L - 1e-9) finir()
+    }
+    if (!restes.length) finir()
+  }
+  finir()
+  return out.map((pts) => pts.map(([x, y]) => [Math.round(x * 1e6) / 1e6, Math.round(y * 1e6) / 1e6] as PointCase))
+}
+
+/** La position d'une ouverture : le point au milieu d'elle, en cases. */
+function centreDOuverture(c: Construction, o: OuvertureBatie): PointCase | null {
+  const m = c.murs.find((x) => x.id === o.murId)
+  return m ? placeOuverture(m, o).centre : null
+}
+
+/**
+ * Fusionner les murs superposés de toute la construction : les pièces fermées
+ * gardent leurs murs, les autres perdent ce qui les recouvre (dans l'ordre où
+ * ils ont été tracés). Les ouvertures restent où elles étaient, sur le mur qui
+ * subsiste à cet endroit.
+ */
+export function fusionnerSuperpositions(c: Construction): Construction {
+  const ferme = (m: MurBati): boolean => {
+    const p = m.pts
+    return p.length > 3 && Math.hypot(p[0][0] - p[p.length - 1][0], p[0][1] - p[p.length - 1][1]) < 1e-6
+  }
+  const ordre = [...c.murs.filter(ferme), ...c.murs.filter((m) => !ferme(m))]
+  const gardes: MurBati[] = []
+  const remplaces = new Map<string, MurBati[]>()
+  let change = false
+  for (const m of ordre) {
+    const morceaux = sansSuperposition(m, gardes)
+    const intact = morceaux.length === 1 && JSON.stringify(morceaux[0]) === JSON.stringify(m.pts)
+    const nouveaux = intact
+      ? [m]
+      : morceaux.map((pts, k) => ({ ...m, id: k === 0 ? m.id : crypto.randomUUID(), pts }))
+    if (!intact) change = true
+    remplaces.set(m.id, nouveaux)
+    gardes.push(...nouveaux)
+  }
+  if (!change) return c
+  const murs = c.murs.flatMap((m) => remplaces.get(m.id) ?? [m])
+  const apres: Construction = { ...c, murs }
+  const ouvertures = c.ouvertures.flatMap((o) => {
+    const avant = c.murs.find((x) => x.id === o.murId)
+    if (!avant || JSON.stringify(remplaces.get(avant.id)?.[0]?.pts) === JSON.stringify(avant.pts)) return [o]
+    const centre = centreDOuverture(c, o)
+    const s = centre ? murSous(apres, centre, TOL_SUPERPOSE * 4, true) : null
+    return s && s.d !== undefined ? [{ ...o, murId: s.murId, d: s.d }] : []
+  })
+  return { ...apres, ouvertures }
 }

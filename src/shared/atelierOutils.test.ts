@@ -10,6 +10,8 @@ import {
   solSous,
   appliquerHabillage,
   centreDeCase,
+  fusionnerSuperpositions,
+  sansSuperposition,
   habillageSous,
   objetsDansRectangle,
   tirerObjet,
@@ -308,5 +310,46 @@ describe('appliquerHabillage', () => {
     /* Tracée dans le sens des aiguilles d'une montre (y vers le bas) : l'intérieur est à droite. */
     expect(m.cote2).toEqual({ assetId: 'bois' })
     expect(m.assetId).toBe('pierre')
+  })
+})
+
+describe('superpositions de murs', () => {
+  const mur = (id: string, pts: [number, number][]) => ({ id, assetId: 'p', pts, epaisseur: 0.4 })
+  it('retire la partie d’un mur qui se superpose à un autre', () => {
+    const piece = mur('piece', [[2, 2], [6, 2], [6, 6], [2, 6], [2, 2]])
+    expect(sansSuperposition(mur('droit', [[0, 2], [4, 2]]), [piece])).toEqual([[[0, 2], [2, 2]]])
+  })
+  it('un mur qui déborde des deux côtés est coupé en deux', () => {
+    const piece = mur('piece', [[2, 2], [6, 2], [6, 6], [2, 6], [2, 2]])
+    expect(sansSuperposition(mur('droit', [[0, 2], [9, 2]]), [piece])).toEqual([
+      [[0, 2], [2, 2]],
+      [[6, 2], [9, 2]]
+    ])
+  })
+  it('un mur entièrement recouvert disparaît', () => {
+    const piece = mur('piece', [[2, 2], [6, 2], [6, 6], [2, 6], [2, 2]])
+    expect(sansSuperposition(mur('droit', [[3, 2], [5, 2]]), [piece])).toEqual([])
+  })
+  it('un mur qui croise sans se superposer reste entier', () => {
+    const piece = mur('piece', [[2, 2], [6, 2], [6, 6], [2, 6], [2, 2]])
+    expect(sansSuperposition(mur('croise', [[4, 0], [4, 8]]), [piece])).toEqual([[[4, 0], [4, 8]]])
+  })
+  it('un coude garde ses deux branches quand seule l’une est superposée en partie', () => {
+    const piece = mur('piece', [[2, 2], [6, 2], [6, 6], [2, 6], [2, 2]])
+    expect(sansSuperposition(mur('l', [[4, 2], [8, 2], [8, 5]]), [piece])).toEqual([[[6, 2], [8, 2], [8, 5]]])
+  })
+  it('fusionnerSuperpositions : les pièces fermées gardent leurs murs, les ouvertures suivent', () => {
+    const c = terrain()
+    c.murs.push(mur('droit', [[0, 2], [9, 2]]), mur('piece', [[2, 2], [6, 2], [6, 6], [2, 6], [2, 2]]))
+    c.ouvertures.push({ id: 'p', murId: 'droit', nature: 'porte', assetId: 'x', d: 0.85, largeur: 1 })
+    const r = fusionnerSuperpositions(c)
+    expect(r.murs.find((m) => m.id === 'piece')!.pts).toHaveLength(5)
+    const morceaux = r.murs.filter((m) => m.id !== 'piece')
+    expect(morceaux.map((m) => m.pts)).toEqual([[[0, 2], [2, 2]], [[6, 2], [9, 2]]])
+    const o = r.ouvertures[0]
+    const porteur = r.murs.find((m) => m.id === o.murId)!
+    expect(porteur.pts).toEqual([[6, 2], [9, 2]])
+    /* 0,85 × 9 = 7,65 cases depuis le début : 1,65 sur 3 du nouveau morceau. */
+    expect(o.d).toBeCloseTo(1.65 / 3, 6)
   })
 })

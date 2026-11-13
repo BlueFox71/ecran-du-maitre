@@ -4,9 +4,17 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { inverserCotes, nouvelId, type MurBati, type PointCase } from '@shared/atelier'
-import { appliquerHabillage, habillageSous, murSous, pieceSous, rectangle } from '@shared/atelierOutils'
+import {
+  appliquerHabillage,
+  fusionnerSuperpositions,
+  habillageSous,
+  murSous,
+  pieceSous,
+  rectangle
+} from '@shared/atelierOutils'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
+import { useStore } from '../../store'
 import { ImportAsset } from '../ImportAsset'
 import { contour, poignee, pointille, trait } from '../dessin'
 
@@ -38,6 +46,7 @@ const ferme = (pts: PointCase[]): boolean =>
 export function EtapeMurs(props: PropsEtape): JSX.Element {
   const { co, assets, setOutil, repeindre } = props
   const murs = assets.filter((a) => a.type === 'mur')
+  const toast = useStore((s) => s.toast)
   const [outil, setOutilMurs] = useState<OutilMurs>('piece')
   const [matiere, setMatiere] = useState<string | null>(null)
   const [epaisseur, setEpaisseur] = useState(EPAISSEUR_DEFAUT)
@@ -66,7 +75,9 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
       ...(teinte ? { teinte } : {}),
       ...(cote2Neuf ? { cote2: cote2Neuf } : {})
     }
-    co.modifier((c) => ({ ...c, murs: [...c.murs, m] }))
+    /* Un mur posé par-dessus un autre n'est pas construit deux fois : la
+       partie qui se superpose est retirée (une pièce fermée garde la sienne). */
+    co.modifier((c) => fusionnerSuperpositions({ ...c, murs: [...c.murs, m] }))
   }
 
   const finirTrace = (): void => {
@@ -360,6 +371,22 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
       <div className="at-section">
         <span className="eyebrow">Matière{deux ? ` · côté ${coteActif}` : ''}</span>
         <Palette assets={murs} parCategorie cle="murs" choisi={matiereVue} onChoisir={(a) => choisirMatiere(a.id)} />
+      </div>
+      <div className="at-section">
+        <button
+          className="btn btn-sm"
+          title="Retire les parties de murs posées l’une sur l’autre ; une pièce fermée garde ses murs"
+          onClick={() => {
+            const c = co.c
+            if (!c) return
+            const r = fusionnerSuperpositions(c)
+            if (r === c) return void toast('Aucun mur ne se superpose.')
+            co.modifier(() => r)
+            setChoisi(null)
+          }}
+        >
+          Fusionner les murs superposés
+        </button>
       </div>
       {murChoisi ? (
         <div className="at-section">
