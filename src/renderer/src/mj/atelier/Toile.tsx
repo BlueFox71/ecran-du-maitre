@@ -55,7 +55,8 @@ export function Toile({
   grille,
   outil,
   repeindre,
-  calque
+  calque,
+  apercuTaille
 }: {
   c: Construction
   assets: Map<string, AssetAtelier>
@@ -68,6 +69,8 @@ export function Toile({
   repeindre: number
   /** Posé exactement sur le terrain, par-dessus la toile (le brouillard du pion d'essai). */
   calque?: JSX.Element | null
+  /** Le terrain tel qu'il serait, en cases du terrain actuel : on le montre avant d'appliquer. */
+  apercuTaille?: { x0: number; y0: number; x1: number; y1: number } | null
 }): JSX.Element {
   const boite = useRef<HTMLDivElement>(null)
   const toile = useRef<HTMLCanvasElement>(null)
@@ -87,12 +90,22 @@ export function Toile({
     return () => ro.disconnect()
   }, [])
 
-  /* Cadrer le terrain entier à l'ouverture, et quand il change de taille. */
+  /* Cadrer le terrain entier à l'ouverture, et quand il change de taille —
+     avec, pendant un aperçu, le terrain tel qu'il serait. */
+  const a = apercuTaille
   useEffect(() => {
     if (!taille.w || !taille.h) return
-    const echelle = Math.min((taille.w - 40) / c.largeur, (taille.h - 40) / c.hauteur)
-    setVue({ echelle, x: (taille.w - c.largeur * echelle) / 2, y: (taille.h - c.hauteur * echelle) / 2 })
-  }, [taille.w > 0 && taille.h > 0, c.largeur, c.hauteur])
+    const x0 = Math.min(0, a?.x0 ?? 0)
+    const y0 = Math.min(0, a?.y0 ?? 0)
+    const x1 = Math.max(c.largeur, a?.x1 ?? 0)
+    const y1 = Math.max(c.hauteur, a?.y1 ?? 0)
+    const echelle = Math.min((taille.w - 40) / (x1 - x0), (taille.h - 40) / (y1 - y0))
+    setVue({
+      echelle,
+      x: (taille.w - (x1 - x0) * echelle) / 2 - x0 * echelle,
+      y: (taille.h - (y1 - y0) * echelle) / 2 - y0 * echelle
+    })
+  }, [taille.w > 0 && taille.h > 0, c.largeur, c.hauteur, a?.x0, a?.y0, a?.x1, a?.y1])
 
   /* Le cache : la construction, à résolution fixe. */
   useEffect(() => {
@@ -136,8 +149,31 @@ export function Toile({
     ctx.strokeStyle = 'rgba(216, 169, 74, 0.6)'
     ctx.lineWidth = 1.5 / vue.echelle
     ctx.strokeRect(0, 0, c.largeur, c.hauteur)
+    if (a) {
+      /* Ce qui viendrait : teinté. Ce qui partirait : rouge. */
+      ctx.save()
+      ctx.beginPath()
+      ctx.rect(0, 0, c.largeur, c.hauteur)
+      ctx.rect(a.x0, a.y0, a.x1 - a.x0, a.y1 - a.y0)
+      ctx.fillStyle = 'rgba(232, 184, 92, 0.12)'
+      ctx.fill('evenodd')
+      ctx.beginPath()
+      ctx.rect(0, 0, c.largeur, c.hauteur)
+      ctx.clip()
+      ctx.beginPath()
+      ctx.rect(0, 0, c.largeur, c.hauteur)
+      ctx.rect(a.x0, a.y0, a.x1 - a.x0, a.y1 - a.y0)
+      ctx.fillStyle = 'rgba(192, 86, 77, 0.45)'
+      ctx.fill('evenodd')
+      ctx.restore()
+      ctx.setLineDash([6 / vue.echelle, 4 / vue.echelle])
+      ctx.strokeStyle = 'rgba(232, 184, 92, 1)'
+      ctx.lineWidth = 2 / vue.echelle
+      ctx.strokeRect(a.x0, a.y0, a.x1 - a.x0, a.y1 - a.y0)
+      ctx.setLineDash([])
+    }
     outil?.dessiner?.(ctx, vue.echelle)
-  }, [vue, taille, cacheV, grille, outil, repeindre, c.largeur, c.hauteur])
+  }, [vue, taille, cacheV, grille, outil, repeindre, c.largeur, c.hauteur, a?.x0, a?.y0, a?.x1, a?.y1])
 
   const enCases = useCallback(
     (e: { clientX: number; clientY: number }): PointCase => {

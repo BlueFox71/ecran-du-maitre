@@ -167,6 +167,7 @@ function Chantier({ place }: { place: Place }): JSX.Element {
   const [outil, setOutil] = useState<Outil | null>(null)
   const [repeint, setRepeint] = useState(0)
   const [agrandir, setAgrandir] = useState(false)
+  const [apercuTaille, setApercuTaille] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
   const [quitter, setQuitter] = useState(false)
   const essai = useEssaiAtelier(place.id, co.c)
 
@@ -322,6 +323,7 @@ function Chantier({ place }: { place: Place }): JSX.Element {
       {agrandir && co.c ? (
         <PanneauTaille
           c={co.c}
+          onApercu={setApercuTaille}
           onAppliquer={(b) => {
             co.agrandir(b)
             setAgrandir(false)
@@ -341,6 +343,7 @@ function Chantier({ place }: { place: Place }): JSX.Element {
             outil={essai.enTest ? null : outil}
             repeindre={repeint}
             calque={essai.calque}
+            apercuTaille={agrandir ? apercuTaille : null}
           />
         ) : (
           <div className="at-toile" />
@@ -385,10 +388,13 @@ function Chantier({ place }: { place: Place }): JSX.Element {
 function PanneauTaille({
   c,
   onAppliquer,
+  onApercu,
   onFermer
 }: {
   c: Construction
   onAppliquer: (b: { gauche: number; haut: number; droite: number; bas: number }) => void
+  /** Le terrain tel qu'il serait, en cases du terrain actuel ; `null` : rien à montrer. */
+  onApercu: (r: { x0: number; y0: number; x1: number; y1: number } | null) => void
   onFermer: () => void
 }): JSX.Element {
   const [unite, setUnite] = useState<'cases' | 'metres'>('cases')
@@ -396,23 +402,35 @@ function PanneauTaille({
   const [taille, setTaille] = useState({ largeur: c.largeur, hauteur: c.hauteur })
   const m = c.metresParCase
   const min = tailleMinimale(c, ancre)
-  const vers = (cases: number): string => String(unite === 'cases' ? cases : Math.round(cases * m * 10) / 10).replace('.', ',')
-  const depuis = (v: string): number => {
-    const n = Number(v.replace(',', '.'))
-    if (!Number.isFinite(n) || n <= 0) return 1
-    return Math.max(1, Math.round(unite === 'cases' ? n : n / m))
-  }
+  const enUnite = (cases: number): number => (unite === 'cases' ? cases : Math.round(cases * m * 10) / 10)
+  const metres = (cases: number): string => String(Math.round(cases * m * 10) / 10).replace('.', ',')
+  const enCases = (v: number): number => Math.max(1, Math.round(unite === 'cases' ? v : v / m))
   const trop = taille.largeur < min.largeur || taille.hauteur < min.hauteur
   const pareil = taille.largeur === c.largeur && taille.hauteur === c.hauteur
+  const bords = bordsPourTaille(c, taille.largeur, taille.hauteur, ancre)
+
+  /* L'aperçu suit chaque changement ; il s'efface en fermant le panneau. */
+  useEffect(() => {
+    onApercu(
+      pareil
+        ? null
+        : { x0: -bords.gauche, y0: -bords.haut, x1: c.largeur + bords.droite, y1: c.hauteur + bords.bas }
+    )
+  }, [bords.gauche, bords.haut, bords.droite, bords.bas, pareil])
+  useEffect(() => () => onApercu(null), [])
+
   const champ = (k: 'largeur' | 'hauteur', label: string): JSX.Element => (
     <label className="at-nombre">
       {label}
       <input
-        key={`${k}-${unite}`}
-        type="text"
-        inputMode="decimal"
-        defaultValue={vers(taille[k])}
-        onChange={(e) => setTaille({ ...taille, [k]: depuis(e.target.value) })}
+        type="number"
+        min={unite === 'cases' ? 1 : m}
+        step={unite === 'cases' ? 1 : m}
+        value={enUnite(taille[k])}
+        onChange={(e) => {
+          const v = Number(e.target.value)
+          if (Number.isFinite(v) && v > 0) setTaille({ ...taille, [k]: enCases(v) })
+        }}
       />
     </label>
   )
@@ -445,19 +463,15 @@ function PanneauTaille({
         )}
       </div>
       <span className="at-dim">
-        {taille.largeur} × {taille.hauteur} cases · {vers(taille.largeur)} × {vers(taille.hauteur)}{' '}
-        {unite === 'cases' ? 'cases' : 'm'} · 1 case = {String(m).replace('.', ',')} m
+        {taille.largeur} × {taille.hauteur} cases · {metres(taille.largeur)} × {metres(taille.hauteur)} m
       </span>
       {trop ? (
         <span className="at-alerte">
-          Trop petit : ce qui est construit dépasserait. Au moins {min.largeur} × {min.hauteur} cases avec ce point gardé.
+          Trop petit : ce qui est construit dépasserait. Au moins {min.largeur} × {min.hauteur} cases (
+          {metres(min.largeur)} × {metres(min.hauteur)} m) avec ce point gardé.
         </span>
       ) : null}
-      <button
-        className="btn btn-sm btn-brass"
-        disabled={trop || pareil}
-        onClick={() => onAppliquer(bordsPourTaille(c, taille.largeur, taille.hauteur, ancre))}
-      >
+      <button className="btn btn-sm btn-brass" disabled={trop || pareil} onClick={() => onAppliquer(bords)}>
         Appliquer
       </button>
       <button className="btn btn-sm" onClick={onFermer}>
