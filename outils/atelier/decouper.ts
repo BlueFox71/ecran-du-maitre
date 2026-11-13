@@ -33,6 +33,8 @@ interface Case {
   vue?: boolean
   /** Sol, mur : cases couvertes par une tuile. */
   tuile?: number
+  /** Ne pas raccorder : un motif régulier (damier) se brouillerait en deux grilles décalées. */
+  brut?: boolean
 }
 
 interface Planche {
@@ -136,7 +138,7 @@ const PLANCHES: Planche[] = [
     retrait: 6,
     raccord: 'deux',
     cases: [
-      { id: 'damier-use', nom: 'Damier usé', tuile: 2 },
+      { id: 'damier-use', nom: 'Damier usé', tuile: 2, brut: true },
       { id: 'dalles-pierre', nom: 'Dalles de pierre', tuile: 3 },
       { id: 'parquet-vert', nom: 'Parquet vert à chevrons', tuile: 2 },
       { id: 'terre-herbe', nom: 'Terre et herbe morte', tuile: 3 }
@@ -218,7 +220,7 @@ for (const pl of PLANCHES) {
     }
     const r = pl.retrait ?? 0
     let piece = rogner(cellule, b.x + r, b.y + r, b.w - 2 * r, b.h - 2 * r)
-    if (pl.raccord) {
+    if (pl.raccord && !c.brut) {
       const p = new Uint8ClampedArray(piece.data.buffer, piece.data.byteOffset, piece.data.length)
       const rac = raccorder(p, piece.width, piece.height, pl.raccord === 'long')
       piece.data = Buffer.from(rac.buffer, rac.byteOffset, rac.length)

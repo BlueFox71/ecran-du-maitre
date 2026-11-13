@@ -181,6 +181,60 @@ function parcouruEnFraction(f: PointMur[], seg: number, p: PointMur): number {
   return l + dist(f[seg], p)
 }
 
+/** L'intervalle qu'une ouverture occupe sur son mur, en distance depuis le début (cases). */
+function intervalle(m: MurBati, o: OuvertureBatie): [number, number] {
+  const L = longueur(m.pts)
+  const demi = Math.min(o.largeur, L * 0.98) / 2
+  const centre = Math.max(demi, Math.min(L - demi, o.d * L))
+  return [centre - demi, centre + demi]
+}
+
+/** Le morceau de polyligne entre deux distances depuis son début. */
+function troncon(pts: PointCase[], d0: number, d1: number): PointCase[] {
+  const out: PointCase[] = [pointA(pts, d0).p]
+  let parcouru = 0
+  for (let i = 0; i + 1 < pts.length; i++) {
+    parcouru += dist(pts[i], pts[i + 1])
+    if (parcouru > d0 + 1e-9 && parcouru < d1 - 1e-9) out.push(pts[i + 1])
+  }
+  out.push(pointA(pts, d1).p)
+  return out
+}
+
+/**
+ * Ce qui reste plein d'un mur bâti une fois ses ouvertures percées : les
+ * morceaux qu'on dessine. Une porte, ouverte ou fermée, est un trou dans la
+ * maçonnerie ; c'est son battant qu'on pose dedans.
+ */
+export function morceauxPleins(m: MurBati, ouvertures: OuvertureBatie[]): PointCase[][] {
+  const L = longueur(m.pts)
+  if (L <= 0) return []
+  const trous = ouvertures
+    .filter((o) => o.murId === m.id)
+    .map((o) => intervalle(m, o))
+    .sort((a, b) => a[0] - b[0])
+  const out: PointCase[][] = []
+  let debut = 0
+  for (const [a, b] of trous) {
+    if (a > debut + 1e-9) out.push(troncon(m.pts, debut, a))
+    debut = Math.max(debut, b)
+  }
+  if (L > debut + 1e-9) out.push(troncon(m.pts, debut, L))
+  return out
+}
+
+/** Où dessiner une ouverture : son centre, l'angle de son mur (radians), sa largeur. */
+export function placeOuverture(
+  m: MurBati,
+  o: OuvertureBatie
+): { centre: PointCase; angle: number; largeur: number } {
+  const [a, b] = intervalle(m, o)
+  const { p, seg } = pointA(m.pts, (a + b) / 2)
+  const u = m.pts[seg]
+  const v = m.pts[seg + 1] ?? u
+  return { centre: p, angle: Math.atan2(v[1] - u[1], v[0] - u[0]), largeur: b - a }
+}
+
 /**
  * Le calque que la construction impose au lieu.
  *

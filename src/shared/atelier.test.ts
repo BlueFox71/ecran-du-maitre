@@ -6,6 +6,8 @@ import {
   deriverCalque,
   enFraction,
   lireConstruction,
+  morceauxPleins,
+  placeOuverture,
   type Construction,
   type ObjetPose
 } from './atelier'
@@ -175,5 +177,39 @@ describe('lireConstruction', () => {
       ]
     })
     expect(lireConstruction(brut).murs.map((m) => m.id)).toEqual(['ok'])
+  })
+})
+
+describe('morceauxPleins', () => {
+  const m = { id: 'm', assetId: 'x', pts: [[0, 0], [10, 0]] as [number, number][], epaisseur: 0.4 }
+  it('un mur sans ouverture reste entier', () => {
+    expect(morceauxPleins(m, [])).toEqual([[[0, 0], [10, 0]]])
+  })
+  it('une porte de 2 cases au milieu coupe le mur en deux', () => {
+    const r = morceauxPleins(m, [{ id: 'p', murId: 'm', nature: 'porte', assetId: 'y', d: 0.5, largeur: 2 }])
+    expect(r).toEqual([
+      [[0, 0], [4, 0]],
+      [[6, 0], [10, 0]]
+    ])
+  })
+  it('sur un mur coudé, le morceau garde son coude', () => {
+    const coude = { ...m, pts: [[0, 0], [4, 0], [4, 4]] as [number, number][] }
+    const r = morceauxPleins(coude, [{ id: 'p', murId: 'm', nature: 'porte', assetId: 'y', d: 0.875, largeur: 1 }])
+    expect(r[0]).toEqual([[0, 0], [4, 0], [4, 2.5]])
+    expect(r[1]).toEqual([[4, 3.5], [4, 4]])
+  })
+  it('les ouvertures d’un autre mur ne comptent pas', () => {
+    expect(morceauxPleins(m, [{ id: 'p', murId: 'autre', nature: 'porte', assetId: 'y', d: 0.5, largeur: 2 }])).toHaveLength(1)
+  })
+})
+
+describe('placeOuverture', () => {
+  it('rend le centre et l’angle de l’ouverture', () => {
+    const m = { id: 'm', assetId: 'x', pts: [[2, 0], [2, 10]] as [number, number][], epaisseur: 0.4 }
+    const p = placeOuverture(m, { id: 'p', murId: 'm', nature: 'porte', assetId: 'y', d: 0.3, largeur: 1 })
+    expect(p.centre[0]).toBeCloseTo(2, 9)
+    expect(p.centre[1]).toBeCloseTo(3, 9)
+    expect(p.angle).toBeCloseTo(Math.PI / 2, 9)
+    expect(p.largeur).toBe(1)
   })
 })
