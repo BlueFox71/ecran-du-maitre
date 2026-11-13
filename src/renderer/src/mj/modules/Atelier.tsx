@@ -6,7 +6,7 @@
  * n'importe laquelle. Ce qu'on enregistre devient la carte du lieu, et ses
  * murs les murs du plan : brouillard, regards et pas suivent d'eux-mêmes.
  */
-import { useCallback, useEffect, useMemo, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import type { AssetAtelier } from '@shared/atelierAssets'
 import type { Place } from '@shared/types'
@@ -233,7 +233,7 @@ function Chantier({ place }: { place: Place }): JSX.Element {
         <button className="btn btn-sm" onClick={sortir} title="Revenir à la liste des lieux construits">
           ←
         </button>
-        <strong className="at-titre">{place.name}</strong>
+        <TitreDuLieu place={place} />
         <nav className="at-etapes" role="tablist" aria-label="Les étapes de la construction">
           {ETAPES.map((e) => (
             <button
@@ -381,6 +381,55 @@ function Chantier({ place }: { place: Place }): JSX.Element {
         ) : null}
       </div>
     </section>
+  )
+}
+
+/** Le nom du lieu, dans la barre de l'atelier : un clic pour le changer. */
+function TitreDuLieu({ place }: { place: Place }): JSX.Element {
+  const s = useStore()
+  const [edition, setEdition] = useState<string | null>(null)
+  /* Échap retire le champ : le « blur » qui suit ne doit rien enregistrer. */
+  const annule = useRef(false)
+  const valider = async (): Promise<void> => {
+    if (annule.current) return
+    const nom = edition?.trim()
+    setEdition(null)
+    if (!nom || nom === place.name) return
+    try {
+      await window.jdr.places.upsert({ id: place.id, name: nom })
+      await s.refreshPlaces()
+    } catch (e) {
+      s.toast(e instanceof Error ? e.message : String(e), true)
+    }
+  }
+  if (edition !== null)
+    return (
+      <input
+        className="at-champ at-titre-champ"
+        autoFocus
+        value={edition}
+        onChange={(e) => setEdition(e.target.value)}
+        onBlur={() => void valider()}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') void valider()
+          if (e.key === 'Escape') {
+            annule.current = true
+            setEdition(null)
+          }
+        }}
+      />
+    )
+  return (
+    <button
+      className="at-titre"
+      title="Renommer le lieu"
+      onClick={() => {
+        annule.current = false
+        setEdition(place.name)
+      }}
+    >
+      {place.name}
+    </button>
   )
 }
 
