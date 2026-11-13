@@ -120,8 +120,12 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
         const c = co.c
         if (!c) return
         /* Clic droit pendant une pose : on repose la vignette, rien n'est posé. */
-        if (type === 'droit' && arme) {
-          setArme(null)
+        if (type === 'droit') {
+          if (arme) setArme(null)
+          else if (geste.current) {
+            geste.current = null
+            co.annuler()
+          } else setChoisis([])
           repeindre()
           return
         }

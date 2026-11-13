@@ -70,6 +70,15 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
       curseur: outil === 'choisir' ? 'pointer' : 'crosshair',
       onPointer: (type, p, _brut, _e, prise) => {
         souris.current = p
+        if (type === 'droit' && outil !== 'tracer') {
+          if (depart.current) depart.current = null
+          else if (sommet.current) {
+            sommet.current = null
+            co.annuler()
+          } else setChoisi(null)
+          repeindre()
+          return
+        }
         if (outil === 'tracer') {
           const pts = points.current
           if (type === 'down') {
@@ -170,6 +179,9 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
           ))}
         </div>
         <p className="at-aide">{OUTILS.find((o) => o.id === outil)!.aide}</p>
+        <ul className="at-raccourcis">
+          <li>Clic droit ou <kbd>Échap</kbd> : annuler une pièce ou un coin qu’on glisse, ou désélectionner</li>
+        </ul>
       </div>
       <label className="at-reglage">
         <span className="eyebrow">

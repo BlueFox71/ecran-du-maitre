@@ -52,8 +52,10 @@ function Lampes({ place, co, setOutil, repeindre }: PropsEtape): JSX.Element {
       onPointer: (type, _p, brut, e, prise) => {
         souris.current = brut
         /* Clic droit pendant une pose : rien n'est posé. */
-        if (type === 'droit' && arme) {
-          setArme(false)
+        if (type === 'droit') {
+          if (arme) setArme(false)
+          else if (glisse.current) glisse.current = null
+          else m.setLumChoisie(null)
           repeindre()
           return
         }
@@ -129,15 +131,20 @@ function Lampes({ place, co, setOutil, repeindre }: PropsEtape): JSX.Element {
     return () => setOutil(null)
   }, [m.lumieres, m.lumChoisie, c, arme])
 
-  /* Échap : on abandonne la pose. */
+  /* Échap abandonne la pose ; Suppr retire la lampe choisie. */
   useEffect(() => {
-    if (!arme) return
     const k = (e: KeyboardEvent): void => {
+      const el = document.activeElement
+      if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return
       if (e.key === 'Escape') setArme(false)
+      if ((e.key === 'Delete' || e.key === 'Backspace') && m.lumChoisie != null) {
+        e.preventDefault()
+        void m.oterLumiere(m.lumChoisie)
+      }
     }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
-  }, [arme])
+  }, [m.lumChoisie])
 
   return (
     <>
@@ -153,6 +160,9 @@ function Lampes({ place, co, setOutil, repeindre }: PropsEtape): JSX.Element {
           <kbd>Maj</kbd> : poser plusieurs lampes
         </li>
         <li>Clic droit ou <kbd>Échap</kbd> : annuler la pose</li>
+        <li>
+          <kbd>Suppr</kbd> : retirer la lampe choisie
+        </li>
       </ul>
       <div className="at-section at-lampe">
         <BarreLumiere m={m} />

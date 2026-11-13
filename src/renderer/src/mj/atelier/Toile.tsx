@@ -221,7 +221,6 @@ export function Toile({
             return
           }
           if (e.button === 0) envoyer('down', e.nativeEvent)
-          if (e.button === 2) envoyer('droit', e.nativeEvent)
         }}
         onPointerMove={(e) => {
           const g = glisse.current
@@ -252,6 +251,11 @@ export function Toile({
           const echelle = Math.min(400, Math.max(4, vue.echelle * f))
           const k = echelle / vue.echelle
           setVue({ echelle, x: mx - (mx - vue.x) * k, y: my - (my - vue.y) * k })
+        }}
+        /* Le clic droit arrive par mousedown : pendant un glisser au bouton
+           gauche, le navigateur n'envoie pas d'autre pointerdown. */
+        onMouseDown={(e) => {
+          if (e.button === 2) envoyer('droit', e.nativeEvent)
         }}
         onContextMenu={(e) => e.preventDefault()}
       />

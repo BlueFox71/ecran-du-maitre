@@ -67,6 +67,14 @@ export function EtapeOuvertures(props: PropsEtape): JSX.Element {
         const s = murSous(c, brut, TOLERANCE, true)
         /* Sur une ouverture posée, on la choisit : pas d'aperçu de pose. */
         survol.current = s && s.d !== undefined && !ouvertureSous(c, brut) ? { murId: s.murId, d: s.d } : null
+        if (type === 'droit') {
+          if (glisse.current) {
+            glisse.current = null
+            co.annuler()
+          } else setChoisie(null)
+          repeindre()
+          return
+        }
         if (type === 'down') {
           const sous = ouvertureSous(c, brut)
           if (sous) {
@@ -150,6 +158,12 @@ export function EtapeOuvertures(props: PropsEtape): JSX.Element {
         Survole un mur : l’aperçu montre où le clic posera l’ouverture. Glisse une ouverture pour la
         déplacer le long de son mur ; Suppr l’efface.
       </p>
+      <ul className="at-raccourcis">
+        <li>Clic droit : remettre l’ouverture qu’on glisse, ou désélectionner</li>
+        <li>
+          <kbd>R</kbd> retourner · <kbd>M</kbd> miroir
+        </li>
+      </ul>
       <label className="at-reglage">
         <span className="eyebrow">Largeur · {String(Math.round(l * 100) / 100).replace('.', ',')} case</span>
         <input

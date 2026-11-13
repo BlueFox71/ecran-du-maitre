@@ -59,6 +59,17 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
       curseur: outil === 'choisir' ? 'pointer' : 'crosshair',
       onPointer: (type, p, _brut, _e, prise) => {
         souris.current = p
+        if (type === 'droit' && (depart.current || trait.current)) {
+          depart.current = null
+          trait.current = null
+          repeindre()
+          return
+        }
+        if (type === 'droit' && outil !== 'poly') {
+          setChoisi(null)
+          repeindre()
+          return
+        }
         if (outil === 'aerosol') {
           if (type === 'down') trait.current = [_brut]
           if (type === 'move' && trait.current) {
@@ -153,6 +164,9 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
           ))}
         </div>
         <p className="at-aide">{OUTILS.find((o) => o.id === outil)!.aide}</p>
+        <ul className="at-raccourcis">
+          <li>Clic droit ou <kbd>Échap</kbd> : annuler ce qui est en cours, ou désélectionner</li>
+        </ul>
         {outil === 'aerosol' ? (
           <label className="at-reglage">
             <span className="eyebrow">Taille du pinceau · {String(rayon).replace('.', ',')} case</span>
