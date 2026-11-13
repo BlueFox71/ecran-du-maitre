@@ -9,6 +9,7 @@ import {
   redimensionner,
   solSous,
   centreDeCase,
+  objetsDansRectangle,
   tirerObjet,
   mettreAuPlan,
   tourner,
@@ -216,5 +217,19 @@ describe('tirerObjet', () => {
   })
   it('sans vignette, rien', () => {
     expect(tirerObjet([], Math.random)).toBeNull()
+  })
+})
+
+describe('objetsDansRectangle', () => {
+  const objs = [
+    meuble({ id: 'dedans', x: 2, y: 2, l: 1, h: 1 }),
+    meuble({ id: 'a-cheval', x: 4.2, y: 2, l: 1, h: 1 }),
+    meuble({ id: 'dehors', x: 8, y: 8, l: 1, h: 1 })
+  ]
+  it('rend les objets que le rectangle touche, quel que soit le sens du glisser', () => {
+    expect(objetsDansRectangle(objs, [4, 3], [1, 1]).sort()).toEqual(['a-cheval', 'dedans'])
+  })
+  it('un rectangle dans le vide ne prend rien', () => {
+    expect(objetsDansRectangle(objs, [5.5, 5], [6, 6])).toEqual([])
   })
 })

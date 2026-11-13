@@ -3,6 +3,7 @@
  * tiré à la souris, le sol sous le curseur, la pièce qu'on veut paver.
  */
 import {
+  contourDeLObjet,
   placeOuverture,
   type Construction,
   type ObjetPose,
@@ -242,4 +243,20 @@ export function tirerObjet(
   const angle = hasard() * 360
   const echelle = ECHELLE_HASARD.min + hasard() * (ECHELLE_HASARD.max - ECHELLE_HASARD.min)
   return { id, angle, echelle }
+}
+
+/** Les objets que touche un rectangle tiré entre deux points (leur boîte le chevauche). */
+export function objetsDansRectangle(objets: ObjetPose[], a: PointCase, b: PointCase): string[] {
+  const x0 = Math.min(a[0], b[0])
+  const x1 = Math.max(a[0], b[0])
+  const y0 = Math.min(a[1], b[1])
+  const y1 = Math.max(a[1], b[1])
+  return objets
+    .filter((o) => {
+      const pts = contourDeLObjet(o)
+      const xs = pts.map((p) => p[0])
+      const ys = pts.map((p) => p[1])
+      return Math.max(...xs) >= x0 && Math.min(...xs) <= x1 && Math.max(...ys) >= y0 && Math.min(...ys) <= y1
+    })
+    .map((o) => o.id)
 }

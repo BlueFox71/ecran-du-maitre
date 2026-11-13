@@ -12,6 +12,7 @@ import {
   centreDeCase,
   mettreAuPlan,
   objetSous,
+  objetsDansRectangle,
   redimensionner,
   tirerObjet,
   tourner,
@@ -31,6 +32,8 @@ type Geste =
   | { quoi: 'deplacer'; id: string; prise: PointCase; depart: Map<string, PointCase> }
   | { quoi: 'coin'; id: string; i: number }
   | { quoi: 'tourner'; id: string }
+  /** Un rectangle de sélection tiré depuis le vide ; `plus` : il ajoute à la sélection (Ctrl). */
+  | { quoi: 'cadre'; de: PointCase; plus: boolean; base: string[] }
   /** Le groupe pivote autour de son centre ; `a0` : l'angle de la souris au départ. */
   | { quoi: 'tournerGroupe'; centre: PointCase; a0: number; depart: ObjetPose[] }
 
@@ -144,7 +147,10 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
         if (type === 'droit') {
           if (hasard) setHasard(false)
           else if (arme) setArme(null)
-          else if (geste.current) {
+          else if (geste.current?.quoi === 'cadre') {
+            setChoisis(geste.current.base)
+            geste.current = null
+          } else if (geste.current) {
             geste.current = null
             co.annuler()
           } else setChoisis([])
@@ -179,9 +185,8 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
           }
           const sous = objetSous(c, brut)
           /* Ctrl + clic : on ajoute l'objet au groupe, ou on l'en retire. */
-          if (e.ctrlKey) {
-            if (sous)
-              setChoisis((l) => (l.includes(sous.id) ? l.filter((id) => id !== sous.id) : [...l, sous.id]))
+          if (e.ctrlKey && sous) {
+            setChoisis((l) => (l.includes(sous.id) ? l.filter((id) => id !== sous.id) : [...l, sous.id]))
             repeindre()
             return
           }
@@ -208,8 +213,10 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
               return
             }
           }
+          /* Depuis le vide : un rectangle de sélection (Ctrl : il ajoute à ce qui est choisi). */
           if (!sous) {
-            setChoisis([])
+            geste.current = { quoi: 'cadre', de: brut, plus: e.ctrlKey, base: e.ctrlKey ? choisis : [] }
+            if (!e.ctrlKey) setChoisis([])
             repeindre()
             return
           }
@@ -251,6 +258,11 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
             co.remplacer((v) => ({ ...v, objets: v.objets.map((o) => tournes.get(o.id) ?? o) }))
           }
         }
+        if (type === 'up' && geste.current?.quoi === 'cadre') {
+          const g = geste.current
+          const pris = objetsDansRectangle(c.objets, g.de, brut)
+          setChoisis(g.plus ? [...new Set([...g.base, ...pris])] : pris)
+        }
         if (type === 'up') geste.current = null
         repeindre()
       },
@@ -266,6 +278,20 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
             echelle,
             true
           )
+        }
+        const g = geste.current
+        if (g?.quoi === 'cadre' && souris.current) {
+          /* Le rectangle, et en direct ce qu'il prendra. */
+          const [a, b] = [g.de, souris.current]
+          ctx.setLineDash([5 / echelle, 4 / echelle])
+          ctx.strokeStyle = 'rgba(232, 184, 92, 0.95)'
+          ctx.fillStyle = 'rgba(232, 184, 92, 0.08)'
+          ctx.lineWidth = 1.5 / echelle
+          ctx.fillRect(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]))
+          ctx.strokeRect(Math.min(a[0], b[0]), Math.min(a[1], b[1]), Math.abs(b[0] - a[0]), Math.abs(b[1] - a[1]))
+          ctx.setLineDash([])
+          const pris = new Set([...g.base, ...objetsDansRectangle(c.objets, a, b)])
+          for (const o of c.objets) if (pris.has(o.id)) contour(ctx, contourDeLObjet(o), echelle)
         }
         for (const o of c.objets) if (choisis.includes(o.id)) contour(ctx, contourDeLObjet(o), echelle)
         const sel = c.objets.filter((o) => choisis.includes(o.id))
@@ -403,6 +429,7 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
           <li>
             <kbd>Ctrl</kbd> + clic sur un objet : sélection multiple
           </li>
+          <li>Glisser depuis le vide : sélectionner tout ce que le rectangle touche</li>
         </ul>
       )}
       <div className="at-section at-outils">
