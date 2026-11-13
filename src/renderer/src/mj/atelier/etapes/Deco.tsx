@@ -373,8 +373,23 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
     ? (assets.find((a) => a.id === seul.assetId)?.nom ?? 'Objet introuvable')
     : `${groupe.length} objets choisis`
 
+  const palette = {
+    assets: objets,
+    choisi: arme?.id ?? null,
+    choisis: hasard ? lot : undefined,
+    onChoisir: (a: AssetAtelier) => {
+      if (!hasard) return setArme(arme?.id === a.id ? null : a)
+      const n = lot.includes(a.id) ? lot.filter((id) => id !== a.id) : [...lot, a.id]
+      setLot(n)
+      tirer(n)
+    },
+    parCategorie: true
+  }
+
+  /* Comme pour le sol : le haut est figé, seule la grille des objets défile. */
   return (
-    <>
+    <div className="at-colonne">
+      <div className="at-fige">
       {groupe.length ? (
         <div className="at-section at-objet">
           <span className="eyebrow">{titre}</span>
@@ -477,19 +492,12 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
           </>
         ) : null}
       </div>
-      <Palette
-        assets={objets}
-        choisi={arme?.id ?? null}
-        choisis={hasard ? lot : undefined}
-        onChoisir={(a) => {
-          if (!hasard) return setArme(arme?.id === a.id ? null : a)
-          const n = lot.includes(a.id) ? lot.filter((id) => id !== a.id) : [...lot, a.id]
-          setLot(n)
-          tirer(n)
-        }}
-        parCategorie
-      />
-      <ImportAsset {...props} typeParDefaut="objet" />
-    </>
+      <Palette {...palette} partie="filtres" />
+      </div>
+      <div className="at-defile">
+        <Palette {...palette} partie="tuiles" />
+        <ImportAsset {...props} typeParDefaut="objet" />
+      </div>
+    </div>
   )
 }
