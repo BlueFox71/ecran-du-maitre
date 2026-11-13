@@ -364,7 +364,6 @@ const PLANCHES: Planche[] = [
   {
     fichier: 'planches/icones 1.png',
     fond: 'magenta',
-    isoler: true,
     icones: true,
     cols: 4,
     rows: 4,
@@ -393,7 +392,6 @@ const PLANCHES: Planche[] = [
   {
     fichier: 'planches/icones 2.png',
     fond: 'magenta',
-    isoler: true,
     icones: true,
     cols: 4,
     rows: 3,
