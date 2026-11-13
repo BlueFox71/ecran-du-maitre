@@ -30,7 +30,11 @@ export function rectangle(a: PointCase, b: PointCase): PointCase[] | null {
 
 /** Le sol du dessus sous un point (le dernier peint gagne). */
 export function solSous(c: Construction, p: PointCase): SolPeint | null {
-  for (let i = c.sols.length - 1; i >= 0; i--) if (dansForme(p, c.sols[i].pts)) return c.sols[i]
+  for (let i = c.sols.length - 1; i >= 0; i--) {
+    const s = c.sols[i]
+    const r = s.rayon
+    if (r ? s.pts.some((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) <= r) : dansForme(p, s.pts)) return s
+  }
   return null
 }
 

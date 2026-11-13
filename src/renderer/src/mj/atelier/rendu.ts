@@ -23,13 +23,6 @@ import type { ImagesAtelier } from './images'
 const FOND = '#0b1014'
 const ABSENT = 'rgba(85, 85, 85, 0.6)'
 
-/** Un nombre stable tiré d'un id : le décalage d'un sol ne doit pas bouger d'un rendu à l'autre. */
-function graine(id: string): number {
-  let h = 2166136261
-  for (let i = 0; i < id.length; i++) h = Math.imul(h ^ id.charCodeAt(i), 16777619)
-  return (h >>> 0) / 2 ** 32
-}
-
 function chemin(ctx: CanvasRenderingContext2D, pts: PointCase[], px: number): void {
   ctx.beginPath()
   pts.forEach(([x, y], i) => (i ? ctx.lineTo(x * px, y * px) : ctx.moveTo(x * px, y * px)))
@@ -38,6 +31,65 @@ function chemin(ctx: CanvasRenderingContext2D, pts: PointCase[], px: number): vo
 function image(images: ImagesAtelier, id: string): HTMLImageElement | null {
   const i = images.get(id)
   return i && i !== 'absent' ? i : null
+}
+
+/** Le motif d'une matière, à l'échelle : une tuile couvre `tuile` cases. */
+function motifDe(
+  ctx: CanvasRenderingContext2D,
+  a: AssetAtelier,
+  img: HTMLImageElement,
+  px: number
+): CanvasPattern {
+  const motif = ctx.createPattern(img, 'repeat')!
+  /* Toutes les matières partent de l'origine du terrain : deux damiers posés
+     l'un sur l'autre tombent case sur case. */
+  motif.setTransform(new DOMMatrix().scaleSelf(((a.tuile ?? 2) * px) / img.width))
+  return motif
+}
+
+/**
+ * Un trait d'aérosol : des touches rondes aux bords fondus, qui s'additionnent
+ * là où le pinceau repasse. On les dessine dans un masque, puis la matière ne
+ * se pose qu'à travers lui.
+ */
+function dessinerAerosol(
+  ctx: CanvasRenderingContext2D,
+  pts: PointCase[],
+  rayon: number,
+  remplissage: string | CanvasPattern,
+  px: number
+): void {
+  const r = rayon * px
+  let x0 = Infinity
+  let y0 = Infinity
+  let x1 = -Infinity
+  let y1 = -Infinity
+  for (const [x, y] of pts) {
+    x0 = Math.min(x0, x * px - r)
+    y0 = Math.min(y0, y * px - r)
+    x1 = Math.max(x1, x * px + r)
+    y1 = Math.max(y1, y * px + r)
+  }
+  const w = Math.ceil(x1 - x0)
+  const h = Math.ceil(y1 - y0)
+  if (w <= 0 || h <= 0) return
+  const masque = document.createElement('canvas')
+  masque.width = w
+  masque.height = h
+  const m = masque.getContext('2d')!
+  m.translate(-x0, -y0)
+  for (const [x, y] of pts) {
+    const g = m.createRadialGradient(x * px, y * px, 0, x * px, y * px, r)
+    g.addColorStop(0, 'rgba(0, 0, 0, 0.55)')
+    g.addColorStop(0.55, 'rgba(0, 0, 0, 0.3)')
+    g.addColorStop(1, 'rgba(0, 0, 0, 0)')
+    m.fillStyle = g
+    m.fillRect(x * px - r, y * px - r, 2 * r, 2 * r)
+  }
+  m.globalCompositeOperation = 'source-in'
+  m.fillStyle = remplissage
+  m.fillRect(x0, y0, w, h)
+  ctx.drawImage(masque, x0, y0)
 }
 
 function dessinerSols(
@@ -50,22 +102,15 @@ function dessinerSols(
   for (const s of c.sols) {
     const a = assets.get(s.assetId)
     const img = image(images, s.assetId)
+    const remplissage = a && img ? motifDe(ctx, a, img, px) : ABSENT
+    if (s.rayon) {
+      dessinerAerosol(ctx, s.pts, s.rayon, remplissage, px)
+      continue
+    }
     ctx.save()
     chemin(ctx, s.pts, px)
     ctx.closePath()
-    if (!a || !img) {
-      ctx.fillStyle = ABSENT
-      ctx.fill()
-      ctx.restore()
-      continue
-    }
-    const motif = ctx.createPattern(img, 'repeat')!
-    const echelle = ((a.tuile ?? 2) * px) / img.width
-    const g = graine(s.id)
-    motif.setTransform(
-      new DOMMatrix().translateSelf(g * img.width * echelle, graine(s.id + '·') * img.height * echelle).scaleSelf(echelle)
-    )
-    ctx.fillStyle = motif
+    ctx.fillStyle = remplissage
     ctx.fill()
     ctx.restore()
   }

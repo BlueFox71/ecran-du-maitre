@@ -21,11 +21,16 @@ import {
 /** Un point en cases, l'origine en haut à gauche du terrain. */
 export type PointCase = [number, number]
 
-/** Une surface de sol : un polygone fermé, peint d'une matière. */
+/**
+ * Une surface de sol, peinte d'une matière : un polygone fermé — ou, avec
+ * `rayon`, un trait d'aérosol, dont `pts` sont les passages du pinceau.
+ */
 export interface SolPeint {
   id: string
   assetId: string
   pts: PointCase[]
+  /** Aérosol : le rayon du pinceau, en cases ; ses bords se fondent dans ce qu'il recouvre. */
+  rayon?: number
 }
 
 /** Un mur épais : sa ligne médiane, sa matière, son épaisseur en cases. */
@@ -387,8 +392,15 @@ export function agrandir(c: Construction, bords: Bords): { construction: Constru
       ...c,
       largeur,
       hauteur,
-      /* Les sols se découpent au nouveau bord ; celui qui sort tout entier part. */
+      /* Les sols se découpent au nouveau bord ; celui qui sort tout entier part.
+         Un aérosol perd les passages tombés dehors. */
       sols: c.sols.flatMap((s) => {
+        if (s.rayon) {
+          const pts = s.pts
+            .map(dec)
+            .filter(([x, y]) => x >= -EPS && y >= -EPS && x <= largeur + EPS && y <= hauteur + EPS)
+          return pts.length ? [{ ...s, pts }] : []
+        }
         const pts = decouper(s.pts.map(dec), largeur, hauteur)
         return pts ? [{ ...s, pts }] : []
       }),
@@ -464,8 +476,10 @@ export function lireConstruction(brut: unknown): Construction {
 
   const sols: SolPeint[] = []
   for (const s of liste(v.sols)) {
-    const pts = points(s?.pts, 3)
-    if (texte(s?.id) && texte(s?.assetId) && pts) sols.push({ id: s.id, assetId: s.assetId, pts })
+    const aerosol = fini(s?.rayon) && s.rayon > 0
+    const pts = points(s?.pts, aerosol ? 1 : 3)
+    if (texte(s?.id) && texte(s?.assetId) && pts)
+      sols.push(aerosol ? { id: s.id, assetId: s.assetId, pts, rayon: s.rayon } : { id: s.id, assetId: s.assetId, pts })
   }
   const murs: MurBati[] = []
   for (const m of liste(v.murs)) {

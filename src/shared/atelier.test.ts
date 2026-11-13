@@ -300,3 +300,17 @@ describe('réduire un terrain couvert de sol', () => {
     expect(tailleMinimale(c, [0, 0]).largeur).toBe(10)
   })
 })
+
+describe('aérosol', () => {
+  it('lireConstruction garde un trait d’aérosol (rayon, même avec un seul point)', () => {
+    const c = terrain(10, 10)
+    c.sols.push({ id: 'a', assetId: 'x', pts: [[2, 2]], rayon: 1.2 })
+    expect(lireConstruction(JSON.stringify(c)).sols).toEqual(c.sols)
+  })
+  it('au redimensionnement, l’aérosol se décale et perd ses points sortis', () => {
+    const c = terrain(10, 10)
+    c.sols.push({ id: 'a', assetId: 'x', pts: [[1, 5], [6, 5]], rayon: 1 })
+    const s = agrandir(c, { gauche: -3, haut: 0, droite: 0, bas: 0 }).construction.sols
+    expect(s).toEqual([{ id: 'a', assetId: 'x', pts: [[3, 5]], rayon: 1 }])
+  })
+})

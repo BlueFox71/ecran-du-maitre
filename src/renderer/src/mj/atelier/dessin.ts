@@ -61,3 +61,23 @@ export function trait(
   ctx.lineWidth = epaisseur
   ctx.stroke()
 }
+
+/** Un rond : la touche d'un aérosol, ou le pinceau sous la souris. */
+export function cercle(
+  ctx: CanvasRenderingContext2D,
+  [x, y]: PointCase,
+  r: number,
+  echelle: number,
+  plein = false
+): void {
+  ctx.beginPath()
+  ctx.arc(x, y, r, 0, Math.PI * 2)
+  if (plein) {
+    ctx.fillStyle = 'rgba(232, 184, 92, 0.08)'
+    ctx.fill()
+  } else {
+    ctx.strokeStyle = 'rgba(232, 184, 92, 0.9)'
+    ctx.lineWidth = 1.5 / echelle
+    ctx.stroke()
+  }
+}

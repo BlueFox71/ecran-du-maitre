@@ -157,3 +157,12 @@ describe('zoneARemplir', () => {
     expect(zoneARemplir(c, [10, 8])).toEqual([[0, 0], [20, 0], [20, 10], [0, 10]])
   })
 })
+
+describe('solSous et l’aérosol', () => {
+  it('un trait d’aérosol se prend à moins d’un rayon de ses points', () => {
+    const c = terrain()
+    c.sols.push({ id: 'a', assetId: 'x', pts: [[2, 2], [4, 2]], rayon: 1 })
+    expect(solSous(c, [4.5, 2.5])?.id).toBe('a')
+    expect(solSous(c, [7, 2])).toBeNull()
+  })
+})
