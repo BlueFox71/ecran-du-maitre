@@ -19,6 +19,7 @@ import {
   readdirSync,
   renameSync,
   statSync,
+  unlinkSync,
   writeFileSync
 } from 'node:fs'
 import { watch, type FSWatcher } from 'node:fs'
@@ -900,6 +901,28 @@ export function copieTournee(rel: string, octets: Uint8Array, jpeg: boolean): st
   writeFileSync(dest, Buffer.from(octets))
   scan()
   return toRel(campaignRoot()!, dest)
+}
+
+/**
+ * Écrit une image produite par l'application dans son dossier — le plan
+ * enregistré d'un lieu bâti, par exemple. Le nom est rendu libre s'il est pris,
+ * et le scan en fait aussitôt un document : la carte d'un lieu doit en être un.
+ */
+export function ecrireImageDeLApp(dossierRel: string, nom: string, octets: Uint8Array): string {
+  const dir = absOf(assurerDossier(dossierRel))
+  const dest = freePath(dir, safeName(nom), '.png')
+  writeFileSync(dest, Buffer.from(octets))
+  scan()
+  return toRel(campaignRoot()!, dest)
+}
+
+/** Efface un fichier que l'application a écrit elle-même ; ailleurs, refuse. */
+export function effacerDeLApp(rel: string): void {
+  if (!dansLApp(rel)) throw new Error('Ce fichier n’est pas celui de l’application.')
+  const abs = absOf(rel)
+  if (!insideRoot(abs) || !existsSync(abs)) return
+  unlinkSync(abs)
+  scan()
 }
 
 export function importInto(folderRel: string, sources: string[]): string[] {

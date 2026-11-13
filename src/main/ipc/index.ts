@@ -24,6 +24,8 @@ import * as annotations from '../db/repos/annotations'
 import * as surlignage from '../db/repos/surlignage'
 import * as objets from '../db/repos/objets'
 import * as murs from '../db/repos/murs'
+import * as atelier from '../atelier'
+import type { Cadre } from '@shared/atelier'
 import * as reglages from '../db/repos/reglages'
 import * as rolls from '../db/repos/rolls'
 import * as pions from '../db/repos/pions'
@@ -386,7 +388,16 @@ export function registerIpc(): void {
     const slide = slideOf(neuve)
     if (slide) display.carteRemplacee(id, ancienne, slide)
   }
+  /* Un lieu bâti se modifie dans l'atelier : son image n'est qu'un tirage de
+     sa construction, la retoucher ici la ferait diverger de ses murs. */
+  const refuserSiConstruit = (id: number): void => {
+    if (places.getPlace(id)?.construit) throw new Error('Ce plan se modifie dans l’atelier')
+  }
   on('places:upsert', (input: any) => {
+    if (input?.id && input.mapItemId !== undefined) {
+      const cur = places.getPlace(input.id)
+      if (cur?.construit && input.mapItemId !== cur.mapItemId) refuserSiConstruit(input.id)
+    }
     const p = places.upsertPlace(input)
     /* Seule la carte compte ici : une description tapée ne rediffuse rien. */
     if (p.id === display.getState().placeId && p.mapItemId !== display.getState().carteDuLieu)
@@ -394,6 +405,7 @@ export function registerIpc(): void {
     return p
   })
   on('places:rogner', (id: number, cadre: { x: number; y: number; w: number; h: number }) => {
+    refuserSiConstruit(id)
     const p = places.getPlace(id)
     const item = p?.mapItemId ? lib.getItem(p.mapItemId) : null
     if (!p || !item?.relPath) throw new Error('Ce lieu n’a pas d’image à rogner')
@@ -408,6 +420,7 @@ export function registerIpc(): void {
      pions, les lampes et les repères qui se recalent — le même calcul qu'un
      rognage, sans nouvelle image. */
   on('places:caler', (id: number, cadre: { x: number; y: number; w: number; h: number }) => {
+    refuserSiConstruit(id)
     const p = places.getPlace(id)
     if (!p?.mapItemId) throw new Error('Ce lieu n’a pas d’image à caler')
     places.recalerApresRognage(id, p.mapItemId, p.mapItemId, cadre)
@@ -420,6 +433,7 @@ export function registerIpc(): void {
   on(
     'places:calerTourne',
     (id: number, octets: Uint8Array, jpeg: boolean, cadre: { x: number; y: number; w: number; h: number }) => {
+      refuserSiConstruit(id)
       const p = places.getPlace(id)
       const item = p?.mapItemId ? lib.getItem(p.mapItemId) : null
       if (!p || !item?.relPath) throw new Error('Ce lieu n’a pas d’image à caler')
@@ -434,6 +448,7 @@ export function registerIpc(): void {
   /* Remplacer l'image d'un plan sans déformer ce qui est posé dessus : les
      pièces découpées et les niveaux qui la partagent suivent. */
   on('places:remplacerCarte', (id: number, nouvelle: number) => {
+    refuserSiConstruit(id)
     const p = places.getPlace(id)
     if (!p) throw new Error('Lieu introuvable')
     const ancienne = p.mapItemId
@@ -495,9 +510,10 @@ export function registerIpc(): void {
   on('places:seen', (id: number, seen: boolean) => places.setSeen(id, seen))
   /* Les apparences de la carte : l'écran suit tout de suite, au direct comme
      en préparation, et les téléphones avec lui. */
-  on('places:ajouterApparence', (placeId: number, itemId: number, nom: string) =>
-    places.ajouterApparence(placeId, itemId, nom)
-  )
+  on('places:ajouterApparence', (placeId: number, itemId: number, nom: string) => {
+    refuserSiConstruit(placeId)
+    return places.ajouterApparence(placeId, itemId, nom)
+  })
   on('places:attacherImage', (placeId: number, itemId: number) => places.attacherImage(placeId, itemId))
   on('places:detacherImage', (placeId: number, itemId: number) => places.detacherImage(placeId, itemId))
   on('places:renommerApparence', (id: number, nom: string) => places.renommerApparence(id, nom))
@@ -670,6 +686,21 @@ export function registerIpc(): void {
     murs.removeMur(id)
     piecesSuivent(placeId)
   })
+
+  /* ---------------- l'atelier des lieux ---------------- */
+  on('atelier:creer', (nom: string, parentId: number | null) => atelier.creer(nom, parentId))
+  on('atelier:construire', (placeId: number) => atelier.construire(placeId))
+  on('atelier:de', (placeId: number) => atelier.de(placeId))
+  on(
+    'atelier:enregistrer',
+    (placeId: number, c: unknown, png: Uint8Array, cadre?: Cadre | null) => {
+      const r = atelier.enregistrer(placeId, c, png, cadre)
+      if (r.ancienne) carteChangee(placeId, r.ancienne, r.neuve)
+      else if (placeId === display.getState().placeId) display.refreshPions()
+      piecesSuivent(placeId)
+      return r.place
+    }
+  )
 
   on('ouvertures:of', (placeId: number | null) => ouvertures.listOuvertures(placeId))
   on('ouvertures:add', (input: any) => ouvertures.addOuverture(input))

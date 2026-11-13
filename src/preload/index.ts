@@ -3,6 +3,7 @@ import type { Brut } from '@shared/reglages'
 import type { Modif } from '@shared/modifs'
 import type { EvenementSm } from '@shared/santeMentale'
 import type { Cible, Plage } from '@shared/surlignage'
+import type { Cadre, Construction } from '@shared/atelier'
 import type {
   JetSm,
   ChoixReinit,
@@ -753,6 +754,25 @@ const api = {
       patch: { nature?: NatureMur; pts?: [number, number][]; ouvert?: boolean }
     ) => call<Mur | null>('murs:update', id, patch),
     remove: (id: number) => call<void>('murs:remove', id)
+  },
+
+  /**
+   * L'atelier des lieux : un plan qu'on construit. La construction est la
+   * seule source de vérité ; l'image et le calque du lieu en dérivent à
+   * chaque enregistrement.
+   */
+  atelier: {
+    /** Un nouveau lieu, bâti d'office, avec un terrain vide. */
+    creer: (nom: string, parentId: number | null) => call<Place>('atelier:creer', nom, parentId),
+    /** Bâtir un lieu existant — refusé s'il a déjà une image. */
+    construire: (placeId: number) => call<Place>('atelier:construire', placeId),
+    de: (placeId: number) => call<Construction | null>('atelier:de', placeId),
+    /**
+     * L'image devient la carte, le calque suit. `cadre` : où se place
+     * l'ancienne carte dans la nouvelle, si le terrain a grandi.
+     */
+    enregistrer: (placeId: number, c: Construction, png: Uint8Array, cadre?: Cadre | null) =>
+      call<Place>('atelier:enregistrer', placeId, c, png, cadre ?? null)
   },
 
   /**
