@@ -2,10 +2,13 @@
  * Étape 4 — la déco. Meubles, tapis, objets, toiles d'araignée : on prend
  * une vignette, on clique où le poser. Un petit objet se pose sur un grand —
  * une bougie sur la commode — puisque le dernier posé passe devant.
+ *
+ * Ctrl + clic ajoute un objet à la sélection (ou l'en retire) : on règle
+ * alors tout le groupe d'un coup — ses blocages, son plan, sa place.
  */
 import { useEffect, useRef, useState } from 'react'
 import { contourDeLObjet, nouvelId, type ObjetPose, type PointCase } from '@shared/atelier'
-import { centreDeCase, objetSous, redimensionner, tourner } from '@shared/atelierOutils'
+import { centreDeCase, mettreAuPlan, objetSous, redimensionner, tourner } from '@shared/atelierOutils'
 import type { AssetAtelier } from '@shared/atelierAssets'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
@@ -16,7 +19,8 @@ import { ImportAsset } from '../ImportAsset'
 const ECART_ROTATION = 0.45
 
 type Geste =
-  | { quoi: 'deplacer'; id: string; dx: number; dy: number }
+  /** `depart` : la place de chaque objet du groupe quand on l'a saisi. */
+  | { quoi: 'deplacer'; id: string; prise: PointCase; depart: Map<string, PointCase> }
   | { quoi: 'coin'; id: string; i: number }
   | { quoi: 'tourner'; id: string }
 
@@ -26,19 +30,45 @@ function poigneeRotation(o: ObjetPose): PointCase {
   return [o.x + r * Math.sin(a), o.y - r * Math.cos(a)]
 }
 
+/** Une case à cocher qui sait dire « mixte » quand les objets choisis diffèrent. */
+function CaseGroupe({
+  valeurs,
+  onChange,
+  children
+}: {
+  valeurs: boolean[]
+  onChange: (v: boolean) => void
+  children: React.ReactNode
+}): JSX.Element {
+  const ref = useRef<HTMLInputElement>(null)
+  const toutes = valeurs.every(Boolean)
+  const mixte = !toutes && valeurs.some(Boolean)
+  useEffect(() => {
+    if (ref.current) ref.current.indeterminate = mixte
+  }, [mixte])
+  return (
+    <label className="at-case">
+      <input ref={ref} type="checkbox" checked={toutes} onChange={(e) => onChange(e.target.checked)} />
+      {children}
+    </label>
+  )
+}
+
 export function EtapeDeco(props: PropsEtape): JSX.Element {
   const { co, assets, setOutil, repeindre } = props
   const objets = assets.filter((a) => a.type === 'objet')
   const [arme, setArme] = useState<AssetAtelier | null>(null)
-  const [choisi, setChoisi] = useState<string | null>(null)
+  const [choisis, setChoisis] = useState<string[]>([])
   const geste = useRef<Geste | null>(null)
   const souris = useRef<PointCase | null>(null)
   /* Ctrl maintenu : l'objet se cale au centre de la case. */
   const cale = useRef(false)
-  const objet = choisi ? co.c?.objets.find((o) => o.id === choisi) ?? null : null
+  const groupe = (co.c?.objets ?? []).filter((o) => choisis.includes(o.id))
+  /* Les poignées de taille et de rotation : pour un objet seul. */
+  const seul = groupe.length === 1 ? groupe[0] : null
 
-  const majObjet = (id: string, f: (o: ObjetPose) => ObjetPose, pas = true): void => {
-    const g = (c: NonNullable<typeof co.c>) => ({ ...c, objets: c.objets.map((o) => (o.id === id ? f(o) : o)) })
+  const majObjets = (ids: string[], f: (o: ObjetPose) => ObjetPose, pas = true): void => {
+    const g = (c: NonNullable<typeof co.c>) => ({ ...c, objets: c.objets.map((o) => (ids.includes(o.id) ? f(o) : o)) })
     if (pas) co.modifier(g)
     else co.remplacer(g)
   }
@@ -50,17 +80,16 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
       curseurSous: (p, prise) => {
         const c = co.c
         if (arme || !c) return undefined
-        const sel = choisi ? c.objets.find((o) => o.id === choisi) : null
-        if (sel) {
-          const rot = poigneeRotation(sel)
+        if (seul) {
+          const rot = poigneeRotation(seul)
           if (Math.hypot(p[0] - rot[0], p[1] - rot[1]) < prise) return 'grab'
-          const coins = contourDeLObjet(sel).slice(0, 4)
+          const coins = contourDeLObjet(seul).slice(0, 4)
           const i = coins.findIndex((q) => Math.hypot(p[0] - q[0], p[1] - q[1]) < prise)
           if (i >= 0) return i % 2 === 0 ? 'nwse-resize' : 'nesw-resize'
         }
         return objetSous(c, p) ? 'move' : undefined
       },
-      onPointer: (type, p, brut, e, prise) => {
+      onPointer: (type, _p, brut, e, prise) => {
         souris.current = brut
         cale.current = e.ctrlKey
         const c = co.c
@@ -73,55 +102,83 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
         }
         if (type === 'down') {
           if (arme) {
+            const [x, y] = e.ctrlKey ? centreDeCase(brut) : brut
             const o: ObjetPose = {
               id: nouvelId(),
               assetId: arme.id,
-              x: e.ctrlKey ? centreDeCase(brut)[0] : brut[0],
-              y: e.ctrlKey ? centreDeCase(brut)[1] : brut[1],
+              x,
+              y,
               l: arme.l ?? 1,
               h: arme.h ?? 1,
               angle: 0,
               bloquePas: !!arme.bloquePas,
               bloqueVue: !!arme.bloqueVue
             }
-            co.modifier((x) => ({ ...x, objets: [...x.objets, o] }))
-            setChoisi(o.id)
+            co.modifier((v) => ({ ...v, objets: [...v.objets, o] }))
+            setChoisis([o.id])
             /* Maj : on garde la vignette pour en poser plusieurs. */
             if (!e.shiftKey) setArme(null)
             return
           }
-          const sel = choisi ? c.objets.find((o) => o.id === choisi) : null
-          if (sel) {
-            const rot = poigneeRotation(sel)
+          const sous = objetSous(c, brut)
+          /* Ctrl + clic : on ajoute l'objet au groupe, ou on l'en retire. */
+          if (e.ctrlKey) {
+            if (sous)
+              setChoisis((l) => (l.includes(sous.id) ? l.filter((id) => id !== sous.id) : [...l, sous.id]))
+            repeindre()
+            return
+          }
+          if (seul) {
+            const rot = poigneeRotation(seul)
             if (Math.hypot(brut[0] - rot[0], brut[1] - rot[1]) < prise) {
               co.marquer()
-              geste.current = { quoi: 'tourner', id: sel.id }
+              geste.current = { quoi: 'tourner', id: seul.id }
               return
             }
-            const coins = contourDeLObjet(sel).slice(0, 4)
+            const coins = contourDeLObjet(seul).slice(0, 4)
             const i = coins.findIndex((q) => Math.hypot(brut[0] - q[0], brut[1] - q[1]) < prise)
             if (i >= 0) {
               co.marquer()
-              geste.current = { quoi: 'coin', id: sel.id, i }
+              geste.current = { quoi: 'coin', id: seul.id, i }
               return
             }
           }
-          const sous = objetSous(c, brut)
-          setChoisi(sous?.id ?? null)
-          if (sous) {
-            co.marquer()
-            geste.current = { quoi: 'deplacer', id: sous.id, dx: brut[0] - sous.x, dy: brut[1] - sous.y }
+          if (!sous) {
+            setChoisis([])
+            repeindre()
+            return
+          }
+          /* Saisir un objet du groupe emporte tout le groupe ; un autre, lui seul. */
+          const ids = choisis.includes(sous.id) ? choisis : [sous.id]
+          if (!choisis.includes(sous.id)) setChoisis(ids)
+          co.marquer()
+          geste.current = {
+            quoi: 'deplacer',
+            id: sous.id,
+            prise: [brut[0] - sous.x, brut[1] - sous.y],
+            depart: new Map(c.objets.filter((o) => ids.includes(o.id)).map((o) => [o.id, [o.x, o.y]]))
           }
         }
         if (type === 'move' && geste.current) {
           const g = geste.current
           if (g.quoi === 'deplacer') {
-            const cible: PointCase = [brut[0] - g.dx, brut[1] - g.dy]
+            /* L'objet saisi mène : calé sur la case avec Ctrl, les autres suivent du même pas. */
+            const cible: PointCase = [brut[0] - g.prise[0], brut[1] - g.prise[1]]
             const [x, y] = e.ctrlKey ? centreDeCase(cible) : cible
-            majObjet(g.id, (o) => ({ ...o, x, y }), false)
+            const d0 = g.depart.get(g.id)!
+            const dx = x - d0[0]
+            const dy = y - d0[1]
+            majObjets(
+              [...g.depart.keys()],
+              (o) => {
+                const d = g.depart.get(o.id)!
+                return { ...o, x: d[0] + dx, y: d[1] + dy }
+              },
+              false
+            )
           }
-          if (g.quoi === 'coin') majObjet(g.id, (o) => redimensionner(o, g.i, brut, !e.altKey), false)
-          if (g.quoi === 'tourner') majObjet(g.id, (o) => tourner(o, brut, e.shiftKey), false)
+          if (g.quoi === 'coin') majObjets([g.id], (o) => redimensionner(o, g.i, brut, !e.altKey), false)
+          if (g.quoi === 'tourner') majObjets([g.id], (o) => tourner(o, brut, e.shiftKey), false)
         }
         if (type === 'up') geste.current = null
         repeindre()
@@ -133,10 +190,10 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
           const [x, y] = cale.current ? centreDeCase(souris.current) : souris.current
           contour(ctx, contourDeLObjet({ ...({} as ObjetPose), x, y, l: arme.l ?? 1, h: arme.h ?? 1, angle: 0 }), echelle, true)
         }
-        const o = choisi ? c.objets.find((x) => x.id === choisi) : null
+        for (const o of c.objets) if (choisis.includes(o.id)) contour(ctx, contourDeLObjet(o), echelle)
+        const o = choisis.length === 1 ? c.objets.find((x) => x.id === choisis[0]) : null
         if (o) {
           const pts = contourDeLObjet(o)
-          contour(ctx, pts, echelle)
           const rot = poigneeRotation(o)
           ctx.beginPath()
           ctx.moveTo(o.x + ((rot[0] - o.x) * (o.h / 2)) / (o.h / 2 + ECART_ROTATION), o.y + ((rot[1] - o.y) * (o.h / 2)) / (o.h / 2 + ECART_ROTATION))
@@ -153,7 +210,7 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
       }
     })
     return () => setOutil(null)
-  }, [arme, choisi, co.c])
+  }, [arme, choisis, co.c])
 
   useEffect(() => {
     const k = (e: KeyboardEvent): void => {
@@ -161,59 +218,54 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
       if (el && /^(INPUT|TEXTAREA|SELECT)$/.test(el.tagName)) return
       if (e.key === 'Escape') {
         setArme(null)
-        setChoisi(null)
+        setChoisis([])
       }
-      if ((e.key === 'Delete' || e.key === 'Backspace') && choisi) supprimer()
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd' && choisi) {
+      if ((e.key === 'Delete' || e.key === 'Backspace') && choisis.length) supprimer()
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'd' && choisis.length) {
         e.preventDefault()
         dupliquer()
       }
     }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
-  }, [choisi, co])
+  }, [choisis, co])
 
   const supprimer = (): void => {
-    if (!choisi) return
-    co.modifier((c) => ({ ...c, objets: c.objets.filter((o) => o.id !== choisi) }))
-    setChoisi(null)
+    if (!choisis.length) return
+    co.modifier((c) => ({ ...c, objets: c.objets.filter((o) => !choisis.includes(o.id)) }))
+    setChoisis([])
   }
   const dupliquer = (): void => {
-    if (!objet) return
-    const copie = { ...objet, id: nouvelId(), x: objet.x + 0.3, y: objet.y + 0.3 }
-    co.modifier((c) => ({ ...c, objets: [...c.objets, copie] }))
-    setChoisi(copie.id)
+    if (!groupe.length) return
+    const copies = groupe.map((o) => ({ ...o, id: nouvelId(), x: o.x + 0.3, y: o.y + 0.3 }))
+    co.modifier((c) => ({ ...c, objets: [...c.objets, ...copies] }))
+    setChoisis(copies.map((o) => o.id))
   }
   const plan = (devant: boolean): void => {
-    if (!objet) return
-    co.modifier((c) => {
-      const reste = c.objets.filter((o) => o.id !== objet.id)
-      return { ...c, objets: devant ? [...reste, objet] : [objet, ...reste] }
-    })
+    if (!choisis.length) return
+    co.modifier((c) => ({ ...c, objets: mettreAuPlan(c.objets, choisis, devant) }))
   }
-  const nom = objet ? assets.find((a) => a.id === objet.assetId)?.nom ?? 'Objet introuvable' : ''
+  const titre = seul
+    ? (assets.find((a) => a.id === seul.assetId)?.nom ?? 'Objet introuvable')
+    : `${groupe.length} objets choisis`
 
   return (
     <>
-      {objet ? (
+      {groupe.length ? (
         <div className="at-section at-objet">
-          <span className="eyebrow">{nom}</span>
-          <label className="at-case">
-            <input
-              type="checkbox"
-              checked={objet.bloquePas}
-              onChange={(e) => majObjet(objet.id, (o) => ({ ...o, bloquePas: e.target.checked }))}
-            />
+          <span className="eyebrow">{titre}</span>
+          <CaseGroupe
+            valeurs={groupe.map((o) => o.bloquePas)}
+            onChange={(v) => majObjets(choisis, (o) => ({ ...o, bloquePas: v }))}
+          >
             Bloque le passage
-          </label>
-          <label className="at-case">
-            <input
-              type="checkbox"
-              checked={objet.bloqueVue}
-              onChange={(e) => majObjet(objet.id, (o) => ({ ...o, bloqueVue: e.target.checked }))}
-            />
+          </CaseGroupe>
+          <CaseGroupe
+            valeurs={groupe.map((o) => o.bloqueVue)}
+            onChange={(v) => majObjets(choisis, (o) => ({ ...o, bloqueVue: v }))}
+          >
             Bloque la vue
-          </label>
+          </CaseGroupe>
           <div className="at-outils">
             <button className="btn btn-sm" onClick={() => plan(true)}>
               Premier plan
@@ -228,10 +280,22 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
               Supprimer
             </button>
           </div>
-          <p className="at-aide">
-            Glisse l’objet pour le déplacer (Ctrl : au centre de la case), un coin pour le
-            redimensionner (Alt : sans garder les proportions), le rond pour le tourner (Maj : par 15°).
-          </p>
+          <ul className="at-raccourcis">
+            <li>
+              <kbd>Ctrl</kbd> + clic : ajouter ou retirer de la sélection
+            </li>
+            <li>Glisser : déplacer {seul ? 'l’objet' : 'le groupe'} (<kbd>Ctrl</kbd> : centrer sur la case)</li>
+            {seul ? (
+              <>
+                <li>
+                  Coin : redimensionner (<kbd>Alt</kbd> : sans garder les proportions)
+                </li>
+                <li>
+                  Rond : tourner (<kbd>Maj</kbd> : par 15°)
+                </li>
+              </>
+            ) : null}
+          </ul>
         </div>
       ) : (
         <ul className="at-raccourcis">
@@ -240,6 +304,9 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
           </li>
           <li>
             <kbd>Maj</kbd> : poser plusieurs fois
+          </li>
+          <li>
+            <kbd>Ctrl</kbd> + clic sur un objet : sélection multiple
           </li>
         </ul>
       )}

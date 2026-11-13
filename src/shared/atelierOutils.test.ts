@@ -9,6 +9,7 @@ import {
   redimensionner,
   solSous,
   centreDeCase,
+  mettreAuPlan,
   tourner,
   zoneARemplir
 } from './atelierOutils'
@@ -172,5 +173,16 @@ describe('centreDeCase', () => {
   it('ramène un point au centre de la case où il tombe', () => {
     expect(centreDeCase([2.1, 4.97])).toEqual([2.5, 4.5])
     expect(centreDeCase([0, 0])).toEqual([0.5, 0.5])
+  })
+})
+
+describe('mettreAuPlan', () => {
+  const ids = (l: { id: string }[]): string => l.map((o) => o.id).join('')
+  const liste = ['a', 'b', 'c', 'd', 'e'].map((id) => ({ id }))
+  it('passe les choisis devant, dans leur ordre', () => {
+    expect(ids(mettreAuPlan(liste, ['d', 'b'], true))).toBe('aceb' + 'd')
+  })
+  it('passe les choisis derrière, dans leur ordre', () => {
+    expect(ids(mettreAuPlan(liste, ['d', 'b'], false))).toBe('bdace')
   })
 })

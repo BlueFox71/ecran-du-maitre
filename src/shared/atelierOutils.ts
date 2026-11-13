@@ -198,3 +198,10 @@ export function zoneARemplir(c: Construction, p: PointCase): PointCase[] {
 export function centreDeCase(p: PointCase): PointCase {
   return [Math.floor(p[0]) + 0.5, Math.floor(p[1]) + 0.5]
 }
+
+/** Passer des objets devant (ou derrière) les autres, en gardant leur ordre entre eux. */
+export function mettreAuPlan<T extends { id: string }>(liste: T[], ids: string[], devant: boolean): T[] {
+  const choisis = liste.filter((o) => ids.includes(o.id))
+  const reste = liste.filter((o) => !ids.includes(o.id))
+  return devant ? [...reste, ...choisis] : [...choisis, ...reste]
+}
