@@ -26884,3 +26884,14 @@ button.at-titre:hover {
 .at-base-chevron {
   color: var(--text-dim);
 }
+/* Ouverte, la matière de base se détache du reste du panneau. */
+.at-base-ouverte {
+  margin: 0 -6px;
+  padding: 6px;
+  border: 1px solid var(--brass-line);
+  border-radius: 10px;
+  background: var(--brass-wash);
+}
+.at-base-ouverte .at-base {
+  background: var(--surface);
+}

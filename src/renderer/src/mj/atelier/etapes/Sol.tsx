@@ -195,7 +195,7 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
           </label>
         ) : null}
       </div>
-      <div className="at-section">
+      <div className={`at-section${baseOuverte ? ' at-base-ouverte' : ''}`}>
         {/* Rangée sous un bouton : on la choisit une fois, elle n'a pas à occuper le panneau. */}
         <button className="at-base" aria-expanded={baseOuverte} onClick={() => setBaseOuverte(!baseOuverte)}>
           {baseAsset ? <img src={urlAsset(baseAsset)} alt="" /> : <span className="at-base-vide" />}
