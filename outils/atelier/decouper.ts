@@ -417,6 +417,9 @@ interface Planche {
    * on efface ce qui vient des voisins.
    */
   isoler?: boolean | 'case'
+  /** Une porte : l'image est centrée sur ses montants, pour qu'une poignée
+      ou un heurtoir d'un seul côté ne décale pas le battant dans le mur. */
+  centrerMontants?: boolean
   /** Des rangées de longueurs différentes : le nombre de cases de chacune (sinon `cols` partout). */
   lignes?: number[]
   /** Des icônes de rayons (catégories, sous-catégories) : `id` est le nom de fichier (`slug`). */
@@ -1315,6 +1318,8 @@ const PLANCHES: Planche[] = [
     type: (c) => (c.id.startsWith('fenetre') ? 'vitre' : 'porte'),
     categorie: 'Portes et fenêtres',
     dossier: 'ouvertures',
+    centrerMontants: true,
+    isoler: 'case',
     cases: [
       { id: 'porte-bois', nom: 'Porte en bois' },
       { id: 'porte-double', nom: 'Porte double' },
@@ -1332,6 +1337,8 @@ const PLANCHES: Planche[] = [
     type: 'porte',
     categorie: 'Portes et fenêtres',
     dossier: 'ouvertures',
+    centrerMontants: true,
+    isoler: 'case',
     cases: [
       { id: 'porte-service', nom: 'Porte de service' },
       { id: 'porte-entree', nom: 'Porte d’entrée' },
@@ -1349,6 +1356,8 @@ const PLANCHES: Planche[] = [
     type: 'porte',
     categorie: 'Portes et fenêtres',
     dossier: 'ouvertures',
+    centrerMontants: true,
+    isoler: 'case',
     cases: [
       { id: 'porte-coffre', nom: 'Porte de coffre-fort' },
       { id: 'porte-cellule', nom: 'Porte de cellule' },
@@ -1366,6 +1375,8 @@ const PLANCHES: Planche[] = [
     type: 'porte',
     categorie: 'Portes et fenêtres',
     dossier: 'ouvertures',
+    centrerMontants: true,
+    isoler: 'case',
     cases: [
       { id: 'porte-blanche', nom: 'Porte blanche' },
       { id: 'porte-coupe-feu', nom: 'Porte coupe-feu' },
@@ -1431,6 +1442,29 @@ const PLANCHES: Planche[] = [
 function rogner(src: PNG, x: number, y: number, w: number, h: number): PNG {
   const out = new PNG({ width: w, height: h })
   PNG.bitblt(src, out, x, y, w, h, 0, 0)
+  return out
+}
+
+/** Le milieu vertical des montants : les colonnes opaques du bord gauche de la boîte. */
+function milieuDesMontants(src: PNG, b: { x: number; y: number; w: number; h: number }): number {
+  let haut = Infinity
+  let bas = -Infinity
+  const bord = Math.max(2, Math.round(b.w * 0.03))
+  for (let y = b.y; y < b.y + b.h; y++)
+    for (let x = b.x; x < b.x + bord; x++)
+      if (src.data[(y * src.width + x) * 4 + 3] > 128) {
+        haut = Math.min(haut, y)
+        bas = Math.max(bas, y)
+      }
+  return haut <= bas ? (haut + bas + 1) / 2 : b.y + b.h / 2
+}
+
+/** Recadre en étendant la boîte de vide, symétriquement autour de `milieu`. */
+function rognerCentre(src: PNG, b: { x: number; y: number; w: number; h: number }, milieu: number): PNG {
+  const demi = Math.ceil(Math.max(milieu - b.y, b.y + b.h - milieu))
+  const out = new PNG({ width: b.w, height: 2 * demi })
+  out.data.fill(0)
+  PNG.bitblt(src, out, b.x, b.y, b.w, b.h, 0, Math.round(demi - (milieu - b.y)))
   return out
 }
 
@@ -1511,7 +1545,9 @@ for (const pl of PLANCHES) {
       return
     }
     const r = pl.retrait ?? 0
-    let piece = rogner(cellule, b.x + r, b.y + r, b.w - 2 * r, b.h - 2 * r)
+    let piece = pl.centrerMontants
+      ? rognerCentre(cellule, b, milieuDesMontants(cellule, b))
+      : rogner(cellule, b.x + r, b.y + r, b.w - 2 * r, b.h - 2 * r)
     if (pl.raccord && !c.brut) {
       const p = new Uint8ClampedArray(piece.data.buffer, piece.data.byteOffset, piece.data.length)
       const rac = raccorder(p, piece.width, piece.height, pl.raccord === 'long')
