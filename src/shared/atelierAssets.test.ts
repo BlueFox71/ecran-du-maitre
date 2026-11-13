@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { boiteOpaque, detourerMagenta, lireCatalogue, lumiereEnAlpha, raccorder } from './atelierAssets'
+import { boiteOpaque, detourerMagenta, filtrerAssets, lireCatalogue, lumiereEnAlpha, raccorder, rangement } from './atelierAssets'
 
 /** Une image w × h remplie d'une couleur. */
 function image(w: number, h: number, rgba: [number, number, number, number]): Uint8ClampedArray {
@@ -112,5 +112,35 @@ describe('lireCatalogue', () => {
     expect(
       lireCatalogue({ v: 1, assets: [{ id: 'a', type: 'sol', nom: 'A', categorie: 'S', fichier: '../../secret.png' }] }, 'moi')
     ).toEqual([])
+  })
+})
+
+describe('rangement des assets', () => {
+  const a = (id: string, categorie: string, sousCategorie?: string, nom = id) =>
+    ({ id, source: 'pack', type: 'objet', nom, categorie, sousCategorie, fichier: id + '.png' }) as const
+  const liste = [
+    a('lampe', 'Lumière', 'Lampes', 'Lampe à huile'),
+    a('chene', 'Nature', 'Arbres', 'Chêne'),
+    a('bougie', 'Lumière', 'Bougies', 'Bougeoir'),
+    a('rocher', 'Nature', 'Rochers', 'Gros rocher'),
+    a('sapin', 'Nature', 'Arbres', 'Sapin'),
+    a('crane', 'Macabre', undefined, 'Crâne')
+  ]
+  it('rangement : les catégories et leurs sous-catégories, dans l’ordre où elles apparaissent', () => {
+    expect(rangement(liste)).toEqual([
+      { categorie: 'Lumière', sous: ['Lampes', 'Bougies'] },
+      { categorie: 'Nature', sous: ['Arbres', 'Rochers'] },
+      { categorie: 'Macabre', sous: [] }
+    ])
+  })
+  it('filtrer par catégorie, sous-catégorie et nom (sans tenir compte des accents)', () => {
+    expect(filtrerAssets(liste, { categorie: 'Nature' }).map((x) => x.id)).toEqual(['chene', 'rocher', 'sapin'])
+    expect(filtrerAssets(liste, { categorie: 'Nature', sous: 'Arbres' }).map((x) => x.id)).toEqual(['chene', 'sapin'])
+    expect(filtrerAssets(liste, { recherche: 'crane' }).map((x) => x.id)).toEqual(['crane'])
+    expect(filtrerAssets(liste, {}).length).toBe(6)
+  })
+  it('lireCatalogue garde la sous-catégorie', () => {
+    const [x] = lireCatalogue({ v: 1, assets: [{ id: 'l', type: 'objet', nom: 'L', categorie: 'Lumière', sousCategorie: 'Lampes', fichier: 'l.png' }] }, 'pack')
+    expect(x.sousCategorie).toBe('Lampes')
   })
 })

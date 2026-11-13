@@ -37,6 +37,67 @@ interface Case {
   brut?: boolean
 }
 
+/**
+ * Le rangement des objets : catégorie et sous-catégorie, par id. Ce qui n'y
+ * est pas garde la catégorie de sa planche.
+ */
+const RANGEMENT: Record<string, [string, string]> = {
+  'lit-double': ['Mobilier', 'Lits'],
+  'canape-chesterfield': ['Mobilier', 'Assises'],
+  fauteuil: ['Mobilier', 'Assises'],
+  chaise: ['Mobilier', 'Assises'],
+  'table-ronde': ['Mobilier', 'Tables'],
+  'table-de-nuit': ['Mobilier', 'Tables'],
+  bureau: ['Mobilier', 'Tables'],
+  commode: ['Mobilier', 'Rangements'],
+  bibliotheque: ['Mobilier', 'Rangements'],
+  baignoire: ['Mobilier', 'Bain'],
+  cheminee: ['Mobilier', 'Cheminées'],
+  'lampe-huile': ['Lumière', 'Lampes'],
+  bougeoir: ['Lumière', 'Bougies'],
+  chandelier: ['Lumière', 'Bougies'],
+  'livre-ouvert': ['Objets', 'Livres et papiers'],
+  'pile-livres': ['Objets', 'Livres et papiers'],
+  lettres: ['Objets', 'Livres et papiers'],
+  encrier: ['Objets', 'Livres et papiers'],
+  tasse: ['Objets', 'Vaisselle'],
+  miroir: ['Objets', 'Décoration'],
+  napperon: ['Objets', 'Décoration'],
+  coffret: ['Objets', 'Décoration'],
+  crane: ['Macabre', 'Ossements'],
+  'escalier-droit': ['Architecture', 'Escaliers'],
+  'toile-coin': ['Nature', 'Toiles d’araignées'],
+  'toile-ronde': ['Nature', 'Toiles d’araignées'],
+  'toile-dense': ['Nature', 'Toiles d’araignées'],
+  'toile-tendue': ['Nature', 'Toiles d’araignées'],
+  'toile-petite': ['Nature', 'Toiles d’araignées'],
+  'toile-eparse': ['Nature', 'Toiles d’araignées'],
+  'chene-dense': ['Nature', 'Arbres'],
+  'arbre-griffu': ['Nature', 'Arbres'],
+  pin: ['Nature', 'Arbres'],
+  saule: ['Nature', 'Arbres'],
+  'chene-jeune': ['Nature', 'Arbres'],
+  chene: ['Nature', 'Arbres'],
+  'chene-grand': ['Nature', 'Arbres'],
+  'chene-degarni': ['Nature', 'Arbres'],
+  'sapin-jeune': ['Nature', 'Arbres'],
+  sapin: ['Nature', 'Arbres'],
+  'sapin-grand': ['Nature', 'Arbres'],
+  'sapin-roussi': ['Nature', 'Arbres'],
+  'mort-petit': ['Nature', 'Arbres'],
+  mort: ['Nature', 'Arbres'],
+  'mort-grand': ['Nature', 'Arbres'],
+  'mort-mousse': ['Nature', 'Arbres'],
+  buisson: ['Nature', 'Végétation'],
+  ronces: ['Nature', 'Végétation'],
+  'hautes-herbes': ['Nature', 'Végétation'],
+  champignons: ['Nature', 'Végétation'],
+  rochers: ['Nature', 'Rochers'],
+  'gros-rocher': ['Nature', 'Rochers'],
+  'tronc-couche': ['Nature', 'Bois mort'],
+  souche: ['Nature', 'Bois mort']
+}
+
 interface Planche {
   fichier: string
   fond: 'magenta' | 'noir' | 'aucun'
@@ -366,7 +427,9 @@ for (const pl of PLANCHES) {
     const fichier = `${pl.dossier}/${c.id}.png`
     mkdirSync(dirname(join(PACK, fichier)), { recursive: true })
     writeFileSync(join(PACK, fichier), PNG.sync.write(piece))
-    const entree: Record<string, unknown> = { id: `${pl.dossier}/${c.id}`, type, nom: c.nom, categorie: pl.categorie, fichier }
+    const [categorie, sousCategorie] = RANGEMENT[c.id] ?? [pl.categorie, undefined]
+    const entree: Record<string, unknown> = { id: `${pl.dossier}/${c.id}`, type, nom: c.nom, categorie, fichier }
+    if (sousCategorie) entree.sousCategorie = sousCategorie
     if (type === 'sol' || type === 'mur') entree.tuile = c.tuile ?? 2
     if (type === 'objet') {
       const l = c.l ?? 1
@@ -379,6 +442,22 @@ for (const pl of PLANCHES) {
     console.log(`${fichier}  ${piece.width}×${piece.height}`)
   })
 }
+
+/* L'ordre de la palette : les sols, murs et ouvertures d'abord, puis les objets
+   par catégorie et sous-catégorie, dans un ordre qui se lit. */
+const ORDRE_CATEGORIES = ['Mobilier', 'Lumière', 'Objets', 'Architecture', 'Nature', 'Macabre']
+const ORDRE_SOUS = ['Arbres', 'Végétation', 'Rochers', 'Bois mort', 'Toiles d’araignées']
+const rang = (e: Record<string, unknown>): [number, number] => {
+  if (e.type !== 'objet') return [-1, 0]
+  const c = ORDRE_CATEGORIES.indexOf(String(e.categorie))
+  const s = ORDRE_SOUS.indexOf(String(e.sousCategorie ?? ''))
+  return [c < 0 ? 99 : c, s < 0 ? 0 : s]
+}
+catalogue.sort((a, b) => {
+  const [ca, sa] = rang(a)
+  const [cb, sb] = rang(b)
+  return ca - cb || sa - sb
+})
 
 writeFileSync(join(PACK, 'catalogue.json'), JSON.stringify({ v: 1, assets: catalogue }, null, 2) + '\n')
 console.log(`${catalogue.length} assets → resources/atelier/catalogue.json`)

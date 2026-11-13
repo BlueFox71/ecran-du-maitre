@@ -84,6 +84,7 @@ export function ImportAsset({
   const [type, setType] = useState<TypeAsset>(typeParDefaut)
   const [nom, setNom] = useState('')
   const [categorie, setCategorie] = useState('')
+  const [sousCategorie, setSousCategorie] = useState('')
   const [taille, setTaille] = useState(1)
   const [pas, setPas] = useState(false)
   const [vue, setVue] = useState(false)
@@ -109,6 +110,7 @@ export function ImportAsset({
           type,
           nom: nom.trim() || fichier.name.replace(/\.[^.]+$/, ''),
           categorie: categorie.trim() || CATEGORIE[type],
+          ...(sousCategorie.trim() ? { sousCategorie: sousCategorie.trim() } : {}),
           ...(texture ? { tuile: taille } : {}),
           ...(type === 'objet'
             ? { l: taille, h: Math.round(taille * ratio * 100) / 100, bloquePas: pas, bloqueVue: vue }
@@ -148,6 +150,12 @@ export function ImportAsset({
         placeholder={`Catégorie (${CATEGORIE[type]})`}
         value={categorie}
         onChange={(e) => setCategorie(e.target.value)}
+      />
+      <input
+        className="at-champ"
+        placeholder="Sous-catégorie (Lampes, Arbres…), facultative"
+        value={sousCategorie}
+        onChange={(e) => setSousCategorie(e.target.value)}
       />
       {type === 'objet' || texture ? (
         <label className="at-reglage">

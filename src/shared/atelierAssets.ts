@@ -16,8 +16,10 @@ export interface AssetAtelier {
   source: SourceAsset
   type: TypeAsset
   nom: string
-  /** « Sols », « Chambre », « Horreur »… */
+  /** « Mobilier », « Lumière », « Nature »… */
   categorie: string
+  /** Le rayon dans la catégorie : « Lampes », « Arbres »… Absent : rangé à la racine. */
+  sousCategorie?: string
   /** Relatif au dossier de sa source. */
   fichier: string
   /** Sol, mur : combien de cases une tuile couvre. */
@@ -66,6 +68,7 @@ export function lireCatalogue(brut: unknown, source: SourceAsset): AssetAtelier[
       categorie: texte(a.categorie) ? a.categorie.trim() : 'Divers',
       fichier: a.fichier
     }
+    if (texte(a.sousCategorie)) asset.sousCategorie = a.sousCategorie.trim()
     if (a.type === 'sol' || a.type === 'mur') asset.tuile = positif(a.tuile) ? a.tuile : 2
     if (a.type === 'objet') {
       asset.l = positif(a.l) ? a.l : 1
@@ -205,4 +208,38 @@ export function lumiereEnAlpha(rgba: Uint8ClampedArray): Uint8ClampedArray {
     out[i + 3] = l
   }
   return out
+}
+
+/* ---------------- rangement ---------------- */
+
+/** Les catégories et leurs sous-catégories, dans l'ordre où elles apparaissent. */
+export function rangement(assets: AssetAtelier[]): { categorie: string; sous: string[] }[] {
+  const out: { categorie: string; sous: string[] }[] = []
+  for (const a of assets) {
+    let c = out.find((x) => x.categorie === a.categorie)
+    if (!c) out.push((c = { categorie: a.categorie, sous: [] }))
+    if (a.sousCategorie && !c.sous.includes(a.sousCategorie)) c.sous.push(a.sousCategorie)
+  }
+  return out
+}
+
+/** Pour chercher sans se soucier des accents ni des majuscules. */
+const plat = (t: string): string =>
+  t
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+/** Les assets d'une catégorie, d'une sous-catégorie, et dont le nom contient la recherche. */
+export function filtrerAssets(
+  assets: AssetAtelier[],
+  f: { categorie?: string | null; sous?: string | null; recherche?: string }
+): AssetAtelier[] {
+  const q = plat(f.recherche?.trim() ?? '')
+  return assets.filter(
+    (a) =>
+      (!f.categorie || a.categorie === f.categorie) &&
+      (!f.sous || a.sousCategorie === f.sous) &&
+      (!q || plat(a.nom).includes(q) || plat(a.sousCategorie ?? '').includes(q))
+  )
 }
