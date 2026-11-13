@@ -430,7 +430,6 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
           <li>
             <kbd>Ctrl</kbd> + clic sur un objet : sélection multiple
           </li>
-          <li>Glisser depuis le vide : sélectionner tout ce que le rectangle touche</li>
         </ul>
       )}
       <div className="at-section">
@@ -475,11 +474,6 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
               />
               Taille variée
             </label>
-          <p className="at-aide">
-            {lot.length
-              ? `${lot.length} vignette${lot.length > 1 ? 's' : ''} cochée${lot.length > 1 ? 's' : ''} : clique sur le plan pour en semer. Clic droit ou Échap pour arrêter.`
-              : 'Coche les vignettes à semer, puis clique sur le plan.'}
-          </p>
           </>
         ) : null}
       </div>
