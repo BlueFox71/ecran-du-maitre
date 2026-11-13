@@ -360,3 +360,14 @@ describe('mur à deux côtés', () => {
     expect(inverserCotes(m)).toEqual({ ...m, assetId: 'bois', teinte: undefined, cote2: { assetId: 'pierre', teinte: '#111111' } })
   })
 })
+
+describe('habillages', () => {
+  it('lireConstruction garde les habillages valables', () => {
+    const c = { ...terrain(10, 10), habillages: [{ id: 'h', pt: [3, 4], assetId: 'bois', teinte: '#4a5e3e' }, { id: 'x', pt: 'non', assetId: 'b' }] }
+    expect(lireConstruction(JSON.stringify(c)).habillages).toEqual([{ id: 'h', pt: [3, 4], assetId: 'bois', teinte: '#4a5e3e' }])
+  })
+  it('agrandir déplace le point des habillages', () => {
+    const c = { ...terrain(10, 10), habillages: [{ id: 'h', pt: [3, 4] as [number, number], assetId: 'bois' }] }
+    expect(agrandir(c, { gauche: 2, haut: 1, droite: 0, bas: 0 }).construction.habillages![0].pt).toEqual([5, 5])
+  })
+})

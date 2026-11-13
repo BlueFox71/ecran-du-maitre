@@ -4,13 +4,13 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { inverserCotes, nouvelId, type MurBati, type PointCase } from '@shared/atelier'
-import { murSous, rectangle } from '@shared/atelierOutils'
+import { habillageSous, murSous, pieceSous, rectangle } from '@shared/atelierOutils'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
 import { ImportAsset } from '../ImportAsset'
-import { poignee, pointille, trait } from '../dessin'
+import { contour, poignee, pointille, trait } from '../dessin'
 
-type OutilMurs = 'tracer' | 'piece' | 'choisir'
+type OutilMurs = 'tracer' | 'piece' | 'habiller' | 'choisir'
 
 const OUTILS: { id: OutilMurs; label: string; aide: string }[] = [
   {
@@ -19,6 +19,11 @@ const OUTILS: { id: OutilMurs; label: string; aide: string }[] = [
     aide: 'Clique de coin en coin. Clic droit, double-clic ou Échap termine ; un clic sur le premier point referme le mur.'
   },
   { id: 'piece', label: 'Pièce rectangulaire', aide: 'Glisse : les quatre murs d’une pièce, d’un coup.' },
+  {
+    id: 'habiller',
+    label: 'Habiller une pièce',
+    aide: 'Clique dans une pièce : tous ses murs prennent la matière et la couleur choisies, du côté de la pièce seulement. Alt + clic retire l’habillage.'
+  },
   { id: 'choisir', label: 'Choisir', aide: 'Clique un mur pour le choisir, glisse un coin pour le déplacer. Suppr l’efface.' }
 ]
 
@@ -112,6 +117,20 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
             if (r) poser([...r, r[0]])
             depart.current = null
           }
+        } else if (outil === 'habiller') {
+          if (type === 'down' && co.c && pieceSous(co.c, _brut)) {
+            const deja = habillageSous(co.c, _brut)
+            const pt = _brut
+            if (_e.altKey) {
+              if (deja) co.modifier((c) => ({ ...c, habillages: (c.habillages ?? []).filter((h) => h.id !== deja.id) }))
+            } else if (matiereSure) {
+              const h = { id: deja?.id ?? nouvelId(), pt, assetId: matiereSure, ...(teinte ? { teinte } : {}) }
+              co.modifier((c) => ({
+                ...c,
+                habillages: [...(c.habillages ?? []).filter((x) => x.id !== h.id), h]
+              }))
+            }
+          }
         } else {
           if (type === 'down' && co.c) {
             const s = murSous(co.c, _brut, Math.max(prise, 0.2))
@@ -148,6 +167,10 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
           const pts = p ? [...points.current, p] : points.current
           trait(ctx, pts, ep)
           pointille(ctx, pts, echelle)
+        }
+        if (outil === 'habiller' && p && co.c) {
+          const piece = pieceSous(co.c, p)
+          if (piece) contour(ctx, piece, echelle, true)
         }
         if (outil === 'piece' && depart.current && p) {
           const r = rectangle(depart.current, p)

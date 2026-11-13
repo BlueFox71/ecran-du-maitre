@@ -18,6 +18,7 @@ import {
   type PointCase
 } from '@shared/atelier'
 import type { AssetAtelier } from '@shared/atelierAssets'
+import { pieceSous } from '@shared/atelierOutils'
 import type { ImagesAtelier } from './images'
 
 const FOND = '#0b1014'
@@ -201,46 +202,66 @@ function dessinerMurs(
   /* La maçonnerie : la texture tourne avec le segment, sa hauteur est l'épaisseur.
      Un mur à deux côtés pose chaque face sur sa moitié : le côté 1 à gauche du
      sens de tracé (y < 0), le côté 2 à droite. */
-  for (const { m, parts } of morceaux) {
-    const faces: { assetId: string; teinte?: string; y0: number; y1: number }[] = m.cote2
+  type Face = { assetId: string; teinte?: string; y0: number; y1: number }
+  const peindre = (facesDe: (m: (typeof morceaux)[number]['m']) => Face[]): void => {
+    for (const { m, parts } of morceaux) {
+      const faces = facesDe(m)
+      for (const p of parts)
+        pourChaqueSegment(p, m, px, (x, y, angle, l, ep) => {
+          ctx.save()
+          ctx.translate(x, y)
+          ctx.rotate(angle)
+          for (const f of faces) {
+            const img = image(images, f.assetId)
+            const fy = f.y0 * ep
+            const fh = (f.y1 - f.y0) * ep
+            if (img) {
+              const motif = ctx.createPattern(img, 'repeat-x')!
+              const e = ep / img.height
+              motif.setTransform(new DOMMatrix().translateSelf(-ep / 2, -ep / 2).scaleSelf(e))
+              ctx.fillStyle = motif
+            } else ctx.fillStyle = '#2c2c30'
+            ctx.fillRect(-ep / 2, fy, l + ep, fh)
+            /* La couleur, multipliée : le blanc la prend telle quelle, une pierre
+               ou une brique la prend en gardant ses détails. */
+            if (f.teinte) {
+              ctx.globalCompositeOperation = 'multiply'
+              ctx.fillStyle = f.teinte
+              ctx.fillRect(-ep / 2, fy, l + ep, fh)
+              ctx.globalCompositeOperation = 'source-over'
+            }
+          }
+          /* Le volume : deux arêtes sombres, un liseré clair au milieu. */
+          ctx.fillStyle = 'rgba(0, 0, 0, 0.45)'
+          ctx.fillRect(-ep / 2, -ep / 2, l + ep, Math.max(1, ep * 0.08))
+          ctx.fillRect(-ep / 2, ep / 2 - Math.max(1, ep * 0.08), l + ep, Math.max(1, ep * 0.08))
+          ctx.fillStyle = 'rgba(255, 240, 210, 0.07)'
+          ctx.fillRect(-ep / 2, -ep * 0.075, l + ep, ep * 0.15)
+          ctx.restore()
+        })
+    }
+  }
+  peindre((m) =>
+    m.cote2
       ? [
           { assetId: m.assetId, teinte: m.teinte, y0: -0.5, y1: 0 },
           { assetId: m.cote2.assetId, teinte: m.cote2.teinte, y0: 0, y1: 0.5 }
         ]
       : [{ assetId: m.assetId, teinte: m.teinte, y0: -0.5, y1: 0.5 }]
-    for (const p of parts)
-      pourChaqueSegment(p, m, px, (x, y, angle, l, ep) => {
-        ctx.save()
-        ctx.translate(x, y)
-        ctx.rotate(angle)
-        for (const f of faces) {
-          const img = image(images, f.assetId)
-          const fy = f.y0 * ep
-          const fh = (f.y1 - f.y0) * ep
-          if (img) {
-            const motif = ctx.createPattern(img, 'repeat-x')!
-            const e = ep / img.height
-            motif.setTransform(new DOMMatrix().translateSelf(-ep / 2, -ep / 2).scaleSelf(e))
-            ctx.fillStyle = motif
-          } else ctx.fillStyle = '#2c2c30'
-          ctx.fillRect(-ep / 2, fy, l + ep, fh)
-          /* La couleur, multipliée : le blanc la prend telle quelle, une pierre
-             ou une brique la prend en gardant ses détails. */
-          if (f.teinte) {
-            ctx.globalCompositeOperation = 'multiply'
-            ctx.fillStyle = f.teinte
-            ctx.fillRect(-ep / 2, fy, l + ep, fh)
-            ctx.globalCompositeOperation = 'source-over'
-          }
-        }
-        /* Le volume : deux arêtes sombres, un liseré clair au milieu. */
-        ctx.fillStyle = 'rgba(0, 0, 0, 0.45)'
-        ctx.fillRect(-ep / 2, -ep / 2, l + ep, Math.max(1, ep * 0.08))
-        ctx.fillRect(-ep / 2, ep / 2 - Math.max(1, ep * 0.08), l + ep, Math.max(1, ep * 0.08))
-        ctx.fillStyle = 'rgba(255, 240, 210, 0.07)'
-        ctx.fillRect(-ep / 2, -ep * 0.075, l + ep, ep * 0.15)
-        ctx.restore()
-      })
+  )
+
+  /* Les pièces habillées : on repeint tous les murs avec leur matière, mais
+     seulement à l'intérieur du contour de la pièce — ce qui ne laisse que les
+     moitiés de murs tournées vers elle, coins et seuils compris. */
+  for (const h of c.habillages ?? []) {
+    const piece = pieceSous(c, h.pt)
+    if (!piece) continue
+    ctx.save()
+    chemin(ctx, piece, px)
+    ctx.closePath()
+    ctx.clip()
+    peindre(() => [{ assetId: h.assetId, teinte: h.teinte, y0: -0.5, y1: 0.5 }])
+    ctx.restore()
   }
 }
 

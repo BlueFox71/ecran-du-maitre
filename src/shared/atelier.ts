@@ -110,11 +110,24 @@ export interface Construction {
    * c'est elle que la gomme fait réapparaître. Absente : le fond nu.
    */
   base?: string | null
+  /**
+   * Les pièces habillées : tous les murs qui entourent la pièce où tombe `pt`
+   * prennent cette matière, du côté de la pièce seulement.
+   */
+  habillages?: Habillage[]
   /** Chaque liste est dans l'ordre où l'on dessine : le dernier par-dessus. */
   sols: SolPeint[]
   murs: MurBati[]
   ouvertures: OuvertureBatie[]
   objets: ObjetPose[]
+}
+
+/** L'habillage d'une pièce : un point à l'intérieur, et la matière de ses murs. */
+export interface Habillage {
+  id: string
+  pt: PointCase
+  assetId: string
+  teinte?: string
 }
 
 /** Un trait du calque tiré de la construction ; `atelierId` le retrouve d'un enregistrement à l'autre. */
@@ -435,7 +448,8 @@ export function agrandir(c: Construction, bords: Bords): { construction: Constru
       }),
       murs: c.murs.map((m) => ({ ...m, pts: m.pts.map(dec) })),
       ouvertures: c.ouvertures.map((o) => ({ ...o })),
-      objets: c.objets.map((o) => ({ ...o, x: o.x + gauche, y: o.y + haut }))
+      objets: c.objets.map((o) => ({ ...o, x: o.x + gauche, y: o.y + haut })),
+      ...(c.habillages ? { habillages: c.habillages.map((h) => ({ ...h, pt: dec(h.pt) })) } : {})
     },
     cadre: {
       x: -gauche / c.largeur,
@@ -575,9 +589,16 @@ export function lireConstruction(brut: unknown): Construction {
         bloqueVue: !!o.bloqueVue
       })
   }
+  const habillages: Habillage[] = []
+  for (const h of liste(v.habillages)) {
+    const pt = points([h?.pt], 1)
+    if (texte(h?.id) && texte(h?.assetId) && pt)
+      habillages.push({ id: h.id, pt: pt[0], assetId: h.assetId, ...(couleurSure(h.teinte) ? { teinte: h.teinte } : {}) })
+  }
   return {
     v: 1,
     ...(texte(v.base) ? { base: v.base } : {}),
+    ...(habillages.length ? { habillages } : {}),
     largeur: fini(v.largeur) && v.largeur >= 1 ? v.largeur : base.largeur,
     hauteur: fini(v.hauteur) && v.hauteur >= 1 ? v.hauteur : base.hauteur,
     metresParCase: fini(v.metresParCase) && v.metresParCase > 0 ? v.metresParCase : base.metresParCase,

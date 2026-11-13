@@ -6,6 +6,7 @@ import {
   contourDeLObjet,
   placeOuverture,
   type Construction,
+  type Habillage,
   type ObjetPose,
   type OuvertureBatie,
   type PointCase,
@@ -260,4 +261,11 @@ export function objetsDansRectangle(objets: ObjetPose[], a: PointCase, b: PointC
       return Math.max(...xs) >= x0 && Math.min(...xs) <= x1 && Math.max(...ys) >= y0 && Math.min(...ys) <= y1
     })
     .map((o) => o.id)
+}
+
+/** L'habillage de la pièce où tombe un point, s'il y en a un. */
+export function habillageSous(c: Construction, p: PointCase): Habillage | null {
+  const piece = pieceSous(c, p)
+  if (!piece) return null
+  return c.habillages?.find((h) => dansForme(h.pt, piece) && pieceSous(c, h.pt)?.length === piece.length) ?? null
 }

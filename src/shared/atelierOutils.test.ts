@@ -9,6 +9,7 @@ import {
   redimensionner,
   solSous,
   centreDeCase,
+  habillageSous,
   objetsDansRectangle,
   tirerObjet,
   mettreAuPlan,
@@ -240,5 +241,35 @@ describe('tirerObjet, variations au choix', () => {
     expect(r.angle).toBe(0)
     expect(r.echelle).toBe(1)
     expect(r.id).toBe('b')
+  })
+})
+
+describe('habillage des pièces', () => {
+  const maison = (): Construction => {
+    const c = terrain()
+    c.murs.push(
+      { id: 'ext', assetId: 'pierre', pts: [[1, 1], [11, 1], [11, 9], [1, 9], [1, 1]], epaisseur: 0.4 },
+      { id: 'refend', assetId: 'pierre', pts: [[6, 1], [6, 9]], epaisseur: 0.4 }
+    )
+    return c
+  }
+  it('habillageSous retrouve l’habillage de la pièce où tombe le point', () => {
+    const c = maison()
+    c.habillages = [{ id: 'h', pt: [3, 5], assetId: 'bois' }]
+    expect(habillageSous(c, [2, 2])?.id).toBe('h')
+    expect(habillageSous(c, [8, 5])).toBeNull()
+    expect(habillageSous(c, [15, 5])).toBeNull()
+  })
+})
+
+describe('habillageSous, deux pièces de même forme', () => {
+  it('ne confond pas deux pièces qui ont autant de coins', () => {
+    const c = terrain()
+    c.murs.push(
+      { id: 'ext', assetId: 'p', pts: [[1, 1], [11, 1], [11, 9], [1, 9], [1, 1]], epaisseur: 0.4 },
+      { id: 'refend', assetId: 'p', pts: [[6, 1], [6, 9]], epaisseur: 0.4 }
+    )
+    c.habillages = [{ id: 'g', pt: [3, 5], assetId: 'bois' }]
+    expect(habillageSous(c, [9, 5])).toBeNull()
   })
 })
