@@ -91,9 +91,15 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
       curseur: outil === 'choisir' ? 'pointer' : 'crosshair',
       onPointer: (type, p, _brut, _e, prise) => {
         souris.current = p
-        if (type === 'droit' && outil !== 'tracer') {
-          if (depart.current) depart.current = null
-          else if (sommet.current) {
+        /* Clic droit : on range l'outil et on revient à la sélection (le
+           tracé en cours est terminé, une pièce entamée abandonnée). En
+           sélection, il annule le coin qu'on glisse ou désélectionne. */
+        if (type === 'droit') {
+          if (outil === 'tracer') finirTrace()
+          if (outil !== 'choisir') {
+            depart.current = null
+            setOutilMurs('choisir')
+          } else if (sommet.current) {
             sommet.current = null
             co.annuler()
           } else setChoisi(null)
@@ -109,7 +115,7 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
               points.current = []
             } else pts.push(p)
           }
-          if (type === 'dbl' || type === 'droit') finirTrace()
+          if (type === 'dbl') finirTrace()
         } else if (outil === 'piece') {
           if (type === 'down') depart.current = p
           if (type === 'up' && depart.current) {
@@ -285,7 +291,7 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
         </div>
         <p className="at-aide">{OUTILS.find((o) => o.id === outil)!.aide}</p>
         <ul className="at-raccourcis">
-          <li>Clic droit ou <kbd>Échap</kbd> : annuler une pièce ou un coin qu’on glisse, ou désélectionner</li>
+          <li>Clic droit : revenir à la sélection (en sélection : annuler un coin qu’on glisse, ou désélectionner)</li>
         </ul>
       </div>
       <label className="at-reglage">
