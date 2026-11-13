@@ -26928,3 +26928,6 @@ button.at-titre:hover {
   margin: -6px -6px 0;
   padding: 6px;
 }
+.at-tuile img.couvre {
+  object-fit: cover;
+}

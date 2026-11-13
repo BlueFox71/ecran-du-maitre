@@ -374,7 +374,29 @@ const RANGEMENT: Record<string, [string, string]> = {
   'herbe-givree': ['Herbe', ''],
   'herbe-boueuse': ['Herbe', ''],
   'herbe-violettes': ['Herbe', ''],
-  'herbe-rase': ['Herbe', '']
+  'herbe-rase': ['Herbe', ''],
+  'pierre-moussue': ['Pierre', ''],
+  'moellons': ['Pierre', ''],
+  'brique-rouge': ['Brique', ''],
+  'palissade-cloutee': ['Bois', ''],
+  'pierre-grise': ['Pierre', ''],
+  'pierre-taillee': ['Pierre', ''],
+  'brique-claire': ['Brique', ''],
+  'planches-mur': ['Bois', ''],
+  'pierre-joints-mousse': ['Pierre', ''],
+  'colombage': ['Bois', ''],
+  'calcaire': ['Pierre', ''],
+  'pierre-seche': ['Pierre', ''],
+  'ruines': ['Nature', ''],
+  'haie': ['Nature', ''],
+  'roche': ['Nature', ''],
+  'beton': ['Plâtre et béton', ''],
+  'platre-blanc': ['Plâtre et béton', ''],
+  'cachot': ['Pierre', ''],
+  'briques-suie': ['Brique', ''],
+  'pierre-sombre': ['Pierre', ''],
+  'platre-boiserie': ['Bois', ''],
+  'briques': ['Brique', '']
 }
 
 interface Planche {
@@ -1149,6 +1171,96 @@ const PLANCHES: Planche[] = [
       { id: 'sable-herbes', nom: 'Sable et herbes sèches', tuile: 2 },
       { id: 'terre-cailloux', nom: 'Terre et cailloux', tuile: 2 },
       { id: 'sable-dalles', nom: 'Sable et dalles brisées', tuile: 2 }
+    ]
+  },
+  {
+    fichier: 'planches/murs 2.png',
+    fond: 'magenta',
+    isoler: 'case',
+    cols: 1,
+    rows: 4,
+    type: 'mur',
+    categorie: 'Murs',
+    dossier: 'murs',
+    retrait: 6,
+    raccord: 'long',
+    cases: [
+      { id: 'pierre-moussue', nom: 'Pierre moussue', tuile: 2.5 },
+      { id: 'moellons', nom: 'Moellons', tuile: 2.5 },
+      { id: 'brique-rouge', nom: 'Brique rouge', tuile: 2.5 },
+      { id: 'palissade-cloutee', nom: 'Palissade cloutée', tuile: 2.5 }
+    ]
+  },
+  {
+    fichier: 'planches/murs 3.png',
+    fond: 'magenta',
+    isoler: 'case',
+    cols: 1,
+    rows: 4,
+    type: 'mur',
+    categorie: 'Murs',
+    dossier: 'murs',
+    retrait: 6,
+    raccord: 'long',
+    cases: [
+      { id: 'pierre-grise', nom: 'Pierre grise', tuile: 2.5 },
+      { id: 'pierre-taillee', nom: 'Pierre taillée', tuile: 2.5 },
+      { id: 'brique-claire', nom: 'Brique claire', tuile: 2.5 },
+      { id: 'planches-mur', nom: 'Planches', tuile: 2.5 }
+    ]
+  },
+  {
+    fichier: 'planches/murs 4.png',
+    fond: 'magenta',
+    isoler: 'case',
+    cols: 1,
+    rows: 4,
+    type: 'mur',
+    categorie: 'Murs',
+    dossier: 'murs',
+    retrait: 6,
+    raccord: 'long',
+    cases: [
+      { id: 'pierre-joints-mousse', nom: 'Pierre aux joints moussus', tuile: 2.5 },
+      { id: 'colombage', nom: 'Colombage et plâtre', tuile: 2.5 },
+      { id: 'calcaire', nom: 'Calcaire', tuile: 2.5 },
+      null
+    ]
+  },
+  {
+    fichier: 'planches/murs 5.png',
+    fond: 'magenta',
+    isoler: 'case',
+    cols: 1,
+    rows: 4,
+    type: 'mur',
+    categorie: 'Murs',
+    dossier: 'murs',
+    retrait: 6,
+    raccord: 'long',
+    cases: [
+      { id: 'pierre-seche', nom: 'Pierre sèche', tuile: 2.5 },
+      { id: 'ruines', nom: 'Ruines', tuile: 2.5 },
+      { id: 'haie', nom: 'Haie', tuile: 2.5 },
+      { id: 'roche', nom: 'Roche de caverne', tuile: 2.5 }
+    ]
+  },
+  {
+    fichier: 'planches/murs 6.png',
+    fond: 'magenta',
+    isoler: 'case',
+    cols: 1,
+    rows: 4,
+    type: 'mur',
+    categorie: 'Murs',
+    dossier: 'murs',
+    retrait: 6,
+    raccord: 'long',
+    cases: [
+      { id: 'beton', nom: 'Béton', tuile: 2.5 },
+      { id: 'platre-blanc', nom: 'Plâtre blanc', tuile: 2.5 },
+      { id: 'cachot', nom: 'Pierre de cachot', tuile: 2.5 },
+      { id: 'briques-suie', nom: 'Briques noircies', tuile: 2.5 }
     ]
   },
   {

@@ -92,7 +92,8 @@ function Tuiles({
           title={a.sousCategorie ? `${a.nom} · ${a.categorie} › ${a.sousCategorie}` : a.nom}
           onClick={() => onChoisir(a)}
         >
-          <img src={urlAsset(a)} alt="" loading="lazy" />
+          {/* Une bande de mur, si mince, se lit mieux quand elle remplit le carré. */}
+          <img className={a.type === 'mur' ? 'couvre' : undefined} src={urlAsset(a)} alt="" loading="lazy" />
           {a.nom}
         </button>
       ))}

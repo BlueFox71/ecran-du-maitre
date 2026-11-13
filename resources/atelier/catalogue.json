@@ -898,6 +898,158 @@
       "tuile": 2
     },
     {
+      "id": "murs/pierre-moussue",
+      "type": "mur",
+      "nom": "Pierre moussue",
+      "categorie": "Pierre",
+      "fichier": "murs/pierre-moussue.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/moellons",
+      "type": "mur",
+      "nom": "Moellons",
+      "categorie": "Pierre",
+      "fichier": "murs/moellons.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/brique-rouge",
+      "type": "mur",
+      "nom": "Brique rouge",
+      "categorie": "Brique",
+      "fichier": "murs/brique-rouge.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/palissade-cloutee",
+      "type": "mur",
+      "nom": "Palissade cloutée",
+      "categorie": "Bois",
+      "fichier": "murs/palissade-cloutee.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/pierre-grise",
+      "type": "mur",
+      "nom": "Pierre grise",
+      "categorie": "Pierre",
+      "fichier": "murs/pierre-grise.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/pierre-taillee",
+      "type": "mur",
+      "nom": "Pierre taillée",
+      "categorie": "Pierre",
+      "fichier": "murs/pierre-taillee.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/brique-claire",
+      "type": "mur",
+      "nom": "Brique claire",
+      "categorie": "Brique",
+      "fichier": "murs/brique-claire.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/planches-mur",
+      "type": "mur",
+      "nom": "Planches",
+      "categorie": "Bois",
+      "fichier": "murs/planches-mur.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/pierre-joints-mousse",
+      "type": "mur",
+      "nom": "Pierre aux joints moussus",
+      "categorie": "Pierre",
+      "fichier": "murs/pierre-joints-mousse.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/colombage",
+      "type": "mur",
+      "nom": "Colombage et plâtre",
+      "categorie": "Bois",
+      "fichier": "murs/colombage.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/calcaire",
+      "type": "mur",
+      "nom": "Calcaire",
+      "categorie": "Pierre",
+      "fichier": "murs/calcaire.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/pierre-seche",
+      "type": "mur",
+      "nom": "Pierre sèche",
+      "categorie": "Pierre",
+      "fichier": "murs/pierre-seche.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/ruines",
+      "type": "mur",
+      "nom": "Ruines",
+      "categorie": "Nature",
+      "fichier": "murs/ruines.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/haie",
+      "type": "mur",
+      "nom": "Haie",
+      "categorie": "Nature",
+      "fichier": "murs/haie.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/roche",
+      "type": "mur",
+      "nom": "Roche de caverne",
+      "categorie": "Nature",
+      "fichier": "murs/roche.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/beton",
+      "type": "mur",
+      "nom": "Béton",
+      "categorie": "Plâtre et béton",
+      "fichier": "murs/beton.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/platre-blanc",
+      "type": "mur",
+      "nom": "Plâtre blanc",
+      "categorie": "Plâtre et béton",
+      "fichier": "murs/platre-blanc.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/cachot",
+      "type": "mur",
+      "nom": "Pierre de cachot",
+      "categorie": "Pierre",
+      "fichier": "murs/cachot.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "murs/briques-suie",
+      "type": "mur",
+      "nom": "Briques noircies",
+      "categorie": "Brique",
+      "fichier": "murs/briques-suie.png",
+      "tuile": 2.5
+    },
+    {
       "id": "sols/damier-use",
       "type": "sol",
       "nom": "Damier usé",
@@ -941,7 +1093,7 @@
       "id": "murs/pierre-sombre",
       "type": "mur",
       "nom": "Pierre sombre",
-      "categorie": "Murs",
+      "categorie": "Pierre",
       "fichier": "murs/pierre-sombre.png",
       "tuile": 2.5
     },
@@ -949,7 +1101,7 @@
       "id": "murs/platre-boiserie",
       "type": "mur",
       "nom": "Plâtre et poutre",
-      "categorie": "Murs",
+      "categorie": "Bois",
       "fichier": "murs/platre-boiserie.png",
       "tuile": 2.5
     },
@@ -957,7 +1109,7 @@
       "id": "murs/briques",
       "type": "mur",
       "nom": "Briques",
-      "categorie": "Murs",
+      "categorie": "Brique",
       "fichier": "murs/briques.png",
       "tuile": 2.5
     },

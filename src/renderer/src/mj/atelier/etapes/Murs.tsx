@@ -204,6 +204,8 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
         <span className="eyebrow">Matière</span>
         <Palette
           assets={murs}
+          parCategorie
+          cle="murs"
           choisi={murChoisi?.assetId ?? matiereSure}
           onChoisir={(a) => {
             setMatiere(a.id)
