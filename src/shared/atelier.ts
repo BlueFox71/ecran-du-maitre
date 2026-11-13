@@ -294,21 +294,56 @@ export function deriverCalque(c: Construction): CalqueDerive {
   return { murs, ouvertures }
 }
 
+/** Ce qui est construit, en cases : sols, murs (avec leur épaisseur), objets. `null` : rien. */
+export function boiteDuContenu(c: Construction): { x0: number; y0: number; x1: number; y1: number } | null {
+  let x0 = Infinity
+  let y0 = Infinity
+  let x1 = -Infinity
+  let y1 = -Infinity
+  const prendre = (pts: PointCase[], marge = 0): void => {
+    for (const [x, y] of pts) {
+      x0 = Math.min(x0, x - marge)
+      y0 = Math.min(y0, y - marge)
+      x1 = Math.max(x1, x + marge)
+      y1 = Math.max(y1, y + marge)
+    }
+  }
+  for (const s of c.sols) prendre(s.pts)
+  for (const m of c.murs) prendre(m.pts, m.epaisseur / 2)
+  for (const o of c.objets) prendre(contourDeLObjet(o))
+  return x0 === Infinity ? null : { x0, y0, x1, y1 }
+}
+
+type Bords = { gauche: number; haut: number; droite: number; bas: number }
+const EPS = 1e-9
+
+/** Le contenu tient-il dans le terrain une fois les bords appliqués ? */
+function tient(c: Construction, b: Bords): boolean {
+  const L = c.largeur + b.gauche + b.droite
+  const H = c.hauteur + b.haut + b.bas
+  if (L < 1 - EPS || H < 1 - EPS) return false
+  const k = boiteDuContenu(c)
+  if (!k) return true
+  return (
+    k.x0 + b.gauche >= -EPS && k.x1 + b.gauche <= L + EPS && k.y0 + b.haut >= -EPS && k.y1 + b.haut <= H + EPS
+  )
+}
+
 /**
- * Agrandir le terrain par ses bords.
+ * Changer la taille du terrain par ses bords — positifs, on ajoute des cases ;
+ * négatifs, on en retire.
  *
- * On n'agrandit que : rogner ferait tomber hors de la carte des pions, des
- * lampes, des sons qu'on ne voit pas d'ici. Le cadre rendu dit où l'ancienne
- * carte se place dans la nouvelle, en fractions de l'ancienne — exactement ce
- * que `recalerApresRognage` attend pour recaler ce qui est posé sur le lieu.
+ * On ne coupe jamais ce qui est construit : un mur à moitié hors du terrain
+ * deviendrait un mur tronqué dans le calque, et des pions, des lampes posés
+ * là tomberaient hors de la carte. Le cadre rendu dit où l'ancienne carte se
+ * place dans la nouvelle, en fractions de l'ancienne — exactement ce que
+ * `recalerApresRognage` attend pour recaler ce qui est posé sur le lieu.
  */
-export function agrandir(
-  c: Construction,
-  bords: { gauche: number; haut: number; droite: number; bas: number }
-): { construction: Construction; cadre: Cadre } {
+export function agrandir(c: Construction, bords: Bords): { construction: Construction; cadre: Cadre } {
   const { gauche, haut, droite, bas } = bords
-  if ([gauche, haut, droite, bas].some((v) => !Number.isFinite(v) || v < 0))
-    throw new Error('On n’agrandit un terrain que vers l’extérieur')
+  if ([gauche, haut, droite, bas].some((v) => !Number.isFinite(v)))
+    throw new Error('Une taille de terrain se compte en cases')
+  if (!tient(c, bords)) throw new Error('Le terrain couperait ce qui est construit')
   const dec = (p: PointCase): PointCase => [p[0] + gauche, p[1] + haut]
   const largeur = c.largeur + gauche + droite
   const hauteur = c.hauteur + haut + bas
@@ -329,6 +364,27 @@ export function agrandir(
       h: hauteur / c.hauteur
     }
   }
+}
+
+/** Ce qui reste fixe quand le terrain change de taille : 0 le bord gauche (ou haut), 0,5 le milieu, 1 le bord droit (ou bas). */
+export type Ancre = [0 | 0.5 | 1, 0 | 0.5 | 1]
+
+/** Les bords qui donnent au terrain cette taille, le point d'ancrage restant en place. */
+export function bordsPourTaille(c: Construction, largeur: number, hauteur: number, ancre: Ancre): Bords {
+  const dL = largeur - c.largeur
+  const dH = hauteur - c.hauteur
+  const gauche = ancre[0] === 0 ? 0 : ancre[0] === 1 ? dL : Math.trunc(dL / 2)
+  const haut = ancre[1] === 0 ? 0 : ancre[1] === 1 ? dH : Math.trunc(dH / 2)
+  return { gauche: gauche + 0, haut: haut + 0, droite: dL - gauche + 0, bas: dH - haut + 0 }
+}
+
+/** La plus petite taille, en cases entières, qui garde tout ce qui est construit. */
+export function tailleMinimale(c: Construction, ancre: Ancre): { largeur: number; hauteur: number } {
+  let largeur = 1
+  while (largeur < c.largeur && !tient(c, { ...bordsPourTaille(c, largeur, c.hauteur, ancre), haut: 0, bas: 0 })) largeur++
+  let hauteur = 1
+  while (hauteur < c.hauteur && !tient(c, { ...bordsPourTaille(c, c.largeur, hauteur, ancre), gauche: 0, droite: 0 })) hauteur++
+  return { largeur, hauteur }
 }
 
 /**

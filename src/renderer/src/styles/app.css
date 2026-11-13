@@ -26713,3 +26713,27 @@ body.surligneur-actif [data-cible] {
   position: absolute;
   pointer-events: none;
 }
+
+/* Le point qui reste en place quand le terrain change de taille. */
+.at-ancre {
+  display: grid;
+  grid-template-columns: repeat(3, 14px);
+  gap: 3px;
+}
+.at-ancre button {
+  width: 14px;
+  height: 14px;
+  padding: 0;
+  border: 1px solid var(--line);
+  border-radius: 3px;
+  background: var(--surface);
+  cursor: pointer;
+}
+.at-ancre button[aria-pressed='true'] {
+  border-color: var(--brass);
+  background: var(--brass);
+}
+.at-alerte {
+  color: var(--blood, #c0564d);
+  font-size: 12.5px;
+}

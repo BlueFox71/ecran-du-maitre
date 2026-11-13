@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   agrandir,
+  bordsPourTaille,
+  tailleMinimale,
   composerCadres,
   constructionVide,
   contourDeLObjet,
@@ -152,8 +154,41 @@ describe('agrandir', () => {
     expect((0.5 - cadre.y) / cadre.h).toBeCloseTo(0.5, 9)
   })
 
-  it('refuse de rétrécir', () => {
-    expect(() => agrandir(terrain(10, 10), { gauche: -1, haut: 0, droite: 0, bas: 0 })).toThrow()
+  it('rétrécit quand rien de construit ne dépasse, et le cadre suit', () => {
+    const c = terrain(10, 10)
+    c.murs.push({ id: 'm', assetId: 'x', pts: [[3, 3], [6, 3]], epaisseur: 0.4 })
+    const { construction, cadre } = agrandir(c, { gauche: -2, haut: 0, droite: -2, bas: 0 })
+    expect(construction.largeur).toBe(6)
+    expect(construction.murs[0].pts[0]).toEqual([1, 3])
+    expect(cadre.x).toBeCloseTo(0.2, 9)
+    expect(cadre.w).toBeCloseTo(0.6, 9)
+  })
+  it('refuse de couper ce qui est construit', () => {
+    const c = terrain(10, 10)
+    c.murs.push({ id: 'm', assetId: 'x', pts: [[3, 3], [6, 3]], epaisseur: 0.4 })
+    expect(() => agrandir(c, { gauche: -3, haut: 0, droite: 0, bas: 0 })).toThrow()
+  })
+  it('refuse un terrain de moins d’une case', () => {
+    expect(() => agrandir(terrain(2, 2), { gauche: 0, haut: 0, droite: -2, bas: 0 })).toThrow()
+  })
+})
+
+describe('taille du terrain', () => {
+  it('bordsPourTaille répartit selon l’ancre', () => {
+    const c = terrain(10, 10)
+    expect(bordsPourTaille(c, 14, 8, [0, 0])).toEqual({ gauche: 0, haut: 0, droite: 4, bas: -2 })
+    expect(bordsPourTaille(c, 14, 8, [1, 1])).toEqual({ gauche: 4, haut: -2, droite: 0, bas: 0 })
+    expect(bordsPourTaille(c, 14, 8, [0.5, 0.5])).toEqual({ gauche: 2, haut: -1, droite: 2, bas: -1 })
+  })
+  it('tailleMinimale : ce qu’il faut pour garder tout le contenu, selon l’ancre', () => {
+    const c = terrain(10, 10)
+    c.objets.push({ id: 'o', assetId: 'a', x: 6, y: 2, l: 2, h: 2, angle: 0, bloquePas: false, bloqueVue: false })
+    /* L'objet couvre x 5..7, y 1..3. */
+    expect(tailleMinimale(c, [0, 0])).toEqual({ largeur: 7, hauteur: 3 })
+    expect(tailleMinimale(c, [1, 1])).toEqual({ largeur: 5, hauteur: 9 })
+  })
+  it('un terrain vide descend jusqu’à une case', () => {
+    expect(tailleMinimale(terrain(10, 10), [0.5, 0.5])).toEqual({ largeur: 1, hauteur: 1 })
   })
 })
 

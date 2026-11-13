@@ -24,7 +24,7 @@ export function EtapeEclairage(props: PropsEtape): JSX.Element {
   const { place, co } = props
   if (!place.mapItemId) return <p className="at-aide">Enregistre une première fois pour poser la lumière.</p>
   if (co.agrandi)
-    return <p className="at-aide">Le terrain a grandi : enregistre d’abord, pour que les lampes se placent juste.</p>
+    return <p className="at-aide">Le terrain a changé de taille : enregistre d’abord, pour que les lampes se placent juste.</p>
   return <Lampes {...props} />
 }
 

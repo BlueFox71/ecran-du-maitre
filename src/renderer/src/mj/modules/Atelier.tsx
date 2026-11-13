@@ -10,6 +10,7 @@ import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useStore } from '../store'
 import type { AssetAtelier } from '@shared/atelierAssets'
 import type { Place } from '@shared/types'
+import { bordsPourTaille, tailleMinimale, type Ancre, type Construction } from '@shared/atelier'
 import { chargerImages, type ImagesAtelier } from '../atelier/images'
 import { useConstruction, type ConstructionOuverte } from '../atelier/useConstruction'
 import { Toile, type Outil } from '../atelier/Toile'
@@ -269,7 +270,7 @@ function Chantier({ place }: { place: Place }): JSX.Element {
           {essai.enTest ? 'Arrêter l’essai' : 'Essayer avec un pion'}
         </button>
         <button className="btn btn-sm" onClick={() => setAgrandir(!agrandir)} aria-pressed={agrandir}>
-          Agrandir…
+          Taille du terrain…
         </button>
         <button className="btn btn-sm" disabled={!co.peutAnnuler} onClick={co.annuler} title="Annuler (Ctrl+Z)">
           ↶
@@ -319,14 +320,13 @@ function Chantier({ place }: { place: Place }): JSX.Element {
       ) : null}
 
       {agrandir && co.c ? (
-        <PanneauAgrandir
-          onAgrandir={(b) => {
+        <PanneauTaille
+          c={co.c}
+          onAppliquer={(b) => {
             co.agrandir(b)
             setAgrandir(false)
           }}
           onFermer={() => setAgrandir(false)}
-          largeur={co.c.largeur}
-          hauteur={co.c.hauteur}
         />
       ) : null}
 
@@ -382,43 +382,83 @@ function Chantier({ place }: { place: Place }): JSX.Element {
   )
 }
 
-function PanneauAgrandir({
-  largeur,
-  hauteur,
-  onAgrandir,
+function PanneauTaille({
+  c,
+  onAppliquer,
   onFermer
 }: {
-  largeur: number
-  hauteur: number
-  onAgrandir: (b: { gauche: number; haut: number; droite: number; bas: number }) => void
+  c: Construction
+  onAppliquer: (b: { gauche: number; haut: number; droite: number; bas: number }) => void
   onFermer: () => void
 }): JSX.Element {
-  const [b, setB] = useState({ gauche: 0, haut: 0, droite: 0, bas: 0 })
-  const champ = (k: keyof typeof b, label: string): JSX.Element => (
+  const [unite, setUnite] = useState<'cases' | 'metres'>('cases')
+  const [ancre, setAncre] = useState<Ancre>([0, 0])
+  const [taille, setTaille] = useState({ largeur: c.largeur, hauteur: c.hauteur })
+  const m = c.metresParCase
+  const min = tailleMinimale(c, ancre)
+  const vers = (cases: number): string => String(unite === 'cases' ? cases : Math.round(cases * m * 10) / 10).replace('.', ',')
+  const depuis = (v: string): number => {
+    const n = Number(v.replace(',', '.'))
+    if (!Number.isFinite(n) || n <= 0) return 1
+    return Math.max(1, Math.round(unite === 'cases' ? n : n / m))
+  }
+  const trop = taille.largeur < min.largeur || taille.hauteur < min.hauteur
+  const pareil = taille.largeur === c.largeur && taille.hauteur === c.hauteur
+  const champ = (k: 'largeur' | 'hauteur', label: string): JSX.Element => (
     <label className="at-nombre">
       {label}
       <input
-        type="number"
-        min={0}
-        max={200}
-        value={b[k]}
-        onChange={(e) => setB({ ...b, [k]: Math.max(0, Math.round(Number(e.target.value) || 0)) })}
+        key={`${k}-${unite}`}
+        type="text"
+        inputMode="decimal"
+        defaultValue={vers(taille[k])}
+        onChange={(e) => setTaille({ ...taille, [k]: depuis(e.target.value) })}
       />
     </label>
   )
-  const total = b.gauche + b.haut + b.droite + b.bas
   return (
     <div className="at-agrandir">
-      <span>Ajouter des cases :</span>
-      {champ('gauche', 'à gauche')}
-      {champ('haut', 'en haut')}
-      {champ('droite', 'à droite')}
-      {champ('bas', 'en bas')}
-      <span className="at-dim">
-        → {largeur + b.gauche + b.droite} × {hauteur + b.haut + b.bas} cases
+      <span>Taille du terrain :</span>
+      {champ('largeur', 'largeur')}
+      {champ('hauteur', 'hauteur')}
+      <div className="at-outils">
+        <button className="btn btn-sm" aria-pressed={unite === 'cases'} onClick={() => setUnite('cases')}>
+          cases
+        </button>
+        <button className="btn btn-sm" aria-pressed={unite === 'metres'} onClick={() => setUnite('metres')}>
+          mètres
+        </button>
+      </div>
+      <span className="at-dim" title="Ce qui reste en place : le terrain grandit ou rétrécit de l’autre côté">
+        Garder
       </span>
-      <button className="btn btn-sm btn-brass" disabled={!total} onClick={() => onAgrandir(b)}>
-        Agrandir
+      <div className="at-ancre" role="group" aria-label="Le point qui reste en place">
+        {([0, 0.5, 1] as const).flatMap((y) =>
+          ([0, 0.5, 1] as const).map((x) => (
+            <button
+              key={`${x}-${y}`}
+              aria-pressed={ancre[0] === x && ancre[1] === y}
+              onClick={() => setAncre([x, y])}
+              title="Ce coin (ou ce bord) reste en place"
+            />
+          ))
+        )}
+      </div>
+      <span className="at-dim">
+        {taille.largeur} × {taille.hauteur} cases · {vers(taille.largeur)} × {vers(taille.hauteur)}{' '}
+        {unite === 'cases' ? 'cases' : 'm'} · 1 case = {String(m).replace('.', ',')} m
+      </span>
+      {trop ? (
+        <span className="at-alerte">
+          Trop petit : ce qui est construit dépasserait. Au moins {min.largeur} × {min.hauteur} cases avec ce point gardé.
+        </span>
+      ) : null}
+      <button
+        className="btn btn-sm btn-brass"
+        disabled={trop || pareil}
+        onClick={() => onAppliquer(bordsPourTaille(c, taille.largeur, taille.hauteur, ancre))}
+      >
+        Appliquer
       </button>
       <button className="btn btn-sm" onClick={onFermer}>
         Fermer
