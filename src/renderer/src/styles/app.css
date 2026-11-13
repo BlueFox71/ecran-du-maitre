@@ -26895,3 +26895,36 @@ button.at-titre:hover {
 .at-base-ouverte .at-base {
   background: var(--surface);
 }
+
+/* Une étape en deux temps : un haut figé, une grille qui défile. */
+.at-panneau:has(> .at-colonne) {
+  overflow: hidden;
+}
+.at-colonne {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.at-fige {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.at-defile {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-right: -8px;
+  padding-right: 8px;
+}
+/* La grille de la matière de base, sous son bloc figé : même fond. */
+.at-defile.at-base-ouverte {
+  margin: -6px -6px 0;
+  padding: 6px;
+}

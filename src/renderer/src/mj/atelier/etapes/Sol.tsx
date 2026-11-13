@@ -166,8 +166,35 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
     return () => window.removeEventListener('keydown', k)
   }, [choisi, co])
 
+  const paletteBase = {
+    assets: sols,
+    parCategorie: true,
+    cle: 'sols-base',
+    choisi: co.c?.base ?? null,
+    /* On reste ouvert : on essaie plusieurs matières avant de garder la bonne. */
+    onChoisir: (a: (typeof sols)[number]) => co.modifier((c) => ({ ...c, base: a.id }))
+  }
+  const paletteMatiere = {
+    assets: sols,
+    parCategorie: true,
+    cle: 'sols',
+    choisi: matiereSure,
+    onChoisir: (a: (typeof sols)[number]) => {
+      setMatiere(a.id)
+      if (choisi && !co.c?.sols.find((x) => x.id === choisi)?.gomme)
+        co.modifier((c) => ({
+          ...c,
+          sols: c.sols.map((s) => (s.id === choisi ? { ...s, assetId: a.id } : s))
+        }))
+    }
+  }
+
+  /* Le haut est figé — outils, matière de base, filtres de la matière — et
+     seule la grille défile dessous. Ouverte, la matière de base prend la
+     grille pour elle ; refermée, on retrouve celle des sols à peindre. */
   return (
-    <>
+    <div className="at-colonne">
+      <div className="at-fige">
       <div className="at-section">
         <span className="eyebrow">Outil</span>
         <div className="at-outils">
@@ -197,7 +224,12 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
       </div>
       <div className={`at-section${baseOuverte ? ' at-base-ouverte' : ''}`}>
         {/* Rangée sous un bouton : on la choisit une fois, elle n'a pas à occuper le panneau. */}
-        <button className="at-base" aria-expanded={baseOuverte} onClick={() => setBaseOuverte(!baseOuverte)}>
+        <button
+          className="at-base"
+          aria-expanded={baseOuverte}
+          title="Elle couvre tout le terrain, sous les sols peints : la gomme la fait réapparaître"
+          onClick={() => setBaseOuverte(!baseOuverte)}
+        >
           {baseAsset ? <img src={urlAsset(baseAsset)} alt="" /> : <span className="at-base-vide" />}
           <span>
             <span className="eyebrow">Matière de base</span>
@@ -207,7 +239,6 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
         </button>
         {baseOuverte ? (
           <>
-            <p className="at-aide">Elle couvre tout le terrain, sous les sols peints : la gomme la fait réapparaître.</p>
             <div className="at-outils">
               <button
                 className="btn btn-sm"
@@ -219,36 +250,19 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
                 Aucune
               </button>
             </div>
-            <Palette
-              assets={sols}
-              parCategorie
-              cle="sols-base"
-              choisi={co.c?.base ?? null}
-              onChoisir={(a) => {
-                /* On reste ouvert : on essaie plusieurs matières avant de garder la bonne. */
-                co.modifier((c) => ({ ...c, base: a.id }))
-              }}
-            />
+            <Palette {...paletteBase} partie="filtres" />
           </>
         ) : null}
       </div>
-      <div className="at-section">
-        <span className="eyebrow">Matière</span>
-        <Palette
-          assets={sols}
-          parCategorie
-          cle="sols"
-          choisi={matiereSure}
-          onChoisir={(a) => {
-            setMatiere(a.id)
-            if (choisi && !co.c?.sols.find((x) => x.id === choisi)?.gomme)
-              co.modifier((c) => ({
-                ...c,
-                sols: c.sols.map((s) => (s.id === choisi ? { ...s, assetId: a.id } : s))
-              }))
-          }}
-        />
+      {baseOuverte ? null : (
+        <div className="at-section">
+          <span className="eyebrow">Matière</span>
+          <Palette {...paletteMatiere} partie="filtres" />
+        </div>
+      )}
       </div>
+      <div className={`at-defile${baseOuverte ? ' at-base-ouverte' : ''}`}>
+      {baseOuverte ? <Palette {...paletteBase} partie="tuiles" /> : <Palette {...paletteMatiere} partie="tuiles" />}
       {choisi ? (
         <div className="at-section">
           <button
@@ -263,6 +277,7 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
         </div>
       ) : null}
       <ImportAsset {...props} typeParDefaut="sol" />
-    </>
+      </div>
+    </div>
   )
 }

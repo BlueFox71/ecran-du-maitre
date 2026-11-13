@@ -9,17 +9,34 @@
  * L'icône d'un rayon est une image du pack (`icones/<nom>.png`) ; tant qu'elle
  * n'existe pas, on montre la vignette d'un objet du rayon.
  */
-import { useState } from 'react'
+import { useState, useSyncExternalStore } from 'react'
 import { filtrerAssets, rangement, type AssetAtelier } from '@shared/atelierAssets'
 import { urlAsset } from './images'
 
 /** Le rangement choisi, retenu tant que l'application est ouverte — un par palette (sols, objets…). */
 type Memoire = { categorie: string | null; sous: string | null; recherche: string; chercher: boolean }
 const memoires = new Map<string, Memoire>()
+const ecoutes = new Set<() => void>()
 const memoireDe = (cle: string): Memoire => {
   let m = memoires.get(cle)
   if (!m) memoires.set(cle, (m = { categorie: null, sous: null, recherche: '', chercher: false }))
   return m
+}
+/* Un rangement partagé : les filtres et la grille d'une même palette peuvent
+   vivre à deux endroits du panneau (les filtres figés, la grille qui défile). */
+function useRangement(cle: string): [Memoire, (patch: Partial<Memoire>) => void] {
+  const m = useSyncExternalStore(
+    (f) => {
+      ecoutes.add(f)
+      return () => ecoutes.delete(f)
+    },
+    () => memoireDe(cle)
+  )
+  const changer = (patch: Partial<Memoire>): void => {
+    memoires.set(cle, { ...memoireDe(cle), ...patch })
+    for (const f of ecoutes) f()
+  }
+  return [m, changer]
 }
 
 /** Le nom de fichier de l'icône d'un rayon : « Toiles d'araignées » → `toiles-d-araignees`. */
@@ -89,7 +106,8 @@ export function Palette({
   choisis,
   onChoisir,
   parCategorie = false,
-  cle = 'objets'
+  cle = 'objets',
+  partie = 'tout'
 }: {
   assets: AssetAtelier[]
   choisi: string | null
@@ -99,31 +117,14 @@ export function Palette({
   parCategorie?: boolean
   /** La palette dont on retient le rangement : deux palettes ne se mélangent pas. */
   cle?: string
+  /** Ce qu'on affiche ici : tout, seulement les filtres, ou seulement la grille. */
+  partie?: 'tout' | 'filtres' | 'tuiles'
 }): JSX.Element {
-  const memoire = memoireDe(cle)
-  const [categorie, setCategorieE] = useState<string | null>(memoire.categorie)
-  const [sous, setSousE] = useState<string | null>(memoire.sous)
-  const [recherche, setRechercheE] = useState(memoire.recherche)
-  const [chercher, setChercherE] = useState(memoire.chercher)
-  const setCategorie = (v: string | null): void => {
-    memoire.categorie = v
-    memoire.sous = null
-    setCategorieE(v)
-    setSousE(null)
-  }
-  const setSous = (v: string | null): void => {
-    memoire.sous = v
-    setSousE(v)
-  }
-  const setRecherche = (v: string): void => {
-    memoire.recherche = v
-    setRechercheE(v)
-  }
-  const setChercher = (v: boolean): void => {
-    memoire.chercher = v
-    setChercherE(v)
-    if (!v) setRecherche('')
-  }
+  const [{ categorie, sous, recherche, chercher }, changer] = useRangement(cle)
+  const setCategorie = (v: string | null): void => changer({ categorie: v, sous: null })
+  const setSous = (v: string | null): void => changer({ sous: v })
+  const setRecherche = (v: string): void => changer({ recherche: v })
+  const setChercher = (v: boolean): void => changer({ chercher: v, ...(v ? {} : { recherche: '' }) })
 
   if (!assets.length) return <p className="at-vide">Aucun asset de ce type pour l’instant.</p>
   const estChoisi = (a: AssetAtelier): boolean => (choisis ? choisis.includes(a.id) : choisi === a.id)
@@ -152,8 +153,8 @@ export function Palette({
             ]
           : [{ titre: '', liste }]
 
-  return (
-    <div className="at-rangement">
+  const filtres = (
+    <>
       <div className="at-icones" role="group" aria-label="Catégories">
         <button className="at-icone" aria-pressed={!cat} title="Tout" onClick={() => setCategorie(null)}>
           <IconeTout />
@@ -200,6 +201,10 @@ export function Palette({
           ))}
         </div>
       ) : null}
+    </>
+  )
+  const grille = (
+    <>
       {liste.length ? (
         groupes
           .filter((g) => g.liste.length)
@@ -212,6 +217,14 @@ export function Palette({
       ) : (
         <p className="at-vide">Rien ne correspond.</p>
       )}
+    </>
+  )
+  if (partie === 'filtres') return <div className="at-rangement">{filtres}</div>
+  if (partie === 'tuiles') return <div className="at-rangement">{grille}</div>
+  return (
+    <div className="at-rangement">
+      {filtres}
+      {grille}
     </div>
   )
 }
