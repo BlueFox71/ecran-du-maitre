@@ -26447,3 +26447,255 @@ body.surligneur-actif [data-cible] {
   opacity: 0.45;
   cursor: default;
 }
+
+/* ============================================================
+   L'atelier des lieux
+   ============================================================ */
+
+.at-accueil-corps {
+  display: grid;
+  gap: 18px;
+  max-width: 720px;
+}
+.at-bloc {
+  display: grid;
+  gap: 8px;
+}
+.at-ligne {
+  display: flex;
+  gap: 8px;
+}
+.at-champ {
+  flex: 1;
+  min-width: 0;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.at-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 6px;
+}
+.at-lieu {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 9px 12px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.at-lieu:hover {
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+.at-lieu svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  color: var(--brass);
+}
+.at-vide {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 12.5px;
+}
+
+.at-chantier {
+  gap: 8px;
+}
+.at-barre {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+.at-titre {
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-size: 16px;
+  margin-right: 8px;
+}
+.at-etapes {
+  display: flex;
+  gap: 3px;
+  padding: 3px;
+  border-radius: 8px;
+  background: var(--sunk);
+}
+.at-etape {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 5px 11px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.at-etape .num {
+  font-size: 11px;
+  opacity: 0.6;
+}
+.at-etape[aria-selected='true'] {
+  background: var(--brass);
+  color: #fff;
+}
+.at-etape[aria-selected='true'] .num {
+  opacity: 0.85;
+}
+.at-barre .spacer,
+.at-etat .spacer {
+  flex: 1;
+}
+.at-barre .btn[aria-pressed='true'] {
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+
+.at-bandeau,
+.at-agrandir {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  padding: 8px 12px;
+  border: 1px solid var(--brass-line);
+  border-radius: 8px;
+  background: var(--brass-wash);
+  font-size: 13px;
+}
+.at-nombre {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+}
+.at-nombre input {
+  width: 58px;
+  padding: 3px 6px;
+  border: 1px solid var(--line);
+  border-radius: 5px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.at-dim {
+  color: var(--text-dim);
+}
+
+.at-corps {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 8px;
+}
+.at-toile {
+  flex: 1;
+  min-width: 0;
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  background: #05080a;
+}
+.at-toile canvas {
+  display: block;
+  touch-action: none;
+}
+.at-panneau {
+  flex: none;
+  width: 260px;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+}
+.at-section {
+  display: grid;
+  gap: 8px;
+}
+.at-outils {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.at-outils .btn[aria-pressed='true'] {
+  border-color: var(--brass);
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
+.at-tuiles {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.at-tuile {
+  display: grid;
+  gap: 3px;
+  padding: 3px;
+  border: 2px solid transparent;
+  border-radius: 6px;
+  background: var(--sunk);
+  color: var(--text-dim);
+  font: inherit;
+  font-size: 10.5px;
+  line-height: 1.2;
+  text-align: center;
+  cursor: pointer;
+}
+.at-tuile img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+  border-radius: 4px;
+  background: #1b2226;
+}
+.at-tuile[aria-pressed='true'] {
+  border-color: var(--brass);
+  color: var(--text);
+}
+.at-aide {
+  margin: 0;
+  color: var(--text-faint);
+  font-size: 12px;
+  line-height: 1.4;
+}
+.at-reglage {
+  display: grid;
+  gap: 4px;
+  font-size: 12.5px;
+}
+.at-case {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 13px;
+}
+
+.at-etat {
+  flex: none;
+  display: flex;
+  gap: 16px;
+  flex-wrap: wrap;
+  color: var(--text-faint);
+  font-size: 11.5px;
+}

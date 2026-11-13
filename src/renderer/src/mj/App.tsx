@@ -25,6 +25,7 @@ import { Pochette } from './modules/Pochette'
 import { Library } from './modules/Library'
 import { Editor } from './modules/Editor'
 import { Places, lesPlans } from './modules/Places'
+import { Atelier } from './modules/Atelier'
 import { Objets } from './modules/Objets'
 import { Timeline } from './modules/Timeline'
 import { Annexes } from './modules/Annexes'
@@ -37,6 +38,7 @@ import { demarrerSm } from './santeMentale/etat'
 import {
   IconChevron,
   IconCadrage,
+  IconMurs,
   IconCoffre,
   IconNote,
   IconDoc,
@@ -237,6 +239,13 @@ export function App(): JSX.Element {
             {/* Les seuls lieux qui ont un plan : on les feuillette d'un plan à l'autre. */}
             <div className="nav-sous">
               <NavItem id="plans" label="Plans" count={nbPlans} icon={<IconCadrage />} />
+              {/* L'atelier : un plan qu'on construit, mur par mur, plutôt qu'on ne le retrace. */}
+              <NavItem
+                id="atelier"
+                label="Atelier"
+                count={s.places.filter((p) => p.construit).length}
+                icon={<IconMurs />}
+              />
             </div>
             {/* La réserve : ce qui se trouve, se ramasse, se porte. Elle est
                 de la matière, comme les lieux — on la prépare avant la séance,
@@ -340,6 +349,7 @@ export function App(): JSX.Element {
               {s.view === 'editor' && <Editor />}
               {s.view === 'places' && <Places />}
               {s.view === 'plans' && <Places plans />}
+              {s.view === 'atelier' && <Atelier />}
               {s.view === 'objets' && <Objets />}
               {s.view === 'sons' && <Sonotheque />}
               {s.view === 'timeline' && <Timeline />}
@@ -511,6 +521,10 @@ function subtitle(s: ReturnType<typeof useStore.getState>): string {
     case 'plans': {
       const n = lesPlans(s.places).length
       return `${n} plan${n > 1 ? 's' : ''}`
+    }
+    case 'atelier': {
+      const n = s.places.filter((p) => p.construit).length
+      return `${n} lieu${n > 1 ? 'x' : ''} construit${n > 1 ? 's' : ''}`
     }
     case 'objets': {
       const poses = s.objets.reduce((n, o) => n + o.placements.length, 0)

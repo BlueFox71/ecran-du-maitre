@@ -45,6 +45,7 @@ export type ViewId =
   | 'editor'
   | 'places'
   | 'plans'
+  | 'atelier'
   | 'objets'
   | 'sons'
   | 'timeline'
@@ -195,8 +196,12 @@ interface State {
 
   /** Document ouvert dans l'éditeur. */
   editingItemId: number | null
+  /** Le lieu ouvert dans l'atelier ; `null`, l'accueil de l'atelier. */
+  atelierLieuId: number | null
 
   setView: (v: ViewId) => void
+  /** Ouvre l'atelier sur un lieu bâti (ou sur son accueil). */
+  ouvrirAtelier: (placeId: number | null) => void
   setVisuel: (v: 0 | 1) => void
   setTransition: (t: Transition) => void
   /** Écrit un réglage de la campagne. `null` l'efface et rend son défaut. */
@@ -340,8 +345,10 @@ export const useStore = create<State>((set, get) => ({
   rollStats: { total: 0, judged: 0, success: 0, fumble: 0, rate: 0 },
 
   editingItemId: null,
+  atelierLieuId: null,
 
   setView: (v) => set({ view: v }),
+  ouvrirAtelier: (placeId) => set({ view: 'atelier', atelierLieuId: placeId }),
   setVisuel: (v) => set({ visuel: v }),
   /* Le geste est immédiat — on arme la bascule et on bascule — et l'écriture
      suit sans qu'on l'attende : une bascule ne se met pas en file d'attente

@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   agrandir,
+  composerCadres,
   constructionVide,
   contourDeLObjet,
   deriverCalque,
@@ -211,5 +212,16 @@ describe('placeOuverture', () => {
     expect(p.centre[1]).toBeCloseTo(3, 9)
     expect(p.angle).toBeCloseTo(Math.PI / 2, 9)
     expect(p.largeur).toBe(1)
+  })
+})
+
+describe('composerCadres', () => {
+  it('deux agrandissements successifs recalent comme un seul', () => {
+    const c0 = terrain(10, 10)
+    const r1 = agrandir(c0, { gauche: 2, haut: 0, droite: 0, bas: 3 })
+    const r2 = agrandir(r1.construction, { gauche: 0, haut: 4, droite: 5, bas: 0 })
+    const direct = agrandir(c0, { gauche: 2, haut: 4, droite: 5, bas: 3 }).cadre
+    const compose = composerCadres(r1.cadre, r2.cadre)
+    for (const k of ['x', 'y', 'w', 'h'] as const) expect(compose[k]).toBeCloseTo(direct[k], 9)
   })
 })

@@ -327,6 +327,15 @@ export function agrandir(
   }
 }
 
+/**
+ * Deux recalages l'un après l'autre : `a`, puis `b` exprimé dans la carte
+ * issue de `a`. On agrandit parfois deux fois avant d'enregistrer ; le lieu,
+ * lui, ne se recale qu'une fois.
+ */
+export function composerCadres(a: Cadre, b: Cadre): Cadre {
+  return { x: a.x + b.x * a.w, y: a.y + b.y * a.h, w: a.w * b.w, h: a.h * b.h }
+}
+
 /* ---------------- relecture méfiante ---------------- */
 
 const fini = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)

@@ -188,7 +188,10 @@ function buildMenu(): void {
    propre dossier de données, donc son propre verrou. Sans cela, `npm run dev`
    se refermerait sans un mot tant que l'exécutable tourne — et c'est justement
    pendant qu'on prépare une séance qu'on a envie de voir une retouche. */
-if (!app.isPackaged) app.setPath('userData', `${app.getPath('userData')} (dev)`)
+if (!app.isPackaged)
+  app.setPath('userData', process.env.EDM_PROFIL_DEV || `${app.getPath('userData')} (dev)`)
+/* `EDM_PROFIL_DEV` : un profil de dev à part, pour lancer une seconde
+   instance d'essai sur une campagne jetable sans fermer celle qui tourne. */
 
 /* Un son posé sur le plan part quand un téléphone pousse un pion : personne
    n'a cliqué dans la fenêtre du MJ, et Chromium refuserait de le jouer. */
