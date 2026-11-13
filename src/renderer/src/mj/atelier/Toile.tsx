@@ -156,7 +156,11 @@ export function Toile({
         ref={toile}
         style={{ width: taille.w, height: taille.h, cursor: glisse.current ? 'grabbing' : outil?.curseur ?? 'default' }}
         onPointerDown={(e) => {
-          ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+          try {
+            ;(e.target as HTMLElement).setPointerCapture(e.pointerId)
+          } catch {
+            /* un pointeur déjà relâché : rien à capturer */
+          }
           if (e.button === 1 || (e.button === 0 && espace.current)) {
             if (vue) glisse.current = { x: e.clientX, y: e.clientY, vx: vue.x, vy: vue.y }
             e.preventDefault()
