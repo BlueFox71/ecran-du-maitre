@@ -212,6 +212,8 @@ export interface Place {
   apparences: Apparence[]
   /** L'apparence montrée ; `null`, la carte elle-même. */
   apparenceId: number | null
+  /** Le lieu sort de l'atelier : son image et ses murs dérivent de sa construction. */
+  construit: boolean
   /** Les images et vidéos à montrer ici, dans leur ordre — au Paravent, avec le moment. */
   imageIds: number[]
   docCount: number
@@ -1366,6 +1368,13 @@ export interface Mur {
    * rien su : on passe derrière une tenture, tirée ou non.
    */
   ouvert: boolean
+  /**
+   * Le trait vient de l'atelier : l'id de ce qui l'a fait naître dans la
+   * construction (un mur bâti, ou `obj:<id>` pour l'emprise d'un meuble).
+   * Nul ou absent : tracé à la main. Un trait de l'atelier ne se modifie que
+   * dans l'atelier — il serait réécrit au prochain enregistrement.
+   */
+  atelierId?: string | null
 }
 
 /**
@@ -1398,6 +1407,8 @@ export interface Ouverture {
    * « Porte » (`nomDePorte`) ; null : elle s'appelle comme sa nature.
    */
   nom: string | null
+  /** L'ouverture vient de l'atelier (voir `Mur.atelierId`). */
+  atelierId?: string | null
 }
 
 /**

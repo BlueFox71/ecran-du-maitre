@@ -25,7 +25,8 @@ const SELECT = `
          p.nom_montre AS nomMontre,
          p.regard_portee AS regardPortee, p.astre, p.astre_cap AS astreCap,
          p.nord, p.ciel, p.ciel_cap AS cielCap, p.apparence_id AS apparenceId,
-         (SELECT COUNT(*) FROM item i WHERE i.place_id = p.id) AS docCount
+         (SELECT COUNT(*) FROM item i WHERE i.place_id = p.id) AS docCount,
+         EXISTS (SELECT 1 FROM construction c WHERE c.place_id = p.id) AS construit
     FROM place p`
 
 /**
@@ -89,7 +90,8 @@ function toPlace(r: any): Place {
     apparences: [],
     apparenceId: r.apparenceId ?? null,
     imageIds: [],
-    docCount: r.docCount
+    docCount: r.docCount,
+    construit: !!r.construit
   }
 }
 

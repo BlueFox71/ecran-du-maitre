@@ -2018,5 +2018,27 @@ export const MIGRATIONS: { id: number; sql: string }[] = [
        et les téléphones. Le MJ le montre pièce par pièce ; caché d'office. */
     ALTER TABLE place ADD COLUMN nom_montre INTEGER NOT NULL DEFAULT 0;
     `
+  },
+  {
+    id: 94,
+    sql: `
+    /* L'atelier des lieux : un plan qu'on construit au lieu de le retracer.
+
+       La construction — sols, murs, ouvertures, meubles, en cases — est la
+       seule source de verite d'un lieu bati. Son image et son calque en
+       derivent a chaque enregistrement. Une ligne ici : le lieu est bati. */
+    CREATE TABLE construction (
+      place_id INTEGER PRIMARY KEY REFERENCES place(id) ON DELETE CASCADE,
+      data     TEXT NOT NULL,
+      maj      TEXT NOT NULL DEFAULT (datetime('now'))
+    );
+
+    /* Ce qui vient de l'atelier s'y retrouve par son id dans la
+       construction : on met a jour la meme ligne plutot que d'en recreer
+       une, et une porte ouverte, verrouillee ou nommee le reste. NULL : un
+       trait trace a la main, que l'atelier ne touche jamais. */
+    ALTER TABLE mur       ADD COLUMN atelier_id TEXT;
+    ALTER TABLE ouverture ADD COLUMN atelier_id TEXT;
+    `
   }
 ]

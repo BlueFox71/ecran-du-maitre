@@ -25,7 +25,7 @@ import {
 } from '@shared/types'
 
 const SELECT = `
-  SELECT id, place_id AS placeId, nature, pts, ouverte
+  SELECT id, place_id AS placeId, nature, pts, ouverte, atelier_id AS atelierId
     FROM mur`
 
 const clamp = (v: number): number => Math.min(1, Math.max(0, v))
@@ -56,7 +56,8 @@ function toMur(r: any): Mur {
     pts: toPoints(r.pts),
     /* `ouverte` en base, `ouvert` ici : c'est d'un rideau qu'on parle
        maintenant, plus d'une porte. Voir la migration 40. */
-    ouvert: !!r.ouverte
+    ouvert: !!r.ouverte,
+    atelierId: r.atelierId ?? null
   }
 }
 

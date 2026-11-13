@@ -12,7 +12,8 @@ import * as reglages from './reglages'
 import { lireCampagne } from '@shared/reglages'
 
 const SELECT = `
-  SELECT o.id, o.mur_id AS murId, o.nature, o.d, o.largeur, o.ouverte, o.verrouillee, o.nom
+  SELECT o.id, o.mur_id AS murId, o.nature, o.d, o.largeur, o.ouverte, o.verrouillee, o.nom,
+         o.atelier_id AS atelierId
     FROM ouverture o`
 
 const clamp = (v: number, min = 0, max = 1): number => Math.min(max, Math.max(min, v))
@@ -29,7 +30,8 @@ function toOuverture(r: any): Ouverture {
     largeur: clamp(r.largeur, LARGEUR.min, LARGEUR.max),
     ouverte: !!r.ouverte,
     verrouillee: !!r.verrouillee,
-    nom: typeof r.nom === 'string' && r.nom.trim() ? r.nom : null
+    nom: typeof r.nom === 'string' && r.nom.trim() ? r.nom : null,
+    atelierId: r.atelierId ?? null
   }
 }
 
