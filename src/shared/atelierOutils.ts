@@ -193,3 +193,8 @@ export function tourner(o: ObjetPose, p: PointCase, pas: boolean): ObjetPose {
 export function zoneARemplir(c: Construction, p: PointCase): PointCase[] {
   return pieceSous(c, p) ?? (rectangle([0, 0], [c.largeur, c.hauteur]) as PointCase[])
 }
+
+/** Le centre de la case où tombe un point : là où Ctrl cale un objet. */
+export function centreDeCase(p: PointCase): PointCase {
+  return [Math.floor(p[0]) + 0.5, Math.floor(p[1]) + 0.5]
+}

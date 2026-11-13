@@ -5,7 +5,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { contourDeLObjet, nouvelId, type ObjetPose, type PointCase } from '@shared/atelier'
-import { objetSous, redimensionner, tourner } from '@shared/atelierOutils'
+import { centreDeCase, objetSous, redimensionner, tourner } from '@shared/atelierOutils'
 import type { AssetAtelier } from '@shared/atelierAssets'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
@@ -33,6 +33,8 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
   const [choisi, setChoisi] = useState<string | null>(null)
   const geste = useRef<Geste | null>(null)
   const souris = useRef<PointCase | null>(null)
+  /* Ctrl maintenu : l'objet se cale au centre de la case. */
+  const cale = useRef(false)
   const objet = choisi ? co.c?.objets.find((o) => o.id === choisi) ?? null : null
 
   const majObjet = (id: string, f: (o: ObjetPose) => ObjetPose, pas = true): void => {
@@ -60,6 +62,7 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
       },
       onPointer: (type, p, brut, e, prise) => {
         souris.current = brut
+        cale.current = e.ctrlKey
         const c = co.c
         if (!c) return
         if (type === 'down') {
@@ -67,8 +70,8 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
             const o: ObjetPose = {
               id: nouvelId(),
               assetId: arme.id,
-              x: p[0],
-              y: p[1],
+              x: e.ctrlKey ? centreDeCase(brut)[0] : brut[0],
+              y: e.ctrlKey ? centreDeCase(brut)[1] : brut[1],
               l: arme.l ?? 1,
               h: arme.h ?? 1,
               angle: 0,
@@ -106,7 +109,11 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
         }
         if (type === 'move' && geste.current) {
           const g = geste.current
-          if (g.quoi === 'deplacer') majObjet(g.id, (o) => ({ ...o, x: brut[0] - g.dx, y: brut[1] - g.dy }), false)
+          if (g.quoi === 'deplacer') {
+            const cible: PointCase = [brut[0] - g.dx, brut[1] - g.dy]
+            const [x, y] = e.ctrlKey ? centreDeCase(cible) : cible
+            majObjet(g.id, (o) => ({ ...o, x, y }), false)
+          }
           if (g.quoi === 'coin') majObjet(g.id, (o) => redimensionner(o, g.i, brut, !e.altKey), false)
           if (g.quoi === 'tourner') majObjet(g.id, (o) => tourner(o, brut, e.shiftKey), false)
         }
@@ -117,7 +124,7 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
         const c = co.c
         if (!c) return
         if (arme && souris.current) {
-          const [x, y] = souris.current
+          const [x, y] = cale.current ? centreDeCase(souris.current) : souris.current
           contour(ctx, contourDeLObjet({ ...({} as ObjetPose), x, y, l: arme.l ?? 1, h: arme.h ?? 1, angle: 0 }), echelle, true)
         }
         const o = choisi ? c.objets.find((x) => x.id === choisi) : null
@@ -216,14 +223,14 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
             </button>
           </div>
           <p className="at-aide">
-            Glisse l’objet pour le déplacer, un coin pour le redimensionner (Alt : sans garder les
-            proportions), le rond pour le tourner (Maj : par 15°).
+            Glisse l’objet pour le déplacer (Ctrl : au centre de la case), un coin pour le
+            redimensionner (Alt : sans garder les proportions), le rond pour le tourner (Maj : par 15°).
           </p>
         </div>
       ) : (
         <p className="at-aide">
-          Prends une vignette puis clique où poser l’objet (Maj : en poser plusieurs). Clique un
-          objet posé pour le régler.
+          Prends une vignette puis clique où poser l’objet (Maj : en poser plusieurs ; Ctrl : au
+          centre de la case). Clique un objet posé pour le régler.
         </p>
       )}
       <Palette assets={objets} choisi={arme?.id ?? null} onChoisir={(a) => setArme(arme?.id === a.id ? null : a)} parCategorie />

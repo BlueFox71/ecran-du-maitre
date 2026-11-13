@@ -8,6 +8,7 @@ import {
   rectangle,
   redimensionner,
   solSous,
+  centreDeCase,
   tourner,
   zoneARemplir
 } from './atelierOutils'
@@ -164,5 +165,12 @@ describe('solSous et l’aérosol', () => {
     c.sols.push({ id: 'a', assetId: 'x', pts: [[2, 2], [4, 2]], rayon: 1 })
     expect(solSous(c, [4.5, 2.5])?.id).toBe('a')
     expect(solSous(c, [7, 2])).toBeNull()
+  })
+})
+
+describe('centreDeCase', () => {
+  it('ramène un point au centre de la case où il tombe', () => {
+    expect(centreDeCase([2.1, 4.97])).toEqual([2.5, 4.5])
+    expect(centreDeCase([0, 0])).toEqual([0.5, 0.5])
   })
 })
