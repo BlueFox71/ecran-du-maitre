@@ -5,7 +5,7 @@
       "id": "sols/herbe-verte",
       "type": "sol",
       "nom": "Herbe verte",
-      "categorie": "Sols",
+      "categorie": "Herbe",
       "fichier": "sols/herbe-verte.png",
       "tuile": 2
     },
@@ -13,7 +13,7 @@
       "id": "sols/herbe-terre",
       "type": "sol",
       "nom": "Herbe et terre",
-      "categorie": "Sols",
+      "categorie": "Herbe",
       "fichier": "sols/herbe-terre.png",
       "tuile": 2
     },
@@ -21,7 +21,7 @@
       "id": "sols/herbe-haute",
       "type": "sol",
       "nom": "Herbe haute",
-      "categorie": "Sols",
+      "categorie": "Herbe",
       "fichier": "sols/herbe-haute.png",
       "tuile": 2
     },
@@ -29,7 +29,7 @@
       "id": "sols/herbe-feuilles",
       "type": "sol",
       "nom": "Herbe et feuilles mortes",
-      "categorie": "Sols",
+      "categorie": "Herbe",
       "fichier": "sols/herbe-feuilles.png",
       "tuile": 2
     },
@@ -37,7 +37,7 @@
       "id": "sols/mousse",
       "type": "sol",
       "nom": "Mousse",
-      "categorie": "Sols",
+      "categorie": "Herbe",
       "fichier": "sols/mousse.png",
       "tuile": 2
     },
@@ -45,7 +45,7 @@
       "id": "sols/herbe-fleurie",
       "type": "sol",
       "nom": "Herbe fleurie",
-      "categorie": "Sols",
+      "categorie": "Herbe",
       "fichier": "sols/herbe-fleurie.png",
       "tuile": 2
     },
@@ -53,7 +53,7 @@
       "id": "sols/trefle",
       "type": "sol",
       "nom": "Trèfle",
-      "categorie": "Sols",
+      "categorie": "Herbe",
       "fichier": "sols/trefle.png",
       "tuile": 2
     },
@@ -61,7 +61,7 @@
       "id": "sols/herbe-seche",
       "type": "sol",
       "nom": "Herbe sèche",
-      "categorie": "Sols",
+      "categorie": "Herbe",
       "fichier": "sols/herbe-seche.png",
       "tuile": 2
     },
@@ -69,7 +69,7 @@
       "id": "sols/herbe-givree",
       "type": "sol",
       "nom": "Herbe givrée",
-      "categorie": "Sols",
+      "categorie": "Herbe",
       "fichier": "sols/herbe-givree.png",
       "tuile": 2
     },
@@ -77,7 +77,7 @@
       "id": "sols/herbe-boueuse",
       "type": "sol",
       "nom": "Herbe boueuse",
-      "categorie": "Sols",
+      "categorie": "Herbe",
       "fichier": "sols/herbe-boueuse.png",
       "tuile": 2
     },
@@ -85,7 +85,7 @@
       "id": "sols/herbe-violettes",
       "type": "sol",
       "nom": "Herbe aux violettes",
-      "categorie": "Sols",
+      "categorie": "Herbe",
       "fichier": "sols/herbe-violettes.png",
       "tuile": 2
     },
@@ -93,15 +93,815 @@
       "id": "sols/herbe-rase",
       "type": "sol",
       "nom": "Herbe rase et terre",
-      "categorie": "Sols",
+      "categorie": "Herbe",
       "fichier": "sols/herbe-rase.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/parquet-chene-clair",
+      "type": "sol",
+      "nom": "Parquet chêne clair",
+      "categorie": "Bois",
+      "fichier": "sols/parquet-chene-clair.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/parquet-fonce",
+      "type": "sol",
+      "nom": "Parquet foncé",
+      "categorie": "Bois",
+      "fichier": "sols/parquet-fonce.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/chevrons-chene",
+      "type": "sol",
+      "nom": "Chevrons de chêne",
+      "categorie": "Bois",
+      "fichier": "sols/chevrons-chene.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/batons-rompus",
+      "type": "sol",
+      "nom": "Bâtons rompus",
+      "categorie": "Bois",
+      "fichier": "sols/batons-rompus.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/planches-grises",
+      "type": "sol",
+      "nom": "Planches grises",
+      "categorie": "Bois",
+      "fichier": "sols/planches-grises.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/chevrons-acajou",
+      "type": "sol",
+      "nom": "Chevrons d’acajou",
+      "categorie": "Bois",
+      "fichier": "sols/chevrons-acajou.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/planches-noires",
+      "type": "sol",
+      "nom": "Planches noires",
+      "categorie": "Bois",
+      "fichier": "sols/planches-noires.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/planches-claires",
+      "type": "sol",
+      "nom": "Planches claires",
+      "categorie": "Bois",
+      "fichier": "sols/planches-claires.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/carrelage-beige",
+      "type": "sol",
+      "nom": "Carrelage beige",
+      "categorie": "Carrelage",
+      "fichier": "sols/carrelage-beige.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/carrelage-ardoise",
+      "type": "sol",
+      "nom": "Carrelage ardoise",
+      "categorie": "Carrelage",
+      "fichier": "sols/carrelage-ardoise.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/marbre-blanc",
+      "type": "sol",
+      "nom": "Marbre blanc",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/marbre-blanc.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/marbre-noir-or",
+      "type": "sol",
+      "nom": "Marbre noir veiné d’or",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/marbre-noir-or.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/damier-noir-blanc",
+      "type": "sol",
+      "nom": "Damier noir et blanc",
+      "categorie": "Carrelage",
+      "fichier": "sols/damier-noir-blanc.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/carreaux-ciment-bleus",
+      "type": "sol",
+      "nom": "Carreaux de ciment bleus",
+      "categorie": "Carrelage",
+      "fichier": "sols/carreaux-ciment-bleus.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/cabochons",
+      "type": "sol",
+      "nom": "Carrelage à cabochons",
+      "categorie": "Carrelage",
+      "fichier": "sols/cabochons.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/carreaux-metro",
+      "type": "sol",
+      "nom": "Carreaux métro",
+      "categorie": "Carrelage",
+      "fichier": "sols/carreaux-metro.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/dallage-irregulier",
+      "type": "sol",
+      "nom": "Dallage irrégulier",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/dallage-irregulier.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/paves-mousse",
+      "type": "sol",
+      "nom": "Pavés moussus",
+      "categorie": "Extérieur",
+      "fichier": "sols/paves-mousse.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/dalles-calcaire",
+      "type": "sol",
+      "nom": "Dalles de calcaire",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/dalles-calcaire.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/beton-lisse",
+      "type": "sol",
+      "nom": "Béton lisse",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/beton-lisse.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/terrazzo-clair",
+      "type": "sol",
+      "nom": "Terrazzo clair",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/terrazzo-clair.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/terrazzo-noir",
+      "type": "sol",
+      "nom": "Terrazzo noir",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/terrazzo-noir.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/terrazzo-orange",
+      "type": "sol",
+      "nom": "Terrazzo orangé",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/terrazzo-orange.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/chevrons-brique",
+      "type": "sol",
+      "nom": "Chevrons de brique",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/chevrons-brique.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/moquette-beige",
+      "type": "sol",
+      "nom": "Moquette beige",
+      "categorie": "Moquette",
+      "fichier": "sols/moquette-beige.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/moquette-grise",
+      "type": "sol",
+      "nom": "Moquette grise",
+      "categorie": "Moquette",
+      "fichier": "sols/moquette-grise.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/moquette-rouge",
+      "type": "sol",
+      "nom": "Moquette rouge",
+      "categorie": "Moquette",
+      "fichier": "sols/moquette-rouge.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/moquette-verte",
+      "type": "sol",
+      "nom": "Moquette verte",
+      "categorie": "Moquette",
+      "fichier": "sols/moquette-verte.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/moquette-bleue",
+      "type": "sol",
+      "nom": "Moquette bleue",
+      "categorie": "Moquette",
+      "fichier": "sols/moquette-bleue.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/carreaux-geometriques",
+      "type": "sol",
+      "nom": "Carreaux géométriques",
+      "categorie": "Carrelage",
+      "fichier": "sols/carreaux-geometriques.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/fourrure",
+      "type": "sol",
+      "nom": "Fourrure",
+      "categorie": "Moquette",
+      "fichier": "sols/fourrure.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/tatami",
+      "type": "sol",
+      "nom": "Tatami",
+      "categorie": "Bois",
+      "fichier": "sols/tatami.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/caoutchouc",
+      "type": "sol",
+      "nom": "Caoutchouc à pastilles",
+      "categorie": "Métal",
+      "fichier": "sols/caoutchouc.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/tole-larmee",
+      "type": "sol",
+      "nom": "Tôle larmée",
+      "categorie": "Métal",
+      "fichier": "sols/tole-larmee.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/tole-perforee",
+      "type": "sol",
+      "nom": "Tôle perforée",
+      "categorie": "Métal",
+      "fichier": "sols/tole-perforee.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/mosaique-piscine",
+      "type": "sol",
+      "nom": "Mosaïque de piscine",
+      "categorie": "Carrelage",
+      "fichier": "sols/mosaique-piscine.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/chevrons-miel",
+      "type": "sol",
+      "nom": "Chevrons miel",
+      "categorie": "Bois",
+      "fichier": "sols/chevrons-miel.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/batons-rompus-fonce",
+      "type": "sol",
+      "nom": "Bâtons rompus foncés",
+      "categorie": "Bois",
+      "fichier": "sols/batons-rompus-fonce.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/planches-delavees",
+      "type": "sol",
+      "nom": "Planches délavées",
+      "categorie": "Bois",
+      "fichier": "sols/planches-delavees.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/planches-blanchies",
+      "type": "sol",
+      "nom": "Planches blanchies",
+      "categorie": "Bois",
+      "fichier": "sols/planches-blanchies.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/planches-rustiques",
+      "type": "sol",
+      "nom": "Planches rustiques",
+      "categorie": "Bois",
+      "fichier": "sols/planches-rustiques.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/planches-noyer",
+      "type": "sol",
+      "nom": "Planches de noyer",
+      "categorie": "Bois",
+      "fichier": "sols/planches-noyer.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/planches-pin",
+      "type": "sol",
+      "nom": "Planches de pin",
+      "categorie": "Bois",
+      "fichier": "sols/planches-pin.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/planches-ebene",
+      "type": "sol",
+      "nom": "Planches d’ébène",
+      "categorie": "Bois",
+      "fichier": "sols/planches-ebene.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/marbre-creme-or",
+      "type": "sol",
+      "nom": "Marbre crème veiné d’or",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/marbre-creme-or.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/marbre-vert",
+      "type": "sol",
+      "nom": "Marbre vert",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/marbre-vert.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/marbre-rouge",
+      "type": "sol",
+      "nom": "Marbre rouge",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/marbre-rouge.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/marbre-gris",
+      "type": "sol",
+      "nom": "Marbre gris",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/marbre-gris.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/terrazzo-blanc",
+      "type": "sol",
+      "nom": "Terrazzo blanc",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/terrazzo-blanc.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/terrazzo-anthracite",
+      "type": "sol",
+      "nom": "Terrazzo anthracite",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/terrazzo-anthracite.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/dalles-travertin",
+      "type": "sol",
+      "nom": "Dalles de travertin",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/dalles-travertin.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/dalles-schiste",
+      "type": "sol",
+      "nom": "Dalles de schiste",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/dalles-schiste.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/hexagones-creme",
+      "type": "sol",
+      "nom": "Hexagones crème",
+      "categorie": "Carrelage",
+      "fichier": "sols/hexagones-creme.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/hexagones-ardoise",
+      "type": "sol",
+      "nom": "Hexagones ardoise",
+      "categorie": "Carrelage",
+      "fichier": "sols/hexagones-ardoise.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/cubes-trompe-oeil",
+      "type": "sol",
+      "nom": "Cubes en trompe-l’œil",
+      "categorie": "Carrelage",
+      "fichier": "sols/cubes-trompe-oeil.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/carreaux-ciment-azur",
+      "type": "sol",
+      "nom": "Carreaux de ciment azur",
+      "categorie": "Carrelage",
+      "fichier": "sols/carreaux-ciment-azur.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/etoiles-bleues",
+      "type": "sol",
+      "nom": "Carreaux aux étoiles bleues",
+      "categorie": "Carrelage",
+      "fichier": "sols/etoiles-bleues.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/tomettes",
+      "type": "sol",
+      "nom": "Tomettes",
+      "categorie": "Carrelage",
+      "fichier": "sols/tomettes.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/terre-cuite",
+      "type": "sol",
+      "nom": "Carreaux de terre cuite",
+      "categorie": "Carrelage",
+      "fichier": "sols/terre-cuite.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/paves-herbe",
+      "type": "sol",
+      "nom": "Pavés et herbe",
+      "categorie": "Extérieur",
+      "fichier": "sols/paves-herbe.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/dalles-herbe",
+      "type": "sol",
+      "nom": "Dalles et herbe",
+      "categorie": "Extérieur",
+      "fichier": "sols/dalles-herbe.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/dallage-romain",
+      "type": "sol",
+      "nom": "Dallage romain",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/dallage-romain.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/gravier",
+      "type": "sol",
+      "nom": "Gravier",
+      "categorie": "Extérieur",
+      "fichier": "sols/gravier.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/terre-battue",
+      "type": "sol",
+      "nom": "Terre battue",
+      "categorie": "Extérieur",
+      "fichier": "sols/terre-battue.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/gazon",
+      "type": "sol",
+      "nom": "Gazon",
+      "categorie": "Extérieur",
+      "fichier": "sols/gazon.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/terre-clairsemee",
+      "type": "sol",
+      "nom": "Terre clairsemée",
+      "categorie": "Extérieur",
+      "fichier": "sols/terre-clairsemee.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/moquette-laine",
+      "type": "sol",
+      "nom": "Moquette de laine",
+      "categorie": "Moquette",
+      "fichier": "sols/moquette-laine.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/moquette-anthracite",
+      "type": "sol",
+      "nom": "Moquette anthracite",
+      "categorie": "Moquette",
+      "fichier": "sols/moquette-anthracite.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/moquette-violette",
+      "type": "sol",
+      "nom": "Moquette violette",
+      "categorie": "Moquette",
+      "fichier": "sols/moquette-violette.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/moquette-canard",
+      "type": "sol",
+      "nom": "Moquette bleu canard",
+      "categorie": "Moquette",
+      "fichier": "sols/moquette-canard.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/moquette-cotelee",
+      "type": "sol",
+      "nom": "Moquette côtelée",
+      "categorie": "Moquette",
+      "fichier": "sols/moquette-cotelee.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/sisal",
+      "type": "sol",
+      "nom": "Sisal",
+      "categorie": "Moquette",
+      "fichier": "sols/sisal.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/planches-vieillies",
+      "type": "sol",
+      "nom": "Planches vieillies",
+      "categorie": "Bois",
+      "fichier": "sols/planches-vieillies.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/planches-ecaillees",
+      "type": "sol",
+      "nom": "Planches écaillées",
+      "categorie": "Bois",
+      "fichier": "sols/planches-ecaillees.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/chevrons-pierre",
+      "type": "sol",
+      "nom": "Chevrons de pierre",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/chevrons-pierre.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/beton-rivete",
+      "type": "sol",
+      "nom": "Dalles de béton rivetées",
+      "categorie": "Métal",
+      "fichier": "sols/beton-rivete.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/beton-brut",
+      "type": "sol",
+      "nom": "Béton brut",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/beton-brut.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/beton-fissure",
+      "type": "sol",
+      "nom": "Béton fissuré",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/beton-fissure.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/caillebotis",
+      "type": "sol",
+      "nom": "Caillebotis",
+      "categorie": "Métal",
+      "fichier": "sols/caillebotis.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/hexagones-cabochons",
+      "type": "sol",
+      "nom": "Hexagones à cabochons",
+      "categorie": "Carrelage",
+      "fichier": "sols/hexagones-cabochons.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/hexagones-turquoise",
+      "type": "sol",
+      "nom": "Hexagones turquoise",
+      "categorie": "Carrelage",
+      "fichier": "sols/hexagones-turquoise.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/mosaique-verte",
+      "type": "sol",
+      "nom": "Mosaïque verte",
+      "categorie": "Carrelage",
+      "fichier": "sols/mosaique-verte.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/eau",
+      "type": "sol",
+      "nom": "Eau",
+      "categorie": "Extérieur",
+      "fichier": "sols/eau.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/glace",
+      "type": "sol",
+      "nom": "Glace",
+      "categorie": "Extérieur",
+      "fichier": "sols/glace.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/neige",
+      "type": "sol",
+      "nom": "Neige",
+      "categorie": "Extérieur",
+      "fichier": "sols/neige.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/terre-craquelee",
+      "type": "sol",
+      "nom": "Terre craquelée",
+      "categorie": "Extérieur",
+      "fichier": "sols/terre-craquelee.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/feuilles-mortes",
+      "type": "sol",
+      "nom": "Feuilles mortes",
+      "categorie": "Extérieur",
+      "fichier": "sols/feuilles-mortes.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/pierres-mousse",
+      "type": "sol",
+      "nom": "Pierres et mousse",
+      "categorie": "Extérieur",
+      "fichier": "sols/pierres-mousse.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/vannerie",
+      "type": "sol",
+      "nom": "Vannerie",
+      "categorie": "Bois",
+      "fichier": "sols/vannerie.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/lattes-bambou",
+      "type": "sol",
+      "nom": "Lattes de bambou",
+      "categorie": "Bois",
+      "fichier": "sols/lattes-bambou.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/dalles-ardoise",
+      "type": "sol",
+      "nom": "Dalles d’ardoise",
+      "categorie": "Pierre et marbre",
+      "fichier": "sols/dalles-ardoise.png",
+      "tuile": 1.5
+    },
+    {
+      "id": "sols/sable-ondule",
+      "type": "sol",
+      "nom": "Sable ondulé",
+      "categorie": "Sable",
+      "fichier": "sols/sable-ondule.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/sable-fin",
+      "type": "sol",
+      "nom": "Sable fin",
+      "categorie": "Sable",
+      "fichier": "sols/sable-fin.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/dunes",
+      "type": "sol",
+      "nom": "Dunes",
+      "categorie": "Sable",
+      "fichier": "sols/dunes.png",
+      "tuile": 2.5
+    },
+    {
+      "id": "sols/sable-craquele",
+      "type": "sol",
+      "nom": "Sable craquelé",
+      "categorie": "Sable",
+      "fichier": "sols/sable-craquele.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/sable-cailloux",
+      "type": "sol",
+      "nom": "Sable et cailloux",
+      "categorie": "Sable",
+      "fichier": "sols/sable-cailloux.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/sable-vent",
+      "type": "sol",
+      "nom": "Sable sculpté par le vent",
+      "categorie": "Sable",
+      "fichier": "sols/sable-vent.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/sable-herbes",
+      "type": "sol",
+      "nom": "Sable et herbes sèches",
+      "categorie": "Sable",
+      "fichier": "sols/sable-herbes.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/terre-cailloux",
+      "type": "sol",
+      "nom": "Terre et cailloux",
+      "categorie": "Sable",
+      "fichier": "sols/terre-cailloux.png",
+      "tuile": 2
+    },
+    {
+      "id": "sols/sable-dalles",
+      "type": "sol",
+      "nom": "Sable et dalles brisées",
+      "categorie": "Sable",
+      "fichier": "sols/sable-dalles.png",
       "tuile": 2
     },
     {
       "id": "sols/damier-use",
       "type": "sol",
       "nom": "Damier usé",
-      "categorie": "Sols",
+      "categorie": "Carrelage",
       "fichier": "sols/damier-use.png",
       "tuile": 2
     },
@@ -109,7 +909,7 @@
       "id": "sols/dalles-pierre",
       "type": "sol",
       "nom": "Dalles de pierre",
-      "categorie": "Sols",
+      "categorie": "Pierre et marbre",
       "fichier": "sols/dalles-pierre.png",
       "tuile": 3
     },
@@ -117,7 +917,7 @@
       "id": "sols/parquet-vert",
       "type": "sol",
       "nom": "Parquet vert à chevrons",
-      "categorie": "Sols",
+      "categorie": "Bois",
       "fichier": "sols/parquet-vert.png",
       "tuile": 2
     },
@@ -125,7 +925,7 @@
       "id": "sols/terre-herbe",
       "type": "sol",
       "nom": "Terre et herbe morte",
-      "categorie": "Sols",
+      "categorie": "Extérieur",
       "fichier": "sols/terre-herbe.png",
       "tuile": 3
     },
@@ -133,7 +933,7 @@
       "id": "sols/parquet-sombre",
       "type": "sol",
       "nom": "Parquet sombre",
-      "categorie": "Sols",
+      "categorie": "Bois",
       "fichier": "sols/parquet-sombre.png",
       "tuile": 2
     },

@@ -13,8 +13,14 @@ import { useState } from 'react'
 import { filtrerAssets, rangement, type AssetAtelier } from '@shared/atelierAssets'
 import { urlAsset } from './images'
 
-/** Le rangement choisi, retenu tant que l'application est ouverte. */
-const memoire = { categorie: null as string | null, sous: null as string | null, recherche: '', chercher: false }
+/** Le rangement choisi, retenu tant que l'application est ouverte — un par palette (sols, objets…). */
+type Memoire = { categorie: string | null; sous: string | null; recherche: string; chercher: boolean }
+const memoires = new Map<string, Memoire>()
+const memoireDe = (cle: string): Memoire => {
+  let m = memoires.get(cle)
+  if (!m) memoires.set(cle, (m = { categorie: null, sous: null, recherche: '', chercher: false }))
+  return m
+}
 
 /** Le nom de fichier de l'icône d'un rayon : « Toiles d'araignées » → `toiles-d-araignees`. */
 export function slug(nom: string): string {
@@ -82,7 +88,8 @@ export function Palette({
   choisi,
   choisis,
   onChoisir,
-  parCategorie = false
+  parCategorie = false,
+  cle = 'objets'
 }: {
   assets: AssetAtelier[]
   choisi: string | null
@@ -90,7 +97,10 @@ export function Palette({
   choisis?: string[]
   onChoisir: (a: AssetAtelier) => void
   parCategorie?: boolean
+  /** La palette dont on retient le rangement : deux palettes ne se mélangent pas. */
+  cle?: string
 }): JSX.Element {
+  const memoire = memoireDe(cle)
   const [categorie, setCategorieE] = useState<string | null>(memoire.categorie)
   const [sous, setSousE] = useState<string | null>(memoire.sous)
   const [recherche, setRechercheE] = useState(memoire.recherche)

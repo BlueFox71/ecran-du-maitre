@@ -206,6 +206,8 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
         </div>
         <Palette
           assets={sols}
+          parCategorie
+          cle="sols-base"
           choisi={co.c?.base ?? null}
           onChoisir={(a) => co.modifier((c) => ({ ...c, base: a.id }))}
         />
@@ -214,6 +216,8 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
         <span className="eyebrow">Matière</span>
         <Palette
           assets={sols}
+          parCategorie
+          cle="sols"
           choisi={matiereSure}
           onChoisir={(a) => {
             setMatiere(a.id)
