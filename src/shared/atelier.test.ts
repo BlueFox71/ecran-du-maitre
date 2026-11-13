@@ -331,3 +331,16 @@ describe('matière de base et gomme', () => {
     expect(lireConstruction(brut).sols).toEqual([])
   })
 })
+
+describe('teinte des murs', () => {
+  it('lireConstruction garde une teinte valable et écarte le reste', () => {
+    const c = terrain(10, 10)
+    c.murs.push(
+      { id: 'a', assetId: 'x', pts: [[0, 0], [1, 1]], epaisseur: 0.4, teinte: '#7a2e2e' },
+      { id: 'b', assetId: 'x', pts: [[0, 0], [1, 1]], epaisseur: 0.4, teinte: 'rouge' as never }
+    )
+    const m = lireConstruction(JSON.stringify(c)).murs
+    expect(m[0].teinte).toBe('#7a2e2e')
+    expect(m[1].teinte).toBeUndefined()
+  })
+})

@@ -26931,3 +26931,36 @@ button.at-titre:hover {
 .at-tuile img.couvre {
   object-fit: cover;
 }
+
+/* Les couleurs d'un mur : des pastilles, une sans couleur, une au choix. */
+.at-couleurs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.at-pastille {
+  position: relative;
+  width: 26px;
+  height: 26px;
+  padding: 0;
+  border: 2px solid var(--line);
+  border-radius: 50%;
+  cursor: pointer;
+  overflow: hidden;
+}
+.at-pastille[aria-pressed='true'] {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 2px var(--brass-wash);
+}
+.at-pastille-aucune {
+  background: linear-gradient(135deg, transparent 45%, #c0564d 45%, #c0564d 55%, transparent 55%), var(--surface);
+}
+.at-pastille-libre {
+  background: conic-gradient(#c0564d, #d8a94a, #4a5e3e, #3e5468, #5b4a6e, #c0564d);
+}
+.at-pastille-libre input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}

@@ -1494,6 +1494,33 @@ for (const pl of PLANCHES) {
   })
 }
 
+/* Le mur blanc : un enduit à peine grainé, fabriqué ici. Uni, il prend
+   exactement la couleur qu'on lui donne dans l'atelier. */
+{
+  const W = 1024
+  const H = 160
+  const blanc = new PNG({ width: W, height: H })
+  let g = 12345
+  const hasard = (): number => ((g = (g * 1664525 + 1013904223) >>> 0) / 2 ** 32)
+  /* Un grain doux qui se raccorde en longueur : du bruit lissé, bouclé sur la largeur. */
+  const bruit = Array.from({ length: W / 8 }, hasard)
+  for (let y = 0; y < H; y++)
+    for (let x = 0; x < W; x++) {
+      const k = x / 8
+      const i0 = Math.floor(k) % bruit.length
+      const t = k - Math.floor(k)
+      const doux = bruit[i0] * (1 - t) + bruit[(i0 + 1) % bruit.length] * t
+      const v = Math.round(236 + doux * 10 + (hasard() - 0.5) * 8)
+      const i = (y * W + x) * 4
+      blanc.data[i] = v
+      blanc.data[i + 1] = v
+      blanc.data[i + 2] = Math.max(0, v - 3)
+      blanc.data[i + 3] = 255
+    }
+  writeFileSync(join(PACK, 'murs/uni-blanc.png'), PNG.sync.write(blanc))
+  catalogue.push({ id: 'murs/uni-blanc', type: 'mur', nom: 'Mur uni (à colorer)', categorie: 'Plâtre et béton', fichier: 'murs/uni-blanc.png', tuile: 2.5 })
+}
+
 /* L'ordre de la palette : les sols, murs et ouvertures d'abord, puis les objets
    par catégorie et sous-catégorie, dans un ordre qui se lit. */
 const ORDRE_CATEGORIES = ['Mobilier', 'Lumière', 'Objets', 'Architecture', 'Nature', 'Macabre', 'Moderne']

@@ -213,6 +213,14 @@ function dessinerMurs(
           ctx.fillStyle = motif
         } else ctx.fillStyle = '#2c2c30'
         ctx.fillRect(-ep / 2, -ep / 2, l + ep, ep)
+        /* La couleur du mur, multipliée : le blanc la prend telle quelle, une
+           pierre ou une brique la prend en gardant ses détails. */
+        if (m.teinte) {
+          ctx.globalCompositeOperation = 'multiply'
+          ctx.fillStyle = m.teinte
+          ctx.fillRect(-ep / 2, -ep / 2, l + ep, ep)
+          ctx.globalCompositeOperation = 'source-over'
+        }
         /* Le volume : deux arêtes sombres, un liseré clair au milieu. */
         ctx.fillStyle = 'rgba(0, 0, 0, 0.45)'
         ctx.fillRect(-ep / 2, -ep / 2, l + ep, Math.max(1, ep * 0.08))

@@ -24,6 +24,9 @@ const OUTILS: { id: OutilMurs; label: string; aide: string }[] = [
 
 export const EPAISSEUR_DEFAUT = 0.4
 
+/** Quelques couleurs de mur tout de suite à portée : badigeons, enduits, papiers peints passés. */
+const TEINTES = ['#e9e2d0', '#c9b48a', '#a8785a', '#7a2e2e', '#4a5e3e', '#3e5468', '#5b4a6e', '#2f2f33']
+
 const ferme = (pts: PointCase[]): boolean =>
   pts.length > 2 && Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 1e-6
 
@@ -33,6 +36,8 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
   const [outil, setOutilMurs] = useState<OutilMurs>('piece')
   const [matiere, setMatiere] = useState<string | null>(null)
   const [epaisseur, setEpaisseur] = useState(EPAISSEUR_DEFAUT)
+  /* La couleur des prochains murs ; `null`, la matière telle quelle. */
+  const [teinte, setTeinte] = useState<string | null>(null)
   const [choisi, setChoisi] = useState<string | null>(null)
   const points = useRef<PointCase[]>([])
   const depart = useRef<PointCase | null>(null)
@@ -44,7 +49,7 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
   const poser = (pts: PointCase[]): void => {
     const net = pts.filter((p, i, t) => !i || Math.hypot(p[0] - t[i - 1][0], p[1] - t[i - 1][1]) > 1e-6)
     if (net.length < 2 || !matiereSure) return
-    const m: MurBati = { id: nouvelId(), assetId: matiereSure, pts: net, epaisseur }
+    const m: MurBati = { id: nouvelId(), assetId: matiereSure, pts: net, epaisseur, ...(teinte ? { teinte } : {}) }
     co.modifier((c) => ({ ...c, murs: [...c.murs, m] }))
   }
 
@@ -144,7 +149,7 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
       }
     })
     return () => setOutil(null)
-  }, [outil, matiereSure, epaisseur, choisi, co.c])
+  }, [outil, matiereSure, epaisseur, teinte, choisi, co.c])
 
   useEffect(() => {
     const k = (e: KeyboardEvent): void => {
@@ -165,6 +170,20 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
   const regler = (patch: Partial<MurBati>): void => {
     if (!choisi) return
     co.modifier((c) => ({ ...c, murs: c.murs.map((m) => (m.id === choisi ? { ...m, ...patch } : m)) }))
+  }
+
+  const couleur = murChoisi ? (murChoisi.teinte ?? null) : teinte
+  const choisirCouleur = (t: string | null): void => {
+    setTeinte(t)
+    if (murChoisi)
+      co.modifier((c) => ({
+        ...c,
+        murs: c.murs.map((m) => {
+          if (m.id !== murChoisi.id) return m
+          const { teinte: _sans, ...reste } = m
+          return t ? { ...reste, teinte: t } : reste
+        })
+      }))
   }
 
   return (
@@ -200,6 +219,30 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
           }}
         />
       </label>
+      <div className="at-section">
+        <span className="eyebrow">Couleur{murChoisi ? ' du mur choisi' : ''}</span>
+        <div className="at-couleurs">
+          <button
+            className="at-pastille at-pastille-aucune"
+            aria-pressed={!couleur}
+            title="La matière telle quelle"
+            onClick={() => choisirCouleur(null)}
+          />
+          {TEINTES.map((t) => (
+            <button
+              key={t}
+              className="at-pastille"
+              style={{ background: t }}
+              aria-pressed={couleur === t}
+              title={t}
+              onClick={() => choisirCouleur(t)}
+            />
+          ))}
+          <label className="at-pastille at-pastille-libre" title="Une autre couleur…">
+            <input type="color" value={couleur ?? '#b8a27a'} onChange={(e) => choisirCouleur(e.target.value)} />
+          </label>
+        </div>
+      </div>
       <div className="at-section">
         <span className="eyebrow">Matière</span>
         <Palette

@@ -44,6 +44,8 @@ export interface MurBati {
   assetId: string
   pts: PointCase[]
   epaisseur: number
+  /** Une couleur posée sur la matière (`#rrggbb`) : sur un mur blanc, c'est elle qu'on voit. */
+  teinte?: string
 }
 
 export type NatureOuvertureBatie = NatureOuverture
@@ -501,7 +503,13 @@ export function lireConstruction(brut: unknown): Construction {
   for (const m of liste(v.murs)) {
     const pts = points(m?.pts, 2)
     if (texte(m?.id) && texte(m?.assetId) && pts && fini(m.epaisseur) && m.epaisseur > 0)
-      murs.push({ id: m.id, assetId: m.assetId, pts, epaisseur: m.epaisseur })
+      murs.push({
+        id: m.id,
+        assetId: m.assetId,
+        pts,
+        epaisseur: m.epaisseur,
+        ...(typeof m.teinte === 'string' && /^#[0-9a-f]{6}$/i.test(m.teinte) ? { teinte: m.teinte } : {})
+      })
   }
   const ouvertures: OuvertureBatie[] = []
   for (const o of liste(v.ouvertures)) {

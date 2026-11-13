@@ -1156,6 +1156,14 @@
       "fichier": "ouvertures/fenetre-baie.png"
     },
     {
+      "id": "murs/uni-blanc",
+      "type": "mur",
+      "nom": "Mur uni (à colorer)",
+      "categorie": "Plâtre et béton",
+      "fichier": "murs/uni-blanc.png",
+      "tuile": 2.5
+    },
+    {
       "id": "objets/lit-double",
       "type": "objet",
       "nom": "Lit double",
