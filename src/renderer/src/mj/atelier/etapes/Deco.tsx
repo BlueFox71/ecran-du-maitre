@@ -8,7 +8,7 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { contourDeLObjet, nouvelId, type ObjetPose, type PointCase } from '@shared/atelier'
-import { centreDeCase, mettreAuPlan, objetSous, redimensionner, tourner } from '@shared/atelierOutils'
+import { centreDeCase, mettreAuPlan, objetSous, redimensionner, tourner, tournerGroupe } from '@shared/atelierOutils'
 import type { AssetAtelier } from '@shared/atelierAssets'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
@@ -23,12 +23,33 @@ type Geste =
   | { quoi: 'deplacer'; id: string; prise: PointCase; depart: Map<string, PointCase> }
   | { quoi: 'coin'; id: string; i: number }
   | { quoi: 'tourner'; id: string }
+  /** Le groupe pivote autour de son centre ; `a0` : l'angle de la souris au départ. */
+  | { quoi: 'tournerGroupe'; centre: PointCase; a0: number; depart: ObjetPose[] }
 
 function poigneeRotation(o: ObjetPose): PointCase {
   const a = (o.angle * Math.PI) / 180
   const r = o.h / 2 + ECART_ROTATION
   return [o.x + r * Math.sin(a), o.y - r * Math.cos(a)]
 }
+
+/** La boîte d'un groupe d'objets, en cases. */
+function boiteDuGroupe(groupe: ObjetPose[]): { x0: number; y0: number; x1: number; y1: number } {
+  const pts = groupe.flatMap((o) => contourDeLObjet(o))
+  const xs = pts.map((p) => p[0])
+  const ys = pts.map((p) => p[1])
+  return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) }
+}
+
+/** La poignée de rotation d'un groupe : au-dessus de sa boîte, au milieu. */
+function poigneeDuGroupe(groupe: ObjetPose[]): { poignee: PointCase; centre: PointCase } {
+  const b = boiteDuGroupe(groupe)
+  const cx = (b.x0 + b.x1) / 2
+  return { poignee: [cx, b.y0 - ECART_ROTATION], centre: [cx, (b.y0 + b.y1) / 2] }
+}
+
+/** L'angle d'un point vu d'un centre, en degrés, 0 vers le haut, dans le sens des aiguilles d'une montre. */
+const angleVers = (centre: PointCase, p: PointCase): number =>
+  (Math.atan2(p[0] - centre[0], -(p[1] - centre[1])) * 180) / Math.PI
 
 /** Une case à cocher qui sait dire « mixte » quand les objets choisis diffèrent. */
 function CaseGroupe({
@@ -80,6 +101,10 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
       curseurSous: (p, prise) => {
         const c = co.c
         if (arme || !c) return undefined
+        if (groupe.length > 1) {
+          const { poignee: pg } = poigneeDuGroupe(groupe)
+          if (Math.hypot(p[0] - pg[0], p[1] - pg[1]) < prise) return 'grab'
+        }
         if (seul) {
           const rot = poigneeRotation(seul)
           if (Math.hypot(p[0] - rot[0], p[1] - rot[1]) < prise) return 'grab'
@@ -127,6 +152,14 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
               setChoisis((l) => (l.includes(sous.id) ? l.filter((id) => id !== sous.id) : [...l, sous.id]))
             repeindre()
             return
+          }
+          if (groupe.length > 1) {
+            const { poignee: pg, centre } = poigneeDuGroupe(groupe)
+            if (Math.hypot(brut[0] - pg[0], brut[1] - pg[1]) < prise) {
+              co.marquer()
+              geste.current = { quoi: 'tournerGroupe', centre, a0: angleVers(centre, brut), depart: groupe }
+              return
+            }
           }
           if (seul) {
             const rot = poigneeRotation(seul)
@@ -179,6 +212,12 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
           }
           if (g.quoi === 'coin') majObjets([g.id], (o) => redimensionner(o, g.i, brut, !e.altKey), false)
           if (g.quoi === 'tourner') majObjets([g.id], (o) => tourner(o, brut, e.shiftKey), false)
+          if (g.quoi === 'tournerGroupe') {
+            let delta = angleVers(g.centre, brut) - g.a0
+            if (e.shiftKey) delta = Math.round(delta / 15) * 15
+            const tournes = new Map(tournerGroupe(g.depart, g.centre, delta).map((o) => [o.id, o]))
+            co.remplacer((v) => ({ ...v, objets: v.objets.map((o) => tournes.get(o.id) ?? o) }))
+          }
         }
         if (type === 'up') geste.current = null
         repeindre()
@@ -191,6 +230,25 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
           contour(ctx, contourDeLObjet({ ...({} as ObjetPose), x, y, l: arme.l ?? 1, h: arme.h ?? 1, angle: 0 }), echelle, true)
         }
         for (const o of c.objets) if (choisis.includes(o.id)) contour(ctx, contourDeLObjet(o), echelle)
+        const sel = c.objets.filter((o) => choisis.includes(o.id))
+        if (sel.length > 1) {
+          /* Le groupe : sa boîte en pointillés, et sa poignée de rotation. */
+          const b = boiteDuGroupe(sel)
+          const { poignee: pg } = poigneeDuGroupe(sel)
+          ctx.setLineDash([5 / echelle, 4 / echelle])
+          ctx.strokeStyle = 'rgba(232, 184, 92, 0.8)'
+          ctx.lineWidth = 1.5 / echelle
+          ctx.strokeRect(b.x0, b.y0, b.x1 - b.x0, b.y1 - b.y0)
+          ctx.setLineDash([])
+          ctx.beginPath()
+          ctx.moveTo(pg[0], b.y0)
+          ctx.lineTo(pg[0], pg[1])
+          ctx.stroke()
+          ctx.beginPath()
+          ctx.arc(pg[0], pg[1], 5 / echelle, 0, Math.PI * 2)
+          ctx.fillStyle = '#fff'
+          ctx.fill()
+        }
         const o = choisis.length === 1 ? c.objets.find((x) => x.id === choisis[0]) : null
         if (o) {
           const pts = contourDeLObjet(o)
@@ -286,15 +344,13 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
             </li>
             <li>Glisser : déplacer {seul ? 'l’objet' : 'le groupe'} (<kbd>Ctrl</kbd> : centrer sur la case)</li>
             {seul ? (
-              <>
-                <li>
-                  Coin : redimensionner (<kbd>Alt</kbd> : sans garder les proportions)
-                </li>
-                <li>
-                  Rond : tourner (<kbd>Maj</kbd> : par 15°)
-                </li>
-              </>
+              <li>
+                Coin : redimensionner (<kbd>Alt</kbd> : sans garder les proportions)
+              </li>
             ) : null}
+            <li>
+              Rond : tourner {seul ? 'l’objet' : 'le groupe'} (<kbd>Maj</kbd> : par 15°)
+            </li>
           </ul>
         </div>
       ) : (

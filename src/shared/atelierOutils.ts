@@ -205,3 +205,23 @@ export function mettreAuPlan<T extends { id: string }>(liste: T[], ids: string[]
   const reste = liste.filter((o) => !ids.includes(o.id))
   return devant ? [...reste, ...choisis] : [...choisis, ...reste]
 }
+
+/**
+ * Faire pivoter un groupe d'objets autour d'un point : chacun tourne autour
+ * de lui comme sur un plateau, et sur lui-même du même angle.
+ */
+export function tournerGroupe(objets: ObjetPose[], centre: PointCase, delta: number): ObjetPose[] {
+  const a = (delta * Math.PI) / 180
+  const cos = Math.cos(a)
+  const sin = Math.sin(a)
+  return objets.map((o) => {
+    const dx = o.x - centre[0]
+    const dy = o.y - centre[1]
+    return {
+      ...o,
+      x: centre[0] + dx * cos - dy * sin,
+      y: centre[1] + dx * sin + dy * cos,
+      angle: (((o.angle + delta) % 360) + 360) % 360
+    }
+  })
+}

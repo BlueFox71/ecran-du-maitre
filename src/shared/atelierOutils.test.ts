@@ -11,6 +11,7 @@ import {
   centreDeCase,
   mettreAuPlan,
   tourner,
+  tournerGroupe,
   zoneARemplir
 } from './atelierOutils'
 
@@ -184,5 +185,18 @@ describe('mettreAuPlan', () => {
   })
   it('passe les choisis derrière, dans leur ordre', () => {
     expect(ids(mettreAuPlan(liste, ['d', 'b'], false))).toBe('bdace')
+  })
+})
+
+describe('tournerGroupe', () => {
+  it('fait pivoter les objets autour du centre, et chacun sur lui-même', () => {
+    const objs = [meuble({ id: 'a', x: 4, y: 5 }), meuble({ id: 'b', x: 6, y: 5, angle: 10 })]
+    const r = tournerGroupe(objs, [5, 5], 90)
+    expect(r[0].x).toBeCloseTo(5, 9)
+    expect(r[0].y).toBeCloseTo(4, 9)
+    expect(r[0].angle).toBeCloseTo(90, 9)
+    expect(r[1].x).toBeCloseTo(5, 9)
+    expect(r[1].y).toBeCloseTo(6, 9)
+    expect(r[1].angle).toBeCloseTo(100, 9)
   })
 })

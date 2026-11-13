@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { constructionVide, type Construction } from './atelier'
-import { calqueDEssai } from './essai'
+import { calqueDEssai, lueurDeLampe } from './essai'
 import type { CalqueBrouillard } from './types'
 
 const base: CalqueBrouillard = {
@@ -41,5 +41,20 @@ describe('calqueDEssai', () => {
   it('des ids distincts pour chaque trait', () => {
     const ids = calqueDEssai(maison(), base, new Set()).murs.map((m) => m.id)
     expect(new Set(ids).size).toBe(ids.length)
+  })
+})
+
+describe('lueurDeLampe', () => {
+  it('la lueur s’arrête au mur', () => {
+    const c: Construction = { ...constructionVide(), largeur: 10, hauteur: 10 }
+    c.murs.push({ id: 'm', assetId: 'x', pts: [[5, 0], [5, 10]], epaisseur: 0.4 })
+    const pts = lueurDeLampe(c, { x: 0.2, y: 0.5, penombre: 0.8, ouverture: 360, cap: 0 })
+    expect(pts.length).toBeGreaterThan(3)
+    expect(Math.max(...pts.map((p) => p[0]))).toBeLessThanOrEqual(5 + 1e-6)
+  })
+  it('sans mur, elle porte jusqu’à sa pénombre', () => {
+    const c: Construction = { ...constructionVide(), largeur: 10, hauteur: 10 }
+    const pts = lueurDeLampe(c, { x: 0.5, y: 0.5, penombre: 0.2, ouverture: 360, cap: 0 })
+    expect(Math.max(...pts.map((p) => p[0]))).toBeCloseTo(7, 1)
   })
 })

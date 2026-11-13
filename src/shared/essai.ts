@@ -7,6 +7,7 @@
  */
 import { deriverCalque, type Construction } from './atelier'
 import type { CalqueBrouillard, Mur, Ouverture } from './types'
+import { barrieres, bords, champDeVision } from './murs'
 
 /** `ouvertes` : les ids d'atelier des portes qu'on a ouvertes pendant l'essai. */
 export function calqueDEssai(
@@ -34,4 +35,27 @@ export function calqueDEssai(
       atelierId: o.atelierId
     }))
   return { ...lieu, murs, ouvertures }
+}
+
+/** Les pixels d'une case pour le calcul de la lueur (un repère arbitraire : tout s'y mesure en proportion). */
+const PX_LUEUR = 100
+
+/**
+ * Ce qu'une lampe éclaire dans la construction en cours, en cases : un rond
+ * (ou un faisceau) de la portée de sa pénombre, arrêté par les murs et les
+ * meubles qui cachent la vue, comme en séance. Les portes y sont fermées.
+ */
+export function lueurDeLampe(
+  c: Construction,
+  l: { x: number; y: number; penombre: number; ouverture: number; cap: number }
+): [number, number][] {
+  const k = calqueDEssai(c, { murs: [], ouvertures: [] } as unknown as CalqueBrouillard, new Set())
+  const w = c.largeur * PX_LUEUR
+  const h = c.hauteur * PX_LUEUR
+  const murs = barrieres(k.murs, 'vue', (p) => ({ x: p[0] * w, y: p[1] * h }), k.ouvertures).concat(bords(w, h))
+  const ouverture = l.ouverture >= 360 ? 360 : l.ouverture
+  return champDeVision(murs, { x: l.x * w, y: l.y * h }, l.cap, ouverture, l.penombre * w).map((p) => [
+    p.x / PX_LUEUR,
+    p.y / PX_LUEUR
+  ])
 }

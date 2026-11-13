@@ -7,6 +7,7 @@
  */
 import { useEffect, useRef } from 'react'
 import type { PointCase } from '@shared/atelier'
+import { lueurDeLampe } from '@shared/essai'
 import type { PropsEtape } from '../../modules/Atelier'
 import { BarreLumiere, useMurs } from '../../components/Murs'
 
@@ -62,6 +63,13 @@ function Lampes({ place, co, setOutil, repeindre }: PropsEtape): JSX.Element {
           const g = glisse.current?.id === l.id ? glisse.current.p : enCases(l.x, l.y)
           const r = l.penombre * c.largeur
           if (l.allumee) {
+            /* La lueur s'arrête aux murs et aux meubles qui cachent la vue, comme en séance. */
+            const zone = lueurDeLampe(c, { ...l, x: g[0] / c.largeur, y: g[1] / c.hauteur })
+            ctx.save()
+            ctx.beginPath()
+            zone.forEach(([x, y], i) => (i ? ctx.lineTo(x, y) : ctx.moveTo(x, y)))
+            ctx.closePath()
+            ctx.clip()
             const grad = ctx.createRadialGradient(g[0], g[1], 0, g[0], g[1], r)
             grad.addColorStop(0, teinte(l.teinte, 0.4))
             grad.addColorStop(Math.min(0.99, Math.max(0.01, l.clair / l.penombre)), teinte(l.teinte, 0.2))
@@ -70,6 +78,7 @@ function Lampes({ place, co, setOutil, repeindre }: PropsEtape): JSX.Element {
             ctx.beginPath()
             ctx.arc(g[0], g[1], r, 0, Math.PI * 2)
             ctx.fill()
+            ctx.restore()
           }
           ctx.beginPath()
           ctx.arc(g[0], g[1], (m.lumChoisie === l.id ? 8 : 6) / echelle, 0, Math.PI * 2)
@@ -82,7 +91,7 @@ function Lampes({ place, co, setOutil, repeindre }: PropsEtape): JSX.Element {
       }
     })
     return () => setOutil(null)
-  }, [m.lumieres, m.lumChoisie, c.largeur, c.hauteur])
+  }, [m.lumieres, m.lumChoisie, c])
 
   return (
     <>
