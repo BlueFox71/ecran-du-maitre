@@ -228,10 +228,14 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
           </p>
         </div>
       ) : (
-        <p className="at-aide">
-          Prends une vignette puis clique où poser l’objet (Maj : en poser plusieurs ; Ctrl : au
-          centre de la case). Clique un objet posé pour le régler.
-        </p>
+        <ul className="at-raccourcis">
+          <li>
+            <kbd>Ctrl</kbd> : centrer sur la case
+          </li>
+          <li>
+            <kbd>Maj</kbd> : poser plusieurs fois
+          </li>
+        </ul>
       )}
       <Palette assets={objets} choisi={arme?.id ?? null} onChoisir={(a) => setArme(arme?.id === a.id ? null : a)} parCategorie />
       <ImportAsset {...props} typeParDefaut="objet" />

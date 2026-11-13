@@ -26737,3 +26737,25 @@ body.surligneur-actif [data-cible] {
   color: var(--blood, #c0564d);
   font-size: 12.5px;
 }
+
+/* Les raccourcis d'une étape, en liste courte. */
+.at-raccourcis {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: grid;
+  gap: 4px;
+  color: var(--text-dim);
+  font-size: 12px;
+}
+.at-raccourcis kbd {
+  display: inline-block;
+  min-width: 34px;
+  padding: 1px 5px;
+  border: 1px solid var(--line);
+  border-radius: 4px;
+  background: var(--sunk);
+  color: var(--text);
+  font: 11px 'IBM Plex Mono', monospace;
+  text-align: center;
+}
