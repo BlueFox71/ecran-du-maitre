@@ -5,7 +5,7 @@
  * sur la construction, et on les règle avec les mêmes commandes que dans
  * l'éditeur de plan.
  */
-import { useEffect, useRef } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import type { PointCase } from '@shared/atelier'
 import { lueurDeLampe } from '@shared/essai'
 import type { PropsEtape } from '../../modules/Atelier'
@@ -32,14 +32,39 @@ export function EtapeEclairage(props: PropsEtape): JSX.Element {
 function Lampes({ place, co, setOutil, repeindre }: PropsEtape): JSX.Element {
   const m = useMurs(place.id)
   const glisse = useRef<{ id: number; p: PointCase } | null>(null)
+  /* La pose armée : le prochain clic pose une lampe. Sans elle, un clic choisit. */
+  const [arme, setArme] = useState(false)
+  const souris = useRef<PointCase | null>(null)
   const c = co.c!
   const enCases = (x: number, y: number): PointCase => [x * c.largeur, y * c.hauteur]
 
   useEffect(() => {
     setOutil({
-      curseur: 'crosshair',
-      onPointer: (type, _p, brut, _e, prise) => {
+      curseur: arme ? 'copy' : 'default',
+      curseurSous: (p, prise) =>
+        !arme &&
+        m.lumieres.some((l) => {
+          const [x, y] = enCases(l.x, l.y)
+          return Math.hypot(p[0] - x, p[1] - y) < prise
+        })
+          ? 'move'
+          : undefined,
+      onPointer: (type, _p, brut, e, prise) => {
+        souris.current = brut
+        /* Clic droit pendant une pose : rien n'est posé. */
+        if (type === 'droit' && arme) {
+          setArme(false)
+          repeindre()
+          return
+        }
         if (type === 'down') {
+          if (arme) {
+            void m.poserLumiere(brut[0] / c.largeur, brut[1] / c.hauteur)
+            /* Maj : on garde la pose pour en mettre plusieurs. */
+            if (!e.shiftKey) setArme(false)
+            repeindre()
+            return
+          }
           const proche = m.lumieres.find((l) => {
             const [x, y] = enCases(l.x, l.y)
             return Math.hypot(brut[0] - x, brut[1] - y) < prise
@@ -47,7 +72,7 @@ function Lampes({ place, co, setOutil, repeindre }: PropsEtape): JSX.Element {
           if (proche) {
             m.setLumChoisie(proche.id)
             glisse.current = { id: proche.id, p: brut }
-          } else void m.poserLumiere(brut[0] / c.largeur, brut[1] / c.hauteur)
+          } else m.setLumChoisie(null)
         }
         if (type === 'move' && glisse.current) glisse.current = { ...glisse.current, p: brut }
         if (type === 'up' && glisse.current) {
@@ -58,6 +83,17 @@ function Lampes({ place, co, setOutil, repeindre }: PropsEtape): JSX.Element {
         repeindre()
       },
       dessiner: (ctx, echelle) => {
+        /* La lampe qu'on s'apprête à poser, sous la souris. */
+        if (arme && souris.current) {
+          const [x, y] = souris.current
+          ctx.beginPath()
+          ctx.arc(x, y, 7 / echelle, 0, Math.PI * 2)
+          ctx.fillStyle = 'rgba(240, 193, 90, 0.6)'
+          ctx.fill()
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.7)'
+          ctx.lineWidth = 1.5 / echelle
+          ctx.stroke()
+        }
         /* Un aperçu de la lueur : la vraie se calcule en séance, avec les murs. */
         for (const l of m.lumieres) {
           const g = glisse.current?.id === l.id ? glisse.current.p : enCases(l.x, l.y)
@@ -91,14 +127,33 @@ function Lampes({ place, co, setOutil, repeindre }: PropsEtape): JSX.Element {
       }
     })
     return () => setOutil(null)
-  }, [m.lumieres, m.lumChoisie, c])
+  }, [m.lumieres, m.lumChoisie, c, arme])
+
+  /* Échap : on abandonne la pose. */
+  useEffect(() => {
+    if (!arme) return
+    const k = (e: KeyboardEvent): void => {
+      if (e.key === 'Escape') setArme(false)
+    }
+    window.addEventListener('keydown', k)
+    return () => window.removeEventListener('keydown', k)
+  }, [arme])
 
   return (
     <>
       <p className="at-aide">
-        Clique pour poser une lampe, glisse-la pour la déplacer. Elles éclairent en séance, arrêtées
-        par les murs enregistrés.
+        Clique une lampe pour la régler, glisse-la pour la déplacer. Elles éclairent en séance,
+        arrêtées par les murs.
       </p>
+      <button className="btn btn-sm" aria-pressed={arme} onClick={() => setArme(!arme)}>
+        {arme ? 'Clique sur le plan pour poser la lampe' : 'Ajouter une lampe'}
+      </button>
+      <ul className="at-raccourcis">
+        <li>
+          <kbd>Maj</kbd> : poser plusieurs lampes
+        </li>
+        <li>Clic droit ou <kbd>Échap</kbd> : annuler la pose</li>
+      </ul>
       <div className="at-section at-lampe">
         <BarreLumiere m={m} />
       </div>
