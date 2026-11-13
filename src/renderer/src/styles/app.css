@@ -26844,3 +26844,43 @@ button.at-titre:hover {
   width: 26px;
   height: 26px;
 }
+
+/* La matière de base : un bouton qui montre la matière choisie et ouvre sa grille. */
+.at-base {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--sunk);
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.at-base:hover,
+.at-base[aria-expanded='true'] {
+  border-color: var(--brass-line);
+}
+.at-base img,
+.at-base-vide {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  border-radius: 5px;
+  object-fit: cover;
+  background: #1b2226;
+}
+.at-base > span:nth-child(2) {
+  display: grid;
+  flex: 1;
+  min-width: 0;
+}
+.at-base-nom {
+  font-size: 13px;
+}
+.at-base-chevron {
+  color: var(--text-dim);
+}

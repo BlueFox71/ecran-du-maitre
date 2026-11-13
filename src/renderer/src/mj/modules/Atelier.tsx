@@ -31,7 +31,7 @@ const ETAPES: { id: EtapeId; label: string }[] = [
   { id: 'sol', label: 'Sol' },
   { id: 'murs', label: 'Murs' },
   { id: 'ouvertures', label: 'Portes et fenêtres' },
-  { id: 'deco', label: 'Déco' },
+  { id: 'deco', label: 'Objets' },
   { id: 'eclairage', label: 'Éclairage' }
 ]
 

@@ -7,6 +7,7 @@ import { nouvelId, type PointCase } from '@shared/atelier'
 import { rectangle, solSous, zoneARemplir } from '@shared/atelierOutils'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
+import { urlAsset } from '../images'
 import { ImportAsset } from '../ImportAsset'
 import { cercle, contour, pointille } from '../dessin'
 
@@ -42,6 +43,8 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
   const [outil, setOutilSol] = useState<OutilSol>('rect')
   const [matiere, setMatiere] = useState<string | null>(null)
   const [choisi, setChoisi] = useState<string | null>(null)
+  const [baseOuverte, setBaseOuverte] = useState(false)
+  const baseAsset = co.c?.base ? sols.find((x) => x.id === co.c!.base) : undefined
   const depart = useRef<PointCase | null>(null)
   const points = useRef<PointCase[]>([])
   const souris = useRef<PointCase | null>(null)
@@ -193,24 +196,42 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
         ) : null}
       </div>
       <div className="at-section">
-        <span className="eyebrow">Matière de base</span>
-        <p className="at-aide">Elle couvre tout le terrain, sous les sols peints : la gomme la fait réapparaître.</p>
-        <div className="at-outils">
-          <button
-            className="btn btn-sm"
-            aria-pressed={!co.c?.base}
-            onClick={() => co.modifier((c) => ({ ...c, base: null }))}
-          >
-            Aucune
-          </button>
-        </div>
-        <Palette
-          assets={sols}
-          parCategorie
-          cle="sols-base"
-          choisi={co.c?.base ?? null}
-          onChoisir={(a) => co.modifier((c) => ({ ...c, base: a.id }))}
-        />
+        {/* Rangée sous un bouton : on la choisit une fois, elle n'a pas à occuper le panneau. */}
+        <button className="at-base" aria-expanded={baseOuverte} onClick={() => setBaseOuverte(!baseOuverte)}>
+          {baseAsset ? <img src={urlAsset(baseAsset)} alt="" /> : <span className="at-base-vide" />}
+          <span>
+            <span className="eyebrow">Matière de base</span>
+            <span className="at-base-nom">{baseAsset?.nom ?? 'Aucune'}</span>
+          </span>
+          <span className="at-base-chevron">{baseOuverte ? '▴' : '▾'}</span>
+        </button>
+        {baseOuverte ? (
+          <>
+            <p className="at-aide">Elle couvre tout le terrain, sous les sols peints : la gomme la fait réapparaître.</p>
+            <div className="at-outils">
+              <button
+                className="btn btn-sm"
+                aria-pressed={!co.c?.base}
+                onClick={() => {
+                  co.modifier((c) => ({ ...c, base: null }))
+                  setBaseOuverte(false)
+                }}
+              >
+                Aucune
+              </button>
+            </div>
+            <Palette
+              assets={sols}
+              parCategorie
+              cle="sols-base"
+              choisi={co.c?.base ?? null}
+              onChoisir={(a) => {
+                co.modifier((c) => ({ ...c, base: a.id }))
+                setBaseOuverte(false)
+              }}
+            />
+          </>
+        ) : null}
       </div>
       <div className="at-section">
         <span className="eyebrow">Matière</span>
