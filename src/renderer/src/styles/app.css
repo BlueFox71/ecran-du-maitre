@@ -26779,3 +26779,7 @@ button.at-titre:hover {
   font-size: 16px;
   font-weight: 700;
 }
+/* Le geste qui accompagne une touche (« + clic ») : lisible comme la touche. */
+.at-raccourcis .geste {
+  color: var(--text);
+}
