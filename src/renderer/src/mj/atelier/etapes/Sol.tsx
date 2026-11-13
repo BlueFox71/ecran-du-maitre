@@ -14,7 +14,7 @@ type OutilSol = 'rect' | 'poly' | 'remplir' | 'choisir'
 
 const OUTILS: { id: OutilSol; label: string; aide: string }[] = [
   { id: 'rect', label: 'Rectangle', aide: 'Glisse pour peindre un rectangle.' },
-  { id: 'poly', label: 'Polygone', aide: 'Clique chaque coin ; double-clic ou clic sur le premier point pour fermer.' },
+  { id: 'poly', label: 'Polygone', aide: 'Clique chaque coin ; clic droit, double-clic ou clic sur le premier point pour fermer.' },
   { id: 'remplir', label: 'Remplir la pièce', aide: 'Clique dans une pièce fermée par des murs : son sol est peint d’un coup.' },
   { id: 'choisir', label: 'Choisir', aide: 'Clique un sol pour le choisir ; une matière s’y applique, Suppr l’efface.' }
 ]
@@ -59,7 +59,7 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
               points.current = []
             } else pts.push(p)
           }
-          if (type === 'dbl' && pts.length >= 3) {
+          if ((type === 'dbl' || type === 'droit') && pts.length >= 3) {
             peindre([...pts])
             points.current = []
           }

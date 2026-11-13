@@ -225,3 +225,19 @@ describe('composerCadres', () => {
     for (const k of ['x', 'y', 'w', 'h'] as const) expect(compose[k]).toBeCloseTo(direct[k], 9)
   })
 })
+
+describe('orientation des ouvertures', () => {
+  it('lireConstruction garde « retourne » et « miroir », et les met à faux par défaut', () => {
+    const c = { ...constructionVide(), murs: [{ id: 'm', assetId: 'x', pts: [[0, 0], [5, 0]], epaisseur: 0.4 }] }
+    const brut = JSON.stringify({
+      ...c,
+      ouvertures: [
+        { id: 'a', murId: 'm', nature: 'porte', assetId: 'p', d: 0.5, largeur: 1, retourne: true, miroir: true },
+        { id: 'b', murId: 'm', nature: 'vitre', assetId: 'f', d: 0.2, largeur: 1 }
+      ]
+    })
+    const o = lireConstruction(brut).ouvertures
+    expect([o[0].retourne, o[0].miroir]).toEqual([true, true])
+    expect([o[1].retourne, o[1].miroir]).toEqual([false, false])
+  })
+})

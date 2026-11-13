@@ -16,7 +16,7 @@ const OUTILS: { id: OutilMurs; label: string; aide: string }[] = [
   {
     id: 'tracer',
     label: 'Tracer',
-    aide: 'Clique de coin en coin. Double-clic ou Échap termine ; un clic sur le premier point referme le mur.'
+    aide: 'Clique de coin en coin. Clic droit, double-clic ou Échap termine ; un clic sur le premier point referme le mur.'
   },
   { id: 'piece', label: 'Pièce rectangulaire', aide: 'Glisse : les quatre murs d’une pièce, d’un coup.' },
   { id: 'choisir', label: 'Choisir', aide: 'Clique un mur pour le choisir, glisse un coin pour le déplacer. Suppr l’efface.' }
@@ -79,7 +79,7 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
               points.current = []
             } else pts.push(p)
           }
-          if (type === 'dbl') finirTrace()
+          if (type === 'dbl' || type === 'droit') finirTrace()
         } else if (outil === 'piece') {
           if (type === 'down') depart.current = p
           if (type === 'up' && depart.current) {

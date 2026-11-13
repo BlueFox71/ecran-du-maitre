@@ -12,7 +12,8 @@ import type { AssetAtelier } from '@shared/atelierAssets'
 import { dessinerConstruction } from './rendu'
 import type { ImagesAtelier } from './images'
 
-export type GestePointeur = 'down' | 'move' | 'up' | 'dbl'
+/** `droit` : un clic droit — il termine un tracé en cours. */
+export type GestePointeur = 'down' | 'move' | 'up' | 'dbl' | 'droit'
 
 export interface Outil {
   curseur?: string
@@ -179,6 +180,7 @@ export function Toile({
             return
           }
           if (e.button === 0) envoyer('down', e.nativeEvent)
+          if (e.button === 2) envoyer('droit', e.nativeEvent)
         }}
         onPointerMove={(e) => {
           const g = glisse.current

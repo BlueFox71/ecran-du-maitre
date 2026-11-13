@@ -42,6 +42,19 @@ export function EtapeOuvertures(props: PropsEtape): JSX.Element {
   const nature: OuvertureBatie['nature'] = asset?.type === 'vitre' ? 'vitre' : 'porte'
   const ouvChoisie = choisie ? co.c?.ouvertures.find((o) => o.id === choisie) ?? null : null
   const [largeur, setLargeur] = useState(LARGEUR_PORTE)
+  /* L'orientation des prochaines ouvertures ; une ouverture choisie a la sienne. */
+  const [sens, setSens] = useState({ retourne: false, miroir: false })
+  const sensActuel = ouvChoisie
+    ? { retourne: !!ouvChoisie.retourne, miroir: !!ouvChoisie.miroir }
+    : sens
+  const basculer = (k: 'retourne' | 'miroir'): void => {
+    if (ouvChoisie)
+      co.modifier((c) => ({
+        ...c,
+        ouvertures: c.ouvertures.map((o) => (o.id === ouvChoisie.id ? { ...o, [k]: !o[k] } : o))
+      }))
+    else setSens((s) => ({ ...s, [k]: !s[k] }))
+  }
 
   useEffect(() => {
     setOutil({
@@ -58,7 +71,7 @@ export function EtapeOuvertures(props: PropsEtape): JSX.Element {
             co.marquer()
             glisse.current = sous.id
           } else if (s && s.d !== undefined && modeleSur) {
-            const o: OuvertureBatie = { id: nouvelId(), murId: s.murId, nature, assetId: modeleSur, d: s.d, largeur }
+            const o: OuvertureBatie = { id: nouvelId(), murId: s.murId, nature, assetId: modeleSur, d: s.d, largeur, ...sens }
             co.modifier((x) => ({ ...x, ouvertures: [...x.ouvertures, o] }))
             /* Pas choisie d'office : on enchaîne souvent porte puis fenêtre, et
                prendre une autre vignette changerait celle qu'on vient de poser. */
@@ -96,7 +109,7 @@ export function EtapeOuvertures(props: PropsEtape): JSX.Element {
       }
     })
     return () => setOutil(null)
-  }, [modeleSur, nature, largeur, choisie, co.c])
+  }, [modeleSur, nature, largeur, sens, choisie, co.c])
 
   useEffect(() => {
     const k = (e: KeyboardEvent): void => {
@@ -107,10 +120,12 @@ export function EtapeOuvertures(props: PropsEtape): JSX.Element {
         setChoisie(null)
       }
       if (e.key === 'Escape') setChoisie(null)
+      if (!e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'r') basculer('retourne')
+      if (!e.ctrlKey && !e.metaKey && e.key.toLowerCase() === 'm') basculer('miroir')
     }
     window.addEventListener('keydown', k)
     return () => window.removeEventListener('keydown', k)
-  }, [choisie, co])
+  }, [choisie, co, sens])
 
   const choisirModele = (id: string, type: string): void => {
     setModele(id)
@@ -151,6 +166,27 @@ export function EtapeOuvertures(props: PropsEtape): JSX.Element {
           }}
         />
       </label>
+      <div className="at-section">
+        <span className="eyebrow">Orientation{ouvChoisie ? ' de l’ouverture choisie' : ''}</span>
+        <div className="at-outils">
+          <button
+            className="btn btn-sm"
+            aria-pressed={sensActuel.retourne}
+            title="Le battant de l’autre côté du mur (R)"
+            onClick={() => basculer('retourne')}
+          >
+            ⇅ Retourner
+          </button>
+          <button
+            className="btn btn-sm"
+            aria-pressed={sensActuel.miroir}
+            title="Les gonds à l’autre bout (M)"
+            onClick={() => basculer('miroir')}
+          >
+            ⇆ Miroir
+          </button>
+        </div>
+      </div>
       <div className="at-section">
         <span className="eyebrow">Portes</span>
         <Palette

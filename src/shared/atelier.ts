@@ -48,6 +48,10 @@ export interface OuvertureBatie {
   d: number
   /** Sa largeur, en cases. */
   largeur: number
+  /** Le battant de l'autre côté du mur (tourné d'un demi-tour). */
+  retourne?: boolean
+  /** Les gonds à l'autre bout (l'image en miroir le long du mur). */
+  miroir?: boolean
 }
 
 /** Un meuble, un tapis, un objet de décor. */
@@ -391,7 +395,9 @@ export function lireConstruction(brut: unknown): Construction {
         nature: o.nature,
         assetId: o.assetId,
         d: Math.min(1, Math.max(0, o.d)),
-        largeur: o.largeur
+        largeur: o.largeur,
+        retourne: !!o.retourne,
+        miroir: !!o.miroir
       })
   }
   const objets: ObjetPose[] = []

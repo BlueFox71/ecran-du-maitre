@@ -157,7 +157,8 @@ function dessinerOuvertures(
     const h = img ? Math.min(m.epaisseur * px * 1.15, (l * img.height) / img.width) : m.epaisseur * px * 0.4
     ctx.save()
     ctx.translate(centre[0] * px, centre[1] * px)
-    ctx.rotate(angle)
+    ctx.rotate(angle + (o.retourne ? Math.PI : 0))
+    if (o.miroir) ctx.scale(-1, 1)
     ctx.shadowColor = 'rgba(0, 0, 0, 0.6)'
     ctx.shadowBlur = h * 0.6
     if (img) ctx.drawImage(img, -l / 2, -h / 2, l, h)
