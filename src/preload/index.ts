@@ -767,6 +767,8 @@ const api = {
     creer: (nom: string, parentId: number | null) => call<Place>('atelier:creer', nom, parentId),
     /** Bâtir un lieu existant — refusé s'il a déjà une image. */
     construire: (placeId: number) => call<Place>('atelier:construire', placeId),
+    /** Un niveau de plus : le lieu doublé, construction comprise, rangé juste après. */
+    ajouterNiveau: (placeId: number) => call<Place>('atelier:ajouterNiveau', placeId),
     de: (placeId: number) => call<Construction | null>('atelier:de', placeId),
     /**
      * L'image devient la carte, le calque suit. `cadre` : où se place

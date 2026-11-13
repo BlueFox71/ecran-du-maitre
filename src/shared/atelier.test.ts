@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest'
 import {
   agrandir,
+  nomDuNiveauSuivant,
   bordsPourTaille,
   tailleMinimale,
   composerCadres,
@@ -369,5 +370,15 @@ describe('habillages', () => {
   it('agrandir déplace le point des habillages', () => {
     const c = { ...terrain(10, 10), habillages: [{ id: 'h', pt: [3, 4] as [number, number], assetId: 'bois' }] }
     expect(agrandir(c, { gauche: 2, haut: 1, droite: 0, bas: 0 }).construction.habillages![0].pt).toEqual([5, 5])
+  })
+})
+
+describe('nomDuNiveauSuivant', () => {
+  it('le premier double devient le niveau 2', () => {
+    expect(nomDuNiveauSuivant('Le manoir', ['Le manoir'])).toBe('Le manoir · niveau 2')
+  })
+  it('compte les niveaux déjà là, même depuis un niveau', () => {
+    const freres = ['Le manoir', 'Le manoir · niveau 2', 'Le manoir · niveau 3']
+    expect(nomDuNiveauSuivant('Le manoir · niveau 2', freres)).toBe('Le manoir · niveau 4')
   })
 })

@@ -1,5 +1,6 @@
 import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { copierLigne } from '../copie'
+import { nomDuNiveauSuivant } from '@shared/atelier'
 import { copierFiche } from './ficheLieu'
 import { fixerInitial } from './objets'
 import * as reglages from './reglages'
@@ -671,6 +672,35 @@ export function duplicatePlace(id: number): number {
     nouveau = copierLieu(id, activeSessionId(), { parentId: null, ord: rangSuivant(racine.tier, null) })
   })()
   return nouveau.get(id)!
+}
+
+/**
+ * Un niveau de plus : le lieu doublé, rangé juste après lui chez le même
+ * contenant et dans la même séance, sous le nom « … · niveau N ». Le double
+ * part avec tout ce que tient le lieu — construction de l'atelier comprise —
+ * pour qu'on n'ait plus qu'à retoucher l'étage. Rend l'identifiant du double.
+ */
+export function dupliquerEnNiveau(id: number): number {
+  const db = getDb()
+  const p = getPlace(id)
+  if (!p) throw new Error('Lieu introuvable')
+  const { s } = db.prepare(`SELECT session_id AS s FROM place WHERE id = ?`).get(id) as { s: number | null }
+  const freres = db
+    .prepare(`SELECT name FROM place WHERE campaign_id = ? AND parent_id IS ? AND session_id IS ?`)
+    .all(activeCampaignId(), p.parentId, s) as { name: string }[]
+  let neuf = 0
+  db.transaction(() => {
+    db.prepare(
+      `UPDATE place SET ord = ord + 1
+        WHERE campaign_id = ? AND tier = ? AND parent_id IS ? AND session_id IS ? AND ord > ?`
+    ).run(activeCampaignId(), p.tier, p.parentId, s, p.ord)
+    neuf = copierLieu(id, s as number, { parentId: p.parentId, ord: p.ord + 1 }).get(id)!
+    db.prepare(`UPDATE place SET name = ? WHERE id = ?`).run(
+      nomDuNiveauSuivant(p.name, freres.map((f) => f.name)),
+      neuf
+    )
+  })()
+  return neuf
 }
 
 /**

@@ -228,6 +228,25 @@ function Chantier({ place }: { place: Place }): JSX.Element {
     return () => window.clearInterval(t)
   }, [place.id])
 
+  /* Un niveau de plus : on enregistre d'abord ce qui est en cours, pour que
+     le double parte de l'état qu'on voit, puis on ouvre le nouveau niveau. */
+  const [doublage, setDoublage] = useState(false)
+  const ajouterNiveau = async (): Promise<void> => {
+    if (doublage) return
+    setDoublage(true)
+    try {
+      if (co.sale && !(await co.enregistrer())) return
+      const neuf = await window.jdr.atelier.ajouterNiveau(place.id)
+      await s.refreshPlaces()
+      s.ouvrirAtelier(neuf.id)
+      s.toast(`« ${neuf.name} » est prêt : c'est un double de « ${place.name} », à retoucher pour cet étage.`)
+    } catch (e) {
+      s.toast(e instanceof Error ? e.message : String(e), true)
+    } finally {
+      setDoublage(false)
+    }
+  }
+
   const sortir = (): void => {
     if (co.sale) setQuitter(true)
     else s.ouvrirAtelier(null)
@@ -288,6 +307,14 @@ function Chantier({ place }: { place: Place }): JSX.Element {
           }
         >
           {essai.enTest ? 'Arrêter l’essai' : 'Essayer avec un pion'}
+        </button>
+        <button
+          className="btn btn-sm"
+          disabled={doublage || co.enregistrement}
+          onClick={() => void ajouterNiveau()}
+          title="Doubler ce lieu pour en faire l’étage suivant : murs, portes, sols, objets et lumières sont repris, à retoucher"
+        >
+          + Niveau
         </button>
         <button className="btn btn-sm" onClick={() => setAgrandir(!agrandir)} aria-pressed={agrandir}>
           Taille du terrain…

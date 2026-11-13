@@ -699,6 +699,7 @@ export function registerIpc(): void {
   /* ---------------- l'atelier des lieux ---------------- */
   on('atelier:creer', (nom: string, parentId: number | null) => atelier.creer(nom, parentId))
   on('atelier:construire', (placeId: number) => atelier.construire(placeId))
+  on('atelier:ajouterNiveau', (placeId: number) => atelier.ajouterNiveau(placeId))
   on('atelier:de', (placeId: number) => atelier.de(placeId))
   on('atelier:assets', () => atelierAssets.tousLesAssets())
   on('atelier:importer', (meta: any, png: Uint8Array) => atelierAssets.importer(meta, png))

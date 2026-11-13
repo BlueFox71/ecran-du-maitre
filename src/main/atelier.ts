@@ -32,6 +32,11 @@ export function creer(nom: string, parentId: number | null): Place {
   return places.getPlace(p.id)!
 }
 
+/** Un niveau de plus : le lieu bâti doublé, à retoucher pour l'étage. */
+export function ajouterNiveau(placeId: number): Place {
+  return places.getPlace(places.dupliquerEnNiveau(placeId))!
+}
+
 /** Bâtir un lieu qui existe déjà — à condition qu'il n'ait pas encore d'image. */
 export function construire(placeId: number): Place {
   const p = places.getPlace(placeId)

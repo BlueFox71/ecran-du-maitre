@@ -608,3 +608,21 @@ export function lireConstruction(brut: unknown): Construction {
     objets
   }
 }
+
+const NIVEAU = / · niveau (\d+)$/
+
+/**
+ * Le nom d'un niveau ajouté en doublant un lieu : « Le manoir · niveau 2 »,
+ * puis 3, 4… On part du nom sans son numéro, et on passe après le plus haut
+ * niveau déjà rangé à côté.
+ */
+export function nomDuNiveauSuivant(nom: string, freres: string[]): string {
+  const base = nom.replace(NIVEAU, '')
+  let haut = 1
+  for (const f of freres) {
+    if (f.replace(NIVEAU, '') !== base) continue
+    const n = Number(NIVEAU.exec(f)?.[1] ?? 1)
+    if (n > haut) haut = n
+  }
+  return `${base} · niveau ${haut + 1}`
+}
