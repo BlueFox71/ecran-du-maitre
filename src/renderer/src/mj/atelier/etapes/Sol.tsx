@@ -13,7 +13,7 @@ import { cercle, contour, pointille } from '../dessin'
 /** La taille du pinceau d'aérosol, par défaut, en cases (son rayon). */
 const RAYON_AEROSOL = 1
 
-type OutilSol = 'rect' | 'poly' | 'aerosol' | 'remplir' | 'choisir'
+type OutilSol = 'rect' | 'poly' | 'aerosol' | 'gomme' | 'remplir' | 'choisir'
 
 const OUTILS: { id: OutilSol; label: string; aide: string }[] = [
   { id: 'rect', label: 'Rectangle', aide: 'Glisse pour peindre un rectangle.' },
@@ -22,6 +22,11 @@ const OUTILS: { id: OutilSol; label: string; aide: string }[] = [
     id: 'aerosol',
     label: 'Aérosol',
     aide: 'Glisse pour vaporiser la matière : ses bords se fondent dans le sol dessous. Repasser l’épaissit.'
+  },
+  {
+    id: 'gomme',
+    label: 'Gomme',
+    aide: 'Glisse pour effacer les sols peints : la matière de base réapparaît dessous. Repasser efface davantage.'
   },
   {
     id: 'remplir',
@@ -70,17 +75,21 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
           repeindre()
           return
         }
-        if (outil === 'aerosol') {
+        if (outil === 'aerosol' || outil === 'gomme') {
           if (type === 'down') trait.current = [_brut]
           if (type === 'move' && trait.current) {
             const der = trait.current[trait.current.length - 1]
             /* Une touche tous les quarts de rayon : assez serré pour un trait continu. */
             if (Math.hypot(_brut[0] - der[0], _brut[1] - der[1]) >= rayon / 4) trait.current.push(_brut)
           }
-          if (type === 'up' && trait.current && matiereSure) {
+          if (type === 'up' && trait.current && (outil === 'gomme' || matiereSure)) {
             const pts = trait.current
             trait.current = null
-            co.modifier((c) => ({ ...c, sols: [...c.sols, { id: nouvelId(), assetId: matiereSure, pts, rayon }] }))
+            const trace =
+              outil === 'gomme'
+                ? { id: nouvelId(), assetId: '', pts, rayon, gomme: true }
+                : { id: nouvelId(), assetId: matiereSure!, pts, rayon }
+            co.modifier((c) => ({ ...c, sols: [...c.sols, trace] }))
           }
           souris.current = _brut
         } else if (outil === 'rect') {
@@ -121,7 +130,7 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
         if (outil === 'remplir' && p && co.c) {
           contour(ctx, zoneARemplir(co.c, p), echelle, true)
         }
-        if (outil === 'aerosol') {
+        if (outil === 'aerosol' || outil === 'gomme') {
           for (const q of trait.current ?? []) cercle(ctx, q, rayon, echelle, true)
           if (p) cercle(ctx, p, rayon, echelle)
         }
@@ -169,7 +178,7 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
         <ul className="at-raccourcis">
           <li>Clic droit ou <kbd>Échap</kbd> : annuler ce qui est en cours, ou désélectionner</li>
         </ul>
-        {outil === 'aerosol' ? (
+        {outil === 'aerosol' || outil === 'gomme' ? (
           <label className="at-reglage">
             <span className="eyebrow">Taille du pinceau · {String(rayon).replace('.', ',')} case</span>
             <input
@@ -184,13 +193,31 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
         ) : null}
       </div>
       <div className="at-section">
+        <span className="eyebrow">Matière de base</span>
+        <p className="at-aide">Elle couvre tout le terrain, sous les sols peints : la gomme la fait réapparaître.</p>
+        <div className="at-outils">
+          <button
+            className="btn btn-sm"
+            aria-pressed={!co.c?.base}
+            onClick={() => co.modifier((c) => ({ ...c, base: null }))}
+          >
+            Aucune
+          </button>
+        </div>
+        <Palette
+          assets={sols}
+          choisi={co.c?.base ?? null}
+          onChoisir={(a) => co.modifier((c) => ({ ...c, base: a.id }))}
+        />
+      </div>
+      <div className="at-section">
         <span className="eyebrow">Matière</span>
         <Palette
           assets={sols}
           choisi={matiereSure}
           onChoisir={(a) => {
             setMatiere(a.id)
-            if (choisi)
+            if (choisi && !co.c?.sols.find((x) => x.id === choisi)?.gomme)
               co.modifier((c) => ({
                 ...c,
                 sols: c.sols.map((s) => (s.id === choisi ? { ...s, assetId: a.id } : s))

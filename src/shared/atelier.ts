@@ -31,6 +31,11 @@ export interface SolPeint {
   pts: PointCase[]
   /** Aérosol : le rayon du pinceau, en cases ; ses bords se fondent dans ce qu'il recouvre. */
   rayon?: number
+  /**
+   * Un coup de gomme (toujours au pinceau, avec `rayon`) : il efface les sols
+   * peints avant lui, et laisse voir la matière de base. `assetId` n'y sert pas.
+   */
+  gomme?: boolean
 }
 
 /** Un mur épais : sa ligne médiane, sa matière, son épaisseur en cases. */
@@ -81,6 +86,11 @@ export interface Construction {
   largeur: number
   hauteur: number
   metresParCase: number
+  /**
+   * La matière de base : elle couvre tout le terrain, sous tous les sols —
+   * c'est elle que la gomme fait réapparaître. Absente : le fond nu.
+   */
+  base?: string | null
   /** Chaque liste est dans l'ordre où l'on dessine : le dernier par-dessus. */
   sols: SolPeint[]
   murs: MurBati[]
@@ -478,7 +488,13 @@ export function lireConstruction(brut: unknown): Construction {
   for (const s of liste(v.sols)) {
     const aerosol = fini(s?.rayon) && s.rayon > 0
     const pts = points(s?.pts, aerosol ? 1 : 3)
-    if (texte(s?.id) && texte(s?.assetId) && pts)
+    if (!texte(s?.id) || !pts) continue
+    /* Un coup de gomme n'a pas de matière, mais il lui faut un pinceau. */
+    if (s.gomme) {
+      if (aerosol) sols.push({ id: s.id, assetId: '', pts, rayon: s.rayon, gomme: true })
+      continue
+    }
+    if (texte(s.assetId))
       sols.push(aerosol ? { id: s.id, assetId: s.assetId, pts, rayon: s.rayon } : { id: s.id, assetId: s.assetId, pts })
   }
   const murs: MurBati[] = []
@@ -532,6 +548,7 @@ export function lireConstruction(brut: unknown): Construction {
   }
   return {
     v: 1,
+    ...(texte(v.base) ? { base: v.base } : {}),
     largeur: fini(v.largeur) && v.largeur >= 1 ? v.largeur : base.largeur,
     hauteur: fini(v.hauteur) && v.hauteur >= 1 ? v.hauteur : base.hauteur,
     metresParCase: fini(v.metresParCase) && v.metresParCase > 0 ? v.metresParCase : base.metresParCase,

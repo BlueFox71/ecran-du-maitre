@@ -92,6 +92,26 @@ function dessinerAerosol(
   ctx.drawImage(masque, x0, y0)
 }
 
+/** Un coup de gomme : des touches rondes aux bords fondus, qui trouent ce qui est dessous. */
+function gommer(ctx: CanvasRenderingContext2D, pts: PointCase[], rayon: number, px: number): void {
+  const r = rayon * px
+  ctx.save()
+  ctx.globalCompositeOperation = 'destination-out'
+  for (const [x, y] of pts) {
+    const g = ctx.createRadialGradient(x * px, y * px, 0, x * px, y * px, r)
+    g.addColorStop(0, 'rgba(0, 0, 0, 0.95)')
+    g.addColorStop(0.5, 'rgba(0, 0, 0, 0.7)')
+    g.addColorStop(1, 'rgba(0, 0, 0, 0)')
+    ctx.fillStyle = g
+    ctx.fillRect(x * px - r, y * px - r, 2 * r, 2 * r)
+  }
+  ctx.restore()
+}
+
+/**
+ * Le sol : la matière de base sur tout le terrain, puis les sols peints dans
+ * un calque à part — la gomme le troue, et c'est la base qu'on voit au travers.
+ */
 function dessinerSols(
   ctx: CanvasRenderingContext2D,
   c: Construction,
@@ -99,21 +119,39 @@ function dessinerSols(
   images: ImagesAtelier,
   px: number
 ): void {
+  const W = Math.round(c.largeur * px)
+  const H = Math.round(c.hauteur * px)
+  if (c.base) {
+    const a = assets.get(c.base)
+    const img = image(images, c.base)
+    ctx.fillStyle = a && img ? motifDe(ctx, a, img, px) : ABSENT
+    ctx.fillRect(0, 0, W, H)
+  }
+  if (!c.sols.length) return
+  const calque = document.createElement('canvas')
+  calque.width = W
+  calque.height = H
+  const k = calque.getContext('2d')!
   for (const s of c.sols) {
-    const a = assets.get(s.assetId)
-    const img = image(images, s.assetId)
-    const remplissage = a && img ? motifDe(ctx, a, img, px) : ABSENT
-    if (s.rayon) {
-      dessinerAerosol(ctx, s.pts, s.rayon, remplissage, px)
+    if (s.gomme) {
+      if (s.rayon) gommer(k, s.pts, s.rayon, px)
       continue
     }
-    ctx.save()
-    chemin(ctx, s.pts, px)
-    ctx.closePath()
-    ctx.fillStyle = remplissage
-    ctx.fill()
-    ctx.restore()
+    const a = assets.get(s.assetId)
+    const img = image(images, s.assetId)
+    const remplissage = a && img ? motifDe(k, a, img, px) : ABSENT
+    if (s.rayon) {
+      dessinerAerosol(k, s.pts, s.rayon, remplissage, px)
+      continue
+    }
+    k.save()
+    chemin(k, s.pts, px)
+    k.closePath()
+    k.fillStyle = remplissage
+    k.fill()
+    k.restore()
   }
+  ctx.drawImage(calque, 0, 0)
 }
 
 /** Un morceau de mur, segment par segment : un rectangle tourné, prolongé d'une demi-épaisseur aux deux bouts. */

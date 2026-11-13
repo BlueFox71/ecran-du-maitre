@@ -314,3 +314,20 @@ describe('aérosol', () => {
     expect(s).toEqual([{ id: 'a', assetId: 'x', pts: [[3, 5]], rayon: 1 }])
   })
 })
+
+describe('matière de base et gomme', () => {
+  it('lireConstruction garde la matière de base et les coups de gomme', () => {
+    const c = { ...terrain(10, 10), base: 'pack:sols/terre' }
+    c.sols.push({ id: 'g', assetId: '', pts: [[2, 2], [3, 2]], rayon: 0.8, gomme: true })
+    const lu = lireConstruction(JSON.stringify(c))
+    expect(lu.base).toBe('pack:sols/terre')
+    expect(lu.sols).toEqual([{ id: 'g', assetId: '', pts: [[2, 2], [3, 2]], rayon: 0.8, gomme: true }])
+  })
+  it('sans base, la construction n’en a pas', () => {
+    expect(lireConstruction(JSON.stringify(terrain(10, 10))).base ?? null).toBeNull()
+  })
+  it('un coup de gomme sans rayon est écarté', () => {
+    const brut = JSON.stringify({ ...terrain(10, 10), sols: [{ id: 'g', assetId: '', pts: [[1, 1], [2, 2], [3, 1]], gomme: true }] })
+    expect(lireConstruction(brut).sols).toEqual([])
+  })
+})
