@@ -22,6 +22,9 @@ import { EtapeOuvertures } from '../atelier/etapes/Ouvertures'
 import { EtapeDeco } from '../atelier/etapes/Deco'
 import { EtapeEclairage } from '../atelier/etapes/Eclairage'
 
+/** L'atelier s'enregistre de lui-même à ce rythme, s'il y a des changements. */
+const AUTO_ENREGISTREMENT = 5 * 60 * 1000
+
 export type EtapeId = 'sol' | 'murs' | 'ouvertures' | 'deco' | 'eclairage'
 
 const ETAPES: { id: EtapeId; label: string }[] = [
@@ -207,6 +210,23 @@ function Chantier({ place }: { place: Place }): JSX.Element {
       s.toast(`« ${place.name} » est enregistré : son plan et ses murs sont à jour.`)
     }
   }
+
+  /* L'enregistrement automatique : toutes les cinq minutes, s'il y a du neuf.
+     La construction de l'instant est lue au moment du tic, pas à la pose de
+     la minuterie. */
+  const dernier = useRef(co)
+  dernier.current = co
+  useEffect(() => {
+    const t = window.setInterval(async () => {
+      const k = dernier.current
+      if (!k.sale || k.enregistrement) return
+      if (await k.enregistrer()) {
+        await s.refreshPlaces()
+        s.toast(`« ${place.name} » enregistré automatiquement.`)
+      }
+    }, AUTO_ENREGISTREMENT)
+    return () => window.clearInterval(t)
+  }, [place.id])
 
   const sortir = (): void => {
     if (co.sale) setQuitter(true)
