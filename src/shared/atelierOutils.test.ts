@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest'
-import { constructionVide, type Construction } from './atelier'
-import { murSous, ouvertureSous, pieceSous, rectangle, solSous } from './atelierOutils'
+import { constructionVide, type Construction, type ObjetPose } from './atelier'
+import {
+  murSous,
+  objetSous,
+  ouvertureSous,
+  pieceSous,
+  rectangle,
+  redimensionner,
+  solSous,
+  tourner
+} from './atelierOutils'
 
 const terrain = (): Construction => ({ ...constructionVide(), largeur: 20, hauteur: 10 })
 
@@ -87,5 +96,49 @@ describe('ouvertureSous', () => {
   it('à côté de l’ouverture, rien', () => {
     expect(ouvertureSous(c, [7, 2])).toBeNull()
     expect(ouvertureSous(c, [5, 3])).toBeNull()
+  })
+})
+
+const meuble = (o: Partial<ObjetPose>): ObjetPose => ({
+  id: 'o', assetId: 'a', x: 5, y: 5, l: 2, h: 1, angle: 0, bloquePas: false, bloqueVue: false, ...o
+})
+
+describe('objetSous', () => {
+  it('rend l’objet du dessus, en tenant compte de sa rotation', () => {
+    const c = terrain()
+    c.objets.push(meuble({ id: 'tapis', l: 4, h: 4 }), meuble({ id: 'table', angle: 90 }))
+    expect(objetSous(c, [5, 5.8])?.id).toBe('table')
+    expect(objetSous(c, [6.5, 5])?.id).toBe('tapis')
+    expect(objetSous(c, [9, 9])).toBeNull()
+  })
+})
+
+describe('redimensionner', () => {
+  it('tirer un coin garde les proportions et le coin opposé en place', () => {
+    const o = redimensionner(meuble({}), 2, [8, 6.5], true)
+    expect(o.l).toBeCloseTo(4, 6)
+    expect(o.h).toBeCloseTo(2, 6)
+    expect(o.x).toBeCloseTo(6, 6)
+    expect(o.y).toBeCloseTo(5.5, 6)
+  })
+  it('sans garder les proportions, chaque côté suit', () => {
+    const o = redimensionner(meuble({}), 2, [8, 7.5], false)
+    expect(o.l).toBeCloseTo(4, 6)
+    expect(o.h).toBeCloseTo(3, 6)
+  })
+  it('ne descend pas sous un dixième de case', () => {
+    const o = redimensionner(meuble({}), 2, [4, 4.5], false)
+    expect(o.l).toBeGreaterThanOrEqual(0.1)
+    expect(o.h).toBeGreaterThanOrEqual(0.1)
+  })
+})
+
+describe('tourner', () => {
+  it('oriente l’objet vers le point (la poignée est au-dessus du centre)', () => {
+    expect(tourner(meuble({}), [7, 5], false).angle).toBeCloseTo(90, 6)
+    expect(tourner(meuble({}), [5, 3], false).angle).toBeCloseTo(0, 6)
+  })
+  it('par pas de 15° quand on le demande', () => {
+    expect(tourner(meuble({}), [6, 3.1], true).angle % 15).toBeCloseTo(0, 6)
   })
 })

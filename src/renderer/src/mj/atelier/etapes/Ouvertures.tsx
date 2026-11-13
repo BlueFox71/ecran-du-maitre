@@ -8,6 +8,7 @@ import { nouvelId, placeOuverture, type OuvertureBatie, type PointCase } from '@
 import { murSous, ouvertureSous } from '@shared/atelierOutils'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
+import { ImportAsset } from '../ImportAsset'
 import { contour } from '../dessin'
 
 /** La largeur d'une ouverture qu'on pose, en cases. */
@@ -28,7 +29,8 @@ function rect(centre: PointCase, angle: number, l: number, e: number): PointCase
   ].map(([x, y]) => [centre[0] + x * c - y * s, centre[1] + x * s + y * c] as PointCase)
 }
 
-export function EtapeOuvertures({ co, assets, setOutil, repeindre }: PropsEtape): JSX.Element {
+export function EtapeOuvertures(props: PropsEtape): JSX.Element {
+  const { co, assets, setOutil, repeindre } = props
   const portes = assets.filter((a) => a.type === 'porte')
   const fenetres = assets.filter((a) => a.type === 'vitre')
   const [modele, setModele] = useState<string | null>(null)
@@ -176,6 +178,7 @@ export function EtapeOuvertures({ co, assets, setOutil, repeindre }: PropsEtape)
           Effacer cette ouverture
         </button>
       ) : null}
+      <ImportAsset {...props} typeParDefaut="porte" />
     </>
   )
 }

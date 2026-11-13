@@ -7,6 +7,7 @@ import { nouvelId, type PointCase } from '@shared/atelier'
 import { pieceSous, rectangle, solSous } from '@shared/atelierOutils'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
+import { ImportAsset } from '../ImportAsset'
 import { contour, pointille } from '../dessin'
 
 type OutilSol = 'rect' | 'poly' | 'remplir' | 'choisir'
@@ -18,7 +19,8 @@ const OUTILS: { id: OutilSol; label: string; aide: string }[] = [
   { id: 'choisir', label: 'Choisir', aide: 'Clique un sol pour le choisir ; une matière s’y applique, Suppr l’efface.' }
 ]
 
-export function EtapeSol({ co, assets, setOutil, repeindre }: PropsEtape): JSX.Element {
+export function EtapeSol(props: PropsEtape): JSX.Element {
+  const { co, assets, setOutil, repeindre } = props
   const sols = assets.filter((a) => a.type === 'sol')
   const [outil, setOutilSol] = useState<OutilSol>('rect')
   const [matiere, setMatiere] = useState<string | null>(null)
@@ -40,7 +42,7 @@ export function EtapeSol({ co, assets, setOutil, repeindre }: PropsEtape): JSX.E
     depart.current = null
     setOutil({
       curseur: outil === 'choisir' ? 'pointer' : 'crosshair',
-      onPointer: (type, p) => {
+      onPointer: (type, p, _brut, _e, prise) => {
         souris.current = p
         if (outil === 'rect') {
           if (type === 'down') depart.current = p
@@ -52,7 +54,7 @@ export function EtapeSol({ co, assets, setOutil, repeindre }: PropsEtape): JSX.E
           const pts = points.current
           if (type === 'down') {
             const premier = pts[0]
-            if (premier && pts.length >= 3 && Math.hypot(p[0] - premier[0], p[1] - premier[1]) < 0.3) {
+            if (premier && pts.length >= 3 && Math.hypot(p[0] - premier[0], p[1] - premier[1]) < Math.max(prise, 0.05)) {
               peindre([...pts])
               points.current = []
             } else pts.push(p)
@@ -149,6 +151,7 @@ export function EtapeSol({ co, assets, setOutil, repeindre }: PropsEtape): JSX.E
           </button>
         </div>
       ) : null}
+      <ImportAsset {...props} typeParDefaut="sol" />
     </>
   )
 }

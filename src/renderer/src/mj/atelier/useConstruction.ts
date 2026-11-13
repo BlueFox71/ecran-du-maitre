@@ -33,6 +33,8 @@ export interface ConstructionOuverte {
   peutAnnuler: boolean
   peutRetablir: boolean
   sale: boolean
+  /** Le terrain a grandi depuis le dernier enregistrement : les fractions du lieu ne suivent pas encore. */
+  agrandi: boolean
   enregistrement: boolean
   enregistrer: () => Promise<boolean>
   agrandir: (bords: { gauche: number; haut: number; droite: number; bas: number }) => void
@@ -165,6 +167,7 @@ export function useConstruction(
     peutAnnuler: passe.length > 0,
     peutRetablir: futur.length > 0,
     sale,
+    agrandi: cadre.current !== null,
     enregistrement,
     enregistrer,
     agrandir,

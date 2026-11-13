@@ -7,6 +7,7 @@ import { nouvelId, type MurBati, type PointCase } from '@shared/atelier'
 import { murSous, rectangle } from '@shared/atelierOutils'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
+import { ImportAsset } from '../ImportAsset'
 import { poignee, pointille, trait } from '../dessin'
 
 type OutilMurs = 'tracer' | 'piece' | 'choisir'
@@ -22,12 +23,12 @@ const OUTILS: { id: OutilMurs; label: string; aide: string }[] = [
 ]
 
 export const EPAISSEUR_DEFAUT = 0.4
-const TOLERANCE = 0.35
 
 const ferme = (pts: PointCase[]): boolean =>
   pts.length > 2 && Math.hypot(pts[0][0] - pts[pts.length - 1][0], pts[0][1] - pts[pts.length - 1][1]) < 1e-6
 
-export function EtapeMurs({ co, assets, setOutil, repeindre }: PropsEtape): JSX.Element {
+export function EtapeMurs(props: PropsEtape): JSX.Element {
+  const { co, assets, setOutil, repeindre } = props
   const murs = assets.filter((a) => a.type === 'mur')
   const [outil, setOutilMurs] = useState<OutilMurs>('piece')
   const [matiere, setMatiere] = useState<string | null>(null)
@@ -67,13 +68,13 @@ export function EtapeMurs({ co, assets, setOutil, repeindre }: PropsEtape): JSX.
     depart.current = null
     setOutil({
       curseur: outil === 'choisir' ? 'pointer' : 'crosshair',
-      onPointer: (type, p) => {
+      onPointer: (type, p, _brut, _e, prise) => {
         souris.current = p
         if (outil === 'tracer') {
           const pts = points.current
           if (type === 'down') {
             const premier = pts[0]
-            if (premier && pts.length >= 2 && Math.hypot(p[0] - premier[0], p[1] - premier[1]) < 0.3) {
+            if (premier && pts.length >= 2 && Math.hypot(p[0] - premier[0], p[1] - premier[1]) < Math.max(prise, 0.05)) {
               poser([...pts, premier])
               points.current = []
             } else pts.push(p)
@@ -88,7 +89,7 @@ export function EtapeMurs({ co, assets, setOutil, repeindre }: PropsEtape): JSX.
           }
         } else {
           if (type === 'down' && co.c) {
-            const s = murSous(co.c, p, TOLERANCE)
+            const s = murSous(co.c, _brut, Math.max(prise, 0.2))
             setChoisi(s?.murId ?? null)
             if (s && s.sommet !== null) {
               co.marquer()
@@ -205,6 +206,7 @@ export function EtapeMurs({ co, assets, setOutil, repeindre }: PropsEtape): JSX.
           </button>
         </div>
       ) : null}
+      <ImportAsset {...props} typeParDefaut="mur" />
     </>
   )
 }

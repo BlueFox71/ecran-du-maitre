@@ -236,6 +236,9 @@ function Chantier({ place }: { place: Place }): JSX.Element {
               aria-selected={etape === e.id}
               className="at-etape"
               onClick={() => {
+                /* L'onglet déjà ouvert : rien à faire — effacer l'outil ici
+                   laisserait la toile sans outil, l'étape ne le recréant pas. */
+                if (e.id === etape) return
                 setOutil(null)
                 setEtape(e.id)
               }}

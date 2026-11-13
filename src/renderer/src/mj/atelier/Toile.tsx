@@ -16,8 +16,18 @@ export type GestePointeur = 'down' | 'move' | 'up' | 'dbl'
 
 export interface Outil {
   curseur?: string
-  /** `p` est aimanté à la grille (si elle est active et Maj relâché), `brut` jamais. */
-  onPointer?: (type: GestePointeur, p: PointCase, brut: PointCase, e: PointerEvent | MouseEvent) => void
+  /**
+   * `p` est aimanté à la grille (si elle est active et Maj relâché), `brut` jamais.
+   * `prise` : la distance, en cases, qui fait 10 pixels à l'écran — ce qu'il
+   * faut pour saisir un coin ou une poignée, quel que soit le zoom.
+   */
+  onPointer?: (
+    type: GestePointeur,
+    p: PointCase,
+    brut: PointCase,
+    e: PointerEvent | MouseEvent,
+    prise: number
+  ) => void
   /** Dessine par-dessus la construction ; le contexte est en cases. `echelle` : pixels écran par case. */
   dessiner?: (ctx: CanvasRenderingContext2D, echelle: number) => void
 }
@@ -31,6 +41,8 @@ export function aimanter(p: PointCase, grille: boolean, e: { shiftKey: boolean }
 }
 
 const PX_CACHE_MAX = 96
+/** Ce qu'il faut de pixels, à l'écran, pour saisir une poignée. */
+const PRISE_PX = 10
 
 export function Toile({
   c,
@@ -147,7 +159,7 @@ export function Toile({
 
   const envoyer = (type: GestePointeur, e: PointerEvent | MouseEvent): void => {
     const brut = enCases(e)
-    outil?.onPointer?.(type, aimanter(brut, grille, e), brut, e)
+    outil?.onPointer?.(type, aimanter(brut, grille, e), brut, e, vue ? PRISE_PX / vue.echelle : 0.2)
   }
 
   return (

@@ -2,7 +2,14 @@
  * Ce que les outils de l'atelier demandent à la géométrie : un rectangle
  * tiré à la souris, le sol sous le curseur, la pièce qu'on veut paver.
  */
-import { placeOuverture, type Construction, type OuvertureBatie, type PointCase, type SolPeint } from './atelier'
+import {
+  placeOuverture,
+  type Construction,
+  type ObjetPose,
+  type OuvertureBatie,
+  type PointCase,
+  type SolPeint
+} from './atelier'
 import { dansForme, formesDesMurs } from './pieces'
 import type { Mur, PointMur } from './types'
 
@@ -117,4 +124,63 @@ export function ouvertureSous(c: Construction, p: PointCase): OuvertureBatie | n
     if (Math.abs(le) <= largeur / 2 && Math.abs(tr) <= Math.max(m.epaisseur, 0.3)) return o
   }
   return null
+}
+
+/** Un point dans le repère d'un objet : origine au centre, axes tournés avec lui. */
+function local(o: ObjetPose, p: PointCase): PointCase {
+  const a = (o.angle * Math.PI) / 180
+  const dx = p[0] - o.x
+  const dy = p[1] - o.y
+  return [dx * Math.cos(a) + dy * Math.sin(a), -dx * Math.sin(a) + dy * Math.cos(a)]
+}
+
+/** L'objet du dessus sous un point (le dernier posé gagne). */
+export function objetSous(c: Construction, p: PointCase): ObjetPose | null {
+  for (let i = c.objets.length - 1; i >= 0; i--) {
+    const o = c.objets[i]
+    const [lx, ly] = local(o, p)
+    if (Math.abs(lx) <= o.l / 2 && Math.abs(ly) <= o.h / 2) return o
+  }
+  return null
+}
+
+const TAILLE_MIN = 0.1
+
+/**
+ * Tirer le coin `i` d'un objet (dans l'ordre de `contourDeLObjet`) jusqu'à
+ * `p` : le coin opposé ne bouge pas. `garder` : les proportions restent
+ * celles de l'image — c'est le cas par défaut, un meuble ne s'étire pas.
+ */
+export function redimensionner(o: ObjetPose, i: number, p: PointCase, garder: boolean): ObjetPose {
+  const sx = i === 1 || i === 2 ? 1 : -1
+  const sy = i >= 2 ? 1 : -1
+  const a = (o.angle * Math.PI) / 180
+  const cos = Math.cos(a)
+  const sin = Math.sin(a)
+  /* Le coin opposé, fixe. */
+  const qx = o.x + (-sx * o.l * cos) / 2 - (-sy * o.h * sin) / 2
+  const qy = o.y + (-sx * o.l * sin) / 2 + (-sy * o.h * cos) / 2
+  const dx = p[0] - qx
+  const dy = p[1] - qy
+  let l = Math.max(TAILLE_MIN, (dx * cos + dy * sin) * sx)
+  let h = Math.max(TAILLE_MIN, (-dx * sin + dy * cos) * sy)
+  if (garder) {
+    const k = Math.max(l / o.l, h / o.h)
+    l = Math.max(TAILLE_MIN, o.l * k)
+    h = Math.max(TAILLE_MIN, o.h * k)
+  }
+  return {
+    ...o,
+    l,
+    h,
+    x: qx + (sx * l * cos) / 2 - (sy * h * sin) / 2,
+    y: qy + (sx * l * sin) / 2 + (sy * h * cos) / 2
+  }
+}
+
+/** Tourner un objet vers un point : sa poignée de rotation est au-dessus de lui. `pas` : par 15°. */
+export function tourner(o: ObjetPose, p: PointCase, pas: boolean): ObjetPose {
+  let angle = (Math.atan2(p[0] - o.x, -(p[1] - o.y)) * 180) / Math.PI
+  if (pas) angle = Math.round(angle / 15) * 15
+  return { ...o, angle: ((angle % 360) + 360) % 360 }
 }
