@@ -10,7 +10,7 @@
  * Ajouter une planche = ajouter une entrée à PLANCHES, puis relancer.
  */
 import { PNG } from 'pngjs'
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import {
   boiteOpaque,
@@ -116,6 +116,8 @@ interface Planche {
    * on efface ce qui vient des voisins.
    */
   isoler?: boolean
+  /** Des icônes de rayons (catégories, sous-catégories) : `id` est le nom de fichier (`slug`). */
+  icones?: boolean
   cases: (Case | null)[]
 }
 
@@ -358,6 +360,59 @@ const PLANCHES: Planche[] = [
       { id: 'fenetre', nom: 'Fenêtre' },
       { id: 'fenetre-baie', nom: 'Baie vitrée' }
     ]
+  },
+  {
+    fichier: 'planches/icones 1.png',
+    fond: 'magenta',
+    isoler: true,
+    icones: true,
+    cols: 4,
+    rows: 4,
+    type: 'objet',
+    categorie: '',
+    dossier: 'icones',
+    cases: [
+      { id: 'mobilier', nom: 'Mobilier' },
+      { id: 'lumiere', nom: 'Lumière' },
+      { id: 'objets', nom: 'Objets' },
+      { id: 'architecture', nom: 'Architecture' },
+      { id: 'nature', nom: 'Nature' },
+      { id: 'macabre', nom: 'Macabre' },
+      { id: 'lits', nom: 'Lits' },
+      { id: 'assises', nom: 'Assises' },
+      { id: 'tables', nom: 'Tables' },
+      { id: 'rangements', nom: 'Rangements' },
+      { id: 'bain', nom: 'Bain' },
+      { id: 'cheminees', nom: 'Cheminées' },
+      { id: 'lampes', nom: 'Lampes' },
+      { id: 'bougies', nom: 'Bougies' },
+      { id: 'lampadaires', nom: 'Lampadaires' },
+      { id: 'plafonniers', nom: 'Plafonniers' }
+    ]
+  },
+  {
+    fichier: 'planches/icones 2.png',
+    fond: 'magenta',
+    isoler: true,
+    icones: true,
+    cols: 4,
+    rows: 3,
+    type: 'objet',
+    categorie: '',
+    dossier: 'icones',
+    cases: [
+      { id: 'livres-et-papiers', nom: 'Livres et papiers' },
+      { id: 'vaisselle', nom: 'Vaisselle' },
+      { id: 'decoration', nom: 'Décoration' },
+      { id: 'escaliers', nom: 'Escaliers' },
+      { id: 'arbres', nom: 'Arbres' },
+      { id: 'vegetation', nom: 'Végétation' },
+      { id: 'rochers', nom: 'Rochers' },
+      { id: 'bois-mort', nom: 'Bois mort' },
+      { id: 'toiles-d-araignees', nom: 'Toiles d’araignées' },
+      { id: 'ossements', nom: 'Ossements' },
+      { id: 'mes-objets', nom: 'Mes objets' }
+    ]
   }
 ]
 
@@ -370,6 +425,10 @@ function rogner(src: PNG, x: number, y: number, w: number, h: number): PNG {
 const catalogue: Record<string, unknown>[] = []
 
 for (const pl of PLANCHES) {
+  if (!existsSync(join(SOURCES, pl.fichier))) {
+    console.warn(`! ${pl.fichier} : pas encore là, passée`)
+    continue
+  }
   const img = PNG.sync.read(readFileSync(join(SOURCES, pl.fichier)))
   const px = new Uint8ClampedArray(img.data.buffer, img.data.byteOffset, img.data.length)
   const net =
@@ -422,6 +481,14 @@ for (const pl of PLANCHES) {
       const p = new Uint8ClampedArray(piece.data.buffer, piece.data.byteOffset, piece.data.length)
       const rac = raccorder(p, piece.width, piece.height, pl.raccord === 'long')
       piece.data = Buffer.from(rac.buffer, rac.byteOffset, rac.length)
+    }
+    /* Une icône de rayon : rangée à part, sous le nom du rayon, hors du catalogue. */
+    if (pl.icones) {
+      const f = join(PACK, 'icones', `${c.id}.png`)
+      mkdirSync(dirname(f), { recursive: true })
+      writeFileSync(f, PNG.sync.write(piece))
+      console.log(`icones/${c.id}.png  ${piece.width}×${piece.height}`)
+      return
     }
     const type = typeof pl.type === 'function' ? pl.type(c) : pl.type
     const fichier = `${pl.dossier}/${c.id}.png`

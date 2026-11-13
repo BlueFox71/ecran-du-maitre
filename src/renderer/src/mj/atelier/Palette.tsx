@@ -1,16 +1,54 @@
 /**
  * Les vignettes d'assets d'une étape.
  *
- * Rangées (`parCategorie`) : une recherche par nom, une rangée de catégories,
- * puis une rangée de sous-catégories — « Tout » en tête de chacune. Le choix
- * est retenu le temps de la session, d'une étape à l'autre.
+ * Rangées (`parCategorie`) : une rangée d'icônes pour les catégories, une
+ * rangée d'icônes plus petites pour les sous-catégories de celle qui est
+ * ouverte, et une loupe pour chercher par nom. Le choix est retenu le temps de
+ * la session, d'une étape à l'autre.
+ *
+ * L'icône d'un rayon est une image du pack (`icones/<nom>.png`) ; tant qu'elle
+ * n'existe pas, on montre la vignette d'un objet du rayon.
  */
 import { useState } from 'react'
 import { filtrerAssets, rangement, type AssetAtelier } from '@shared/atelierAssets'
 import { urlAsset } from './images'
 
 /** Le rangement choisi, retenu tant que l'application est ouverte. */
-const memoire = { categorie: null as string | null, sous: null as string | null, recherche: '' }
+const memoire = { categorie: null as string | null, sous: null as string | null, recherche: '', chercher: false }
+
+/** Le nom de fichier de l'icône d'un rayon : « Toiles d'araignées » → `toiles-d-araignees`. */
+export function slug(nom: string): string {
+  return nom
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+}
+
+/** L'icône d'un rayon : son image dédiée, sinon celle d'un objet qui y est rangé. */
+function IconeRayon({ nom, repli }: { nom: string; repli: AssetAtelier | undefined }): JSX.Element {
+  const [manque, setManque] = useState(false)
+  if (!manque) return <img src={`jdr://atelier/pack/icones/${slug(nom)}.png`} alt="" onError={() => setManque(true)} />
+  return repli ? <img src={urlAsset(repli)} alt="" /> : <span className="at-icone-vide" />
+}
+
+/** « Tout » : quatre petits carrés. */
+const IconeTout = (): JSX.Element => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <rect x="4" y="4" width="7" height="7" rx="1.5" />
+    <rect x="13" y="4" width="7" height="7" rx="1.5" />
+    <rect x="4" y="13" width="7" height="7" rx="1.5" />
+    <rect x="13" y="13" width="7" height="7" rx="1.5" />
+  </svg>
+)
+
+const IconeLoupe = (): JSX.Element => (
+  <svg viewBox="0 0 24 24" aria-hidden="true">
+    <circle cx="10.5" cy="10.5" r="6" fill="none" strokeWidth="2.2" />
+    <path d="M15 15l5 5" strokeWidth="2.4" strokeLinecap="round" />
+  </svg>
+)
 
 function Tuiles({
   liste,
@@ -56,6 +94,7 @@ export function Palette({
   const [categorie, setCategorieE] = useState<string | null>(memoire.categorie)
   const [sous, setSousE] = useState<string | null>(memoire.sous)
   const [recherche, setRechercheE] = useState(memoire.recherche)
+  const [chercher, setChercherE] = useState(memoire.chercher)
   const setCategorie = (v: string | null): void => {
     memoire.categorie = v
     memoire.sous = null
@@ -70,63 +109,83 @@ export function Palette({
     memoire.recherche = v
     setRechercheE(v)
   }
+  const setChercher = (v: boolean): void => {
+    memoire.chercher = v
+    setChercherE(v)
+    if (!v) setRecherche('')
+  }
 
   if (!assets.length) return <p className="at-vide">Aucun asset de ce type pour l’instant.</p>
   const estChoisi = (a: AssetAtelier): boolean => (choisis ? choisis.includes(a.id) : choisi === a.id)
   if (!parCategorie) return <Tuiles liste={assets} estChoisi={estChoisi} onChoisir={onChoisir} />
 
   const rayons = rangement(assets)
-  /* Une catégorie retenue qui n'existe plus (un import retiré) : on revient à tout. */
+  /* Un rayon retenu qui n'existe plus (un import retiré) : on revient à tout. */
   const cat = rayons.some((r) => r.categorie === categorie) ? categorie : null
   const sousCats = rayons.find((r) => r.categorie === cat)?.sous ?? []
   const sc = sous && sousCats.includes(sous) ? sous : null
-  const liste = filtrerAssets(assets, { categorie: cat, sous: sc, recherche })
+  const liste = filtrerAssets(assets, { categorie: cat, sous: sc, recherche: chercher ? recherche : '' })
+  const repliCat = (c: string): AssetAtelier | undefined => assets.find((a) => a.categorie === c)
+  const repliSous = (c: string, s: string): AssetAtelier | undefined =>
+    assets.find((a) => a.categorie === c && a.sousCategorie === s)
 
-  /* Tout montrer d'un bloc serait long : sans filtre, on titre par catégorie ;
-     dans une catégorie, par sous-catégorie. */
-  const groupes: { titre: string; liste: AssetAtelier[] }[] = recherche.trim()
-    ? [{ titre: '', liste }]
-    : !cat
-      ? rayons.map((r) => ({ titre: r.categorie, liste: liste.filter((a) => a.categorie === r.categorie) }))
-      : !sc && sousCats.length
-        ? [
-            ...sousCats.map((s) => ({ titre: s, liste: liste.filter((a) => a.sousCategorie === s) })),
-            { titre: '', liste: liste.filter((a) => !a.sousCategorie) }
-          ]
-        : [{ titre: '', liste }]
+  /* Sans filtre, on titre par catégorie ; dans une catégorie, par sous-catégorie. */
+  const groupes: { titre: string; liste: AssetAtelier[] }[] =
+    chercher && recherche.trim()
+      ? [{ titre: '', liste }]
+      : !cat
+        ? rayons.map((r) => ({ titre: r.categorie, liste: liste.filter((a) => a.categorie === r.categorie) }))
+        : !sc && sousCats.length
+          ? [
+              ...sousCats.map((s) => ({ titre: s, liste: liste.filter((a) => a.sousCategorie === s) })),
+              { titre: '', liste: liste.filter((a) => !a.sousCategorie) }
+            ]
+          : [{ titre: '', liste }]
 
   return (
     <div className="at-rangement">
-      <input
-        className="at-champ at-recherche"
-        type="search"
-        placeholder="Chercher un objet…"
-        value={recherche}
-        onChange={(e) => setRecherche(e.target.value)}
-      />
-      <div className="at-filtres" role="group" aria-label="Catégories">
-        <button className="at-filtre" aria-pressed={!cat} onClick={() => setCategorie(null)}>
-          Tout
+      <div className="at-icones" role="group" aria-label="Catégories">
+        <button className="at-icone" aria-pressed={!cat} title="Tout" onClick={() => setCategorie(null)}>
+          <IconeTout />
+          <span>Tout</span>
         </button>
         {rayons.map((r) => (
           <button
             key={r.categorie}
-            className="at-filtre"
+            className="at-icone"
             aria-pressed={cat === r.categorie}
+            title={r.categorie}
             onClick={() => setCategorie(r.categorie)}
           >
-            {r.categorie}
+            <IconeRayon nom={r.categorie} repli={repliCat(r.categorie)} />
+            <span>{r.categorie}</span>
           </button>
         ))}
+        <button className="at-icone" aria-pressed={chercher} title="Chercher par nom" onClick={() => setChercher(!chercher)}>
+          <IconeLoupe />
+          <span>Chercher</span>
+        </button>
       </div>
+      {chercher ? (
+        <input
+          className="at-champ at-recherche"
+          type="search"
+          autoFocus
+          placeholder="Chercher un objet…"
+          value={recherche}
+          onChange={(e) => setRecherche(e.target.value)}
+        />
+      ) : null}
       {cat && sousCats.length ? (
-        <div className="at-filtres at-sous" role="group" aria-label="Sous-catégories">
-          <button className="at-filtre" aria-pressed={!sc} onClick={() => setSous(null)}>
-            Tout
+        <div className="at-icones at-sous" role="group" aria-label="Sous-catégories">
+          <button className="at-icone" aria-pressed={!sc} title={`Tout ${cat}`} onClick={() => setSous(null)}>
+            <IconeTout />
+            <span>Tout</span>
           </button>
           {sousCats.map((s) => (
-            <button key={s} className="at-filtre" aria-pressed={sc === s} onClick={() => setSous(s)}>
-              {s}
+            <button key={s} className="at-icone" aria-pressed={sc === s} title={s} onClick={() => setSous(s)}>
+              <IconeRayon nom={s} repli={repliSous(cat, s)} />
+              <span>{s}</span>
             </button>
           ))}
         </div>

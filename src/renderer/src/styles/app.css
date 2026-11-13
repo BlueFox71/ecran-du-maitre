@@ -26784,36 +26784,63 @@ button.at-titre:hover {
   color: var(--text);
 }
 
-/* Le rangement des assets : recherche, catégories, sous-catégories. */
+/* Le rangement des assets : des icônes de catégories, puis de sous-catégories. */
 .at-rangement {
   display: grid;
   gap: 8px;
 }
-.at-filtres {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
+.at-icones {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
 }
-.at-filtre {
-  padding: 3px 9px;
+.at-icone {
+  display: grid;
+  justify-items: center;
+  gap: 3px;
+  padding: 5px 2px 4px;
   border: 1px solid var(--line);
-  border-radius: 999px;
+  border-radius: 8px;
   background: var(--sunk);
   color: var(--text-dim);
   font: inherit;
-  font-size: 12px;
+  font-size: 10px;
+  line-height: 1.15;
+  text-align: center;
   cursor: pointer;
 }
-.at-filtre[aria-pressed='true'] {
+.at-icone img,
+.at-icone svg,
+.at-icone .at-icone-vide {
+  width: 34px;
+  height: 34px;
+  object-fit: contain;
+}
+.at-icone svg {
+  padding: 5px;
+  fill: currentColor;
+  stroke: currentColor;
+}
+.at-icone span {
+  max-width: 100%;
+}
+.at-icone:hover {
+  border-color: var(--brass-line);
+  color: var(--text);
+}
+.at-icone[aria-pressed='true'] {
   border-color: var(--brass);
-  background: var(--brass);
-  color: #fff;
-}
-.at-sous .at-filtre {
-  font-size: 11.5px;
-  padding: 2px 8px;
-}
-.at-sous .at-filtre[aria-pressed='true'] {
   background: var(--brass-wash);
   color: var(--brass-ink);
+}
+.at-sous {
+  grid-template-columns: repeat(3, 1fr);
+  padding: 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--brass-wash) 40%, transparent);
+}
+.at-sous .at-icone img,
+.at-sous .at-icone svg {
+  width: 26px;
+  height: 26px;
 }
