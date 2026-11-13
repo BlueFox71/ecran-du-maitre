@@ -53,3 +53,52 @@ export function pieceSous(c: Construction, p: PointCase): PointCase[] | null {
     }
   return meilleure
 }
+
+/**
+ * Le mur bâti le plus proche d'un point, s'il est à moins de `tol` cases.
+ * `sommet` : l'indice du sommet saisi, si l'on est tout près d'un coin.
+ * `avecD` : où l'on tombe le long du mur, de 0 à 1 — là où se pose une porte.
+ */
+export function murSous(
+  c: Construction,
+  p: PointCase,
+  tol: number,
+  avecD = false
+): { murId: string; sommet: number | null; d?: number } | null {
+  let meilleur: { murId: string; sommet: number | null; d: number; dist: number } | null = null
+  for (const m of c.murs) {
+    let L = 0
+    for (let i = 0; i + 1 < m.pts.length; i++) L += Math.hypot(m.pts[i + 1][0] - m.pts[i][0], m.pts[i + 1][1] - m.pts[i][1])
+    if (L <= 0) continue
+    let parcouru = 0
+    for (let i = 0; i + 1 < m.pts.length; i++) {
+      const a = m.pts[i]
+      const b = m.pts[i + 1]
+      const vx = b[0] - a[0]
+      const vy = b[1] - a[1]
+      const l2 = vx * vx + vy * vy
+      const l = Math.sqrt(l2)
+      const t = l2 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / l2)) : 0
+      const dist = Math.hypot(p[0] - (a[0] + t * vx), p[1] - (a[1] + t * vy))
+      if (dist < tol && (!meilleur || dist < meilleur.dist))
+        meilleur = { murId: m.id, sommet: null, d: (parcouru + t * l) / L, dist }
+      parcouru += l
+    }
+    if (meilleur?.murId === m.id) {
+      let proche = -1
+      let dmin = tol
+      m.pts.forEach((q, i) => {
+        const d = Math.hypot(p[0] - q[0], p[1] - q[1])
+        if (d < dmin) {
+          dmin = d
+          proche = i
+        }
+      })
+      if (proche >= 0) meilleur.sommet = proche
+    }
+  }
+  /* TypeScript ne suit pas l'affectation faite dans les boucles : on le lui redit. */
+  const r = meilleur as { murId: string; sommet: number | null; d: number } | null
+  if (!r) return null
+  return avecD ? { murId: r.murId, sommet: r.sommet, d: r.d } : { murId: r.murId, sommet: r.sommet }
+}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { constructionVide, type Construction } from './atelier'
-import { pieceSous, rectangle, solSous } from './atelierOutils'
+import { murSous, pieceSous, rectangle, solSous } from './atelierOutils'
 
 const terrain = (): Construction => ({ ...constructionVide(), largeur: 20, hauteur: 10 })
 
@@ -54,5 +54,25 @@ describe('pieceSous', () => {
     c.objets.push({ id: 'lit', assetId: 'l', x: 4, y: 4, l: 2, h: 2, angle: 0, bloquePas: true, bloqueVue: true })
     const p = pieceSous(c, [4, 4])!
     expect(Math.max(...p.map((q) => q[0]))).toBeCloseTo(11, 6)
+  })
+})
+
+describe('murSous', () => {
+  const c = terrain()
+  c.murs.push(
+    { id: 'a', assetId: 'x', pts: [[1, 1], [9, 1]], epaisseur: 0.4 },
+    { id: 'b', assetId: 'x', pts: [[1, 5], [9, 5], [9, 9]], epaisseur: 0.4 }
+  )
+  it('trouve le mur le plus proche, à la tolérance près', () => {
+    expect(murSous(c, [5, 1.2], 0.5)).toEqual({ murId: 'a', sommet: null })
+    expect(murSous(c, [5, 3], 0.5)).toBeNull()
+  })
+  it('près d’un sommet, le dit', () => {
+    expect(murSous(c, [9.1, 5.1], 0.5)).toEqual({ murId: 'b', sommet: 1 })
+  })
+  it('le long du segment, rend aussi où l’on est', () => {
+    const r = murSous(c, [9.2, 7], 0.5, true)!
+    expect(r.murId).toBe('b')
+    expect(r.d).toBeCloseTo((8 + 2) / 12, 6)
   })
 })
