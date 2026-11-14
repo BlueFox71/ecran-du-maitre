@@ -15,11 +15,21 @@ export const urlAsset = (a: AssetAtelier): string =>
 
 const enCours = new Map<string, Promise<void>>()
 
-/** Charge ce qui manque ; rend quand toutes les images demandées sont prêtes ou absentes. */
-export function chargerImages(assets: AssetAtelier[], images: ImagesAtelier): Promise<void> {
+/**
+ * Charge ce qui manque ; rend quand toutes les images demandées sont prêtes ou
+ * absentes. `progres` suit le compte, à chaque image finie.
+ */
+export function chargerImages(
+  assets: AssetAtelier[],
+  images: ImagesAtelier,
+  progres?: (faites: number, total: number) => void
+): Promise<void> {
+  let faites = 0
+  const une = (): void => progres?.(++faites, assets.length)
+  progres?.(0, assets.length)
   return Promise.all(
     assets.map((a) => {
-      if (images.has(a.id)) return Promise.resolve()
+      if (images.has(a.id)) return Promise.resolve().then(une)
       let p = enCours.get(a.id)
       if (!p) {
         p = new Promise<void>((fin) => {
@@ -37,7 +47,7 @@ export function chargerImages(assets: AssetAtelier[], images: ImagesAtelier): Pr
         }).finally(() => enCours.delete(a.id))
         enCours.set(a.id, p)
       }
-      return p
+      return p.then(une)
     })
   ).then(() => undefined)
 }

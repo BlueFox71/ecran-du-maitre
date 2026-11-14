@@ -235,11 +235,15 @@ function Chantier({ place }: { place: Place }): JSX.Element {
   const [quitter, setQuitter] = useState(false)
   const essai = useEssaiAtelier(place.id, co.c)
 
+  /* Tant que des images manquent, un voile de chargement couvre le chantier :
+     on ne montre pas un lieu à moitié dessiné. */
+  const [chargement, setChargement] = useState<{ faites: number; total: number } | null>({ faites: 0, total: 0 })
   const recharger = useCallback(async () => {
     const a = await window.jdr.atelier.assets()
     setAssets(a)
-    await chargerImages(a, images)
+    await chargerImages(a, images, (faites, total) => setChargement({ faites, total }))
     setVersionImages((v) => v + 1)
+    setChargement(null)
   }, [images])
 
   useEffect(() => {
@@ -471,6 +475,22 @@ function Chantier({ place }: { place: Place }): JSX.Element {
       ) : null}
 
       <div className="at-corps">
+        {chargement || !co.c ? (
+          <div className="at-chargement" role="status" aria-live="polite">
+            <span className="at-roue" aria-hidden="true" />
+            <span>Chargement du lieu…</span>
+            {chargement?.total ? (
+              <>
+                <span className="at-jauge">
+                  <span style={{ width: `${(chargement.faites / chargement.total) * 100}%` }} />
+                </span>
+                <span className="at-compte">
+                  {chargement.faites} / {chargement.total} images
+                </span>
+              </>
+            ) : null}
+          </div>
+        ) : null}
         {co.c ? (
           <Toile
             c={co.c}

@@ -26604,6 +26604,7 @@ body.surligneur-actif [data-cible] {
   min-height: 0;
   display: flex;
   gap: 8px;
+  position: relative;
 }
 .at-toile {
   flex: 1;
@@ -27022,4 +27023,50 @@ button.at-titre:hover {
 .at-lieu-suppr:disabled {
   opacity: 0.3;
   cursor: not-allowed;
+}
+
+/* Le voile de chargement du chantier : tant que la dernière image n'est pas là. */
+.at-chargement {
+  position: absolute;
+  inset: 0;
+  z-index: 5;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  background: var(--sunk);
+  color: var(--text-dim);
+  border-radius: 6px;
+}
+.at-roue {
+  width: 34px;
+  height: 34px;
+  border: 3px solid var(--line);
+  border-top-color: var(--brass);
+  border-radius: 50%;
+  animation: at-tourne 0.9s linear infinite;
+}
+@keyframes at-tourne {
+  to {
+    transform: rotate(360deg);
+  }
+}
+.at-jauge {
+  width: min(260px, 60%);
+  height: 4px;
+  border-radius: 2px;
+  background: var(--line);
+  overflow: hidden;
+}
+.at-jauge span {
+  display: block;
+  height: 100%;
+  background: var(--brass);
+  transition: width 0.15s;
+}
+.at-compte {
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--text-faint);
 }
