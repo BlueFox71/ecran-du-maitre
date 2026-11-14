@@ -26978,23 +26978,33 @@ button.at-titre:hover {
   font-variant-numeric: tabular-nums;
 }
 
-/* Un lieu construit dans la liste de l'atelier, et sa corbeille. */
+/* Un lieu construit dans la liste de l'atelier, et sa corbeille, posée
+   dans la tuile, à droite. */
 .at-lieu-ligne {
-  display: flex;
-  gap: 4px;
+  position: relative;
 }
 .at-lieu-ligne .at-lieu {
-  flex: 1;
+  padding-right: 40px;
+}
+.at-lieu-ligne .at-lieu span {
   min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 .at-lieu-suppr {
-  flex: none;
+  position: absolute;
+  top: 50%;
+  right: 6px;
+  transform: translateY(-50%);
   display: grid;
   place-items: center;
-  width: 34px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--raised);
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
   color: var(--text-dim);
   cursor: pointer;
 }
@@ -27006,10 +27016,10 @@ button.at-titre:hover {
   stroke-width: 1.5;
 }
 .at-lieu-suppr:hover:not(:disabled) {
-  border-color: var(--blood);
+  background: rgba(0, 0, 0, 0.25);
   color: var(--blood);
 }
 .at-lieu-suppr:disabled {
-  opacity: 0.35;
+  opacity: 0.3;
   cursor: not-allowed;
 }
