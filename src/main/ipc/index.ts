@@ -339,6 +339,9 @@ export function registerIpc(): void {
   on('items:rename', (rel: string, name: string) => fsLib.renameEntry(rel, name))
   on('items:trash', (rel: string) => fsLib.trashEntry(rel))
   on('items:reveal', (rel: string) => fsLib.revealEntry(rel))
+  /* shell.openPath ouvre aussi bien un fichier qu'un dossier : avec le logiciel
+     que Windows lui associe, et seulement dans le dossier de campagne. */
+  on('items:openWith', (rel: string) => fsLib.openFolderInExplorer(rel))
   /* La page d'un PDF dont on tire sa vignette. Le dépôt efface la signature de
      l'examen ; c'est planifier() qui remet le graveur au travail. */
   on('items:thumbPage', (id: number, page: number) => {

@@ -338,6 +338,8 @@ const api = {
     trash: (rel: string) => call<void>('items:trash', rel),
     importFiles: (folderRel = '') => call<UiItem[]>('items:import', folderRel),
     reveal: (relPath: string) => call<void>('items:reveal', relPath),
+    /** Ouvrir le fichier avec le logiciel de Windows (Word pour un .docx…). */
+    openWith: (relPath: string) => call<void>('items:openWith', relPath),
     /**
      * De quelle page d'un PDF on tire sa vignette. Elle se regrave ensuite
      * toute seule, et `library.onChanged` l'annonce.

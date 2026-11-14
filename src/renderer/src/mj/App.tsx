@@ -29,6 +29,7 @@ import { Atelier } from './modules/Atelier'
 import { Objets } from './modules/Objets'
 import { Timeline } from './modules/Timeline'
 import { Annexes } from './modules/Annexes'
+import { cibleAnnexe } from './annexeGlisser'
 import { Trame } from './modules/Trame'
 import { PAGES_PREPARATION } from './components/SousMenuPreparation'
 import { BlocNotes } from './modules/BlocNotes'
@@ -388,7 +389,8 @@ function NavItem({
   count,
   icon,
   ouvert,
-  onDeplier
+  onDeplier,
+  cible
 }: {
   id: ViewId
   label: string
@@ -397,6 +399,8 @@ function NavItem({
   /** Un module peut tenir un bout de lui-même sous le rail : le chevron l'ouvre. */
   ouvert?: boolean
   onDeplier?: () => void
+  /** Les gestes d'une cible de lâcher, quand l'entrée accepte qu'on y dépose quelque chose. */
+  cible?: Record<string, (e: React.DragEvent<HTMLElement>) => void>
 }): JSX.Element {
   const setView = useStore((s) => s.setView)
   /* L'Éditeur ouvert sur le texte d'un moment reste un détour de la
@@ -406,7 +410,7 @@ function NavItem({
   const docDuMoment = useRetourMoment((r) => r.docId)
   const ici = view === 'editor' && docDuMoment !== null && docDuMoment === editingItemId ? 'timeline' : view
   const entree = (
-    <button className="nav-item" aria-current={ici === id} onClick={() => setView(id)}>
+    <button className="nav-item" aria-current={ici === id} onClick={() => setView(id)} {...cible}>
       {icon}
       {label}
       {count !== undefined ? <span className="count">{count}</span> : null}
@@ -474,6 +478,8 @@ function Preparation(): JSX.Element {
             if (!dedans) s.setView('timeline')
             if (!ouvert) basculer()
           }}
+          /* Repliée, l'entrée reçoit à la place des Annexes qu'elle cache. */
+          {...(ouvert ? {} : cibleAnnexe())}
         >
           <IconPen />
           Préparation de la séance
@@ -497,7 +503,13 @@ function Preparation(): JSX.Element {
             icon={<IconTimeline />}
           />
           <NavItem id="trame" label="Arborescence" icon={<IconTrame />} />
-          <NavItem id="annexes" label="Annexes" count={s.annexes.length} icon={<IconDoc />} />
+          <NavItem
+            id="annexes"
+            label="Annexes"
+            count={s.annexes.length}
+            icon={<IconDoc />}
+            cible={cibleAnnexe()}
+          />
         </div>
       ) : null}
     </>

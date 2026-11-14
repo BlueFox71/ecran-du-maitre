@@ -13,6 +13,7 @@ import {
 import { FOLDER_ICON_KEYS, decorDossier, folderIcon } from '../components/FolderIcons'
 import { dimensions, duree } from '../../shared/mesures'
 import type { UiFolder, UiItem } from '../../../../preload/index'
+import { marquerPourAnnexe, mettreEnAnnexe, peutEtreAnnexe } from '../annexeGlisser'
 
 /* ============================================================
    La bibliothèque est une vue sur un dossier réel.
@@ -435,7 +436,10 @@ export function Library(): JSX.Element {
         key={i.id}
         className={`row file${on ? ' on' : ''}`}
         draggable
-        onDragStart={() => (dragged.current = { kind: 'file', item: i })}
+        onDragStart={(e) => {
+          dragged.current = { kind: 'file', item: i }
+          marquerPourAnnexe(e, i)
+        }}
         /* Lâcher sur un fichier, c'est lâcher dans son dossier : dans un
            dossier déplié, les fichiers couvrent l'essentiel de la place. */
         {...cible(parentOf(i.relPath ?? ''))}
@@ -572,7 +576,10 @@ export function Library(): JSX.Element {
         key={i.id}
         className={`tile${on ? ' on' : ''}`}
         draggable
-        onDragStart={() => (dragged.current = { kind: 'file', item: i })}
+        onDragStart={(e) => {
+          dragged.current = { kind: 'file', item: i }
+          marquerPourAnnexe(e, i)
+        }}
         onClick={() => setSel({ kind: 'file', id: i.id })}
         onDoubleClick={() => ouvrir(i)}
       >
@@ -829,7 +836,10 @@ export function Library(): JSX.Element {
                       key={i.id}
                       className={sel?.kind === 'file' && sel.id === i.id ? 'on' : ''}
                       draggable
-                      onDragStart={() => (dragged.current = { kind: 'file', item: i })}
+                      onDragStart={(e) => {
+          dragged.current = { kind: 'file', item: i }
+          marquerPourAnnexe(e, i)
+        }}
                       onClick={() => setSel({ kind: 'file', id: i.id })}
                       onDoubleClick={() => ouvrir(i)}
                     >
@@ -1214,6 +1224,27 @@ function FileCard({ item }: { item: UiItem }): JSX.Element {
             <IconDoc />
             Ouvrir dans l’éditeur
           </button>
+        ) : null}
+        {peutEtreAnnexe(item.kind) ? (
+          s.annexes.some((a) => a.id === item.id) ? (
+            <button
+              className="btn btn-sm"
+              onClick={() => s.setView('annexes')}
+              title="Ce document est déjà sous la main : aller le lire dans les annexes"
+            >
+              <IconDoc />
+              Voir dans les annexes
+            </button>
+          ) : (
+            <button
+              className="btn btn-sm"
+              onClick={() => void mettreEnAnnexe(item.id)}
+              title="Garder ce document sous la main toute la séance. Astuce : tu peux aussi le glisser sur « Annexes », dans le menu de gauche."
+            >
+              <IconPlus />
+              Mettre en annexe
+            </button>
+          )
         ) : null}
         <button
           className="btn btn-sm"
