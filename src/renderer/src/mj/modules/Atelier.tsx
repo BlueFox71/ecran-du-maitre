@@ -15,7 +15,7 @@ import { chargerImages, type ImagesAtelier } from '../atelier/images'
 import { useConstruction, type ConstructionOuverte } from '../atelier/useConstruction'
 import { Toile, type Outil } from '../atelier/Toile'
 import { useEssaiAtelier } from '../atelier/Essai'
-import { IconMurs, IconPlus } from '../components/Icons'
+import { IconMurs, IconPlus, IconTrash } from '../components/Icons'
 import { EtapeSol } from '../atelier/etapes/Sol'
 import { EtapeMurs } from '../atelier/etapes/Murs'
 import { EtapeOuvertures } from '../atelier/etapes/Ouvertures'
@@ -75,6 +75,22 @@ function Accueil(): JSX.Element {
       s.toast(e instanceof Error ? e.message : String(e), true)
     }
   }
+  /* Supprimer un lieu construit : seulement un brouillon de l'atelier, qu'on
+     n'a encore rangé nulle part. Un lieu rangé dans les Lieux sert à la
+     partie : on le supprime de là-bas, où l'on voit ce qu'il tient. */
+  const [aSupprimer, setASupprimer] = useState<Place | null>(null)
+  const officiel = (p: Place): boolean => p.parentId !== null && s.places.some((q) => q.id === p.parentId)
+  const supprimer = async (p: Place): Promise<void> => {
+    setASupprimer(null)
+    try {
+      await window.jdr.places.remove(p.id)
+      await s.refreshPlaces()
+      s.toast(`« ${p.name} » est supprimé.`)
+    } catch (e) {
+      s.toast(e instanceof Error ? e.message : String(e), true)
+    }
+  }
+
   const construire = async (id: number): Promise<void> => {
     try {
       await window.jdr.atelier.construire(id)
@@ -123,10 +139,23 @@ function Accueil(): JSX.Element {
           {construits.length ? (
             <ul className="at-liste">
               {construits.map((p) => (
-                <li key={p.id}>
+                <li key={p.id} className="at-lieu-ligne">
                   <button className="at-lieu" onClick={() => s.ouvrirAtelier(p.id)}>
                     <IconMurs />
                     <span>{p.name}</span>
+                  </button>
+                  <button
+                    className="at-lieu-suppr"
+                    disabled={officiel(p)}
+                    onClick={() => setASupprimer(p)}
+                    aria-label={`Supprimer « ${p.name} »`}
+                    title={
+                      officiel(p)
+                        ? 'Ce lieu est rangé dans les Lieux : il sert à la partie. Supprime-le depuis les Lieux.'
+                        : 'Supprimer ce lieu'
+                    }
+                  >
+                    <IconTrash />
                   </button>
                 </li>
               ))}
@@ -151,6 +180,38 @@ function Accueil(): JSX.Element {
           </div>
         ) : null}
       </div>
+      {aSupprimer ? (
+        <div className="scrim" onClick={() => setASupprimer(null)}>
+          <div
+            className="modal"
+            role="alertdialog"
+            aria-labelledby="at-suppr-titre"
+            onClick={(e) => e.stopPropagation()}
+            onKeyDown={(e) => {
+              if (e.key === 'Escape') setASupprimer(null)
+            }}
+          >
+            <header>
+              <IconTrash />
+              <h3 id="at-suppr-titre">Supprimer « {aSupprimer.name} » ?</h3>
+            </header>
+            <div className="body">
+              <p>
+                Le lieu et toute sa construction disparaissent : sol, murs, portes, objets et lumières.
+                On ne peut pas revenir en arrière.
+              </p>
+            </div>
+            <footer>
+              <button className="btn" autoFocus onClick={() => setASupprimer(null)}>
+                Annuler
+              </button>
+              <button className="btn btn-danger" onClick={() => void supprimer(aSupprimer)}>
+                Supprimer
+              </button>
+            </footer>
+          </div>
+        </div>
+      ) : null}
     </section>
   )
 }

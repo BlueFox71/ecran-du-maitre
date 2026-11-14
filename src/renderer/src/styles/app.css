@@ -26977,3 +26977,39 @@ button.at-titre:hover {
   font-weight: 600;
   font-variant-numeric: tabular-nums;
 }
+
+/* Un lieu construit dans la liste de l'atelier, et sa corbeille. */
+.at-lieu-ligne {
+  display: flex;
+  gap: 4px;
+}
+.at-lieu-ligne .at-lieu {
+  flex: 1;
+  min-width: 0;
+}
+.at-lieu-suppr {
+  flex: none;
+  display: grid;
+  place-items: center;
+  width: 34px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  color: var(--text-dim);
+  cursor: pointer;
+}
+.at-lieu-suppr svg {
+  width: 15px;
+  height: 15px;
+  stroke: currentColor;
+  fill: none;
+  stroke-width: 1.5;
+}
+.at-lieu-suppr:hover:not(:disabled) {
+  border-color: var(--blood);
+  color: var(--blood);
+}
+.at-lieu-suppr:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+}
