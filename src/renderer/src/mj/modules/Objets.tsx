@@ -45,6 +45,7 @@ import { ChoixDestination, type Destination } from '../components/ChoixDestinati
 import { BandeJoueurs, TYPE_EXEMPLAIRE, TYPE_OBJET } from '../components/BandeJoueurs'
 import { AlerteLieux, lieuxDe } from '../components/ObjetsDuLieu'
 import { ModaleNouvelObjet } from '../components/NouvelObjet'
+import { ImporterDUneSeance } from '../components/ImporterDUneSeance'
 import { RognageCarre } from '../components/RognageCarre'
 import { Piece } from '../../shared/Piece'
 import { ditMontant, monnaiesActives, type Monnaie } from '@shared/monnaies'
@@ -105,6 +106,7 @@ export function Objets(): JSX.Element {
   const [corbeilleVue, setCorbeilleVue] = useState(false)
   const corbeille = corbeilleVue && !inv
   const [rangerOuvert, setRangerOuvert] = useState(false)
+  const [importOuvert, setImportOuvert] = useState(false)
   const [nouvelObjet, setNouvelObjet] = useState(false)
   const nDeplaces = useMemo(() => deplaces(s.objets).length, [s.objets])
   const choisirRayon = (r: number | 'tout'): void => {
@@ -170,6 +172,15 @@ export function Objets(): JSX.Element {
           </p>
         </div>
         <div className="spacer" />
+        {s.sessions.length > 1 ? (
+          <button
+            className="btn btn-sm"
+            onClick={() => setImportOuvert(true)}
+            title="Copier dans cette séance des objets d’une autre séance"
+          >
+            Importer depuis une séance précédente…
+          </button>
+        ) : null}
         <button
           className="btn btn-sm"
           onClick={() => setRangerOuvert(true)}
@@ -387,6 +398,7 @@ export function Objets(): JSX.Element {
         <PanneauReglages x={reglages.x} y={reglages.y} onClose={() => setReglages(null)} />
       ) : null}
       {rangerOuvert ? <ModaleRanger onClose={() => setRangerOuvert(false)} /> : null}
+      {importOuvert ? <ImporterDUneSeance onglet="objets" onClose={() => setImportOuvert(false)} /> : null}
       {nouvelObjet ? (
         <ModaleNouvelObjet
           familleDepart={rayon === 'tout' || rayon === SANS_FAMILLE ? null : rayon}

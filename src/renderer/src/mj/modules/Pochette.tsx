@@ -28,6 +28,7 @@ import { useStore } from '../store'
 import { useEchap } from '../echap'
 import { ChoixDansArbre } from '../components/ChoixDansArbre'
 import { Visionneuse } from '../components/Visionneuse'
+import { ImporterDUneSeance } from '../components/ImporterDUneSeance'
 import {
   IconCheck,
   IconClose,
@@ -79,6 +80,7 @@ export function Pochette(): JSX.Element {
   const s = useStore()
   const [rangement, setRangement] = useState<Rangement>(TOUT)
   const [choix, setChoix] = useState(false)
+  const [importOuvert, setImportOuvert] = useState(false)
   /** Le document dont on ouvre le menu « donner à » ou « ranger ». */
   const [menu, setMenu] = useState<{ id: number; quoi: 'qui' | 'ou' } | null>(null)
   /** L'onglet qu'on est en train de nommer — `0` pour un onglet neuf. */
@@ -157,6 +159,15 @@ export function Pochette(): JSX.Element {
           </p>
         </div>
         <div className="spacer" />
+        {s.sessions.length > 1 ? (
+          <button
+            className="btn btn-ghost"
+            onClick={() => setImportOuvert(true)}
+            title="Copier dans cette séance des documents d’une autre séance"
+          >
+            Importer depuis une séance précédente…
+          </button>
+        ) : null}
         <button className="btn btn-brass" onClick={() => setChoix(true)}>
           <IconPlus />
           Mettre un document
@@ -506,6 +517,7 @@ export function Pochette(): JSX.Element {
           onClose={() => setChoix(false)}
         />
       )}
+      {importOuvert ? <ImporterDUneSeance onglet="pochette" onClose={() => setImportOuvert(false)} /> : null}
     </section>
   )
 }
