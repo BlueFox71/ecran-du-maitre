@@ -1,8 +1,8 @@
-<!-- version: 1.9.0 -->
+<!-- version: 1.9.1 -->
 ### Nouveautés
-- **Deux jeux de règles : Chasse aux fantômes ou World of Warcraft.** Une nouvelle campagne commence par là : ses règles d'abord, son dossier ensuite. À chaque lancement, l'écran demande aussi les règles du soir. Le choix reste celui de la campagne et se change aussi dans Paramètres › Règles du jeu. Chasse aux fantômes, ce sont les règles de toujours : rien ne change.
-- **World of Warcraft fait partie de l'écran.** L'Arbre de talents (édition des arbres, Jeu, Grimoire, Métiers et objets, Aventure) et l'éditeur de cartes s'ouvrent dans la fenêtre de l'écran, dans un nouveau groupe « Azeroth » du menu de gauche. Plus de fenêtre noire ni de navigateur à lancer à côté : le jeu démarre tout seul avec une campagne WoW, et tes sauvegardes et images restent dans leur dossier.
-- **La table d'Azeroth.** Les joueurs jouent dans leur Aventure, sur tablette, téléphone ou PC ; le MJ les suit d'ici : PV, mana, rage ou énergie, améliorations et affaiblissements, et le journal de leurs jets, en direct. Un prénom et « Inviter » donnent l'adresse de sa fiche et son QR code.
-- **La console du MJ.** Demander un jet (1D20 contre 1, 5, 10, 15 ou 20, plus les facteurs) : le panneau Difficulté du joueur se règle tout seul. Infliger des dégâts, soigner, retirer ou rendre de la ressource, poser un état (Étourdi, Empoisonné, Apeuré…), écrire un message, passer au tour suivant — à un joueur ou à tout le groupe. Et le jet du MJ, avec son verdict.
-- **La fiche de campagne WoW.** Passer aux règles WoW pose une fiche à PV, ressource et dix caractéristiques ; l'ancienne fiche est gardée et revient si l'on repasse aux fantômes.
-- **Le simulateur des joueurs** se refabrique et se publie depuis la table d'Azeroth.
+- **Des quêtes à donner d'un clic.** Dans la console du MJ (Azeroth › La table), un bloc « Quêtes » : choisis une quête préparée pour la campagne, rangée par acte, et envoie-la au journal de quêtes des joueurs ; un second bouton la marque terminée. Une quête à la volée s'écrit sur la même ligne.
+- **Un codex qui garde ses secrets.** Une entrée du codex peut être préparée à l'avance et **cachée aux joueurs** : le MJ la voit (marquée d'un cadenas) et la révèle d'un clic au moment où le groupe la découvre. Les tablettes des joueurs la reçoivent toutes seules, avec un mot dans leur discussion.
+- **La campagne 4, « Les cendres de la Légion »**, apparaît dans le filtre du codex.
+
+### Corrections
+- Le codex ne montre plus rien de caché à un joueur, même s'il tape l'adresse du fichier à la main.

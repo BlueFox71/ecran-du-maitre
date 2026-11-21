@@ -23,6 +23,7 @@ import {
   type EnvoiWow,
   type JetWow,
   type JoueurWow,
+  type QuetePreparee,
   type ServeurWow
 } from '@shared/wow'
 
@@ -216,6 +217,7 @@ export function Azeroth(): JSX.Element {
           <p className="aide az-astuce">Clique sur une fiche pour viser ce joueur seulement.</p>
 
           <DemanderJet onEnvoyer={envoyer} />
+          <Quetes onEnvoyer={envoyer} />
           <Degats onEnvoyer={envoyer} />
           <Etats onEnvoyer={envoyer} />
           <Message onEnvoyer={envoyer} />
@@ -699,6 +701,86 @@ function DemanderJet({ onEnvoyer }: { onEnvoyer: Envoyer }): JSX.Element {
         Le panneau « Difficulté » de leur Aventure se règle tout seul ; le joueur lance son sort, sa
         caractéristique ou le d20, et le verdict tombe dans son journal (et ici).
       </p>
+    </div>
+  )
+}
+
+/**
+ * Les quêtes de la campagne : préparées dans `quetes-wow.json` (dossier de la
+ * campagne), envoyées d'un clic au journal de quêtes des joueurs visés. Une
+ * quête déjà reçue n'arrive pas deux fois.
+ */
+function Quetes({ onEnvoyer }: { onEnvoyer: Envoyer }): JSX.Element {
+  const [liste, setListe] = useState<QuetePreparee[]>([])
+  const [choix, setChoix] = useState(0)
+  const [libre, setLibre] = useState({ titre: '', texte: '' })
+  useEffect(() => {
+    void window.jdr.wow.quetes().then(setListe)
+  }, [])
+  const actes = [...new Set(liste.map((q) => q.acte))]
+  const q = liste[choix]
+  const donner = (x: { titre: string; donneur?: string; lieu?: string; texte?: string }): void =>
+    void onEnvoyer({ t: 'quete', quete: x }, `Quête « ${x.titre} »`)
+  return (
+    <div className="az-bloc">
+      <h4>Quêtes</h4>
+      {liste.length ? (
+        <>
+          <select value={choix} onChange={(e) => setChoix(Number(e.target.value))} aria-label="Quête préparée">
+            {actes.map((a) => (
+              <optgroup key={a} label={a}>
+                {liste.map((x, i) =>
+                  x.acte === a ? (
+                    <option key={i} value={i}>
+                      {x.sorte} {x.titre}
+                    </option>
+                  ) : null
+                )}
+              </optgroup>
+            ))}
+          </select>
+          {q ? (
+            <div className="az-quete">
+              <span className="az-lbl">{[q.donneur, q.lieu].filter(Boolean).join(' · ')}</span>
+              {q.texte ? <p>{q.texte}</p> : null}
+            </div>
+          ) : null}
+          <div className="az-ligne">
+            <button className="btn btn-brass" disabled={!q} onClick={() => q && donner(q)}>
+              Donner la quête
+            </button>
+            <button
+              className="btn btn-ghost"
+              disabled={!q}
+              onClick={() => q && void onEnvoyer({ t: 'queteFinie', titre: q.titre }, `Quête terminée : « ${q.titre} »`)}
+              title="Marque la quête comme terminée dans leur journal"
+            >
+              Terminée
+            </button>
+          </div>
+          <p className="aide">★ principale · ◆ secondaire liée · ○ secondaire libre. Le texte est celui que lisent les joueurs.</p>
+        </>
+      ) : (
+        <p className="aide">Aucune quête préparée pour cette campagne (fichier quetes-wow.json dans son dossier).</p>
+      )}
+      <div className="az-ligne">
+        <input
+          type="text"
+          placeholder="Ou une quête à la volée…"
+          value={libre.titre}
+          onChange={(e) => setLibre({ ...libre, titre: e.target.value })}
+        />
+        <button
+          className="btn"
+          disabled={!libre.titre.trim()}
+          onClick={() => {
+            donner({ titre: libre.titre.trim(), texte: libre.texte.trim() || undefined, donneur: 'Le MJ' })
+            setLibre({ titre: '', texte: '' })
+          }}
+        >
+          Donner
+        </button>
+      </div>
     </div>
   )
 }

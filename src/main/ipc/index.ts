@@ -260,6 +260,7 @@ export function registerIpc(): void {
   })
   on('wow:fenetreJoueur', (joueur: string) => wow.fenetreJoueur(joueur))
   on('wow:simulateur', (publier: boolean) => wow.simulateur(!!publier))
+  on('wow:quetes', () => wow.quetesPreparees())
   on('wow:ouvrirDonnees', async () => {
     await shell.openPath(wow.dossier())
     return true

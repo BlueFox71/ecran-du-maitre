@@ -6274,18 +6274,36 @@ const CODEX_CATS = ["Personnages", "Boss", "Lieux", "Bestiaire", "Factions", "Ob
    vécus, commun à tous les joueurs (Sauvegardes\codex.json). Les joueurs le
    lisent ; le MJ (l'appli ouverte sans ?joueur=) peut le corriger. Les notes de
    chaque personnage restent dans sa fiche, à côté. */
-const CAMPAGNES = { 1: "Les Défias", 2: "Les secrets du mont Rochenoire", 3: "L'appel du scarabée" };
-let CODEX_COMMUN = [], codexCommunEtat = "", codexFiltre = "";
+const CAMPAGNES = { 1: "Les Défias", 2: "Les secrets du mont Rochenoire", 3: "L'appel du scarabée", 4: "Les cendres de la Légion" };
+/* Une entrée `cache: true` est préparée par le MJ mais pas encore découverte :
+   les joueurs ne la voient pas ; le MJ la voit, marquée, et la révèle d'un clic. */
+let CODEX_TOUT = [], CODEX_COMMUN = [], codexCommunEtat = "", codexFiltre = "";
 const CODEX_FICHIER = () => APP_DIR + "Sauvegardes/codex.json";
-function chargeCodexCommun() {
-  if (codexCommunEtat) return;
-  codexCommunEtat = "charge";
-  diskRead(CODEX_FICHIER()).then(d => { CODEX_COMMUN = (d && d.entrees) || []; codexCommunEtat = "ok"; majCodex(); });
+function chargeCodexCommun(force) {
+  if (codexCommunEtat && !force) return;
+  if (!codexCommunEtat) codexCommunEtat = "charge";
+  const dejaLu = codexCommunEtat === "ok";
+  diskRead(CODEX_FICHIER()).then(d => {
+    CODEX_TOUT = (d && d.entrees) || [];
+    const avant = CODEX_COMMUN.length;
+    CODEX_COMMUN = JOUEUR ? CODEX_TOUT.filter(c => !c.cache) : CODEX_TOUT;
+    codexCommunEtat = "ok";
+    /* Chez un joueur, ce que le MJ vient de révéler s'annonce dans la discussion
+       (pas à la première lecture : tout y serait « nouveau »). */
+    const n = CODEX_COMMUN.length - avant;
+    if (dejaLu && JOUEUR && n > 0) chat("Votre codex s'est enrichi : " + n + " nouvelle" + (n > 1 ? "s entrées" : " entrée") + ".", "gain");
+    if (!force || perso.fen.codex.open) majCodex();
+  });
 }
+/* Les joueurs lisent le codex dès l'ouverture, puis le relisent de temps en
+   temps : ce que le MJ révèle leur arrive, même codex fermé. */
+setInterval(() => { if (JOUEUR && DISK && codexCommunEtat !== "charge") chargeCodexCommun(true); }, 20000);
 let codexSauveT = 0;
 function sauveCodexCommun() {
   clearTimeout(codexSauveT);
-  codexSauveT = setTimeout(() => diskWrite(CODEX_FICHIER(), JSON.stringify({ entrees: CODEX_COMMUN, savedAt: new Date().toISOString() }, null, 1))
+  /* Seul le MJ écrit, et il tient la liste entière (entrées cachées comprises). */
+  if (JOUEUR) return;
+  codexSauveT = setTimeout(() => diskWrite(CODEX_FICHIER(), JSON.stringify({ entrees: CODEX_TOUT, savedAt: new Date().toISOString() }, null, 1))
     .catch(e => toast("Codex non enregistré (" + e.message + ").", 5000)), 600);
 }
 
@@ -7743,6 +7761,18 @@ function recoit(m) {
     chat(de + " : " + (n >= 0 ? "+" : "") + (perso.res.cur - avant) + " " + h(ressource()) + ".", n >= 0 ? "gain" : "err");
   } else if (q.t === "tour") {
     try { tourSuivant(); } catch (e) {}
+  } else if (q.t === "quete" && q.quete && q.quete.titre) {
+    /* Une quête donnée par le MJ : elle arrive dans le journal (une seule fois par titre). */
+    const t = String(q.quete.titre).slice(0, 120);
+    if (!perso.quetes.some(x => x.titre === t)) {
+      perso.quetes.unshift({ id: uid("q"), titre: t, donneur: String(q.quete.donneur || "").slice(0, 80),
+        lieu: String(q.quete.lieu || "").slice(0, 80), texte: String(q.quete.texte || "").slice(0, 2000), finie: false });
+      chat("Nouvelle quête : <b>" + h(t) + "</b>" + (q.quete.donneur ? " (" + h(q.quete.donneur) + ")" : "") + ".", "gain");
+      if (perso.fen.quetes.open) majQuetes();
+    }
+  } else if (q.t === "queteFinie" && q.titre) {
+    const x = perso.quetes.find(x => x.titre === String(q.titre));
+    if (x && !x.finie) { x.finie = true; chat("Quête terminée : <b>" + h(x.titre) + "</b>.", "gain"); if (perso.fen.quetes.open) majQuetes(); }
   }
   sauvePerso(); if (mode === "wow") { majUnit(); majAuras(); }
 }
@@ -12229,7 +12259,9 @@ function listeCodex() {
   const html = cats.filter((c, i) => cats.indexOf(c) === i).map(cat => {
     const l = tous.filter(c => c.cat === cat).sort((a, b) => (a.titre || "").localeCompare(b.titre || "", "fr"));
     return l.length ? "<h6>" + h(cat) + "</h6>" + l.map(c =>
-      '<button data-cxsel="' + c.id + '"' + (c.id === codexSel ? ' class="on"' : "") + ">" + h(c.titre || "Sans titre") + "</button>").join("") : "";
+      '<button data-cxsel="' + c.id + '"' + (c.id === codexSel ? ' class="on"' : "") +
+        (c.cache ? ' style="opacity:.55;font-style:italic" title="Caché aux joueurs : à révéler quand ils le découvrent"' : "") + ">" +
+        (c.cache ? "🔒 " : "") + h(c.titre || "Sans titre") + "</button>").join("") : "";
   }).join("");
   return html || '<div class="vide">Le codex est vide.</div>';
 }
@@ -12245,7 +12277,10 @@ function majCodex() {
       (mj ? '<input class="titre" data-cxc="titre" value="' + h(c.titre) + '">' : '<div class="titre">' + h(c.titre) + "</div>") +
       '<div class="etat">' + h([c.sous, "Campagne " + c.campagne + " · " + (CAMPAGNES[c.campagne] || ""), c.cat].filter(Boolean).join(" — ")) + "</div>" +
       (mj ? '<textarea data-cxc="texte">' + h(c.texte) + "</textarea>"
-          : '<div class="cxTexte">' + String(c.texte || "").split(/\n\s*\n/).map(p => "<p>" + h(p).replace(/\n/g, "<br>") + "</p>").join("") + "</div>")
+          : '<div class="cxTexte">' + String(c.texte || "").split(/\n\s*\n/).map(p => "<p>" + h(p).replace(/\n/g, "<br>") + "</p>").join("") + "</div>") +
+      (mj ? '<div class="pied"><button class="wb' + (c.cache ? "" : " gris") + '" data-act="cxRevele">' +
+              (c.cache ? "🔓 Révéler aux joueurs" : "🔒 Cacher aux joueurs") + "</button>" +
+              (c.cache ? ' <span style="opacity:.7;font-size:12px">Les joueurs ne le voient pas encore.</span>' : "") + "</div>" : "")
     ) : "";
   const page = commune ? commune : c
     ? '<input class="titre" data-cxf="titre" value="' + h(c.titre) + '" placeholder="Nom">' +
@@ -12271,6 +12306,9 @@ function actionCodex(k) {
     const n = { id: uid("cx"), cat: c ? c.cat : CODEX_CATS[0], titre: "", texte: "" };
     perso.codex.push(n); codexSel = n.id;
     if (codexFiltre && codexFiltre !== "notes") codexFiltre = "";
+  } else if (k === "cxRevele" && c && estCommune(c) && !JOUEUR) {
+    if (c.cache) delete c.cache; else c.cache = true;
+    sauveCodexCommun();
   } else if (k === "cxSuppr" && c && !estCommune(c)) {
     if (!confirm("Effacer « " + (c.titre || "sans titre") + " » du codex ?")) return;
     perso.codex = perso.codex.filter(x => x !== c); codexSel = "";
@@ -12462,7 +12500,7 @@ wow.addEventListener("click", e => {
     const k = act.dataset.act;
     if (FENETRES.includes(k)) return basculeFen(k);
     if (k === "qNouv" || k === "qFinie" || k === "qSuppr") return actionQuete(k);
-    if (k === "cxNouv" || k === "cxSuppr") return actionCodex(k);
+    if (k === "cxNouv" || k === "cxSuppr" || k === "cxRevele") return actionCodex(k);
     if (k === "talents") return setMode("play");
     if (k === "tour") return tourSuivant();
     if (k === "subir") return ouvreDegats(act);

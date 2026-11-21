@@ -291,9 +291,34 @@ async function repondre(req: IncomingMessage, res: ServerResponse): Promise<void
   try {
     if (statSync(c.abs).isDirectory()) return envoyer(res, 404, TYPES['.txt'], '404')
     const data = await readFile(c.abs)
+    /* Le codex garde des entrées cachées aux joueurs (`cache: true`) jusqu'à ce
+       que le MJ les révèle. Seule une page du MJ (l'appli ouverte sans
+       ?joueur=) les reçoit ; une fiche de joueur, ou l'adresse tapée à la main,
+       a le codex sans elles. */
+    if (donnees && c.abs === join(donnees, 'Sauvegardes', 'codex.json') && !pageDuMj(req)) {
+      try {
+        const codex = JSON.parse(data.toString('utf8')) as { entrees?: { cache?: boolean }[] }
+        codex.entrees = (codex.entrees ?? []).filter((e) => !e.cache)
+        return json(res, codex)
+      } catch {
+        return json(res, { entrees: [] })
+      }
+    }
     return envoyer(res, 200, TYPES[extname(c.abs).toLowerCase()] ?? 'application/octet-stream', data)
   } catch {
     return envoyer(res, 404, TYPES['.txt'], '404')
+  }
+}
+
+/** La requête vient-elle d'une page du jeu ouverte par le MJ (sans ?joueur=) ? */
+function pageDuMj(req: IncomingMessage): boolean {
+  const ref = req.headers.referer
+  if (!ref) return false
+  try {
+    const u = new URL(ref)
+    return u.pathname.startsWith('/Application/') && !u.searchParams.has('joueur')
+  } catch {
+    return false
   }
 }
 

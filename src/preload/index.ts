@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Brut } from '@shared/reglages'
-import type { EnvoiWow, JoueurWow, Regles, ServeurWow } from '@shared/wow'
+import type { EnvoiWow, JoueurWow, QuetePreparee, Regles, ServeurWow } from '@shared/wow'
 import type { Modif } from '@shared/modifs'
 import type { EvenementSm } from '@shared/santeMentale'
 import type { Cible, Plage } from '@shared/surlignage'
@@ -168,6 +168,8 @@ const api = {
     fenetreJoueur: (joueur: string) => call<boolean>('wow:fenetreJoueur', joueur),
     ouvrirDonnees: () => call<boolean>('wow:ouvrirDonnees'),
     simulateur: (publier: boolean) => call<{ ok: boolean; texte: string }>('wow:simulateur', publier),
+    /** Les quêtes préparées de la campagne ouverte (quetes-wow.json). */
+    quetes: () => call<QuetePreparee[]>('wow:quetes'),
     choisirDossier: () => call<{ ok: boolean; message: string | null }>('wow:choisirDossier')
   },
 

@@ -13,9 +13,27 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node
 import { dirname, join } from 'node:path'
 import { toDataURL } from 'qrcode'
 import { lirePoste, nomDuMj } from '@shared/reglages'
-import type { EnvoiWow, EtatWow, JoueurWow, ServeurWow } from '@shared/wow'
+import type { EnvoiWow, EtatWow, JoueurWow, QuetePreparee, ServeurWow } from '@shared/wow'
 import { reglagesPoste } from './carnet'
+import { currentProject } from './project'
 import * as serveur from './wowServeur'
+
+/**
+ * Les quêtes préparées de la campagne ouverte : `quetes-wow.json`, dans son
+ * dossier. Absent ou illisible : aucune (le MJ peut toujours en écrire une).
+ */
+export function quetesPreparees(): QuetePreparee[] {
+  const p = currentProject()
+  if (!p) return []
+  try {
+    const l = JSON.parse(readFileSync(join(p.dir, 'quetes-wow.json'), 'utf8'))
+    return (Array.isArray(l) ? l : l?.quetes ?? []).filter(
+      (q: QuetePreparee) => q && typeof q.titre === 'string' && q.titre.trim()
+    )
+  } catch {
+    return []
+  }
+}
 
 /** Là où les données du jeu vivaient avant l'Écran : on les reprend telles quelles. */
 const DOSSIERS_CONNUS = ['D:\\JDR\\WORLD OF WARCRAFT\\classe\\Application']

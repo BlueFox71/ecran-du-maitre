@@ -192,6 +192,24 @@ export type EnvoiWow =
   | { t: 'dd'; dd: number; mod: number; quoi?: string }
   | { t: 'message'; texte: string }
   | { t: 'tour' }
+  | { t: 'quete'; quete: { titre: string; donneur?: string; lieu?: string; texte?: string } }
+  | { t: 'queteFinie'; titre: string }
+
+/**
+ * Une quête préparée pour la campagne, que le MJ envoie au journal des joueurs.
+ * Elle vit dans le dossier de la campagne : `quetes-wow.json`.
+ * Le texte est **ce que les joueurs lisent** : jamais de secret du MJ.
+ */
+export interface QuetePreparee {
+  /** « Prologue », « Acte 1 »… : pour ranger la liste. */
+  acte: string
+  /** ★ principale, ◆ secondaire liée, ○ secondaire libre. */
+  sorte: '★' | '◆' | '○'
+  titre: string
+  donneur?: string
+  lieu?: string
+  texte?: string
+}
 
 /** L'identifiant d'un joueur, comme l'Aventure le fabrique à partir de `?joueur=` (son `slug`). */
 export function idJoueur(s: string): string {
