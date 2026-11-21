@@ -19,6 +19,7 @@ import * as projet from '../project'
 import * as annexes from '../db/repos/annexes'
 import * as smEvenements from '../db/repos/smEvenements'
 import * as pochette from '../db/repos/pochette'
+import * as importSeance from '../db/repos/importSeance'
 import * as mots from '../db/repos/mots'
 import * as annotations from '../db/repos/annotations'
 import * as surlignage from '../db/repos/surlignage'
@@ -49,7 +50,7 @@ import { monnaiesActives } from '@shared/monnaies'
 import { apresLeCombat, apresUnTour, type Modif } from '@shared/modifs'
 import { noterJet } from '../jetDuPerso'
 import { reinitialiser } from '../reinitialiser'
-import type { AnnonceSm, ChoixReinit, EffetSurEntite } from '@shared/types'
+import type { AnnonceSm, ChoixReinit, EffetSurEntite, ImportChoix } from '@shared/types'
 import type { Cible, Plage } from '@shared/surlignage'
 import { estFenetreSuivie, zoomer } from '../zoom'
 import { basculerModePortable, modePortable } from '../modePortable'
@@ -619,6 +620,14 @@ export function registerIpc(): void {
   /* Les inventaires partagés : ce qu'on y range, ouvre ou ferme, les
      téléphones le voient tout de suite. */
   on('objets:inventaireAdd', (nom: string) => objets.addInventaire(nom))
+  /* Importer depuis une séance précédente : des copies, dans la séance
+     ouverte. La Pochette et les téléphones l'apprennent aussitôt. */
+  on('seance:importSource', (srcId: number) => importSeance.sourceImport(srcId))
+  on('seance:importer', (srcId: number, choix: ImportChoix) => {
+    const bilan = importSeance.importer(srcId, activeSessionId(), choix)
+    display.versMj('pochette:changee', null)
+    return remue(bilan)
+  })
   on('objets:inventaireUpdate', (id: number, patch: { nom?: string; ouvert?: boolean; enPochette?: boolean }) =>
     remue(objets.updateInventaire(id, patch))
   )

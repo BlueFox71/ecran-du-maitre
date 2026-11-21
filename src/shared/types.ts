@@ -962,6 +962,47 @@ export interface EffetObjet {
   teinte?: string
 }
 
+/* ---------------- importer depuis une séance précédente ---------------- */
+
+export interface ImportObjet {
+  id: number
+  nom: string
+  imageItemId: number | null
+  teinte: string | null
+}
+/** `id` null : les objets sans famille. */
+export interface ImportFamille {
+  id: number | null
+  nom: string
+  objets: ImportObjet[]
+}
+export interface ImportDoc {
+  id: number
+  itemId: number
+  titre: string
+  playerId: number | null
+}
+/** `id` null : la pile, quand la pochette n'a pas d'onglet. */
+export interface ImportOnglet {
+  id: number | null
+  nom: string
+  docs: ImportDoc[]
+}
+export interface ImportSource {
+  familles: ImportFamille[]
+  onglets: ImportOnglet[]
+}
+export interface ImportChoix {
+  objetIds: number[]
+  docIds: number[]
+}
+export interface ImportBilan {
+  objets: number
+  documents: number
+  /** Documents que la séance avait déjà. */
+  ignores: number
+}
+
 /** Un rayon de la réserve. Huit sont livrés ; le MJ en ajoute et les renomme. */
 export interface ObjetFamille {
   id: number

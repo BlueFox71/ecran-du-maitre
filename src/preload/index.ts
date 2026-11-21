@@ -8,6 +8,9 @@ import type { AssetAtelier } from '@shared/atelierAssets'
 import type {
   JetSm,
   ChoixReinit,
+  ImportBilan,
+  ImportChoix,
+  ImportSource,
   Annotation,
   MotifVibration,
   Son,
@@ -1218,10 +1221,13 @@ const api = {
     exportCsv: () => call<string | null>('rolls:exportCsv')
   },
 
-  /** Remettre la séance à son départ, case par case ; un Ctrl+Z la rend. */
   seance: {
+    /** Remettre la séance à son départ, case par case ; un Ctrl+Z la rend. */
     reinitialiser: (choix: ChoixReinit) =>
-      call<{ objets: number; jauges: number; surlignages: number; pions: number }>('seance:reinitialiser', choix)
+      call<{ objets: number; jauges: number; surlignages: number; pions: number }>('seance:reinitialiser', choix),
+    /** Importer depuis une séance précédente — des copies, dans la séance ouverte. */
+    importSource: (srcId: number) => call<ImportSource>('seance:importSource', srcId),
+    importer: (srcId: number, choix: ImportChoix) => call<ImportBilan>('seance:importer', srcId, choix)
   },
 
   /**
