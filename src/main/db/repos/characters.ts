@@ -1,6 +1,7 @@
 import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { copierLigne } from '../copie'
 import { fixerInitial } from './objets'
+import { rattacherASeance } from './copieSeance'
 import { couleurLibre, lisCadreCarre } from '@shared/types'
 import { emojisDe } from '@shared/emojis'
 import type { Monnaie } from '@shared/monnaies'
@@ -414,6 +415,8 @@ export function duplicatePnj(id: number): number {
   let neuf = 0
   getDb().transaction(() => {
     neuf = copierPnj(id, activeSessionId())
+    /* Ce qu'il porte est copié avec lui. */
+    rattacherASeance(activeSessionId())
   })()
   return neuf
 }

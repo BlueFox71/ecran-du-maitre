@@ -3,6 +3,7 @@ import { copierLigne } from '../copie'
 import { nomDuNiveauSuivant } from '@shared/atelier'
 import { copierFiche } from './ficheLieu'
 import { fixerInitial } from './objets'
+import { rattacherASeance } from './copieSeance'
 import * as reglages from './reglages'
 import { lireCampagne } from '@shared/reglages'
 import { planDe } from './echelle'
@@ -670,6 +671,8 @@ export function duplicatePlace(id: number): number {
   let nouveau = new Map<number, number>()
   getDb().transaction(() => {
     nouveau = copierLieu(id, activeSessionId(), { parentId: null, ord: rangSuivant(racine.tier, null) })
+    /* Ses objets aussi sont des copies : les retoucher ici ne touche pas là-bas. */
+    rattacherASeance(activeSessionId())
   })()
   return nouveau.get(id)!
 }

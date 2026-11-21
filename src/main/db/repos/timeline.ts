@@ -3,6 +3,8 @@ import { getItem } from './library'
 import { copierLieu } from './places'
 import { copierPnj } from './characters'
 import { copierLigne } from '../copie'
+import { ranger } from './objets'
+import { copierDoc, copierFamille, copierInventaire, copierObjet, copierOnglet, nouvelleCorrespondance, rattacherASeance } from './copieSeance'
 import { copierTrame } from './trame'
 import { raccrocherFiches } from './ficheLieu'
 import { dossierDeLApp } from '@shared/dossierDeLApp'
@@ -235,6 +237,8 @@ export function dupliquerSeance(
     /* Les fiches des lieux recopiés désignent les doubles des PNJ et des moments. */
     raccrocherFiches(lieux.values(), pnj, beats)
 
+    copierObjetsEtPochette(srcId, nid, lieux, pnj, suite)
+
     db.prepare(
       `INSERT OR IGNORE INTO seance_absent (session_id, character_id)
          SELECT ?, character_id FROM seance_absent WHERE session_id = ?`
@@ -258,7 +262,55 @@ export function dupliquerSeance(
   })()
 
   setActiveSession(nid)
+  /* Une copie se rejoue depuis le départ : chaque objet retourne à sa place
+     initiale. La suite, elle, reprend la table comme on l'a laissée. */
+  if (!suite)
+    ranger(
+      (getDb().prepare(`SELECT id FROM objet_placement WHERE session_id = ?`).all(nid) as { id: number }[]).map(
+        (r) => r.id
+      )
+    )
   return listSessions().find((s) => s.id === nid)!
+}
+
+/**
+ * Familles, objets, inventaires et pochette suivent la séance dupliquée, en
+ * copies. Les lieux et les PNJ ont déjà emporté leurs exemplaires ; restent
+ * ceux des joueurs, des inventaires et de la corbeille. La suite garde la
+ * pochette telle quelle ; une copie la reprend cachée, comme neuve.
+ */
+function copierObjetsEtPochette(
+  srcId: number,
+  nid: number,
+  lieux: Map<number, number>,
+  pnj: Map<number, number>,
+  suite: boolean
+): void {
+  const db = getDb()
+  const c = nouvelleCorrespondance()
+  const ids = (sql: string): number[] => (db.prepare(sql).all(srcId) as { id: number }[]).map((r) => r.id)
+
+  for (const f of ids(`SELECT id FROM objet_famille WHERE session_id = ? ORDER BY ord, id`)) copierFamille(f, nid, c)
+  for (const i of ids(`SELECT id FROM inventaire WHERE session_id = ? ORDER BY ord, id`))
+    copierInventaire(i, nid, c, { enPochette: true })
+
+  const vers = (m: Map<number, number>, v: number | null): number | null => (v == null ? null : (m.get(v) ?? v))
+  for (const p of db
+    .prepare(
+      `SELECT id, init_place_id AS l, init_character_id AS c FROM objet_placement
+        WHERE session_id = ? AND place_id IS NULL
+          AND (character_id IS NULL OR character_id IN (SELECT id FROM character WHERE kind = 'pj'))`
+    )
+    .all(srcId) as { id: number; l: number | null; c: number | null }[])
+    copierLigne('objet_placement', p.id, { session_id: nid, init_place_id: vers(lieux, p.l), init_character_id: vers(pnj, p.c) })
+
+  rattacherASeance(nid, c)
+  for (const o of ids(`SELECT id FROM objet WHERE session_id = ? ORDER BY ord, id`))
+    if (!c.objets.has(o)) copierObjet(o, nid, c)
+
+  for (const o of ids(`SELECT id FROM pochette_onglet WHERE session_id = ? ORDER BY ord, id`)) copierOnglet(o, nid, c)
+  for (const d of ids(`SELECT id FROM pochette WHERE session_id = ? ORDER BY ord, id`))
+    copierDoc(d, nid, c, suite ? 'actuel' : 'depart')
 }
 
 function beatItems(beatId: number): Item[] {
