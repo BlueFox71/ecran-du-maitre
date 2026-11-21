@@ -17,11 +17,12 @@ import { readFileSync, writeFileSync, existsSync } from 'node:fs'
 import { join } from 'node:path'
 import * as chars from './db/repos/characters'
 import * as players from './db/repos/players'
+import * as carnet from './carnet'
 import * as reglages from './db/repos/reglages'
 import { isDbOpen } from './db'
 import * as display from './display'
 import { lireCampagne } from '@shared/reglages'
-import { CARACS_WOW, type EtatWow, type JoueurWow } from '@shared/wow'
+import { CARACS_WOW, type EtatWow, type JoueurWow, type PersoAAssocier } from '@shared/wow'
 import type { CharacterData } from '@shared/types'
 
 const CLE_LIENS = 'wow.liens'
@@ -105,11 +106,8 @@ export function synchroniser(table: JoueurWow[]): void {
       })
       l[j.id] = ch.id
       poserLiens(l)
-      /* Un joueur de l'Écran au même prénom, sans personnage : c'est le sien. */
-      const p = players
-        .listPlayers()
-        .find((p) => sansAccent(p.name) === sansAccent(nomJoueur(j)) && p.characterId == null)
-      if (p) players.setPlayerCharacter(p.id, ch.id)
+      /* À qui est ce personnage ? Le MJ le dit (voir aAssocier) : l'Écran demande. */
+      display.versMj('wow:aAssocier', null)
       change = true
       continue
     }
@@ -131,6 +129,62 @@ export function synchroniser(table: JoueurWow[]): void {
     display.versMj('characters:relus', null)
     display.refreshJoueurs()
   }
+}
+
+/* ---------------- à qui est ce personnage ? ---------------- */
+
+/** Les personnages dont le MJ a déjà décidé qu'ils n'étaient à personne. */
+const CLE_SANS_JOUEUR = 'wow.sansJoueur'
+
+function sansJoueur(): number[] {
+  try {
+    const l = JSON.parse(reglages.tous()[CLE_SANS_JOUEUR] ?? '[]')
+    return Array.isArray(l) ? l : []
+  } catch {
+    return []
+  }
+}
+
+/**
+ * Les personnages créés dans l'Aventure qui n'ont encore ni joueur dans
+ * l'Écran, ni décision « à personne » du MJ.
+ */
+export function aAssocier(): PersoAAssocier[] {
+  if (!isDbOpen()) return []
+  const pris = new Set(players.listPlayers().map((p) => p.characterId).filter((x) => x != null))
+  const personne = new Set(sansJoueur())
+  const ps = players.listPlayers()
+  const out: PersoAAssocier[] = []
+  for (const [joueur, id] of Object.entries(liens())) {
+    if (pris.has(id) || personne.has(id)) continue
+    const ch = chars.getCharacter(id)
+    if (!ch || ch.kind !== 'pj') continue
+    const nomWow = ch.player || joueur
+    const meme = ps.find((p) => p.characterId == null && sansAccent(p.name) === sansAccent(nomWow))
+    out.push({ characterId: id, nom: ch.name, joueurWow: nomWow, occupation: ch.occupation, suggestion: meme?.id ?? null })
+  }
+  return out
+}
+
+/**
+ * La réponse du MJ : un joueur de l'Écran (`playerId`), un nouveau joueur
+ * (`nouveau` : son nom), ou personne (ni l'un ni l'autre).
+ */
+export function associer(characterId: number, choix: { playerId?: number | null; nouveau?: string | null }): void {
+  let pid = choix.playerId ?? null
+  const nouveau = choix.nouveau?.trim()
+  if (!pid && nouveau) {
+    /* Comme « Ajouter un joueur » : il entre au carnet du poste, puis dans la campagne. */
+    const p = carnet.createCarnetPlayer(nouveau)
+    pid = players.enrollPlayer(p.uid, p.name, p.color).id
+  }
+  if (pid) {
+    players.setPlayerCharacter(pid, characterId)
+  } else {
+    reglages.poser(CLE_SANS_JOUEUR, JSON.stringify([...new Set([...sansJoueur(), characterId])]))
+  }
+  display.versMj('characters:relus', null)
+  display.refreshJoueurs()
 }
 
 /** Le joueur WoW d'un personnage de l'Écran, s'il en a un. */

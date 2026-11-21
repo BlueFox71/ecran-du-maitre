@@ -597,3 +597,39 @@
   max-height: 110px;
   overflow: auto;
 }
+
+/* --- à qui est ce personnage ? --- */
+
+.az-associer .spacer {
+  flex: 1;
+}
+.az-associer p {
+  margin: 0;
+  line-height: 1.45;
+}
+.az-choix-joueurs {
+  display: grid;
+  gap: 5px;
+}
+.az-choix {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 7px 10px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.az-choix.on {
+  border-color: var(--brass);
+  background: var(--brass-wash);
+}
+.az-choix em {
+  font-style: normal;
+  font-size: 11.5px;
+  color: var(--text-faint);
+  margin-left: auto;
+}
+.az-choix input[type='text'] {
+  flex: 1;
+}

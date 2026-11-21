@@ -16,6 +16,7 @@ import * as players from '../db/repos/players'
 import * as carnet from '../carnet'
 import * as mobile from '../mobile'
 import * as wow from '../wow'
+import * as wowFiches from '../wowFiches'
 import type { EnvoiWow, Regles } from '@shared/wow'
 import * as projet from '../project'
 import * as annexes from '../db/repos/annexes'
@@ -261,6 +262,11 @@ export function registerIpc(): void {
   on('wow:fenetreJoueur', (joueur: string) => wow.fenetreJoueur(joueur))
   on('wow:simulateur', (publier: boolean) => wow.simulateur(!!publier))
   on('wow:quetes', () => wow.quetesPreparees())
+  /* Les personnages créés dans l'Aventure, à associer à un joueur de l'Écran. */
+  on('wow:aAssocier', () => wowFiches.aAssocier())
+  on('wow:associer', (characterId: number, choix: { playerId?: number | null; nouveau?: string | null }) =>
+    wowFiches.associer(characterId, choix)
+  )
   on('wow:ouvrirDonnees', async () => {
     await shell.openPath(wow.dossier())
     return true

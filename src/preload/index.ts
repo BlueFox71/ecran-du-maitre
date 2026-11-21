@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Brut } from '@shared/reglages'
-import type { EnvoiWow, JoueurWow, QuetePreparee, Regles, ServeurWow } from '@shared/wow'
+import type { EnvoiWow, JoueurWow, PersoAAssocier, QuetePreparee, Regles, ServeurWow } from '@shared/wow'
 import type { Modif } from '@shared/modifs'
 import type { EvenementSm } from '@shared/santeMentale'
 import type { Cible, Plage } from '@shared/surlignage'
@@ -170,6 +170,16 @@ const api = {
     simulateur: (publier: boolean) => call<{ ok: boolean; texte: string }>('wow:simulateur', publier),
     /** Les quêtes préparées de la campagne ouverte (quetes-wow.json). */
     quetes: () => call<QuetePreparee[]>('wow:quetes'),
+    /** Les personnages créés dans l'Aventure qui attendent leur joueur. */
+    aAssocier: () => call<PersoAAssocier[]>('wow:aAssocier'),
+    associer: (characterId: number, choix: { playerId?: number | null; nouveau?: string | null }) =>
+      call<void>('wow:associer', characterId, choix),
+    /** Un personnage vient d'être créé dans l'Aventure. Renvoie le désabonnement. */
+    onAAssocier: (cb: () => void) => {
+      const h = (): void => cb()
+      ipcRenderer.on('wow:aAssocier', h)
+      return (): void => void ipcRenderer.removeListener('wow:aAssocier', h)
+    },
     choisirDossier: () => call<{ ok: boolean; message: string | null }>('wow:choisirDossier')
   },
 

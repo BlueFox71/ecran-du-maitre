@@ -203,6 +203,17 @@ export type EnvoiWow =
   /** Une fiche corrigée par le MJ dans l'Écran : valeurs totales. */
   | { t: 'fiche'; pv?: number; res?: number; car?: Record<string, number> }
 
+/** Un personnage créé dans l'Aventure, que le MJ doit associer à un joueur de l'Écran. */
+export interface PersoAAssocier {
+  characterId: number
+  nom: string
+  /** Le joueur WoW qui l'a créé (le prénom de son adresse ?joueur=). */
+  joueurWow: string
+  occupation: string | null
+  /** Le joueur de l'Écran au même prénom, à proposer en premier. */
+  suggestion: number | null
+}
+
 /**
  * Une quête préparée pour la campagne, que le MJ envoie au journal des joueurs.
  * Elle vit dans le dossier de la campagne : `quetes-wow.json`.

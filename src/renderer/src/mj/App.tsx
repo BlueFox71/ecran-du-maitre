@@ -39,6 +39,7 @@ import { Azeroth } from './modules/Azeroth'
 import { JeuWow } from './modules/JeuWow'
 import { ChoixRegles } from './components/ChoixRegles'
 import { NouvelleCampagne } from './components/NouvelleCampagne'
+import { AssocierPerso } from './components/AssocierPerso'
 import { demarrerSm } from './santeMentale/etat'
 import {
   IconChevron,
@@ -211,6 +212,7 @@ export function App(): JSX.Element {
       <PupitreStats />
       <ChoixRegles />
       <NouvelleCampagne />
+      <AssocierPerso />
       <Toasts />
     </>
   )
