@@ -1,0 +1,586 @@
+/* ============================================================
+   Les règles de la table (le choix à l'ouverture) et le module Azeroth —
+   World of Warcraft vu du MJ. Les jetons sont ceux de tokens.css : le module
+   suit le thème sombre ou clair comme le reste de l'écran.
+   ============================================================ */
+
+/* ---------------- « Quelles règles pour ce soir ? » ---------------- */
+
+.choix-regles-scrim {
+  background: rgba(4, 8, 10, 0.82);
+}
+.choix-regles {
+  width: min(860px, 100%);
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 10px;
+  box-shadow: var(--shadow-lift);
+  padding: 26px 28px 22px;
+  display: grid;
+  gap: 14px;
+}
+.choix-regles h2 {
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-size: 26px;
+  font-weight: 600;
+  margin: 0;
+}
+.choix-regles .spacer {
+  flex: 1;
+}
+.choix-regles-cartes {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.choix-regles-carte {
+  position: relative;
+  display: grid;
+  justify-items: start;
+  align-content: start;
+  gap: 8px;
+  text-align: left;
+  padding: 18px;
+  border-radius: 9px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--text);
+  cursor: pointer;
+  font: inherit;
+  transition:
+    border-color 0.15s,
+    transform 0.15s,
+    background 0.15s;
+}
+.choix-regles-carte:hover:not(:disabled) {
+  border-color: var(--brass);
+  transform: translateY(-2px);
+}
+.choix-regles-carte.ici {
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+.choix-regles-carte b {
+  font-family: 'Fraunces Variable', Georgia, serif;
+  font-size: 19px;
+}
+.choix-regles-carte .resume {
+  color: var(--text-dim);
+  font-size: 13px;
+  line-height: 1.45;
+}
+.choix-regles-embleme {
+  width: 100%;
+  height: 150px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: var(--sunk);
+  display: grid;
+  place-items: center;
+}
+.choix-regles-embleme img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.regles-wow .choix-regles-embleme {
+  /* Le bleu et l'or d'Azeroth, sous l'image. */
+  background: linear-gradient(160deg, #1b2a4a, #3a2a10);
+}
+.choix-regles-carte .ici-badge {
+  font-size: 11px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--brass-ink);
+}
+.choix-regles-fiche {
+  display: grid;
+  gap: 14px;
+}
+.choix-regles-fiche p {
+  margin: 0;
+  line-height: 1.5;
+  color: var(--text-dim);
+}
+.choix-regles-pied {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+/* ---------------- le module ---------------- */
+
+.azeroth {
+  overflow: hidden;
+}
+.azeroth .vhead > div:first-child {
+  min-width: 260px;
+}
+.az-serveur {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+  justify-content: flex-end;
+  max-width: 760px;
+}
+.az-etat {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  margin-right: 4px;
+}
+.az-etat i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+}
+.az-etat.on i {
+  background: var(--moss);
+  box-shadow: 0 0 8px var(--moss);
+}
+.az-alerte {
+  flex-basis: 100%;
+  text-align: right;
+  font-size: 12px;
+  color: var(--blood);
+}
+
+.az-corps {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 360px;
+  gap: 14px;
+}
+.az-table,
+.az-console {
+  min-height: 0;
+  overflow: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.az-console {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  padding: 12px;
+}
+.az-titre {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.az-titre .spacer {
+  flex: 1;
+}
+.az-compte {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.az-inviter {
+  display: flex;
+  gap: 6px;
+}
+.az-inviter input {
+  width: 170px;
+}
+
+/* --- les fiches --- */
+
+.az-joueurs {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(250px, 1fr));
+  gap: 10px;
+}
+.az-joueur {
+  position: relative;
+  background: var(--raised);
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--classe, var(--line));
+  border-radius: 8px;
+  padding: 10px 11px;
+  display: grid;
+  gap: 7px;
+  cursor: pointer;
+  opacity: 0.62;
+  transition:
+    opacity 0.15s,
+    border-color 0.15s;
+}
+.az-joueur.en-ligne {
+  opacity: 1;
+}
+.az-joueur.vise {
+  border-color: var(--brass);
+  border-left-color: var(--classe, var(--brass));
+  box-shadow: 0 0 0 1px var(--brass);
+}
+.az-joueur.a-terre {
+  background: var(--blood-wash);
+}
+.az-joueur header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.az-point {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--text-faint);
+  flex: none;
+}
+.en-ligne .az-point {
+  background: var(--moss);
+  box-shadow: 0 0 6px var(--moss);
+}
+.az-qui {
+  flex: 1;
+  min-width: 0;
+  display: grid;
+}
+.az-qui b {
+  color: var(--classe, var(--text));
+  font-size: 14.5px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.az-qui span {
+  font-size: 12px;
+  color: var(--text-dim);
+}
+.az-jauge {
+  position: relative;
+  height: 18px;
+  border-radius: 4px;
+  background: var(--sunk);
+  border: 1px solid var(--line-soft);
+  overflow: hidden;
+}
+.az-jauge i {
+  position: absolute;
+  inset: 0 auto 0 0;
+  transition: width 0.3s;
+}
+.az-jauge span {
+  position: relative;
+  display: block;
+  text-align: center;
+  font-size: 11.5px;
+  line-height: 16px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.9);
+  font-variant-numeric: tabular-nums;
+}
+/* Les couleurs des barres de WoW. */
+.az-pv i {
+  background: linear-gradient(#2fa335, #19761d);
+}
+.az-mana i {
+  background: linear-gradient(#2f62d6, #1a3a96);
+}
+.az-rage i {
+  background: linear-gradient(#cf2b2b, #8a1515);
+}
+.az-energie i {
+  background: linear-gradient(#e6c62e, #a68a12);
+}
+.az-focalisation i {
+  background: linear-gradient(#e0813c, #a5551b);
+}
+.az-auras {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.az-aura {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 3px;
+  border: 1px solid var(--moss);
+  background: var(--moss-wash);
+  color: var(--text);
+}
+.az-aura.mal {
+  border-color: var(--blood);
+  background: var(--blood-wash);
+}
+.az-aura em {
+  font-style: normal;
+  margin-left: 4px;
+  color: var(--brass-ink);
+}
+.az-dernier {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 11.5px;
+  color: var(--text-dim);
+  display: grid;
+  gap: 2px;
+}
+.az-dernier li {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.az-ko {
+  position: absolute;
+  top: 8px;
+  right: 48px;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: var(--blood);
+  font-weight: 600;
+}
+
+/* --- le journal --- */
+
+.az-journal {
+  display: grid;
+  gap: 6px;
+  margin-top: 4px;
+}
+.az-journal ul {
+  list-style: none;
+  margin: 0;
+  padding: 8px 10px;
+  background: var(--sunk);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  font-size: 12.5px;
+  display: grid;
+  gap: 3px;
+  max-height: 320px;
+  overflow: auto;
+}
+.az-journal .hr {
+  color: var(--text-faint);
+  margin-right: 6px;
+  font-variant-numeric: tabular-nums;
+}
+.az-l-err {
+  color: var(--blood);
+}
+.az-l-gain {
+  color: var(--moss);
+}
+.az-l-sys {
+  color: var(--text-dim);
+}
+
+/* --- la console --- */
+
+.az-visees {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+  align-items: center;
+  font-size: 12.5px;
+}
+.az-groupe {
+  color: var(--brass-ink);
+}
+.az-astuce {
+  margin: -4px 0 0;
+}
+.az-bloc {
+  display: grid;
+  gap: 7px;
+  padding-top: 10px;
+  border-top: 1px solid var(--line-soft);
+}
+.az-bloc h4 {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--label);
+}
+.az-bloc .aide {
+  margin: 0;
+  font-size: 11.5px;
+}
+.az-ligne {
+  display: flex;
+  gap: 6px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.az-ligne .spacer {
+  flex: 1;
+}
+.az-ligne input[type='number'] {
+  width: 70px;
+}
+.az-ligne input[type='text'] {
+  flex: 1;
+  min-width: 120px;
+}
+.az-lbl {
+  font-size: 12px;
+  color: var(--text-dim);
+  min-width: 62px;
+}
+.az-dds {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(40px, 1fr));
+  gap: 5px;
+}
+.az-dd {
+  font: inherit;
+  font-weight: 600;
+  font-size: 15px;
+  padding: 7px 0;
+  border-radius: 6px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--text);
+  cursor: pointer;
+}
+.az-dd.on {
+  border-color: var(--brass);
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
+.az-facteurs {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.az-facteurs b {
+  min-width: 30px;
+  text-align: center;
+  font-variant-numeric: tabular-nums;
+}
+.az-facteurs b.on {
+  color: var(--brass-ink);
+}
+.az-puce {
+  font: inherit;
+  font-size: 12px;
+  padding: 3px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--text);
+  cursor: pointer;
+}
+.az-puce.on {
+  border-color: var(--brass);
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
+.az-puce.mal {
+  border-color: var(--blood);
+}
+.az-rapides {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.az-coche {
+  display: inline-flex;
+  gap: 5px;
+  align-items: center;
+  font-size: 12.5px;
+  color: var(--text-dim);
+}
+.btn.az-rouge {
+  border-color: var(--blood);
+}
+.btn.az-vert {
+  border-color: var(--moss);
+}
+.az-jets {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 3px;
+  font-size: 12.5px;
+}
+.az-jets li.ok {
+  color: var(--moss);
+}
+.az-jets li.ko {
+  color: var(--blood);
+}
+
+/* --- l'invitation --- */
+
+.az-invitation {
+  width: min(560px, 100%);
+}
+.az-invitation footer .spacer {
+  flex: 1;
+}
+.az-invitation p {
+  margin: 0;
+  color: var(--text-dim);
+  line-height: 1.45;
+}
+.az-adresses {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 5px;
+}
+.az-qr {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+}
+.az-qr img {
+  width: 260px;
+  height: 260px;
+  image-rendering: pixelated;
+  border-radius: 6px;
+}
+.az-url {
+  display: block;
+  text-align: center;
+  font-size: 12.5px;
+  word-break: break-all;
+  user-select: all;
+}
+
+@media (max-width: 1500px) {
+  .az-corps {
+    grid-template-columns: minmax(0, 1fr) 320px;
+  }
+}
+
+/* ---------------- le jeu dans la fenêtre ---------------- */
+
+/* L'Arbre de talents et l'éditeur de cartes prennent toute la place du module. */
+.jeu-wow {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  height: 100%;
+  border: 0;
+  background: #000;
+}
+
+.az-compte-rendu {
+  margin: 0;
+  max-height: 220px;
+  overflow: auto;
+  white-space: pre-wrap;
+  font-size: 12px;
+  padding: 8px 10px;
+  border-radius: 6px;
+  background: var(--sunk);
+  color: var(--moss);
+}
+.az-compte-rendu.ko {
+  color: var(--blood);
+}

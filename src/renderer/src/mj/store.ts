@@ -55,6 +55,11 @@ export type ViewId =
   | 'sheets'
   | 'pochette'
   | 'dice'
+  /** La table de World of Warcraft — seulement aux règles WoW. */
+  | 'azeroth'
+  /** Le jeu WoW dans la fenêtre : l'Arbre de talents (et l'Aventure), les cartes. */
+  | 'wow-jeu'
+  | 'wow-cartes'
 
 interface Toast {
   id: number

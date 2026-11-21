@@ -7,6 +7,84 @@ import { jaugeSanite, type TemplateSpec } from '@shared/types'
 import { Curseur } from '../briques'
 import { BrouillonMonnaies, type Brouillon } from '../contexte'
 import type { Reglage } from '../registre'
+import { REGLES, type Regles } from '@shared/wow'
+import { changerRegles, ficheAChanger, personnagesTouches } from '../../../regles'
+
+/** Les règles de la table : chasse aux fantômes ou World of Warcraft. */
+function ReglesDeLaTable(): JSX.Element {
+  const s = useStore()
+  const [attente, setAttente] = useState<Regles | null>(null)
+  const choisir = (r: Regles): void => {
+    if (ficheAChanger(r) && personnagesTouches() > 0) setAttente(r)
+    else void changerRegles(r, { fiche: true })
+  }
+  const n = personnagesTouches()
+  return (
+    <>
+      <select
+        value={s.reglages.regles ?? 'fantomes'}
+        onChange={(e) => choisir(e.target.value as Regles)}
+        aria-label="Règles de la table"
+      >
+        {REGLES.map((r) => (
+          <option key={r.id} value={r.id}>
+            {r.nom}
+          </option>
+        ))}
+      </select>
+      {attente ? (
+        <Confirmer
+          titre={`Passer la fiche aux règles « ${REGLES.find((x) => x.id === attente)?.nom} » ?`}
+          oui="Changer la fiche"
+          onOui={async () => {
+            const r = attente
+            setAttente(null)
+            await changerRegles(r, { fiche: true })
+          }}
+          onNon={() => setAttente(null)}
+        >
+          <p>
+            Les {n} personnage{n > 1 ? 's' : ''} de la campagne {n > 1 ? 'perdront' : 'perdra'} les cases qui
+            n’existent pas dans la nouvelle fiche.{' '}
+            {attente === 'wow'
+              ? 'L’ancienne fiche est gardée : revenir aux fantômes la rendra.'
+              : 'La fiche d’avant WoW revient telle quelle.'}
+          </p>
+          <p>Pour changer de règles sans toucher à la fiche, choisis-les au lancement de l’écran (« Garder la fiche actuelle »).</p>
+        </Confirmer>
+      ) : null}
+    </>
+  )
+}
+
+/** Le dossier du jeu WoW sur ce poste. */
+function DossierWow(): JSX.Element {
+  const s = useStore()
+  const [message, setMessage] = useState<string | null>(null)
+  return (
+    <>
+      <span className="pm-val" title={s.poste.wowDossier ?? ''}>
+        {s.poste.wowDossier ?? 'cherché tout seul'}
+      </span>
+      <button
+        className="btn btn-sm"
+        onClick={async () => {
+          const r = await window.jdr.wow.choisirDossier()
+          setMessage(r.message)
+          if (r.ok) await s.refreshReglages()
+        }}
+      >
+        Choisir…
+      </button>
+      {s.poste.wowDossier ? (
+        <button className="btn btn-sm btn-ghost" onClick={() => void s.poserPoste('wow.dossier', null)}>
+          Oublier
+        </button>
+      ) : null}
+      {message ? <span className="aide">{message}</span> : null}
+    </>
+  )
+}
 
 /* ============================================================
    Règles du jeu
@@ -89,6 +167,23 @@ export function SanteMentale(): JSX.Element {
 }
 
 export const reglages: Reglage[] = [
+  {
+    id: 'regles',
+    rubrique: 'regles',
+    nom: 'Règles de la table',
+    aide: 'Chasse aux fantômes, ou World of Warcraft : 1D20 contre la difficulté, et les joueurs dans l’Aventure. Demandé aussi à chaque lancement.',
+    mots: ['wow', 'warcraft', 'azeroth', 'fantômes', 'système', 'jeu', 'aventure'],
+    Cmd: ReglesDeLaTable
+  },
+  {
+    id: 'wow.dossier',
+    rubrique: 'regles',
+    nom: 'Données du jeu WoW',
+    aide: 'Le dossier où le jeu range ses sauvegardes (arbres, fiches des joueurs, cartes) et ses images. Le jeu lui-même est dans l’Écran.',
+    mots: ['wow', 'warcraft', 'serveur', 'aventure', 'arbre de talents', 'dossier'],
+    visible: (s) => s.reglages.regles === 'wow',
+    Cmd: DossierWow
+  },
   {
     id: 'fiche.jet',
     rubrique: 'regles',

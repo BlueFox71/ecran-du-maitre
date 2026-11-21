@@ -35,6 +35,9 @@ import { PAGES_PREPARATION } from './components/SousMenuPreparation'
 import { BlocNotes } from './modules/BlocNotes'
 import { Sheets } from './modules/Sheets'
 import { Dice } from './modules/Dice'
+import { Azeroth } from './modules/Azeroth'
+import { JeuWow } from './modules/JeuWow'
+import { ChoixRegles } from './components/ChoixRegles'
 import { demarrerSm } from './santeMentale/etat'
 import {
   IconChevron,
@@ -44,6 +47,8 @@ import {
   IconNote,
   IconDoc,
   IconDie,
+  IconEtoile,
+  IconMap,
   IconFolder,
   IconNotes,
   IconPeople,
@@ -126,6 +131,13 @@ export function App(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
+  /* Aux règles WoW, le jeu tourne dès l'ouverture : les joueurs peuvent
+     ouvrir leur Aventure sans que le MJ passe d'abord par Azeroth. */
+  const regles = s.reglages.regles
+  useEffect(() => {
+    if (s.ready && s.project && regles === 'wow') void window.jdr.wow.demarrer()
+  }, [s.ready, s.project, regles])
+
   // Raccourcis de table : voile noir, écran joueurs, navigation.
   useEffect(() => {
     const onKey = (e: KeyboardEvent): void => {
@@ -196,6 +208,7 @@ export function App(): JSX.Element {
       {fiche === 'fiche' ? <FicheDeCampagne onClose={() => setFiche(null)} /> : null}
       {params ? <Parametres depart={params.depart} cible={params.cible} demande={params.n} onClose={() => setParams(null)} /> : null}
       <PupitreStats />
+      <ChoixRegles />
       <Toasts />
     </>
   )
@@ -226,6 +239,16 @@ export function App(): JSX.Element {
                 Premier du groupe : c'est là qu'on passe la soirée. */}
             <NavItem id="pupitre" label="Paravent" icon={<IconPupitre />} />
           </Group>
+          {/* Aux règles WoW, le jeu d'Azeroth fait partie de l'écran : la table
+              (les joueurs dans leur Aventure), l'Arbre de talents avec son
+              Aventure et ses objets, et les cartes. */}
+          {s.reglages.regles === 'wow' ? (
+            <Group label="Azeroth">
+              <NavItem id="azeroth" label="La table" icon={<IconEtoile />} />
+              <NavItem id="wow-jeu" label="Talents et Aventure" icon={<IconTrame />} />
+              <NavItem id="wow-cartes" label="Cartes" icon={<IconMap />} />
+            </Group>
+          ) : null}
           <Group label="Matière">
             {/* La Préparation de la séance (Chronologie et annexes) ; le Paravent la joue.
                 Préparation, Bibliothèque et Sons se masquent depuis le menu Affichage. */}
@@ -362,6 +385,9 @@ export function App(): JSX.Element {
               {s.view === 'sheets' && <Sheets />}
               {s.view === 'pochette' && <Pochette />}
               {s.view === 'dice' && <Dice />}
+              {s.view === 'azeroth' && <Azeroth />}
+              {/* Toujours monté aux règles WoW : les pages du jeu restent vivantes. */}
+              <JeuWow />
             </>
           )}
         </div>
@@ -566,6 +592,12 @@ function subtitle(s: ReturnType<typeof useStore.getState>): string {
       return s.rollStats.total
         ? `${s.rollStats.total} jets · ${s.rollStats.rate} % de réussite`
         : 'aucun jet pour cette séance'
+    case 'azeroth':
+      return 'World of Warcraft · les joueurs dans l’Aventure'
+    case 'wow-jeu':
+      return 'Édition, Jeu, Grimoire, Métiers, Aventure'
+    case 'wow-cartes':
+      return 'L’éditeur de cartes d’Azeroth'
     default:
       return ''
   }

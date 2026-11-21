@@ -42,7 +42,10 @@ const PAGES: Record<Exclude<ViewId, 'editor'>, Maillon[]> = {
   sons: [{ label: 'Matière' }, { label: 'Sons' }],
   sheets: [{ label: 'Table' }, { label: 'Fiches' }],
   pochette: [{ label: 'Table' }, { label: 'Pochette' }],
-  dice: [{ label: 'Table' }, { label: 'Jets de dés' }]
+  dice: [{ label: 'Table' }, { label: 'Jets de dés' }],
+  azeroth: [{ label: 'Azeroth' }, { label: 'La table' }],
+  'wow-jeu': [{ label: 'Azeroth', view: 'azeroth' }, { label: 'Talents et Aventure' }],
+  'wow-cartes': [{ label: 'Azeroth', view: 'azeroth' }, { label: 'Cartes' }]
 }
 
 function chemin(

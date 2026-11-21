@@ -79,6 +79,30 @@ voir d'abord le [README](../README.md) et le [CLAUDE.md](../CLAUDE.md).
   `vitre` (laisse passer la vue, jamais les pions). Une fenêtre condamnée ou un volet
   roulant sont donc des portes.
 
+## World of Warcraft
+
+L'écran a deux jeux de règles, choisis à chaque lancement (`ChoixRegles.tsx`, réglage de
+campagne `regles`) : **chasse aux fantômes** (l'écran d'origine) et **World of Warcraft**.
+
+- **Le jeu WoW fait partie de l'écran.** Son code est dans `resources/wow/Application/` :
+  `Arbre-de-talents.html` (Édition, Jeu, Grimoire, Métiers et objets, **Aventure** — l'écran
+  des joueurs), `Editeur-de-cartes.html` + `Editeur-de-cartes/`, `Donnees/` (catalogue
+  d'objets). **C'est là qu'on le modifie** ; son mode d'emploi est `resources/wow/LISEZMOI-jeu.md`.
+- **Ses données n'en font pas partie** : Sauvegardes (arbres, fiches des joueurs, cartes)
+  et Images (≈ 180 Mo) restent dans un dossier du disque, réglage de poste `wow.dossier`
+  (par défaut l'ancien `D:\JDR\WORLD OF WARCRAFT\classe\Application`).
+- **Le serveur** (`src/main/wowServeur.ts`) remplace l'ancien `serveur.js` : ports 8730…8739
+  sur le réseau, `/Application/Sauvegardes|Images/…` → les données, le reste de
+  `/Application/…` → le code. Mêmes échanges qu'avant (`/__table/*`, `PUT`), plus
+  `/__table/etat` pour le MJ.
+- **Côté MJ** : module Azeroth (`modules/Azeroth.tsx`) et les pages du jeu dans des
+  `iframe` gardées vivantes (`modules/JeuWow.tsx`) — le jeu attend une seconde de calme
+  avant d'écrire, une page démontée trop tôt perdrait le dernier geste.
+- **Tester** : régler `wow.dossier` du profil de dev sur une **copie** des données — la page
+  écrit d'elle-même dans `Sauvegardes\Temporaire\`.
+- **Le simulateur** (site GitHub Pages des joueurs) : `resources/wow/construire-simulateur.js`,
+  lancé depuis Azeroth ; il vide son dossier de sortie, d'où le garde-fou du `.git`.
+
 ## Publier
 
 Chaque montée de version réécrit `RELEASE_NOTES.md` (voir [CLAUDE.md](../CLAUDE.md)) :

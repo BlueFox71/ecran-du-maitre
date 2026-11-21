@@ -15,6 +15,8 @@ import * as chars from '../db/repos/characters'
 import * as players from '../db/repos/players'
 import * as carnet from '../carnet'
 import * as mobile from '../mobile'
+import * as wow from '../wow'
+import type { EnvoiWow } from '@shared/wow'
 import * as projet from '../project'
 import * as annexes from '../db/repos/annexes'
 import * as smEvenements from '../db/repos/smEvenements'
@@ -240,6 +242,46 @@ export function registerIpc(): void {
        referme et on le rouvre, les téléphones appairés se retrouvent seuls. */
     if (cle === 'portable.port' || cle === 'portable.adresse') await mobile.reconfigurer()
     return brut
+  })
+
+  /* ---------------- World of Warcraft : le pont avec l'Aventure ---------------- */
+
+  /* Rien de tout cela n'écrit dans la base : le jeu tient ses propres fiches,
+     dans son dossier de données. */
+  on('wow:etat', () => wow.etat())
+  on('wow:demarrer', () => wow.demarrer())
+  on('wow:table', () => wow.table())
+  on('wow:envoyer', (ids: string[], quoi: EnvoiWow) => wow.envoyer(ids, quoi))
+  on('wow:qr', (url: string) => wow.qr(url))
+  /* L'adresse d'une page du jeu, que l'Écran montre dans sa fenêtre. */
+  on('wow:adresse', (page: string) => {
+    if (!['Arbre-de-talents.html', 'Editeur-de-cartes.html'].includes(page)) return null
+    return wow.adresseLocale(page)
+  })
+  on('wow:fenetreJoueur', (joueur: string) => wow.fenetreJoueur(joueur))
+  on('wow:simulateur', (publier: boolean) => wow.simulateur(!!publier))
+  on('wow:ouvrirDonnees', async () => {
+    await shell.openPath(wow.dossier())
+    return true
+  })
+  on('wow:choisirDossier', async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    const options = {
+      title: 'Le dossier des données du jeu World of Warcraft (Sauvegardes, Images)',
+      properties: ['openDirectory' as const, 'createDirectory' as const]
+    }
+    const r = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
+    const d = r.canceled ? null : r.filePaths[0]
+    if (!d) return { ok: false, message: null }
+    if (!wow.estDossierDonnees(d)) {
+      /* Un dossier neuf devient un dossier de données vide : le jeu y écrira. */
+      mkdirSync(join(d, 'Sauvegardes'), { recursive: true })
+      mkdirSync(join(d, 'Images'), { recursive: true })
+    }
+    carnet.poserReglagePoste('wow.dossier', d)
+    /* Le serveur passe sur ces données tout de suite. */
+    await wow.demarrer()
+    return { ok: true, message: null }
   })
 
   /* ---------------- l'examen des médias ---------------- */

@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Brut } from '@shared/reglages'
+import type { EnvoiWow, JoueurWow, ServeurWow } from '@shared/wow'
 import type { Modif } from '@shared/modifs'
 import type { EvenementSm } from '@shared/santeMentale'
 import type { Cible, Plage } from '@shared/surlignage'
@@ -150,6 +151,24 @@ const api = {
     poste: () => call<Brut>('reglages:poste'),
     poserPoste: (cle: string, valeur: string | null) =>
       call<Brut>('reglages:poserPoste', cle, valeur)
+  },
+
+  /**
+   * World of Warcraft : le serveur du jeu (l'Aventure des joueurs), sa table
+   * et la boîte des joueurs. Voir `main/wow.ts`.
+   */
+  wow: {
+    etat: () => call<ServeurWow>('wow:etat'),
+    demarrer: () => call<ServeurWow>('wow:demarrer'),
+    table: () => call<JoueurWow[]>('wow:table'),
+    envoyer: (ids: string[], quoi: EnvoiWow) => call<boolean>('wow:envoyer', ids, quoi),
+    qr: (url: string) => call<string>('wow:qr', url),
+    adresse: (page: 'Arbre-de-talents.html' | 'Editeur-de-cartes.html') =>
+      call<string | null>('wow:adresse', page),
+    fenetreJoueur: (joueur: string) => call<boolean>('wow:fenetreJoueur', joueur),
+    ouvrirDonnees: () => call<boolean>('wow:ouvrirDonnees'),
+    simulateur: (publier: boolean) => call<{ ok: boolean; texte: string }>('wow:simulateur', publier),
+    choisirDossier: () => call<{ ok: boolean; message: string | null }>('wow:choisirDossier')
   },
 
   /**

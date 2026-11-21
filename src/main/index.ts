@@ -6,6 +6,7 @@ import { cheminIcone } from './icone'
 import { registerIpc } from './ipc'
 import * as display from './display'
 import * as mobile from './mobile'
+import * as wow from './wow'
 import * as carnet from './carnet'
 import * as projet from './project'
 import { registerMediaProtocol, registerProtocolScheme } from './vault'
@@ -248,6 +249,8 @@ if (!app.requestSingleInstanceLock()) {
     /* Le serveur des portables se referme avec l'application : un port resté
        ouvert après coup empêcherait la prochaine ouverture. */
     mobile.stop()
+    /* Le serveur du jeu WoW, s'il a été lancé d'ici (pas celui lancé à la main). */
+    wow.arreter()
     globalShortcut.unregisterAll()
     examen.arreter()
     stopWatch()
