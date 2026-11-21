@@ -17,6 +17,7 @@ import type { EnvoiWow, EtatWow, JoueurWow, QuetePreparee, ServeurWow } from '@s
 import { reglagesPoste } from './carnet'
 import { currentProject } from './project'
 import * as serveur from './wowServeur'
+import * as fiches from './wowFiches'
 
 /**
  * Les quêtes préparées de la campagne ouverte : `quetes-wow.json`, dans son
@@ -85,10 +86,42 @@ export async function demarrer(): Promise<ServeurWow> {
   const e = await etat()
   if (!e.lance && !e.probleme)
     e.probleme = `Les ports ${serveur.PORT_DEBUT} à ${serveur.PORT_FIN} sont tous pris : redémarre le PC.`
+  if (e.lance) suivreLesFiches()
   return e
 }
 
+/* Les fiches de l'Aventure, tenues en miroir dans l'Écran (voir wowFiches.ts). */
+let suivi: ReturnType<typeof setInterval> | null = null
+let enCours = false
+function suivreLesFiches(): void {
+  if (suivi) return
+  suivi = setInterval(() => {
+    if (enCours || !serveur.portActuel()) return
+    enCours = true
+    table()
+      .then((t) => fiches.synchroniser(t))
+      .catch((err) => console.error('[wow] fiches :', err))
+      .finally(() => (enCours = false))
+  }, 4000)
+}
+
+/** Le MJ a changé une fiche dans l'Écran : elle part dans l'Aventure du joueur. */
+export function pousserFiche(
+  characterId: number,
+  maj: { pv?: number; res?: number; car?: Record<string, number>; ecarts?: Record<string, number> }
+): void {
+  const id = fiches.joueurDe(characterId)
+  if (!id) return
+  fiches.versAventure(characterId, maj, {
+    dossier: dossier(),
+    enLigne: !!serveur.portActuel() && serveur.presents().some((p) => p.id === id),
+    deposer: (joueur, quoi) => serveur.deposer(ID_MJ, nomDuMj(lirePoste(reglagesPoste())), [joueur], quoi)
+  })
+}
+
 export function arreter(): void {
+  if (suivi) clearInterval(suivi)
+  suivi = null
   serveur.arreter()
 }
 

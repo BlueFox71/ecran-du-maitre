@@ -104,6 +104,12 @@ règles (`regles` absent) les demande, une seule fois (`ChoixRegles.tsx`).
   écrit d'elle-même dans `Sauvegardes\Temporaire\`.
 - **Le simulateur** (site GitHub Pages des joueurs) : `resources/wow/construire-simulateur.js`,
   lancé depuis Azeroth ; il vide son dossier de sortie, d'où le garde-fou du `.git`.
+- **Une seule fiche par personnage** (`src/main/wowFiches.ts`) : la fiche de l'Aventure fait foi.
+  Toutes les 4 s, l'Écran crée la fiche d'un joueur dès sa création finie (prénom et race) et la
+  tient à jour (PV, ressource, caractéristiques totales). Le lien est le réglage de campagne
+  `wow.liens`. Dans l'autre sens, `characters:adjust` (pv, ressource) et `characters:setStat`
+  envoient un `{ t: 'fiche' }` à l'Aventure (en ligne) ou écrivent son fichier (hors ligne) ; la
+  fiche est alors laissée 9 s sans synchroniser, le temps que l'Aventure la reçoive.
 
 ## Publier
 

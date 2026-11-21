@@ -136,8 +136,14 @@ export interface AuraWow {
 export interface EtatWow {
   joueur: string
   prenom: string
+  nom?: string
   nomPerso: string
   race: string
+  sexe?: string
+  age?: string
+  histoire?: string
+  /** Les dix caractéristiques, valeurs totales (points, talents, objets). */
+  car?: Record<string, number>
   classe: string
   classeNom: string
   niveau: number
@@ -194,6 +200,8 @@ export type EnvoiWow =
   | { t: 'tour' }
   | { t: 'quete'; quete: { titre: string; donneur?: string; lieu?: string; texte?: string } }
   | { t: 'queteFinie'; titre: string }
+  /** Une fiche corrigée par le MJ dans l'Écran : valeurs totales. */
+  | { t: 'fiche'; pv?: number; res?: number; car?: Record<string, number> }
 
 /**
  * Une quête préparée pour la campagne, que le MJ envoie au journal des joueurs.

@@ -7692,7 +7692,10 @@ const texteChat = s => { try { return (new DOMParser().parseFromString(String(s 
 function etatTable() {
   try {
     return {
-      joueur: NOM_JOUEUR, prenom: perso.prenom || "", nomPerso: nomPerso(), race: perso.race || "",
+      joueur: NOM_JOUEUR, prenom: perso.prenom || "", nom: perso.nom || "", nomPerso: nomPerso(), race: perso.race || "",
+      sexe: perso.sexe || "", age: perso.age || "", histoire: String(perso.histoire || "").slice(0, 4000),
+      /* Les caractéristiques telles que la feuille les montre (points, talents et objets compris). */
+      car: Object.fromEntries(CARACS.map(([k]) => [k, caracTotal(k)])),
       classe: CLASS_ID || "", classeNom: (cls() || {}).name || "", niveau: charLevel(),
       pv: perso.pv.cur | 0, pvMax: pvMax(), res: perso.res.cur | 0, resMax: perso.res.max | 0,
       resNom: ressource(), resType: classeRes(), argent: perso.argent,
@@ -7773,6 +7776,19 @@ function recoit(m) {
   } else if (q.t === "queteFinie" && q.titre) {
     const x = perso.quetes.find(x => x.titre === String(q.titre));
     if (x && !x.finie) { x.finie = true; chat("Quête terminée : <b>" + h(x.titre) + "</b>.", "gain"); if (perso.fen.quetes.open) majQuetes(); }
+  } else if (q.t === "fiche") {
+    /* Le MJ a corrigé la fiche dans l'Écran : PV, ressource, caractéristiques
+       (des valeurs totales ; les points sont recalés pour y arriver). */
+    const dit = [];
+    if (Number.isFinite(+q.pv)) { perso.pv.cur = Math.max(0, Math.min(pvMax(), +q.pv | 0)); dit.push(perso.pv.cur + " PV"); }
+    if (Number.isFinite(+q.res)) { perso.res.cur = Math.max(0, Math.min(perso.res.max | 0, +q.res | 0)); dit.push(perso.res.cur + " " + h(ressource())); }
+    if (q.car && typeof q.car === "object") CARACS.forEach(([k, nom]) => {
+      if (!Number.isFinite(+q.car[k])) return;
+      const autres = caracTotal(k) - (parseInt(perso.car[k].pt) || 0);
+      perso.car[k].pt = (+q.car[k] | 0) - autres; dit.push(nom + " " + caracTotal(k));
+    });
+    if (dit.length) chat(de + " a mis à jour votre fiche : " + dit.join(", ") + ".", "sys");
+    if (typeof majTout === "function") try { majTout(); } catch (e) {}
   }
   sauvePerso(); if (mode === "wow") { majUnit(); majAuras(); }
 }

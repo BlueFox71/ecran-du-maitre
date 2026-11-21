@@ -1257,6 +1257,11 @@ export function registerIpc(): void {
     /* Un point de vie perdu doit se voir à l'écran dans la seconde. */
     const r = chars.adjustGauge(id, key, delta, reason, maxDelta ?? 0)
     display.refreshJoueurs()
+    /* Un personnage WoW : la fiche de l'Aventure suit (PV, ressource). */
+    if (delta !== 0 && (key === 'pv' || key === 'ressource')) {
+      const v = r.character.data.gauges[key]?.value
+      if (v !== undefined) wow.pousserFiche(id, key === 'pv' ? { pv: v } : { res: v })
+    }
     /* Un PNJ qui montre son état le change sur son pion. */
     if (r.character.kind === 'pnj' && r.character.etatVisible) display.refreshPions()
     return r
@@ -1290,8 +1295,11 @@ export function registerIpc(): void {
     return c
   })
   on('characters:setStat', (id: number, key: string, v: number) => {
+    const avant = chars.getCharacter(id)?.data.stats[key]
     const c = chars.setStat(id, key, v)
     mobile.broadcast()
+    /* Un personnage WoW : la caractéristique part dans sa fiche de l'Aventure. */
+    if (avant !== undefined && avant !== v) wow.pousserFiche(id, { car: { [key]: v }, ecarts: { [key]: v - avant } })
     return c
   })
   on('characters:setState', (id: number, key: string, on2: boolean) => chars.setState(id, key, on2))
