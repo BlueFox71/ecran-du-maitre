@@ -87,3 +87,25 @@ it('la suite garde l’état actuel', () => {
   expect(compter(`SELECT COUNT(*) AS n FROM pochette_lu WHERE pochette_id = ?`, d.id)).toBe(1)
   expect(compter(`SELECT COUNT(*) AS n FROM objet_placement WHERE session_id = ?`, s1)).toBe(1)
 })
+
+it('dupliquer remet au départ un objet laissé dans un lieu ou sur un PNJ', () => {
+  activer(s1)
+  const ana = pj('Ana')
+  const camion = inventaire(s1, 'Camion')
+  const scierie = lieu('Scierie', s1)
+  const garde = pnj('Gardien', s1)
+  placer(objet(s1, 'Lampe'), s1, { port: 'lieu', placeId: scierie, init: { port: 'inventaire', inventaireId: camion } })
+  placer(objet(s1, 'Carnet'), s1, { port: 'pj', characterId: garde, init: { port: 'pj', characterId: ana } })
+  const nid = timeline.dupliquerSeance(s1, 'Copie', null, new Map(), false).id
+  const p = db()
+    .prepare(
+      `SELECT o.nom, p.port, i.nom AS inv, p.character_id AS c, o.session_id AS os
+         FROM objet_placement p JOIN objet o ON o.id = p.objet_id LEFT JOIN inventaire i ON i.id = p.inventaire_id
+        WHERE p.session_id = ? ORDER BY o.nom`
+    )
+    .all(nid)
+  expect(p).toEqual([
+    { nom: 'Carnet', port: 'pj', inv: null, c: ana, os: nid },
+    { nom: 'Lampe', port: 'inventaire', inv: 'Camion', c: null, os: nid }
+  ])
+})

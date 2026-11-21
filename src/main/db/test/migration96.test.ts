@@ -4,6 +4,9 @@ import {
   ouvrirBaseEssai, pj, placer, seance
 } from './base'
 import { repartirParSeance } from '../repartition'
+import { lieu } from './base'
+
+const lieuDe = (s: number): number => lieu('Lieu ' + s, s)
 
 let db: ReturnType<typeof ouvrirBaseEssai>
 beforeEach(() => {
@@ -122,4 +125,22 @@ it('l’onglet d’un inventaire partagé n’est copié qu’une fois par séan
     const i = db.prepare(`SELECT pochette_onglet_id AS o FROM inventaire WHERE session_id = ?`).get(s) as any
     expect((db.prepare(`SELECT session_id AS s FROM pochette_onglet WHERE id = ?`).get(i.o) as any).s).toBe(s)
   }
+})
+
+it('une famille masquée ne survit pas là où elle était masquée, et le masquage s’éteint', () => {
+  db.exec(`DELETE FROM game_session`)
+  db.exec(`DELETE FROM objet_famille`)
+  const A = seance('A')
+  const B = seance('B')
+  activer(B)
+  const f = famille(A, 'Photos')
+  db.prepare(`UPDATE objet_famille SET masquee_depuis = ? WHERE id = ?`).run(B, f)
+  placer(objet(A, 'Photo 1', f), A, { port: 'lieu', placeId: lieuDe(A) })
+  placer(objet(A, 'Photo 2', f), B, { port: 'lieu', placeId: lieuDe(B) })
+  toutCommun()
+  repartirParSeance(db)
+  expect(db.prepare(`SELECT nom FROM objet_famille WHERE session_id = ?`).all(A)).toEqual([{ nom: 'Photos' }])
+  expect(nb(`SELECT COUNT(*) AS n FROM objet_famille WHERE session_id = ?`, B)).toBe(0)
+  expect(db.prepare(`SELECT famille_id AS f FROM objet WHERE session_id = ?`).all(B)).toEqual([{ f: null }])
+  expect(nb(`SELECT COUNT(*) AS n FROM objet_famille WHERE masquee_depuis IS NOT NULL`)).toBe(0)
 })

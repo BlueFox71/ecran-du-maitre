@@ -567,7 +567,9 @@ export const useStore = create<State>((set, get) => ({
       get().refreshRolls(),
       get().refreshPlaces(),
       get().refreshCharacters(),
-      get().refreshObjets()
+      get().refreshObjets(),
+      /* Chaque séance a sa pochette : celle d'avant ne doit pas rester à l'écran. */
+      get().refreshPochette()
     ])
   },
 

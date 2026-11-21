@@ -102,6 +102,23 @@ export function repartirParSeance(db: Database.Database): void {
         if (o !== i.o) db.prepare(`UPDATE inventaire SET pochette_onglet_id = ? WHERE id = ?`).run(o, i.id)
       }
     }
+
+    /* Une famille masquée à partir d'une séance n'a pas sa place dans
+       celle-ci ni dans les suivantes : ses objets y restent, sans famille. */
+    const masquees = db
+      .prepare(
+        `SELECT f.id FROM objet_famille f
+           JOIN game_session s ON s.id = f.session_id
+           JOIN game_session m ON m.id = f.masquee_depuis
+          WHERE f.campaign_id = ? AND (s.ord > m.ord OR (s.ord = m.ord AND s.id >= m.id))`
+      )
+      .all(cid) as { id: number }[]
+    for (const f of masquees) {
+      db.prepare(`UPDATE objet SET famille_id = NULL WHERE famille_id = ?`).run(f.id)
+      db.prepare(`DELETE FROM objet_famille WHERE id = ?`).run(f.id)
+    }
   }
+  /* Chaque séance a désormais ses familles : le masquage n'a plus d'objet. */
+  db.exec(`UPDATE objet_famille SET masquee_depuis = NULL`)
   db.exec(`CREATE UNIQUE INDEX IF NOT EXISTS idx_pochette_unique ON pochette(session_id, item_id, player_key)`)
 }

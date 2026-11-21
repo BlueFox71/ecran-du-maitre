@@ -295,14 +295,31 @@ function copierObjetsEtPochette(
     copierInventaire(i, nid, c, { enPochette: true })
 
   const vers = (m: Map<number, number>, v: number | null): number | null => (v == null ? null : (m.get(v) ?? v))
+  /* La suite garde ce que les lieux et les PNJ ont emporté tels quels. Une
+     copie, elle, doit savoir d'où chaque objet partait : les lieux et les PNJ
+     recopiés ont oublié ce départ, on reprend donc tous les exemplaires de la
+     source, chacun avec son départ, et `ranger` les y ramènera. */
+  if (!suite) db.prepare(`DELETE FROM objet_placement WHERE session_id = ?`).run(nid)
   for (const p of db
     .prepare(
-      `SELECT id, init_place_id AS l, init_character_id AS c FROM objet_placement
-        WHERE session_id = ? AND place_id IS NULL
-          AND (character_id IS NULL OR character_id IN (SELECT id FROM character WHERE kind = 'pj'))`
+      `SELECT id, place_id AS pl, character_id AS ch, origine_place_id AS og,
+              init_place_id AS l, init_character_id AS c FROM objet_placement
+        WHERE session_id = ?${
+          suite
+            ? ` AND place_id IS NULL
+                AND (character_id IS NULL OR character_id IN (SELECT id FROM character WHERE kind = 'pj'))`
+            : ''
+        }`
     )
-    .all(srcId) as { id: number; l: number | null; c: number | null }[])
-    copierLigne('objet_placement', p.id, { session_id: nid, init_place_id: vers(lieux, p.l), init_character_id: vers(pnj, p.c) })
+    .all(srcId) as { id: number; pl: number | null; ch: number | null; og: number | null; l: number | null; c: number | null }[])
+    copierLigne('objet_placement', p.id, {
+      session_id: nid,
+      place_id: vers(lieux, p.pl),
+      character_id: vers(pnj, p.ch),
+      origine_place_id: vers(lieux, p.og),
+      init_place_id: vers(lieux, p.l),
+      init_character_id: vers(pnj, p.c)
+    })
 
   rattacherASeance(nid, c)
   for (const o of ids(`SELECT id FROM objet WHERE session_id = ? ORDER BY ord, id`))
