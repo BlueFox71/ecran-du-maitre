@@ -1,6 +1,6 @@
 import Database from 'better-sqlite3'
 import { app } from 'electron'
-import { existsSync, mkdirSync } from 'node:fs'
+import { copyFileSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { MIGRATIONS } from './schema'
 import { seedProject } from './seed'
@@ -29,6 +29,7 @@ export function openDbAt(file: string, nomSiNeuf: string): Database.Database {
   closeDb()
   mkdirSync(dirname(file), { recursive: true })
 
+  const existait = existsSync(file)
   db = new Database(file)
   db.pragma('journal_mode = WAL')
   db.pragma('foreign_keys = ON')
@@ -43,10 +44,17 @@ export function openDbAt(file: string, nomSiNeuf: string): Database.Database {
       .map((r: any) => r.id as number)
   )
 
+  let sauvee = !existait
   for (const m of MIGRATIONS) {
     if (applied.has(m.id)) continue
+    if (m.sauvegarde && !sauvee) {
+      db.pragma('wal_checkpoint(TRUNCATE)')
+      sauvegarderAvant(file, m.id)
+      sauvee = true
+    }
     db.transaction(() => {
       db!.exec(m.sql)
+      m.run?.(db!)
       db!.prepare(`INSERT INTO migration (id) VALUES (?)`).run(m.id)
     })()
     console.log(`[db] migration ${m.id} appliquée`)
@@ -60,6 +68,17 @@ export function openDbAt(file: string, nomSiNeuf: string): Database.Database {
   defaire.installer(db)
 
   return db
+}
+
+/**
+ * Une copie du fichier avant une migration qui touche aux données du MJ.
+ * Rend son chemin. Une copie déjà là n'est pas écrasée : c'est la plus
+ * ancienne qui compte.
+ */
+export function sauvegarderAvant(file: string, id: number): string {
+  const copie = `${file}.avant-migration-${id}`
+  if (!existsSync(copie)) copyFileSync(file, copie)
+  return copie
 }
 
 export function isDbOpen(): boolean {

@@ -1,6 +1,21 @@
 /** Schéma SQLite. Chaque migration est jouée une fois, dans l'ordre, et enregistrée. */
 
-export const MIGRATIONS: { id: number; sql: string }[] = [
+import type Database from 'better-sqlite3'
+
+/**
+ * `sql` d'abord, puis `run` s'il y a un travail que le SQL seul ne sait pas
+ * faire (recopier des lignes en suivant leurs liens), dans la même
+ * transaction. `sauvegarde` : la migration touche aux données du MJ, on garde
+ * une copie du fichier avant de la jouer.
+ */
+export interface Migration {
+  id: number
+  sql: string
+  run?: (db: Database.Database) => void
+  sauvegarde?: boolean
+}
+
+export const MIGRATIONS: Migration[] = [
   {
     id: 1,
     sql: `
@@ -2039,6 +2054,34 @@ export const MIGRATIONS: { id: number; sql: string }[] = [
        trait trace a la main, que l'atelier ne touche jamais. */
     ALTER TABLE mur       ADD COLUMN atelier_id TEXT;
     ALTER TABLE ouverture ADD COLUMN atelier_id TEXT;
+    `
+  }
+,
+  {
+    id: 95,
+    sauvegarde: true,
+    sql: `
+    /* Chaque séance a ses objets. Jusqu'ici les fiches, les familles, les
+       inventaires et la pochette valaient pour toute la campagne, et seuls
+       les exemplaires vivaient dans une séance : une séance neuve héritait
+       de tout. Désormais chacune a les siens, en copies indépendantes, et
+       une séance neuve part vide.
+
+       ON DELETE CASCADE : supprimer une séance emporte ce qui lui appartient,
+       comme ses exemplaires avant. La répartition des lignes existantes se
+       fait à la migration suivante ; l'unicité de la pochette, qui devient
+       « par séance », ne peut revenir qu'après elle. */
+    ALTER TABLE objet           ADD COLUMN session_id INTEGER REFERENCES game_session(id) ON DELETE CASCADE;
+    ALTER TABLE objet_famille   ADD COLUMN session_id INTEGER REFERENCES game_session(id) ON DELETE CASCADE;
+    ALTER TABLE inventaire      ADD COLUMN session_id INTEGER REFERENCES game_session(id) ON DELETE CASCADE;
+    ALTER TABLE pochette        ADD COLUMN session_id INTEGER REFERENCES game_session(id) ON DELETE CASCADE;
+    ALTER TABLE pochette_onglet ADD COLUMN session_id INTEGER REFERENCES game_session(id) ON DELETE CASCADE;
+    CREATE INDEX idx_objet_session           ON objet(session_id, ord);
+    CREATE INDEX idx_objet_famille_session   ON objet_famille(session_id, ord);
+    CREATE INDEX idx_inventaire_session      ON inventaire(session_id, ord);
+    CREATE INDEX idx_pochette_session        ON pochette(session_id, onglet_id, ord);
+    CREATE INDEX idx_pochette_onglet_session ON pochette_onglet(session_id, ord);
+    DROP INDEX idx_pochette_unique;
     `
   }
 ]
