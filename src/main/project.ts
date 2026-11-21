@@ -210,22 +210,7 @@ export async function promptNew(regles?: Regles): Promise<ProjectInfo | null> {
     return null
   }
   if (regles !== 'wow' && regles !== 'fantomes') return switchTo(dir)
-  creeeAvecRegles = dir
   return switchTo(dir, () => poserRegles(regles))
-}
-
-/** Le dossier de la campagne qu'on vient de créer avec ses règles (une fois). */
-let creeeAvecRegles: string | null = null
-
-/**
- * La campagne ouverte vient-elle d'être créée avec ses règles ? L'interface
- * le demande une fois en s'ouvrant, pour ne pas redemander les règles. La
- * réponse se donne une seule fois.
- */
-export function reglesChoisiesALaCreation(): boolean {
-  const oui = creeeAvecRegles !== null && creeeAvecRegles === courant
-  creeeAvecRegles = null
-  return oui
 }
 
 /** Ouvrir : seulement un dossier qui contient déjà une campagne. */

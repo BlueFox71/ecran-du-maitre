@@ -79,7 +79,7 @@ export function NouvelleCampagne(): JSX.Element | null {
         <p className="aide">
           {occupe
             ? 'Choisis maintenant le dossier de la campagne…'
-            : 'Ensuite, tu choisis le dossier qui deviendra la campagne. Les règles se changent plus tard dans Paramètres › Règles du jeu.'}
+            : 'Le choix est définitif : une campagne garde ses règles pour toujours. Ensuite, tu choisis le dossier qui deviendra la campagne.'}
         </p>
       </div>
     </div>

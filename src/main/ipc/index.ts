@@ -303,7 +303,6 @@ export function registerIpc(): void {
   on('project:current', () => projet.currentProject())
   on('project:recents', () => carnet.recents())
   on('project:new', (regles?: Regles) => projet.promptNew(regles))
-  on('project:reglesChoisiesALaCreation', () => projet.reglesChoisiesALaCreation())
   on('project:open', () => projet.promptOpen())
   on('project:openPath', (dir: string): ProjectInfo | null =>
     dir === projet.currentDir() ? projet.currentProject() : projet.switchTo(dir)

@@ -182,8 +182,6 @@ const api = {
     current: () => call<ProjectInfo | null>('project:current'),
     recents: () => call<RecentProject[]>('project:recents'),
     create: (regles?: Regles) => call<ProjectInfo | null>('project:new', regles),
-    /** La campagne ouverte vient d'être créée avec ses règles : ne pas les redemander (une fois). */
-    reglesChoisiesALaCreation: () => call<boolean>('project:reglesChoisiesALaCreation'),
     open: () => call<ProjectInfo | null>('project:open'),
     openPath: (dir: string) => call<ProjectInfo | null>('project:openPath', dir),
     update: (patch: { name?: string; system?: string | null }) =>

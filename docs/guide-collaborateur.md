@@ -81,8 +81,10 @@ voir d'abord le [README](../README.md) et le [CLAUDE.md](../CLAUDE.md).
 
 ## World of Warcraft
 
-L'écran a deux jeux de règles, choisis à chaque lancement (`ChoixRegles.tsx`, réglage de
-campagne `regles`) : **chasse aux fantômes** (l'écran d'origine) et **World of Warcraft**.
+L'écran a deux jeux de règles : **chasse aux fantômes** (l'écran d'origine) et **World of
+Warcraft**. Elles se choisissent **à la création de la campagne** (`NouvelleCampagne.tsx`,
+réglage de campagne `regles`) et **ne se changent plus** ensuite. Seule une campagne d'avant les
+règles (`regles` absent) les demande, une seule fois (`ChoixRegles.tsx`).
 
 - **Le jeu WoW fait partie de l'écran.** Son code est dans `resources/wow/Application/` :
   `Arbre-de-talents.html` (Édition, Jeu, Grimoire, Métiers et objets, **Aventure** — l'écran

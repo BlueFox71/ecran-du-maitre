@@ -7,54 +7,13 @@ import { jaugeSanite, type TemplateSpec } from '@shared/types'
 import { Curseur } from '../briques'
 import { BrouillonMonnaies, type Brouillon } from '../contexte'
 import type { Reglage } from '../registre'
-import { REGLES, type Regles } from '@shared/wow'
-import { changerRegles, ficheAChanger, personnagesTouches } from '../../../regles'
+import { REGLES } from '@shared/wow'
 
-/** Les règles de la table : chasse aux fantômes ou World of Warcraft. */
+/** Les règles de la campagne : choisies à sa création, elles ne se changent plus. */
 function ReglesDeLaTable(): JSX.Element {
   const s = useStore()
-  const [attente, setAttente] = useState<Regles | null>(null)
-  const choisir = (r: Regles): void => {
-    if (ficheAChanger(r) && personnagesTouches() > 0) setAttente(r)
-    else void changerRegles(r, { fiche: true })
-  }
-  const n = personnagesTouches()
-  return (
-    <>
-      <select
-        value={s.reglages.regles ?? 'fantomes'}
-        onChange={(e) => choisir(e.target.value as Regles)}
-        aria-label="Règles de la table"
-      >
-        {REGLES.map((r) => (
-          <option key={r.id} value={r.id}>
-            {r.nom}
-          </option>
-        ))}
-      </select>
-      {attente ? (
-        <Confirmer
-          titre={`Passer la fiche aux règles « ${REGLES.find((x) => x.id === attente)?.nom} » ?`}
-          oui="Changer la fiche"
-          onOui={async () => {
-            const r = attente
-            setAttente(null)
-            await changerRegles(r, { fiche: true })
-          }}
-          onNon={() => setAttente(null)}
-        >
-          <p>
-            Les {n} personnage{n > 1 ? 's' : ''} de la campagne {n > 1 ? 'perdront' : 'perdra'} les cases qui
-            n’existent pas dans la nouvelle fiche.{' '}
-            {attente === 'wow'
-              ? 'L’ancienne fiche est gardée : revenir aux fantômes la rendra.'
-              : 'La fiche d’avant WoW revient telle quelle.'}
-          </p>
-          <p>Pour changer de règles sans toucher à la fiche, choisis-les au lancement de l’écran (« Garder la fiche actuelle »).</p>
-        </Confirmer>
-      ) : null}
-    </>
-  )
+  const r = REGLES.find((x) => x.id === s.reglages.regles)
+  return <span className="pm-val">{r ? r.nom : 'pas encore choisies'}</span>
 }
 
 /** Le dossier du jeu WoW sur ce poste. */
@@ -170,8 +129,8 @@ export const reglages: Reglage[] = [
   {
     id: 'regles',
     rubrique: 'regles',
-    nom: 'Règles de la table',
-    aide: 'Chasse aux fantômes, ou World of Warcraft : 1D20 contre la difficulté, et les joueurs dans l’Aventure. Demandé aussi à chaque lancement.',
+    nom: 'Règles de la campagne',
+    aide: 'Choisies à la création de la campagne, une fois pour toutes : elles ne se changent plus.',
     mots: ['wow', 'warcraft', 'azeroth', 'fantômes', 'système', 'jeu', 'aventure'],
     Cmd: ReglesDeLaTable
   },
