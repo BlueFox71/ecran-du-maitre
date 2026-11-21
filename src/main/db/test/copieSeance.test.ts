@@ -131,3 +131,12 @@ it('rattacherASeance ne touche pas ce qui est déjà là', () => {
   expect(ligne('objet_placement', p).objet_id).toBe(o)
   expect(compter(`SELECT COUNT(*) AS n FROM objet`)).toBe(1)
 })
+
+it('rattacherASeance donne aux objets de la séance une famille de la séance', () => {
+  const f = famille(s1, 'Cercle')
+  const o = objet(s2, 'Bougie', f)
+  rattacherASeance(s2)
+  const fam = ligne('objet', o).famille_id
+  expect(fam).not.toBe(f)
+  expect(ligne('objet_famille', fam).session_id).toBe(s2)
+})

@@ -1,6 +1,7 @@
 /** Schéma SQLite. Chaque migration est jouée une fois, dans l'ordre, et enregistrée. */
 
 import type Database from 'better-sqlite3'
+import { repartirParSeance } from './repartition'
 
 /**
  * `sql` d'abord, puis `run` s'il y a un travail que le SQL seul ne sait pas
@@ -2083,5 +2084,13 @@ export const MIGRATIONS: Migration[] = [
     CREATE INDEX idx_pochette_onglet_session ON pochette_onglet(session_id, ord);
     DROP INDEX idx_pochette_unique;
     `
+  }
+,
+  {
+    id: 96,
+    sauvegarde: true,
+    /* Répartir ce qui était commun : voir repartition.ts. */
+    sql: ``,
+    run: repartirParSeance
   }
 ]

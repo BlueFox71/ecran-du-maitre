@@ -172,6 +172,19 @@ export function rattacherASeance(sid: number, c: Correspondance = nouvelleCorres
   const majObjet = db.prepare(`UPDATE objet_placement SET objet_id = ? WHERE session_id = ? AND objet_id = ?`)
   for (const o of objetsAilleurs) majObjet.run(objetIci(o.id), sid, o.id)
 
+  /* Un objet de la séance range ses pareils dans une famille de la séance. */
+  const famillesAilleurs = db
+    .prepare(
+      `SELECT o.id, o.famille_id AS f FROM objet o JOIN objet_famille f ON f.id = o.famille_id
+        WHERE o.session_id = ? AND f.session_id IS NOT ?`
+    )
+    .all(sid, sid) as { id: number; f: number }[]
+  for (const o of famillesAilleurs)
+    db.prepare(`UPDATE objet SET famille_id = ? WHERE id = ?`).run(
+      masqueePour(o.f, sid) ? null : copierFamille(o.f, sid, c),
+      o.id
+    )
+
   for (const col of ['inventaire_id', 'init_inventaire_id']) {
     const ailleurs = db
       .prepare(
