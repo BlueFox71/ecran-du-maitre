@@ -29,6 +29,7 @@ export function personnagesTouches(): number {
   return useStore.getState().characters.length
 }
 
+
 /** La clé de « déjà demandé à l'ouverture » : une par campagne, le temps de la fenêtre. */
 export function cleDejaDemande(): string {
   const s = useStore.getState()

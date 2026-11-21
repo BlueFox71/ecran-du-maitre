@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Brut } from '@shared/reglages'
-import type { EnvoiWow, JoueurWow, ServeurWow } from '@shared/wow'
+import type { EnvoiWow, JoueurWow, Regles, ServeurWow } from '@shared/wow'
 import type { Modif } from '@shared/modifs'
 import type { EvenementSm } from '@shared/santeMentale'
 import type { Cible, Plage } from '@shared/surlignage'
@@ -179,7 +179,9 @@ const api = {
   project: {
     current: () => call<ProjectInfo | null>('project:current'),
     recents: () => call<RecentProject[]>('project:recents'),
-    create: () => call<ProjectInfo | null>('project:new'),
+    create: (regles?: Regles) => call<ProjectInfo | null>('project:new', regles),
+    /** La campagne ouverte vient d'être créée avec ses règles : ne pas les redemander (une fois). */
+    reglesChoisiesALaCreation: () => call<boolean>('project:reglesChoisiesALaCreation'),
     open: () => call<ProjectInfo | null>('project:open'),
     openPath: (dir: string) => call<ProjectInfo | null>('project:openPath', dir),
     update: (patch: { name?: string; system?: string | null }) =>

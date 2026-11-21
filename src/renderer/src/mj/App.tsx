@@ -38,6 +38,7 @@ import { Dice } from './modules/Dice'
 import { Azeroth } from './modules/Azeroth'
 import { JeuWow } from './modules/JeuWow'
 import { ChoixRegles } from './components/ChoixRegles'
+import { NouvelleCampagne } from './components/NouvelleCampagne'
 import { demarrerSm } from './santeMentale/etat'
 import {
   IconChevron,
@@ -209,6 +210,7 @@ export function App(): JSX.Element {
       {params ? <Parametres depart={params.depart} cible={params.cible} demande={params.n} onClose={() => setParams(null)} /> : null}
       <PupitreStats />
       <ChoixRegles />
+      <NouvelleCampagne />
       <Toasts />
     </>
   )

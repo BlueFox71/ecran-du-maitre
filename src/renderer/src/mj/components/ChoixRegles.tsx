@@ -41,7 +41,22 @@ export function ChoixRegles(): JSX.Element | null {
   const [attente, setAttente] = useState<Regles | null>(null)
   const [occupe, setOccupe] = useState(false)
 
-  const visible = s.ready && !!s.project && !ferme && !dejaDemande()
+  /* Une campagne qu'on vient de créer a reçu ses règles à la création : on le
+     demande au processus principal (une fois) avant de rien montrer. */
+  const [verifie, setVerifie] = useState(false)
+  const pret = s.ready && !!s.project
+  useEffect(() => {
+    if (!pret || verifie) return
+    void window.jdr.project.reglesChoisiesALaCreation().then((oui) => {
+      if (oui) {
+        noterDemande()
+        setFerme(true)
+      }
+      setVerifie(true)
+    })
+  }, [pret, verifie])
+
+  const visible = pret && verifie && !ferme && !dejaDemande()
 
   const finir = async (r: Regles, fiche: boolean): Promise<void> => {
     setOccupe(true)

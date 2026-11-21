@@ -140,7 +140,11 @@ function buildMenu(): void {
         {
           label: 'Nouvelle campagne…',
           accelerator: 'CommandOrControl+N',
-          click: () => void projet.promptNew()
+          /* D'abord les règles : la fenêtre « Nouvelle campagne » de l'interface. */
+          click: () =>
+            void (mainWindow ?? BrowserWindow.getAllWindows()[0])?.webContents.executeJavaScript(
+              "window.dispatchEvent(new CustomEvent('jdr:nouvelle-campagne'))"
+            )
         },
         {
           label: 'Ouvrir une campagne…',
