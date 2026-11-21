@@ -243,16 +243,15 @@ export function seedProject(db: Database.Database, nom: string): void {
     /* Les rayons de la réserve. Une campagne neuve les a d'emblée : on ne
        demande pas au MJ d'inventer huit familles avant de décrire sa première
        lanterne. Il les renomme ensuite, ou les retire. */
+    const sid = Number(
+      db.prepare(`INSERT INTO game_session (campaign_id, label, active) VALUES (?, ?, 1)`).run(cid, 'Séance 1')
+        .lastInsertRowid
+    )
     const fam = db.prepare(
-      `INSERT INTO objet_famille (campaign_id, nom, teinte, glyphe, ord, builtin)
-       VALUES (?, ?, ?, ?, ?, 1)`
+      `INSERT INTO objet_famille (campaign_id, session_id, nom, teinte, glyphe, ord, builtin)
+       VALUES (?, ?, ?, ?, ?, ?, 1)`
     )
-    FAMILLES_LIVREES.forEach((f, i) => fam.run(cid, f.nom, f.teinte, f.glyphe, i))
-
-    db.prepare(`INSERT INTO game_session (campaign_id, label, active) VALUES (?, ?, 1)`).run(
-      cid,
-      'Séance 1'
-    )
+    FAMILLES_LIVREES.forEach((f, i) => fam.run(cid, sid, f.nom, f.teinte, f.glyphe, i))
 
     /* Les rangements d'une fois servent aux campagnes d'avant le dossier de
        l'app. Une campagne neuve n'a rien d'ancien à ranger : sans ces marques,

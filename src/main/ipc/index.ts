@@ -639,7 +639,6 @@ export function registerIpc(): void {
   on('objets:familleAdd', (input: any) => objets.addFamille(input))
   on('objets:familleUpdate', (id: number, patch: any) => objets.updateFamille(id, patch))
   on('objets:familleRemove', (id: number) => objets.removeFamille(id))
-  on('objets:familleMasquer', (id: number, masquee: boolean) => objets.masquerFamille(id, masquee))
 
   /* ---------------- murs invisibles d'un lieu ---------------- */
   /* Même isolement que les annotations, et pour la même raison : aucun de ces
@@ -832,7 +831,6 @@ export function registerIpc(): void {
      fiche avec le MJ. */
   const entrerDansLaSeance = (id: number): void => {
     chars.preparerSeance(id)
-    objets.reporterInventaires(id)
     /* Les inventaires ne tiennent pas la même chose d'une séance à l'autre. */
     if (pochette.suivreInventaires()) display.versMj('pochette:changee', null)
     /* Un combat ne passe pas d'une séance à l'autre. */

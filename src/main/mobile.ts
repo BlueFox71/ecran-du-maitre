@@ -23,7 +23,7 @@ import { randomBytes, randomInt, randomUUID } from 'node:crypto'
 import { basename, extname, join, normalize } from 'node:path'
 import { BrowserWindow, app } from 'electron'
 import { toDataURL } from 'qrcode'
-import { activeCampaignId, getDb, isDbOpen } from './db'
+import { activeCampaignId, activeSessionId, getDb, isDbOpen } from './db'
 import { absOf, insideRoot } from './library'
 import { copieReduite, vignettesDir } from './vault'
 import { plageDemandee } from './plage'
@@ -843,9 +843,9 @@ function nomsDesObjets(): Map<number, string> {
   const rows = getDb()
     .prepare(
       `SELECT image_item_id AS i, nom FROM objet
-        WHERE campaign_id = ? AND image_item_id IS NOT NULL ORDER BY ord DESC, id DESC`
+        WHERE session_id = ? AND image_item_id IS NOT NULL ORDER BY ord DESC, id DESC`
     )
-    .all(activeCampaignId()) as { i: number; nom: string }[]
+    .all(activeSessionId()) as { i: number; nom: string }[]
   return new Map(rows.map((r) => [r.i, r.nom]))
 }
 

@@ -34,10 +34,10 @@ export function listOnglets(): PochetteOnglet[] {
       `SELECT o.id, o.name, o.ord, o.couleur,
               (SELECT COUNT(*) FROM pochette p WHERE p.onglet_id = o.id) AS count
          FROM pochette_onglet o
-        WHERE o.campaign_id = ?
+        WHERE o.session_id = ?
         ORDER BY o.ord, o.id`
     )
-    .all(activeCampaignId()) as PochetteOnglet[]
+    .all(activeSessionId()) as PochetteOnglet[]
 }
 
 /**
@@ -46,17 +46,17 @@ export function listOnglets(): PochetteOnglet[] {
  */
 export function createOnglet(name: string): PochetteOnglet[] {
   const db = getDb()
-  const c = activeCampaignId()
+  const c = activeSessionId()
   const premier = listOnglets().length === 0
   db.transaction(() => {
     const max = db
-      .prepare(`SELECT COALESCE(MAX(ord), -1) AS m FROM pochette_onglet WHERE campaign_id = ?`)
+      .prepare(`SELECT COALESCE(MAX(ord), -1) AS m FROM pochette_onglet WHERE session_id = ?`)
       .get(c) as { m: number }
     const r = db
-      .prepare(`INSERT INTO pochette_onglet (campaign_id, name, ord) VALUES (?, ?, ?)`)
-      .run(c, name.trim() || 'Sans titre', max.m + 1)
+      .prepare(`INSERT INTO pochette_onglet (campaign_id, session_id, name, ord) VALUES (?, ?, ?, ?)`)
+      .run(activeCampaignId(), c, name.trim() || 'Sans titre', max.m + 1)
     if (premier) {
-      db.prepare(`UPDATE pochette SET onglet_id = ? WHERE campaign_id = ? AND onglet_id IS NULL`)
+      db.prepare(`UPDATE pochette SET onglet_id = ? WHERE session_id = ? AND onglet_id IS NULL`)
         .run(r.lastInsertRowid, c)
     }
   })()
@@ -65,8 +65,8 @@ export function createOnglet(name: string): PochetteOnglet[] {
 
 export function renameOnglet(id: number, name: string): PochetteOnglet[] {
   getDb()
-    .prepare(`UPDATE pochette_onglet SET name = ? WHERE id = ? AND campaign_id = ?`)
-    .run(name.trim() || 'Sans titre', id, activeCampaignId())
+    .prepare(`UPDATE pochette_onglet SET name = ? WHERE id = ? AND session_id = ?`)
+    .run(name.trim() || 'Sans titre', id, activeSessionId())
   return listOnglets()
 }
 
@@ -74,8 +74,8 @@ export function renameOnglet(id: number, name: string): PochetteOnglet[] {
 export function setCouleurOnglet(id: number, couleur: string | null): PochetteOnglet[] {
   const cle = couleur && PION_COULEURS.some((c) => c.key === couleur) ? couleur : null
   getDb()
-    .prepare(`UPDATE pochette_onglet SET couleur = ? WHERE id = ? AND campaign_id = ?`)
-    .run(cle, id, activeCampaignId())
+    .prepare(`UPDATE pochette_onglet SET couleur = ? WHERE id = ? AND session_id = ?`)
+    .run(cle, id, activeSessionId())
   return listOnglets()
 }
 
@@ -89,24 +89,24 @@ export function setCouleurOnglet(id: number, couleur: string | null): PochetteOn
  */
 export function removeOnglet(id: number): PochetteOnglet[] {
   const db = getDb()
-  const c = activeCampaignId()
+  const c = activeSessionId()
   const tous = listOnglets()
   const i = tous.findIndex((o) => o.id === id)
   if (i < 0) return tous
   const voisin = tous[i - 1] ?? tous[i + 1] ?? null
 
   db.transaction(() => {
-    db.prepare(`UPDATE pochette SET onglet_id = ? WHERE campaign_id = ? AND onglet_id = ?`)
+    db.prepare(`UPDATE pochette SET onglet_id = ? WHERE session_id = ? AND onglet_id = ?`)
       .run(voisin?.id ?? null, c, id)
-    db.prepare(`DELETE FROM pochette_onglet WHERE id = ? AND campaign_id = ?`).run(id, c)
+    db.prepare(`DELETE FROM pochette_onglet WHERE id = ? AND session_id = ?`).run(id, c)
   })()
   return listOnglets()
 }
 
 export function reorderOnglets(ids: number[]): PochetteOnglet[] {
   const db = getDb()
-  const c = activeCampaignId()
-  const up = db.prepare(`UPDATE pochette_onglet SET ord = ? WHERE id = ? AND campaign_id = ?`)
+  const c = activeSessionId()
+  const up = db.prepare(`UPDATE pochette_onglet SET ord = ? WHERE id = ? AND session_id = ?`)
   db.transaction(() => ids.forEach((id, n) => up.run(n, id, c)))()
   return listOnglets()
 }
@@ -137,7 +137,7 @@ const SELECT = `
     LEFT JOIN player p ON p.id = d.player_id
     LEFT JOIN character ch ON ch.id = p.character_id
     LEFT JOIN pochette_onglet o ON o.id = d.onglet_id
-   WHERE d.campaign_id = ?`
+   WHERE d.session_id = ?`
 
 /**
  * Toute la pochette, rangée comme elle s'affiche : onglet par onglet, et dans
@@ -148,15 +148,15 @@ export function listPochette(): PochetteDoc[] {
   const db = getDb()
   const rows = db
     .prepare(`${SELECT} ORDER BY COALESCE(o.ord, -1), d.ord, d.id DESC`)
-    .all(activeCampaignId()) as Ligne[]
+    .all(activeSessionId()) as Ligne[]
 
   const lus = db
     .prepare(
       `SELECT l.pochette_id, l.player_id
          FROM pochette_lu l JOIN pochette d ON d.id = l.pochette_id
-        WHERE d.campaign_id = ?`
+        WHERE d.session_id = ?`
     )
-    .all(activeCampaignId()) as { pochette_id: number; player_id: number }[]
+    .all(activeSessionId()) as { pochette_id: number; player_id: number }[]
 
   return rows
     .map((r) => {
@@ -206,19 +206,19 @@ function toDoc(
  */
 export function addDoc(itemId: number, playerId: number | null, ongletId: number | null): void {
   const db = getDb()
-  const c = activeCampaignId()
+  const c = activeSessionId()
   const onglets = listOnglets()
   const ou = onglets.length === 0 ? null : (onglets.find((o) => o.id === ongletId)?.id ?? onglets[0].id)
 
   /* En tête : sous le premier de la pile. */
   const min = db
-    .prepare(`SELECT COALESCE(MIN(ord), 0) AS m FROM pochette WHERE campaign_id = ?`)
+    .prepare(`SELECT COALESCE(MIN(ord), 0) AS m FROM pochette WHERE session_id = ?`)
     .get(c) as { m: number }
 
   db.prepare(
-    `INSERT OR IGNORE INTO pochette (campaign_id, item_id, player_id, player_key, onglet_id, ord, visible)
-     VALUES (?, ?, ?, ?, ?, ?, 0)`
-  ).run(c, itemId, playerId, playerId ?? -1, ou, min.m - 1)
+    `INSERT OR IGNORE INTO pochette (campaign_id, session_id, item_id, player_id, player_key, onglet_id, ord, visible)
+     VALUES (?, ?, ?, ?, ?, ?, ?, 0)`
+  ).run(activeCampaignId(), c, itemId, playerId, playerId ?? -1, ou, min.m - 1)
 }
 
 /**
@@ -227,31 +227,31 @@ export function addDoc(itemId: number, playerId: number | null, ongletId: number
  */
 export function reorderDocs(ids: number[]): void {
   const db = getDb()
-  const c = activeCampaignId()
-  const pose = db.prepare(`UPDATE pochette SET ord = ? WHERE id = ? AND campaign_id = ?`)
+  const c = activeSessionId()
+  const pose = db.prepare(`UPDATE pochette SET ord = ? WHERE id = ? AND session_id = ?`)
   db.transaction(() => ids.forEach((id, i) => pose.run(i, id, c)))()
 }
 
 /** Le reprendre. Il disparaît des téléphones à la seconde. */
 export function removeDoc(id: number): void {
-  getDb().prepare(`DELETE FROM pochette WHERE id = ? AND campaign_id = ?`).run(id, activeCampaignId())
+  getDb().prepare(`DELETE FROM pochette WHERE id = ? AND session_id = ?`).run(id, activeSessionId())
 }
 
 /** Le donner à quelqu'un d'autre, ou le rendre à toute la table (`null`). */
 export function setDocPlayer(id: number, playerId: number | null): void {
   const db = getDb()
-  const c = activeCampaignId()
-  /* Le trio (document, joueur, campagne) est unique : si la même chose est
+  const c = activeSessionId()
+  /* Le trio (document, joueur, séance) est unique : si la même chose est
      déjà entre ces mains-là, on ne fabrique pas de doublon — on retire la
      ligne qu'on déplaçait, et celle qui existait reste. */
   const ligne = db
-    .prepare(`SELECT item_id FROM pochette WHERE id = ? AND campaign_id = ?`)
+    .prepare(`SELECT item_id FROM pochette WHERE id = ? AND session_id = ?`)
     .get(id, c) as { item_id: number } | undefined
   if (!ligne) return
 
   const deja = db
     .prepare(
-      `SELECT id FROM pochette WHERE campaign_id = ? AND item_id = ? AND player_key = ? AND id <> ?`
+      `SELECT id FROM pochette WHERE session_id = ? AND item_id = ? AND player_key = ? AND id <> ?`
     )
     .get(c, ligne.item_id, playerId ?? -1, id) as { id: number } | undefined
 
@@ -260,7 +260,7 @@ export function setDocPlayer(id: number, playerId: number | null): void {
       db.prepare(`DELETE FROM pochette WHERE id = ?`).run(id)
       return
     }
-    db.prepare(`UPDATE pochette SET player_id = ?, player_key = ? WHERE id = ? AND campaign_id = ?`)
+    db.prepare(`UPDATE pochette SET player_id = ?, player_key = ? WHERE id = ? AND session_id = ?`)
       .run(playerId, playerId ?? -1, id, c)
     /* Il change de mains : ce que les précédents en avaient lu ne dit plus
        rien de celui qui le reçoit. */
@@ -277,9 +277,9 @@ export function setDocPlayer(id: number, playerId: number | null): void {
  */
 export function setDocVisible(id: number, visible: boolean): void {
   const db = getDb()
-  const c = activeCampaignId()
+  const c = activeSessionId()
   db.transaction(() => {
-    db.prepare(`UPDATE pochette SET visible = ? WHERE id = ? AND campaign_id = ?`)
+    db.prepare(`UPDATE pochette SET visible = ? WHERE id = ? AND session_id = ?`)
       .run(visible ? 1 : 0, id, c)
     if (!visible) db.prepare(`DELETE FROM pochette_lu WHERE pochette_id = ?`).run(id)
   })()
@@ -288,8 +288,8 @@ export function setDocVisible(id: number, visible: boolean): void {
 /** Le ranger ailleurs. */
 export function setDocOnglet(id: number, ongletId: number | null): void {
   getDb()
-    .prepare(`UPDATE pochette SET onglet_id = ? WHERE id = ? AND campaign_id = ?`)
-    .run(ongletId, id, activeCampaignId())
+    .prepare(`UPDATE pochette SET onglet_id = ? WHERE id = ? AND session_id = ?`)
+    .run(ongletId, id, activeSessionId())
 }
 
 /* ============================================================
@@ -321,10 +321,10 @@ export function marquerLu(pochetteId: number, playerId: number): void {
   const ok = db
     .prepare(
       `SELECT 1 FROM pochette
-        WHERE id = ? AND campaign_id = ? AND visible = 1
+        WHERE id = ? AND session_id = ? AND visible = 1
           AND (player_id IS NULL OR player_id = ?)`
     )
-    .get(pochetteId, activeCampaignId(), playerId)
+    .get(pochetteId, activeSessionId(), playerId)
   if (!ok) return
   db.prepare(`INSERT OR IGNORE INTO pochette_lu (pochette_id, player_id) VALUES (?, ?)`)
     .run(pochetteId, playerId)
@@ -364,12 +364,12 @@ export function oublierInventaire(inventaireId: number): () => void {
  */
 export function suivreInventaires(): boolean {
   const db = getDb()
-  const c = activeCampaignId()
+  const c = activeSessionId()
   const sid = activeSessionId()
   let change = false
   const inventaires = db
     .prepare(
-      `SELECT id, nom, en_pochette AS p, pochette_onglet_id AS o FROM inventaire WHERE campaign_id = ?`
+      `SELECT id, nom, en_pochette AS p, pochette_onglet_id AS o FROM inventaire WHERE session_id = ?`
     )
     .all(c) as { id: number; nom: string; p: number; o: number | null }[]
 
@@ -404,7 +404,7 @@ export function suivreInventaires(): boolean {
           /* Le premier onglet ramasse la pile : ce qui y traîne déjà reçoit
              d'abord le sien, pour ne pas se retrouver parmi les objets. */
           const pile = db
-            .prepare(`SELECT 1 FROM pochette WHERE campaign_id = ? LIMIT 1`)
+            .prepare(`SELECT 1 FROM pochette WHERE session_id = ? LIMIT 1`)
             .get(c)
           if (listOnglets().length === 0 && pile) createOnglet('Documents')
           const crees = createOnglet(inv.nom)
@@ -412,16 +412,16 @@ export function suivreInventaires(): boolean {
           db.prepare(`UPDATE inventaire SET pochette_onglet_id = ? WHERE id = ?`).run(onglet, inv.id)
         }
         const max = db
-          .prepare(`SELECT COALESCE(MAX(ord), -1) AS m FROM pochette WHERE campaign_id = ?`)
+          .prepare(`SELECT COALESCE(MAX(ord), -1) AS m FROM pochette WHERE session_id = ?`)
           .get(c) as { m: number }
         manquent.forEach((i, n) => {
           const r = db
             .prepare(
               `INSERT OR IGNORE INTO pochette
-                 (campaign_id, item_id, player_id, player_key, onglet_id, ord, visible, inventaire_id)
-               VALUES (?, ?, NULL, -1, ?, ?, 1, ?)`
+                 (campaign_id, session_id, item_id, player_id, player_key, onglet_id, ord, visible, inventaire_id)
+               VALUES (?, ?, ?, NULL, -1, ?, ?, 1, ?)`
             )
-            .run(c, i, onglet, max.m + 1 + n, inv.id)
+            .run(activeCampaignId(), c, i, onglet, max.m + 1 + n, inv.id)
           if (r.changes) change = true
         })
       }

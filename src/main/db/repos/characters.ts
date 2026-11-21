@@ -363,7 +363,8 @@ function ecrisDonnees(id: number, data: CharacterData): void {
 /**
  * Une séance où l'on entre reçoit l'état de ses joueurs : pour chacun qui n'y
  * a encore rien, une copie de la séance d'avant — ses jauges, ses
- * caractéristiques, ses affaires. Ensuite, chaque séance vit sa vie : soigner
+ * caractéristiques. Pas ses affaires : une séance neuve part les mains vides,
+ * le MJ importe ce qu'il veut reprendre. Ensuite, chaque séance vit sa vie : soigner
  * quelqu'un à la scierie ne le soigne pas à la maison pleureuse.
  *
  * « D'avant » se lit dans l'ordre des séances, celui de la liste (migration 46) ;
@@ -400,15 +401,6 @@ export function preparerSeance(sessionId: number): void {
       db.prepare(
         `INSERT INTO character_seance (character_id, session_id, data) VALUES (?, ?, ?)`
       ).run(j.id, sessionId, avant?.data ?? j.data)
-
-      const dejaEquipe = db
-        .prepare(`SELECT 1 FROM objet_placement WHERE character_id = ? AND session_id = ?`)
-        .get(j.id, sessionId)
-      if (avant && !dejaEquipe)
-        for (const o of db
-          .prepare(`SELECT id FROM objet_placement WHERE character_id = ? AND session_id = ?`)
-          .all(j.id, avant.sid) as { id: number }[])
-          fixerInitial(copierLigne('objet_placement', o.id, { session_id: sessionId }))
     }
   })()
 }

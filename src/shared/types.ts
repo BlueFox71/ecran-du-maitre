@@ -973,10 +973,6 @@ export interface ObjetFamille {
   ord: number
   /** Livrée avec l'application : on peut la renommer, pas s'étonner qu'elle soit là. */
   builtin: boolean
-  /** Un de ses objets est posé dans une autre séance : on ne la touche plus, on la masque. */
-  verrouillee: boolean
-  /** Masquée dans la séance ouverte — depuis celle-ci ou une d'avant. */
-  masquee: boolean
 }
 
 export const GLYPHES_OBJET = [

@@ -22,8 +22,6 @@ import {
   IconCrop,
   IconDonner,
   IconLoupe,
-  IconEye,
-  IconEyeOff,
   IconImage,
   IconPeople,
   IconPlace,
@@ -35,7 +33,6 @@ import {
   IconSearch,
   IconSliders,
   IconTrash,
-  IconVerrou,
   glypheObjet
 } from '../components/Icons'
 import { ChoixDansArbre } from '../components/ChoixDansArbre'
@@ -123,7 +120,7 @@ export function Objets(): JSX.Element {
   /* Le rayon suit l'objet qu'on ouvre depuis « Tout » ? Non : on trie
      l'étagère, on ne la fait pas sauter sous la main. Seul un rayon devenu
      vide — sa famille retirée — ramène à « Tout ». */
-  const rayons = useMemo(() => s.objetFamilles.filter((f) => !f.masquee), [s.objetFamilles])
+  const rayons = s.objetFamilles
   useEffect(() => {
     if (rayon === 'tout' || rayon === SANS_FAMILLE) return
     if (!rayons.some((f) => f.id === rayon)) setRayon('tout')
@@ -613,7 +610,7 @@ function VueInventaire({ inv, onSupprime }: { inv: Inventaire; onSupprime: () =>
     o.placements.filter((p) => p.inventaireId === inv.id).map((p) => ({ o, p }))
   )
   contenu.sort((a, b) => a.o.nom.localeCompare(b.o.nom, 'fr'))
-  const rayons = s.objetFamilles.filter((f) => !f.masquee)
+  const rayons = s.objetFamilles
 
   /* Ce que la Pochette ne montrera pas : un objet sans image n'a rien à y faire voir. */
   const sansImage = contenu.filter(({ o }) => o.imageItemId == null).length
@@ -1246,13 +1243,11 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
                 }
               >
                 <option value="">Sans catégorie</option>
-                {s.objetFamilles
-                  .filter((f) => !f.masquee || f.id === o.familleId)
-                  .map((f) => (
-                    <option key={f.id} value={f.id}>
-                      {f.masquee ? `${f.nom} (masquée)` : f.nom}
-                    </option>
-                  ))}
+                {s.objetFamilles.map((f) => (
+                  <option key={f.id} value={f.id}>
+                    {f.nom}
+                  </option>
+                ))}
               </select>
             </label>
 
@@ -2263,12 +2258,11 @@ function PanneauReglages({
       {s.objetFamilles.map((f) => (
         <button
           key={f.id}
-          className={`opt${f.masquee ? ' masquee' : ''}`}
+          className="opt"
           onClick={() => setEditee(f.id)}
         >
           <span className={`pastille c-${f.teinte}`} />
           <span className="lib">{f.nom}</span>
-          {f.masquee ? <IconEyeOff /> : f.verrouillee ? <IconVerrou /> : null}
           <span className="n num">{s.objets.filter((o) => o.familleId === f.id).length}</span>
         </button>
       ))}
@@ -2329,19 +2323,11 @@ function ModaleFamilles({
             {s.objetFamilles.map((f) => (
               <button
                 key={f.id}
-                className={`fam-btn${choisie === f.id ? ' on' : ''}${f.masquee ? ' masquee' : ''}`}
+                className={`fam-btn${choisie === f.id ? ' on' : ''}`}
                 onClick={() => setChoisie(f.id)}
-                title={
-                  f.masquee
-                    ? 'Masquée à partir de cette séance'
-                    : f.verrouillee
-                      ? 'A servi dans une autre séance : elle ne se modifie plus'
-                      : undefined
-                }
               >
                 <span className={`pastille c-${f.teinte}`} />
                 <span className="lib">{f.nom}</span>
-                {f.masquee ? <IconEyeOff /> : f.verrouillee ? <IconVerrou /> : null}
                 <span className="n">{s.objets.filter((o) => o.familleId === f.id).length}</span>
               </button>
             ))}
@@ -2406,34 +2392,19 @@ function ReglageFamille({
   }
 
   const n = s.objets.filter((o) => o.familleId === f.id).length
-  const fige = f.verrouillee
-
-  const masquer = async (masquee: boolean): Promise<void> => {
-    await window.jdr.objets.familleMasquer(f.id, masquee)
-    await s.refreshObjets()
-  }
 
   return (
-    <div className={`fam-editeur${fige ? ' fige' : ''}`}>
+    <div className="fam-editeur">
       {enGrand ? null : (
         <button className="retour" onClick={onRetour}>
           ← toutes les catégories
         </button>
       )}
 
-      {fige ? (
-        <p className="fam-verrou">
-          <IconVerrou />
-          Elle a servi dans une autre séance&nbsp;: on ne la modifie plus. On peut la masquer
-          à partir de celle-ci — les séances d’avant la montrent toujours.
-        </p>
-      ) : null}
-
       <label className="champ">
         <span>Nom de la catégorie</span>
         <input
-          autoFocus={enGrand && !fige}
-          disabled={fige}
+          autoFocus={enGrand}
           value={nom}
           onChange={(e) => {
             setNom(e.target.value)
@@ -2450,7 +2421,6 @@ function ReglageFamille({
             key={g}
             className={`gl c-${f.teinte}${f.glyphe === g ? ' on' : ''}`}
             title={g}
-            disabled={fige}
             onClick={() => void maj({ glyphe: g })}
           >
             {glypheObjet(g, '')}
@@ -2466,54 +2436,27 @@ function ReglageFamille({
             className={`teinte sw${f.teinte === c.key ? ' on' : ''}`}
             style={{ background: c.hex }}
             title={c.name}
-            disabled={fige}
             onClick={() => void maj({ teinte: c.key })}
           />
         ))}
       </div>
 
-      {f.masquee ? (
-        <>
-          <button className="btn btn-sm btn-c" onClick={() => void masquer(false)}>
-            <IconEye />
-            Réafficher cette catégorie
-          </button>
-          <p className="note">
-            Masquée&nbsp;: elle n’est plus dans la colonne ni dans le choix d’un objet. Ses objets
-            restent sous «&nbsp;Tout&nbsp;».
-          </p>
-        </>
-      ) : fige ? (
-        <>
-          <button className="btn btn-sm btn-c" onClick={() => void masquer(true)}>
-            <IconEyeOff />
-            Masquer à partir de cette séance
-          </button>
-          <p className="note">
-            Elle sort de la colonne et du choix d’un objet&nbsp;; ses objets restent sous
-            «&nbsp;Tout&nbsp;».
-          </p>
-        </>
-      ) : (
-        <>
-          <button
-            className="btn btn-sm btn-danger btn-c"
-            onClick={async () => {
-              await window.jdr.objets.familleRemove(f.id)
-              await s.refreshObjets()
-              onRetour()
-            }}
-          >
-            <IconTrash />
-            Retirer cette catégorie
-          </button>
-          <p className="note">
-            {n === 0
-              ? 'Cette catégorie est vide.'
-              : `Ses ${n} objet${n > 1 ? 's' : ''} rest${n > 1 ? 'ent' : 'e'} en réserve, sans catégorie.`}
-          </p>
-        </>
-      )}
+      <button
+        className="btn btn-sm btn-danger btn-c"
+        onClick={async () => {
+          await window.jdr.objets.familleRemove(f.id)
+          await s.refreshObjets()
+          onRetour()
+        }}
+      >
+        <IconTrash />
+        Retirer cette catégorie
+      </button>
+      <p className="note">
+        {n === 0
+          ? 'Cette catégorie est vide.'
+          : `Ses ${n} objet${n > 1 ? 's' : ''} rest${n > 1 ? 'ent' : 'e'} en réserve, sans catégorie.`}
+      </p>
     </div>
   )
 }

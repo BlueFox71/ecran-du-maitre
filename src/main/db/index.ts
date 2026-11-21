@@ -134,5 +134,17 @@ export function activeSessionId(): number {
   const info = getDb()
     .prepare(`INSERT INTO game_session (campaign_id, label, active) VALUES (?, ?, 1)`)
     .run(cid, 'Séance 1')
-  return Number(info.lastInsertRowid)
+  const sid = Number(info.lastInsertRowid)
+  adopterCommuns(cid, sid)
+  return sid
+}
+
+/**
+ * La première séance d'une campagne recueille ce qui n'appartient encore à
+ * aucune : les familles livrées d'un projet neuf, ou ce qu'une campagne sans
+ * séance possédait avant que chaque séance ait les siens.
+ */
+export function adopterCommuns(cid: number, sid: number): void {
+  for (const t of ['objet_famille', 'objet', 'inventaire', 'pochette_onglet', 'pochette'])
+    getDb().prepare(`UPDATE ${t} SET session_id = ? WHERE campaign_id = ? AND session_id IS NULL`).run(sid, cid)
 }

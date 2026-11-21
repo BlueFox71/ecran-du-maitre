@@ -1,4 +1,4 @@
-import { activeCampaignId, getDb } from './db/index'
+import { activeCampaignId, activeSessionId, getDb } from './db/index'
 import * as chars from './db/repos/characters'
 import * as objets from './db/repos/objets'
 import * as rolls from './db/repos/rolls'
@@ -28,14 +28,12 @@ export function reinitialiser(c: ChoixReinit): {
   let jauges = 0
 
   if (c.objets) {
-    /* Tous les exemplaires de la campagne : `ranger` ne bouge que ceux qui ont
+    /* Tous les exemplaires de la séance : `ranger` ne bouge que ceux qui ont
        quitté leur emplacement initial, et laisse ceux qui l'ont perdu. */
     const ids = (
       db
-        .prepare(
-          `SELECT p.id FROM objet_placement p JOIN objet o ON o.id = p.objet_id WHERE o.campaign_id = ?`
-        )
-        .all(cid) as { id: number }[]
+        .prepare(`SELECT id FROM objet_placement WHERE session_id = ?`)
+        .all(activeSessionId()) as { id: number }[]
     ).map((r) => r.id)
     ranges = objets.ranger(ids)
   }

@@ -18,7 +18,7 @@ export function ModaleNouvelObjet({
   onClose: () => void
 }): JSX.Element {
   const s = useStore()
-  const familles = s.objetFamilles.filter((f) => !f.masquee)
+  const familles = s.objetFamilles
   const [nom, setNom] = useState('')
   const [familleId, setFamilleId] = useState<number | null>(familleDepart)
   const [compte, setCompte] = useState(false)

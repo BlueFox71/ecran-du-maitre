@@ -720,8 +720,6 @@ const api = {
     /** Retirer un rayon laisse ses objets en réserve, sans famille. */
     familleRemove: (id: number) => call<void>('objets:familleRemove', id),
     /** Masquer à partir de la séance ouverte, ou réafficher partout. */
-    familleMasquer: (id: number, masquee: boolean) =>
-      call<ObjetFamille | null>('objets:familleMasquer', id, masquee),
 
     /**
      * Un joueur vient de ranger une de ses affaires depuis son téléphone, ou

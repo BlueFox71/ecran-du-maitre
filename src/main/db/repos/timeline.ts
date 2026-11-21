@@ -1,4 +1,4 @@
-import { activeCampaignId, activeSessionId, getDb } from '../index'
+import { activeCampaignId, activeSessionId, adopterCommuns, getDb } from '../index'
 import { getItem } from './library'
 import { copierLieu } from './places'
 import { copierPnj } from './characters'
@@ -29,6 +29,10 @@ export function createSession(label: string, date?: string): GameSession {
       )
       .run(cid, label, date ?? null, rangSuivant())
   })()
+  /* Une séance neuve part vide — sauf la toute première, qui recueille ce
+     que la campagne avait avant d'avoir des séances. */
+  const n = db.prepare(`SELECT COUNT(*) AS n FROM game_session WHERE campaign_id = ?`).get(cid) as { n: number }
+  if (n.n === 1) adopterCommuns(cid, Number(info.lastInsertRowid))
   return listSessions().find((s) => s.id === Number(info.lastInsertRowid))!
 }
 
