@@ -52,6 +52,13 @@ export interface MurBati {
    * le côté 2 à droite.
    */
   cote2?: { assetId: string; teinte?: string }
+  /**
+   * Un mur qu'on ne peint pas : il découpe les pièces (la salle, le
+   * comptoir, la cuisine sous un même toit). `bloquant` : il arrête aussi le
+   * pas et la vue, comme un vrai mur ; sinon, il n'arrête rien.
+   */
+  invisible?: boolean
+  bloquant?: boolean
 }
 
 /** Échanger les deux faces d'un mur (le côté 1 prend la matière du côté 2, et inversement). */
@@ -97,6 +104,10 @@ export interface ObjetPose {
   angle: number
   bloquePas: boolean
   bloqueVue: boolean
+  /** L'image retournée gauche ↔ droite, dans le repère de l'objet (avant rotation). */
+  miroirX?: boolean
+  /** L'image retournée haut ↔ bas, dans le repère de l'objet. */
+  miroirY?: boolean
 }
 
 export interface Construction {
@@ -301,7 +312,8 @@ export function deriverCalque(c: Construction): CalqueDerive {
   for (const m of c.murs) {
     if (m.pts.length < 2) continue
     parId.set(m.id, m)
-    murs.push({ atelierId: m.id, nature: 'mur', pts: m.pts.map((p) => enFraction(c, p)) })
+    const nature: NatureMur = m.invisible && !m.bloquant ? 'limite' : 'mur'
+    murs.push({ atelierId: m.id, nature, pts: m.pts.map((p) => enFraction(c, p)) })
   }
   for (const o of c.objets) {
     const nature = natureObstacle(o.bloquePas, o.bloqueVue)
@@ -543,7 +555,8 @@ export function lireConstruction(brut: unknown): Construction {
         ...(couleurSure(m.teinte) ? { teinte: m.teinte } : {}),
         ...(texte(m.cote2?.assetId)
           ? { cote2: { assetId: m.cote2.assetId, ...(couleurSure(m.cote2.teinte) ? { teinte: m.cote2.teinte } : {}) } }
-          : {})
+          : {}),
+        ...(m.invisible ? { invisible: true, ...(m.bloquant ? { bloquant: true } : {}) } : {})
       })
   }
   const ouvertures: OuvertureBatie[] = []
@@ -586,7 +599,9 @@ export function lireConstruction(brut: unknown): Construction {
         h: o.h,
         angle: o.angle,
         bloquePas: !!o.bloquePas,
-        bloqueVue: !!o.bloqueVue
+        bloqueVue: !!o.bloqueVue,
+        ...(o.miroirX ? { miroirX: true } : {}),
+        ...(o.miroirY ? { miroirY: true } : {})
       })
   }
   const habillages: Habillage[] = []

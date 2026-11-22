@@ -399,3 +399,19 @@ describe('niveauxDuLieu', () => {
     expect(niveauxDuLieu(tous[0], tous)).toEqual([{ id: 1, n: 1 }])
   })
 })
+
+describe('le mur invisible dans le calque', () => {
+  it('bloquant : un mur ; sinon : une limite de pièce', () => {
+    const c = {
+      ...constructionVide(),
+      murs: [
+        { id: 'a', assetId: 'x', pts: [[0, 0], [1, 0]] as [number, number][], epaisseur: 0.4, invisible: true },
+        { id: 'b', assetId: 'x', pts: [[0, 1], [1, 1]] as [number, number][], epaisseur: 0.4, invisible: true, bloquant: true },
+        { id: 'c', assetId: 'x', pts: [[0, 2], [1, 2]] as [number, number][], epaisseur: 0.4 }
+      ]
+    }
+    expect(deriverCalque(c).murs.map((m) => m.nature)).toEqual(['limite', 'mur', 'mur'])
+    const relu = lireConstruction(JSON.stringify(c))
+    expect(relu.murs.map((m) => [!!m.invisible, !!m.bloquant])).toEqual([[true, false], [true, true], [false, false]])
+  })
+})

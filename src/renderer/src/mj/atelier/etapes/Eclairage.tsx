@@ -29,8 +29,10 @@ export function EtapeEclairage(props: PropsEtape): JSX.Element {
   return <Lampes {...props} />
 }
 
-function Lampes({ place, co, setOutil, repeindre }: PropsEtape): JSX.Element {
+function Lampes({ place, co, setOutil, repeindre, setTestLum }: PropsEtape): JSX.Element {
   const m = useMurs(place.id)
+  /* Le « Test lumière » de la barre d'une lampe joue le même test que celui de l'en-tête. */
+  useEffect(() => setTestLum(m.testLum), [m.testLum])
   const glisse = useRef<{ id: number; p: PointCase } | null>(null)
   /* La pose armée : le prochain clic pose une lampe. Sans elle, un clic choisit. */
   const [arme, setArme] = useState(false)

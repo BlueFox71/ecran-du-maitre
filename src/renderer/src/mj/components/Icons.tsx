@@ -335,6 +335,18 @@ export const IconSoleil = (p: P = {}): JSX.Element =>
     p
   )
 
+/** La pipette de l'atelier : la poire en haut, la bague, le tube qui pique en bas à gauche. */
+export const IconPipette = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <path d="M14.5 9.5 18 6a2.1 2.1 0 1 0-3-3l-3.5 3.5" />
+      <path d="m10.5 5.5 8 8" />
+      <path d="M16.5 11.5 8 20H4.5v-3.5L13 8" />
+      <path d="M6.5 15h6" />
+    </>,
+    p
+  )
+
 /** La gomme du calque des murs : le bloc couché sur sa ligne, et son biseau. */
 export const IconGomme = (p: P = {}): JSX.Element =>
   box(

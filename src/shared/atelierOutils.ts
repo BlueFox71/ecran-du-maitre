@@ -185,6 +185,34 @@ export function redimensionner(o: ObjetPose, i: number, p: PointCase, garder: bo
   }
 }
 
+/** Le milieu des quatre côtés d'un objet : haut, droite, bas, gauche (dans son repère, avant rotation). */
+export function milieuxDesCotes(o: ObjetPose): PointCase[] {
+  const c = contourDeLObjet(o)
+  return [0, 1, 2, 3].map((i) => [(c[i][0] + c[i + 1][0]) / 2, (c[i][1] + c[i + 1][1]) / 2] as PointCase)
+}
+
+/**
+ * Tirer le milieu d'un côté (0 haut, 1 droite, 2 bas, 3 gauche) jusqu'à `p` :
+ * l'objet s'allonge ou rétrécit dans ce sens seulement, le côté opposé reste
+ * en place. Seule la projection de `p` sur l'axe compte : tirer de biais ne
+ * déplace pas l'objet de côté.
+ */
+export function etirer(o: ObjetPose, cote: number, p: PointCase): ObjetPose {
+  const a = (o.angle * Math.PI) / 180
+  const enLargeur = cote === 1 || cote === 3
+  const axe: PointCase = enLargeur ? [Math.cos(a), Math.sin(a)] : [-Math.sin(a), Math.cos(a)]
+  const s = cote === 1 || cote === 2 ? 1 : -1
+  const taille = enLargeur ? o.l : o.h
+  const fixe: PointCase = [o.x - (s * axe[0] * taille) / 2, o.y - (s * axe[1] * taille) / 2]
+  const neuve = Math.max(TAILLE_MIN, s * ((p[0] - fixe[0]) * axe[0] + (p[1] - fixe[1]) * axe[1]))
+  return {
+    ...o,
+    ...(enLargeur ? { l: neuve } : { h: neuve }),
+    x: fixe[0] + (s * axe[0] * neuve) / 2,
+    y: fixe[1] + (s * axe[1] * neuve) / 2
+  }
+}
+
 /** Tourner un objet vers un point : sa poignée de rotation est au-dessus de lui. `pas` : par 15°. */
 export function tourner(o: ObjetPose, p: PointCase, pas: boolean): ObjetPose {
   let angle = (Math.atan2(p[0] - o.x, -(p[1] - o.y)) * 180) / Math.PI
@@ -421,7 +449,10 @@ export function fusionnerSuperpositions(c: Construction): Construction {
     const p = m.pts
     return p.length > 3 && Math.hypot(p[0][0] - p[p.length - 1][0], p[0][1] - p[p.length - 1][1]) < 1e-6
   }
-  const ordre = [...c.murs.filter(ferme), ...c.murs.filter((m) => !ferme(m))]
+  /* Les murs invisibles restent à part : posés le long d'un vrai mur pour
+     découper une pièce, ils ne doivent ni l'entamer, ni être entamés. */
+  const peints = c.murs.filter((m) => !m.invisible)
+  const ordre = [...peints.filter(ferme), ...peints.filter((m) => !ferme(m))]
   const gardes: MurBati[] = []
   const remplaces = new Map<string, MurBati[]>()
   let change = false
@@ -446,4 +477,109 @@ export function fusionnerSuperpositions(c: Construction): Construction {
     return s && s.d !== undefined ? [{ ...o, murId: s.murId, d: s.d }] : []
   })
   return { ...apres, ouvertures }
+}
+
+/* ---------------- la pipette ---------------- */
+
+/**
+ * La matière du sol qu'on voit sous un point : le dernier sol peint qui le
+ * couvre, ou la matière de base si rien ne le couvre — ou si un coup de gomme
+ * l'a mise à nu. `null` : le fond nu.
+ */
+export function matiereDuSolSous(c: Construction, p: PointCase): string | null {
+  const s = solSous(c, p)
+  if (!s || s.gomme) return c.base ?? null
+  return s.assetId
+}
+
+/**
+ * La face de mur sous un point, telle qu'on la voit : la matière et la
+ * couleur du côté où tombe le point. Le côté 1 est à gauche du sens de tracé,
+ * le côté 2 à droite (s'il diffère). `null` : aucun mur à portée.
+ */
+export function faceDuMurSous(
+  c: Construction,
+  p: PointCase,
+  tol: number
+): { murId: string; assetId: string; teinte?: string } | null {
+  let meilleur: { m: MurBati; gauche: boolean; dist: number } | null = null
+  for (const m of c.murs) {
+    for (let i = 0; i + 1 < m.pts.length; i++) {
+      const a = m.pts[i]
+      const b = m.pts[i + 1]
+      const vx = b[0] - a[0]
+      const vy = b[1] - a[1]
+      const l2 = vx * vx + vy * vy
+      const t = l2 ? Math.max(0, Math.min(1, ((p[0] - a[0]) * vx + (p[1] - a[1]) * vy) / l2)) : 0
+      const dist = Math.hypot(p[0] - (a[0] + t * vx), p[1] - (a[1] + t * vy))
+      if (dist > Math.max(tol, m.epaisseur / 2) || (meilleur && dist >= meilleur.dist)) continue
+      /* À gauche du sens de tracé, à l'écran (y vers le bas) : du côté de (vy, −vx). */
+      meilleur = { m, gauche: (p[0] - a[0]) * vy - (p[1] - a[1]) * vx >= 0, dist }
+    }
+  }
+  if (!meilleur) return null
+  const { m, gauche } = meilleur
+  const face = !gauche && m.cote2 ? m.cote2 : { assetId: m.assetId, teinte: m.teinte }
+  return { murId: m.id, assetId: face.assetId, ...(face.teinte ? { teinte: face.teinte } : {}) }
+}
+
+/* ---------------- miroirs et alignements ---------------- */
+
+/** La boîte d'un ensemble d'objets (tournés), en cases. */
+export function boiteDesObjets(objets: ObjetPose[]): { x0: number; y0: number; x1: number; y1: number } {
+  const pts = objets.flatMap((o) => contourDeLObjet(o))
+  const xs = pts.map((p) => p[0])
+  const ys = pts.map((p) => p[1])
+  return { x0: Math.min(...xs), y0: Math.min(...ys), x1: Math.max(...xs), y1: Math.max(...ys) }
+}
+
+/**
+ * Retourner des objets en miroir — `h` : gauche ↔ droite, `v` : haut ↔ bas.
+ * Chacun se retourne sur lui-même ; à plusieurs, ils échangent aussi leurs
+ * places autour du centre du groupe, comme si on retournait le plateau.
+ *
+ * Un objet tourné de θ puis retourné se dessine tourné de −θ, l'image
+ * retournée dans son propre repère : le même axe pour les deux miroirs,
+ * puisqu'un retournement à l'écran ne fait que changer le signe de l'angle.
+ */
+export function miroirObjets(objets: ObjetPose[], axe: 'h' | 'v'): ObjetPose[] {
+  if (!objets.length) return objets
+  const b = boiteDesObjets(objets)
+  const cx = (b.x0 + b.x1) / 2
+  const cy = (b.y0 + b.y1) / 2
+  const seul = objets.length === 1
+  return objets.map((o) => {
+    const angle = (((-o.angle % 360) + 360) % 360) + 0
+    if (axe === 'h') return { ...o, x: seul ? o.x : 2 * cx - o.x, angle, miroirX: !o.miroirX }
+    return { ...o, y: seul ? o.y : 2 * cy - o.y, angle, miroirY: !o.miroirY }
+  })
+}
+
+export type Alignement = 'gauche' | 'centreH' | 'droite' | 'haut' | 'centreV' | 'bas'
+
+/**
+ * Aligner des objets sur la boîte du groupe : leurs bords gauches sur le plus
+ * à gauche, leurs centres sur le centre du groupe… On aligne ce qu'on voit,
+ * la boîte de l'objet tourné, pas son rectangle d'origine.
+ */
+export function alignerObjets(objets: ObjetPose[], comment: Alignement): ObjetPose[] {
+  if (objets.length < 2) return objets
+  const g = boiteDesObjets(objets)
+  return objets.map((o) => {
+    const b = boiteDesObjets([o])
+    switch (comment) {
+      case 'gauche':
+        return { ...o, x: o.x + g.x0 - b.x0 }
+      case 'droite':
+        return { ...o, x: o.x + g.x1 - b.x1 }
+      case 'centreH':
+        return { ...o, x: o.x + (g.x0 + g.x1) / 2 - (b.x0 + b.x1) / 2 }
+      case 'haut':
+        return { ...o, y: o.y + g.y0 - b.y0 }
+      case 'bas':
+        return { ...o, y: o.y + g.y1 - b.y1 }
+      case 'centreV':
+        return { ...o, y: o.y + (g.y0 + g.y1) / 2 - (b.y0 + b.y1) / 2 }
+    }
+  })
 }

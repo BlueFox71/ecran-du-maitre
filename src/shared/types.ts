@@ -1342,7 +1342,7 @@ export interface Annotation {
  * elles se posent **sur** un mur (voir `Ouverture`), justement pour que le
  * contour reste entier et qu'une pièce puisse se refermer dessus.
  */
-export type NatureMur = 'mur' | 'rideau' | 'obstacle' | 'obstacle-bas' | 'obstacle-voile'
+export type NatureMur = 'mur' | 'rideau' | 'obstacle' | 'obstacle-bas' | 'obstacle-voile' | 'limite'
 
 export const MUR_NATURES: Record<
   NatureMur,
@@ -1357,7 +1357,15 @@ export const MUR_NATURES: Record<
      trou dans la chambre, et on n'y perce pas de porte. */
   obstacle: { label: 'Meuble', quoi: 'arrête le pas et la vue', pas: true, vue: true },
   'obstacle-bas': { label: 'Meuble bas', quoi: 'arrête le pas, laisse voir', pas: true, vue: false },
-  'obstacle-voile': { label: 'Meuble ajouré', quoi: 'laisse passer, cache', pas: false, vue: true }
+  'obstacle-voile': { label: 'Meuble ajouré', quoi: 'laisse passer, cache', pas: false, vue: true },
+  /* Un mur invisible de l'atelier, qui ne bloque rien : il ne sert qu'à
+     découper les pièces — la salle et le comptoir, sous un même plafond. */
+  limite: { label: 'Limite de pièce', quoi: 'sépare deux pièces, n’arrête rien', pas: false, vue: false }
+}
+
+/** Ce qui referme une pièce : un mur, ou une limite tracée dans l'atelier. */
+export function murFermant(m: { nature: NatureMur }): boolean {
+  return m.nature === 'mur' || m.nature === 'limite'
 }
 
 /** Ce qu'on trace à la main. Les obstacles ne naissent que de l'atelier. */

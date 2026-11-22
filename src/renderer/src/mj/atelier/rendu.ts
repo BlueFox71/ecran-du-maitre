@@ -336,6 +336,7 @@ function dessinerObjets(
     }
     ctx.translate(o.x * px, o.y * px)
     ctx.rotate((o.angle * Math.PI) / 180)
+    if (o.miroirX || o.miroirY) ctx.scale(o.miroirX ? -1 : 1, o.miroirY ? -1 : 1)
     ctx.shadowColor = 'rgba(0, 0, 0, 0.6)'
     ctx.shadowBlur = 0.15 * px
     ctx.shadowOffsetY = 0.05 * px
@@ -356,8 +357,12 @@ export function dessinerConstruction(
   ctx.fillStyle = FOND
   ctx.fillRect(0, 0, c.largeur * pxParCase, c.hauteur * pxParCase)
   dessinerSols(ctx, c, assets, images, pxParCase)
-  dessinerMurs(ctx, c, images, pxParCase)
-  dessinerOuvertures(ctx, c, images, pxParCase)
+  /* Un mur invisible découpe les pièces, il ne se peint pas — ni lui, ni ce qu'on y aurait percé. */
+  const peints = c.murs.some((m) => m.invisible)
+    ? { ...c, murs: c.murs.filter((m) => !m.invisible) }
+    : c
+  dessinerMurs(ctx, peints, images, pxParCase)
+  dessinerOuvertures(ctx, peints, images, pxParCase)
   dessinerObjets(ctx, c, images, pxParCase)
   ctx.restore()
 }

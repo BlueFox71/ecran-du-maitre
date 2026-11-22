@@ -412,6 +412,122 @@
   align-items: baseline;
   gap: 8px;
 }
+/* « Voir les assets privés de … » : une grille de vignettes, par rayon. */
+.modal.assets-prives.large {
+  width: min(980px, 100%);
+  height: min(820px, 100%);
+}
+.ap-groupe {
+  display: grid;
+  gap: 6px;
+}
+.ap-grille {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 8px;
+}
+.ap-asset {
+  display: grid;
+  gap: 4px;
+  margin: 0;
+  padding: 6px;
+  border-radius: 8px;
+  background: var(--sunk);
+}
+.ap-asset img {
+  width: 100%;
+  aspect-ratio: 1;
+  object-fit: contain;
+}
+.ap-asset figcaption {
+  font-size: 11px;
+  line-height: 1.25;
+  color: var(--text-dim);
+  text-align: center;
+}
+/* Le profil, à gauche de la version : il prend toute la largeur libre, et
+   sa liste s'ouvre vers le haut. */
+.session-version {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  flex: none;
+}
+.choix-profil {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+}
+.choix-profil-bouton {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  width: 100%;
+  padding: 2px 6px;
+  margin-left: -6px;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  cursor: pointer;
+}
+.session-row .choix-profil-bouton b {
+  flex: 1;
+  text-align: left;
+}
+.choix-profil-bouton:hover,
+.choix-profil-bouton[aria-expanded='true'] {
+  border-color: var(--line);
+  background: var(--sunk);
+}
+.choix-profil-chevron {
+  font-size: 9px;
+  color: var(--text-faint);
+}
+.choix-profil-liste {
+  position: absolute;
+  bottom: calc(100% + 6px);
+  left: -6px;
+  right: 0;
+  z-index: 50;
+  min-width: 190px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+}
+.choix-profil-liste button {
+  display: grid;
+  gap: 1px;
+  width: 100%;
+  padding: 6px 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.choix-profil-liste button:hover {
+  background: var(--sunk);
+}
+.choix-profil-liste button[aria-selected='true'] {
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
+.choix-profil-liste .nom {
+  font-weight: 600;
+  font-size: 13px;
+}
+.choix-profil-liste .quoi {
+  font-size: 11px;
+  color: var(--text-faint);
+}
 .session-row b {
   font-family: 'IBM Plex Mono', monospace;
   font-weight: 500;
@@ -12185,6 +12301,14 @@ input[type='range']::-webkit-slider-thumb {
 .mur.n-rideau .trait {
   stroke-width: 5.5;
   stroke-dasharray: 1 10;
+}
+/* La limite de pièce de l'atelier : un mur invisible qui n'arrête rien. */
+.mur.n-limite {
+  --c: #6eb4eb;
+}
+.mur.n-limite .trait {
+  stroke-width: 2.5;
+  stroke-dasharray: 8 6;
 }
 /* L'emprise d'un meuble de l'atelier : fine, en tirets, couleur bois. */
 .mur.n-obstacle,
@@ -26559,6 +26683,37 @@ body.surligneur-actif [data-cible] {
 .at-etape[aria-selected='true'] .num {
   opacity: 0.85;
 }
+.at-barre-outils {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+}
+.at-barre-outils:empty {
+  display: none;
+}
+.at-barre-outils .btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  padding-left: 6px;
+  padding-right: 6px;
+}
+.at-barre-outils .btn svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.at-barre-outils .at-sep {
+  width: 1px;
+  align-self: stretch;
+  margin: 3px 4px;
+  background: var(--line, rgba(255, 255, 255, 0.15));
+}
 .at-barre .spacer,
 .at-etat .spacer {
   flex: 1;
@@ -26931,6 +27086,152 @@ button.at-titre:hover {
 }
 .at-tuile img.couvre {
   object-fit: cover;
+}
+
+/* Le catalogue des objets : thème en tête, deux colonnes de pictogrammes,
+   la recherche et une grille de grandes vignettes posées sur le fond. */
+.at-panneau-large {
+  width: 400px;
+}
+.at-catalogue {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.at-theme {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.at-theme select {
+  flex: 1;
+}
+.at-catalogue-corps {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 6px;
+}
+.at-col-icones {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 46px;
+  overflow-y: auto;
+  padding-right: 6px;
+  border-right: 1px solid var(--line);
+  scrollbar-width: none;
+}
+.at-col-icones .at-icone {
+  flex: none;
+  width: 40px;
+  height: 40px;
+  padding: 3px;
+  place-items: center;
+  border-color: transparent;
+  background: transparent;
+}
+.at-col-icones .at-icone img,
+.at-col-icones .at-icone svg,
+.at-col-icones .at-icone .at-icone-vide {
+  width: 30px;
+  height: 30px;
+}
+.at-col-icones .at-icone svg {
+  padding: 3px;
+}
+.at-col-icones .at-icone[aria-pressed='true'] {
+  border-color: var(--brass);
+  background: var(--brass-wash);
+}
+/* Les pictogrammes sont blancs : assombris sur fond clair, adoucis tant qu'on ne les choisit pas. */
+.at-picto {
+  opacity: 0.78;
+}
+.at-icone:hover .at-picto,
+.at-icone[aria-pressed='true'] .at-picto {
+  opacity: 1;
+}
+:root[data-theme='light'] .at-picto {
+  filter: brightness(0);
+  opacity: 0.62;
+}
+:root[data-theme='light'] .at-icone[aria-pressed='true'] .at-picto {
+  opacity: 0.9;
+}
+.at-catalogue-droite {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.at-recherche-ligne {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-dim);
+}
+.at-recherche-ligne svg {
+  flex: none;
+  width: 18px;
+  height: 18px;
+  fill: none;
+  stroke: currentColor;
+}
+.at-recherche-ligne .at-recherche {
+  flex: 1;
+  min-width: 0;
+}
+.at-catalogue-grille {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  margin-right: -8px;
+  padding-right: 8px;
+}
+.at-groupe-objets {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.at-vignettes {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 4px;
+}
+.at-vignette {
+  aspect-ratio: 1;
+  padding: 8px;
+  border: 2px solid transparent;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+}
+.at-vignette img {
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  filter: drop-shadow(0 2px 3px rgba(0, 0, 0, 0.45));
+  transition: transform 0.12s ease;
+}
+.at-vignette:hover {
+  background: var(--sunk);
+}
+.at-vignette:hover img {
+  transform: scale(1.06);
+}
+.at-vignette[aria-pressed='true'] {
+  border-color: var(--brass);
+  background: var(--brass-wash);
 }
 
 /* Les couleurs d'un mur : des pastilles, une sans couleur, une au choix. */

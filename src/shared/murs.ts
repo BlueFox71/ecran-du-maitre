@@ -19,6 +19,7 @@ import {
   MUR_NATURES,
   murArretePas,
   murArreteVue,
+  murFermant,
   type Mur,
   type Ouverture,
   type PointMur
@@ -30,10 +31,46 @@ export interface Pt {
   y: number
 }
 
-/** Un bout de mur : deux points, et rien d'autre à savoir. */
+/** Un bout de mur : deux points. */
 export interface Barriere {
   a: Pt
   b: Pt
+  /**
+   * Le côté d'un objet (un meuble de l'atelier, contour fermé) : le centre de
+   * son contour. Le regard traverse alors les faces tournées vers lui et ne
+   * bute que sur celles du fond — on voit l'étagère en entier, c'est ce qui
+   * est derrière qui reste caché.
+   */
+  dos?: Pt
+}
+
+/** Les objets qui bloquent la vue : leur contour est fermé, on les voit de l'extérieur. */
+const OBJETS_VUS = new Set(['obstacle', 'obstacle-voile'])
+
+/** Le centre d'un contour fermé (ses sommets distincts) ; `null` s'il n'est pas fermé. */
+function centreSiFerme(pts: PointMur[]): PointMur | null {
+  if (pts.length < 4) return null
+  const [x0, y0] = pts[0]
+  const [x1, y1] = pts[pts.length - 1]
+  if (Math.abs(x0 - x1) > 1e-9 || Math.abs(y0 - y1) > 1e-9) return null
+  const sommets = pts.slice(0, -1)
+  return [
+    sommets.reduce((t, p) => t + p[0], 0) / sommets.length,
+    sommets.reduce((t, p) => t + p[1], 0) / sommets.length
+  ]
+}
+
+/**
+ * Une face du fond, vue de l'œil : l'œil et le centre de l'objet sont du
+ * même côté de sa ligne. Les faces de devant laissent passer le regard.
+ * L'œil sur la ligne, ou dans l'objet : toutes les faces comptent.
+ */
+function faceDuFond(m: Barriere, oeil: Pt): boolean {
+  if (!m.dos) return true
+  const sx = m.b.x - m.a.x
+  const sy = m.b.y - m.a.y
+  const cote = (p: Pt): number => sx * (p.y - m.a.y) - sy * (p.x - m.a.x)
+  return cote(oeil) * cote(m.dos) >= 0
 }
 
 /** Les segments d'une polyligne. Un point seul ne barre rien. */
@@ -65,12 +102,14 @@ export function barrieres(
       /* Un seuil reste un seuil : pour découper en pièces, on ne perce rien.
          Seul un mur découpe : un meuble de l'atelier arrête le pas mais ne
          fait pas d'une chambre deux pièces. */
-      if (m.nature === 'mur') out.push(...segmentsDuMur(m, enPx))
+      if (murFermant(m)) out.push(...segmentsDuMur(m, enPx))
       continue
     }
     if (!garde(m)) continue
+    const centre = quoi === 'vue' && OBJETS_VUS.has(m.nature) ? centreSiFerme(m.pts) : null
+    const dos = centre ? enPx(centre) : null
     for (const [a, b] of segmentsPerces(m, ouvertures, quoi))
-      out.push({ a: enPx(a), b: enPx(b) })
+      out.push(dos ? { a: enPx(a), b: enPx(b), dos } : { a: enPx(a), b: enPx(b) })
   }
   return out
 }
@@ -257,6 +296,8 @@ export function champDeVision(
    */
   portee = Infinity
 ): Pt[] {
+  /* Un objet se voit en entier : son devant ne cache rien, son fond cache ce qui est derrière. */
+  if (murs.some((m) => m.dos)) murs = murs.filter((m) => faceDuFond(m, oeil))
   const plein = ouverture >= 360
   const axe = ((cap - 90) * Math.PI) / 180
   const demi = (ouverture * Math.PI) / 360
@@ -293,7 +334,12 @@ export function champDeVision(
     if (t === null) continue
     /* Le mur d'abord, la portée ensuite : la lampe s'arrête au plus proche. */
     const d = Math.min(t, portee)
-    vus.push({ p: { x: oeil.x + dx * d, y: oeil.y + dy * d }, rang: plein ? ang : ecart(ang) })
+    /* Tout autour, on trie sur un seul tour : les rayons de l'arc partent de
+       −270° et ceux des coins de murs de −180°. Triés tels quels, une même
+       direction revenait deux fois dans la liste, et le polygone repassait
+       sur lui-même — un pan de lumière traversait le mur, en bas à gauche de
+       la lampe. */
+    vus.push({ p: { x: oeil.x + dx * d, y: oeil.y + dy * d }, rang: plein ? Math.atan2(dy, dx) : ecart(ang) })
   }
   vus.sort((u, v) => u.rang - v.rang)
 

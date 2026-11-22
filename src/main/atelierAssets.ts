@@ -8,7 +8,16 @@
 import { app } from 'electron'
 import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from 'node:fs'
 import { join, normalize, sep } from 'node:path'
-import { lireCatalogue, type AssetAtelier, type SourceAsset } from '@shared/atelierAssets'
+import {
+  appliquerRangement,
+  comptesDesProfils,
+  lireCatalogue,
+  lirePrives,
+  visiblesPour,
+  type AssetAtelier,
+  type PrivesAtelier,
+  type SourceAsset
+} from '@shared/atelierAssets'
 
 export function dossierPack(): string {
   return app.isPackaged
@@ -34,8 +43,67 @@ function lire(s: SourceAsset): AssetAtelier[] {
   }
 }
 
+/**
+ * Le pack, rangé par thème, famille et rayon (`rangement.json`, à part du
+ * catalogue que la découpe des planches réécrit). Les imports gardent leur
+ * catégorie : ils sont réécrits sur le disque, le rangement n'a pas à s'y mêler.
+ */
+function lirePack(): AssetAtelier[] {
+  const pack = lire('pack')
+  const f = join(dossierPack(), 'rangement.json')
+  if (!existsSync(f)) return pack
+  try {
+    return appliquerRangement(pack, readFileSync(f, 'utf8'))
+  } catch {
+    return pack
+  }
+}
+
+/* ---------------- les profils ---------------- */
+
+/** Les profils du pack et leurs assets privés (`prives.json`). */
+function prives(): PrivesAtelier {
+  const f = join(dossierPack(), 'prives.json')
+  if (!existsSync(f)) return { profils: [], assets: {} }
+  try {
+    return lirePrives(readFileSync(f, 'utf8'))
+  } catch {
+    return { profils: [], assets: {} }
+  }
+}
+
+/** Le profil choisi sur cette machine : retenu dans le dossier de l'utilisateur, hors de toute campagne. */
+const fichierProfil = (): string => join(dossierMoi(), 'profil.json')
+
+export function profilCourant(): string | null {
+  try {
+    const v = JSON.parse(readFileSync(fichierProfil(), 'utf8'))
+    return typeof v?.profil === 'string' && prives().profils.includes(v.profil) ? v.profil : null
+  } catch {
+    return null
+  }
+}
+
+export function choisirProfil(nom: string | null): string | null {
+  const ok = nom && prives().profils.includes(nom) ? nom : null
+  writeFileSync(fichierProfil(), JSON.stringify({ profil: ok }))
+  return ok
+}
+
+/** Les profils, et combien d'assets privés chacun possède. */
+export function profils(): { courant: string | null; liste: { nom: string; prives: number }[] } {
+  return { courant: profilCourant(), liste: comptesDesProfils(lirePack(), prives()) }
+}
+
+/** Les assets privés d'un profil, quel que soit le profil choisi (mode développeur). */
+export function assetsPrivesDe(nom: string): AssetAtelier[] {
+  const ids = new Set(prives().assets[nom] ?? [])
+  return lirePack().filter((a) => ids.has(a.id.replace(/^pack:/, '')))
+}
+
+/** Ce que l'atelier montre : le pack (sans les assets privés des autres profils), puis les imports. */
 export function tousLesAssets(): AssetAtelier[] {
-  return [...lire('pack'), ...lire('moi')]
+  return [...visiblesPour(lirePack(), prives(), profilCourant()), ...lire('moi')]
 }
 
 /** Le chemin d'un fichier d'asset, ou `null` s'il sortirait de son dossier. */

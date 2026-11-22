@@ -7,7 +7,7 @@
  */
 import { useCallback, useEffect, useRef, useState } from 'react'
 import { agrandir as agrandirC, composerCadres, type Cadre, type Construction } from '@shared/atelier'
-import type { AssetAtelier } from '@shared/atelierAssets'
+import { assetsManquants, type AssetAtelier } from '@shared/atelierAssets'
 import { exporterPng } from './rendu'
 import type { ImagesAtelier } from './images'
 
@@ -144,6 +144,15 @@ export function useConstruction(
     /* Un seul enregistrement à la fois : deux envois du même cadre
        recaleraient deux fois tout ce qui est posé sur le lieu. */
     if (placeId == null || !cur || enCours.current) return false
+    /* Des assets que ce profil ne voit pas (privés d'un autre) : les dessiner
+       en gris remplacerait le plan par une image amputée. On refuse. */
+    const manquent = assetsManquants(cur, new Set(assets.keys()))
+    if (manquent.length) {
+      surErreur(
+        `Ce lieu utilise ${manquent.length} asset${manquent.length > 1 ? 's' : ''} que ce profil ne voit pas : choisis le bon profil (en bas à gauche) avant d’enregistrer.`
+      )
+      return false
+    }
     enCours.current = true
     /* Le cadre part avec cette construction-ci ; un agrandissement fait
        pendant l'envoi repart de zéro, par rapport à elle. */

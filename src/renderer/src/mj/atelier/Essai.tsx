@@ -10,6 +10,9 @@
  *
  * Les portes qu'on ouvre pendant l'essai ne s'ouvrent que pour lui : rien de
  * l'atelier ne touche la base tant qu'on n'enregistre pas.
+ *
+ * « Test lumière » se joue avec les mêmes pièces, sans pion : tenu au bouton,
+ * la construction en cours dans le noir, avec ce que les lampes éclairent.
  */
 import { useEffect, useMemo, useState } from 'react'
 import type { Construction } from '@shared/atelier'
@@ -24,6 +27,11 @@ export interface EssaiAtelier {
   calque: JSX.Element | null
   /** Le volet qui remplace celui de l'étape pendant l'essai. */
   volet: JSX.Element | null
+  /** « Test lumière », tenu : en cours, et de quoi le commencer ou l'arrêter. */
+  testLum: boolean
+  /** Il y a quelque chose à éclairer : une lampe, ou le soleil, la lune. */
+  peutTesterLum: boolean
+  setTestLum: (v: boolean) => void
 }
 
 export function useEssaiAtelier(placeId: number, c: Construction | null): EssaiAtelier {
@@ -60,8 +68,30 @@ export function useEssaiAtelier(placeId: number, c: Construction | null): EssaiA
     })
   }
 
+  /* Le test lumière : les lampes relues à chaque appui — l'étape Éclairage
+     a pu en poser ou en régler depuis, avec sa propre copie. */
+  const [testLum, setTestLumBrut] = useState(false)
+  const setTestLum = (v: boolean): void => {
+    if (v && enTest) return
+    if (v) void mu.relire()
+    setTestLumBrut(v)
+  }
+
   const calque =
-    enTest && k ? (
+    testLum && !enTest && k ? (
+      <CalqueMurs
+        murs={k.murs}
+        ouvertures={k.ouvertures}
+        mode="edition"
+        traitsCaches
+        testLum
+        lumieres={mu.lumieres}
+        lumGarde={mu.lumGarde}
+        astre={mu.astre}
+        nord={mu.nord}
+        regardPortee={mu.regardPortee}
+      />
+    ) : enTest && k ? (
       <CalqueMurs
         murs={k.murs}
         ouvertures={k.ouvertures}
@@ -104,6 +134,9 @@ export function useEssaiAtelier(placeId: number, c: Construction | null): EssaiA
       void mu.commencerEssai()
     },
     calque,
-    volet
+    volet,
+    testLum: testLum && !enTest,
+    peutTesterLum: mu.lumieres.length > 0 || !!mu.astre,
+    setTestLum
   }
 }

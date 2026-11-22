@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { cheminContraint, pasContraint, RAYON_PION, type Barriere, type Pt } from './murs'
+import { barrieres, bords, champDeVision, cheminContraint, pasContraint, RAYON_PION, type Barriere, type Pt } from './murs'
 
 const cadre = { w: 1000, h: 700 }
 const RAYON = Math.max(cadre.w, cadre.h) * RAYON_PION
@@ -148,5 +148,98 @@ describe('les pièces révélées derrière une porte', () => {
       enPx
     )
     expect(tous).toHaveLength(1)
+  })
+})
+
+describe('un objet qui bloque la vue se voit, ce qui est derrière non', () => {
+  const W = 100
+  const enPx = (p: [number, number]): Pt => ({ x: p[0] * W, y: p[1] * W })
+  const carre = (id: number, nature: MurT['nature']): MurT => ({
+    id,
+    placeId: 1,
+    nature,
+    pts: [
+      [0.4, 0.4],
+      [0.6, 0.4],
+      [0.6, 0.6],
+      [0.4, 0.6],
+      [0.4, 0.4]
+    ],
+    ouvert: false
+  })
+  const dedans = (poly: Pt[], x: number, y: number): boolean => {
+    let d = false
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const a = poly[i]
+      const b = poly[j]
+      if (a.y > y !== b.y > y && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) d = !d
+    }
+    return d
+  }
+  const vue = (m: MurT, oeil: Pt): Pt[] =>
+    champDeVision(barrieres([m], 'vue', enPx).concat(bords(W, W)), oeil, 90, 360)
+
+  it('une étagère : on la voit en entier, pas derrière', () => {
+    const v = vue(carre(1, 'obstacle'), { x: 10, y: 50 })
+    expect(dedans(v, 45, 50)).toBe(true)
+    expect(dedans(v, 55, 45)).toBe(true)
+    expect(dedans(v, 80, 50)).toBe(false)
+    /* À côté, hors de son ombre : visible. */
+    expect(dedans(v, 80, 10)).toBe(true)
+  })
+
+  it('pareil pour un objet qui bloque la vue sans bloquer le passage', () => {
+    const v = vue(carre(1, 'obstacle-voile'), { x: 50, y: 95 })
+    expect(dedans(v, 50, 45)).toBe(true)
+    expect(dedans(v, 50, 20)).toBe(false)
+  })
+
+  it('une pièce fermée par des murs reste cachée de l’extérieur', () => {
+    const v = vue(carre(1, 'mur'), { x: 10, y: 50 })
+    expect(dedans(v, 50, 50)).toBe(false)
+  })
+
+  it('de l’intérieur d’un objet, on ne voit pas au travers', () => {
+    const v = vue(carre(1, 'obstacle-voile'), { x: 50, y: 50 })
+    expect(dedans(v, 55, 55)).toBe(true)
+    expect(dedans(v, 90, 50)).toBe(false)
+  })
+})
+
+describe('une lampe tout autour ne passe pas par l’angle d’une pièce', () => {
+  /* Le bureau du Jardin de Jade : deux murs qui se rejoignent en (2400, 2200),
+     la lampe en haut à droite. La pièce, en bas à gauche de la lampe, restait
+     éclairée en biseau depuis l'angle. */
+  const murs: Barriere[] = [
+    { a: { x: 1200, y: 2200 }, b: { x: 2400, y: 2200 } },
+    { a: { x: 2400, y: 2200 }, b: { x: 2400, y: 2980 } },
+    ...bords(4700, 3000)
+  ]
+  const dedans = (poly: Pt[], x: number, y: number): boolean => {
+    let d = false
+    for (let i = 0, j = poly.length - 1; i < poly.length; j = i++) {
+      const a = poly[i]
+      const b = poly[j]
+      if (a.y > y !== b.y > y && x < ((b.x - a.x) * (y - a.y)) / (b.y - a.y) + a.x) d = !d
+    }
+    return d
+  }
+
+  it('la pièce reste dans le noir, le dehors est éclairé', () => {
+    const lueur = champDeVision(murs, { x: 2985, y: 1678 }, 0, 360, 1290)
+    for (const [x, y] of [
+      [2350, 2250],
+      [2300, 2300],
+      [2250, 2230]
+    ])
+      expect(dedans(lueur, x, y)).toBe(false)
+    expect(dedans(lueur, 2500, 2500)).toBe(true)
+    expect(dedans(lueur, 2200, 2100)).toBe(true)
+  })
+
+  it('le polygone fait le tour dans un seul sens', () => {
+    const lueur = champDeVision(murs, { x: 2985, y: 1678 }, 0, 360, 1290)
+    const angles = lueur.map((p) => Math.atan2(p.y - 1678, p.x - 2985))
+    expect(angles.every((a, i) => i === 0 || a >= angles[i - 1] - 1e-9)).toBe(true)
   })
 })

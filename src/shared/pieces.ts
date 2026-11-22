@@ -11,7 +11,7 @@
  * entoure tout le dessin tourne dans l'autre sens : son aire est négative, on
  * l'écarte.
  */
-import type { Mur, PointMur } from './types'
+import { murFermant, type Mur, type PointMur } from './types'
 
 /** Ce qui compte comme voisin : 1,2 % de la carte. */
 export const SOUDURE = 0.012
@@ -30,7 +30,7 @@ type Sommet = { k: number; p: PointMur; sortantes: Demi[] }
 type Demi = { de: Sommet; vers: Sommet; angle: number; jumelle: Demi }
 
 /** Un rideau laisse passer : il coupe la vue, pas le plan. */
-const ferme = (m: Mur): boolean => m.nature === 'mur'
+const ferme = (m: Mur): boolean => murFermant(m)
 
 function segments(murs: Mur[]): [PointMur, PointMur][] {
   const out: [PointMur, PointMur][] = []
@@ -295,7 +295,7 @@ export function fusionnerLesMurs(
   /* On travaille sur une copie : rien n'est écrit tant que l'appelant n'a pas
      décidé de le faire. */
   const sortie = murs.map((m) => ({ ...m, pts: m.pts.map((p) => [p[0], p[1]] as PointMur) }))
-  const fermants = sortie.filter((m) => m.nature === 'mur')
+  const fermants = sortie.filter((m) => murFermant(m))
   let recolles = 0
 
   /* Chaque extrémité, repérée par son mur et son rang — 0 ou le dernier. */

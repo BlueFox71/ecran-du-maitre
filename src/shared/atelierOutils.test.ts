@@ -18,7 +18,14 @@ import {
   mettreAuPlan,
   tourner,
   tournerGroupe,
-  zoneARemplir
+  zoneARemplir,
+  matiereDuSolSous,
+  faceDuMurSous,
+  miroirObjets,
+  alignerObjets,
+  boiteDesObjets,
+  etirer,
+  milieuxDesCotes
 } from './atelierOutils'
 
 const terrain = (): Construction => ({ ...constructionVide(), largeur: 20, hauteur: 10 })
@@ -351,5 +358,156 @@ describe('superpositions de murs', () => {
     expect(porteur.pts).toEqual([[6, 2], [9, 2]])
     /* 0,85 × 9 = 7,65 cases depuis le début : 1,65 sur 3 du nouveau morceau. */
     expect(o.d).toBeCloseTo(1.65 / 3, 6)
+  })
+})
+
+describe('la pipette', () => {
+  it('prend le dernier sol peint, la base sous la gomme, la base hors des sols', () => {
+    const c: Construction = {
+      ...terrain(),
+      base: 'herbe',
+      sols: [
+        { id: 's1', assetId: 'dalles', pts: [[0, 0], [10, 0], [10, 10], [0, 10]] },
+        { id: 's2', assetId: 'tapis', pts: [[2, 2], [4, 2], [4, 4], [2, 4]] },
+        { id: 'g', assetId: '', pts: [[8, 8]], rayon: 1, gomme: true }
+      ]
+    }
+    expect(matiereDuSolSous(c, [3, 3])).toBe('tapis')
+    expect(matiereDuSolSous(c, [6, 3])).toBe('dalles')
+    expect(matiereDuSolSous(c, [8, 8.5])).toBe('herbe')
+    expect(matiereDuSolSous(c, [15, 5])).toBe('herbe')
+    expect(matiereDuSolSous({ ...c, base: null }, [15, 5])).toBeNull()
+  })
+
+  it('prend la face du mur du côté où l’on clique', () => {
+    const c: Construction = {
+      ...terrain(),
+      murs: [
+        {
+          id: 'm',
+          assetId: 'pierre',
+          pts: [[0, 5], [10, 5]],
+          epaisseur: 0.4,
+          teinte: '#aa0000',
+          cote2: { assetId: 'bois' }
+        }
+      ]
+    }
+    /* Tracé vers la droite : le côté 1 est au-dessus à l'écran. */
+    expect(faceDuMurSous(c, [5, 4.9], 0.2)).toEqual({ murId: 'm', assetId: 'pierre', teinte: '#aa0000' })
+    expect(faceDuMurSous(c, [5, 5.1], 0.2)).toEqual({ murId: 'm', assetId: 'bois' })
+    expect(faceDuMurSous(c, [5, 7], 0.2)).toBeNull()
+  })
+
+  it('un mur à un seul côté donne la même face des deux côtés', () => {
+    const c: Construction = {
+      ...terrain(),
+      murs: [{ id: 'm', assetId: 'pierre', pts: [[0, 5], [10, 5]], epaisseur: 0.4 }]
+    }
+    expect(faceDuMurSous(c, [5, 5.1], 0.2)?.assetId).toBe('pierre')
+  })
+})
+
+describe('miroirs et alignements', () => {
+  const obj = (id: string, x: number, y: number, l = 1, h = 1, angle = 0): ObjetPose => ({
+    id,
+    assetId: 'a',
+    x,
+    y,
+    l,
+    h,
+    angle,
+    bloquePas: false,
+    bloqueVue: false
+  })
+
+  it('un objet seul se retourne sur place, son angle change de signe', () => {
+    const [o] = miroirObjets([obj('a', 3, 4, 2, 1, 30)], 'h')
+    expect(o).toMatchObject({ x: 3, y: 4, angle: 330, miroirX: true })
+    const [p] = miroirObjets([o], 'h')
+    expect(p).toMatchObject({ angle: 30, miroirX: false })
+    const [q] = miroirObjets([obj('a', 3, 4)], 'v')
+    expect(q).toMatchObject({ x: 3, y: 4, angle: 0, miroirY: true })
+  })
+
+  it('un groupe échange ses places autour de son centre', () => {
+    const r = miroirObjets([obj('a', 1, 1), obj('b', 5, 3)], 'h')
+    expect(r.map((o) => o.x)).toEqual([5, 1])
+    expect(r.map((o) => o.y)).toEqual([1, 3])
+    const v = miroirObjets([obj('a', 1, 1), obj('b', 5, 3)], 'v')
+    expect(v.map((o) => o.y)).toEqual([3, 1])
+  })
+
+  it('aligne sur la boîte du groupe', () => {
+    const g = [obj('a', 1, 1), obj('b', 5, 3, 3, 1)]
+    expect(alignerObjets(g, 'gauche').map((o) => o.x)).toEqual([1, 2])
+    expect(alignerObjets(g, 'droite').map((o) => o.x)).toEqual([6, 5])
+    expect(alignerObjets(g, 'centreH').map((o) => o.x)).toEqual([3.5, 3.5])
+    expect(alignerObjets(g, 'haut').map((o) => o.y)).toEqual([1, 1])
+    expect(alignerObjets(g, 'bas').map((o) => o.y)).toEqual([3, 3])
+    expect(alignerObjets(g, 'centreV').map((o) => o.y)).toEqual([2, 2])
+  })
+
+  it('aligne ce qu’on voit : la boîte de l’objet tourné', () => {
+    const g = [obj('a', 0, 0, 1, 1), obj('b', 5, 5, 4, 2, 90)]
+    const r = alignerObjets(g, 'gauche')
+    expect(boiteDesObjets([r[1]]).x0).toBeCloseTo(-0.5, 9)
+  })
+})
+
+describe('étirer un objet par un côté', () => {
+  const o: ObjetPose = { id: 'o', assetId: 'a', x: 5, y: 5, l: 4, h: 2, angle: 0, bloquePas: false, bloqueVue: false }
+
+  it('les milieux des côtés : haut, droite, bas, gauche', () => {
+    expect(milieuxDesCotes(o)).toEqual([[5, 4], [7, 5], [5, 6], [3, 5]])
+  })
+
+  it('la largeur rétrécit par la droite, le bord gauche reste en place', () => {
+    const r = etirer(o, 1, [6, 9])
+    expect(r).toMatchObject({ l: 3, h: 2, x: 4.5, y: 5 })
+  })
+
+  it('la longueur s’allonge par le haut, le bas reste en place', () => {
+    const r = etirer(o, 0, [5, 3])
+    expect(r).toMatchObject({ l: 4, h: 3, x: 5, y: 4.5 })
+  })
+
+  it('un objet tourné s’étire le long de son propre axe', () => {
+    const t = { ...o, angle: 90 }
+    /* Tourné d'un quart de tour : sa largeur est verticale à l'écran ; le côté 1 est en bas. */
+    const r = etirer(t, 1, [5, 8])
+    expect(r.l).toBeCloseTo(5, 9)
+    expect(r.x).toBeCloseTo(5, 9)
+    expect(r.y).toBeCloseTo(5.5, 9)
+  })
+
+  it('ne descend pas sous la taille minimale', () => {
+    expect(etirer(o, 1, [0, 5]).l).toBeGreaterThan(0)
+  })
+})
+
+describe('les murs invisibles', () => {
+  it('la fusion ne les coupe pas, et ils ne coupent pas les vrais murs', () => {
+    const c: Construction = {
+      ...terrain(),
+      murs: [
+        { id: 'vrai', assetId: 'pierre', pts: [[0, 5], [10, 5]], epaisseur: 0.4 },
+        { id: 'inv', assetId: 'pierre', pts: [[2, 5], [8, 5]], epaisseur: 0.4, invisible: true }
+      ]
+    }
+    expect(fusionnerSuperpositions(c)).toBe(c)
+  })
+
+  it('une limite invisible découpe la pièce en deux', () => {
+    const salle: Construction = {
+      ...terrain(),
+      murs: [
+        { id: 'tour', assetId: 'pierre', pts: [[0, 0], [10, 0], [10, 6], [0, 6], [0, 0]], epaisseur: 0.4 },
+        { id: 'lim', assetId: 'pierre', pts: [[5, 0], [5, 6]], epaisseur: 0.4, invisible: true }
+      ]
+    }
+    const gauche = pieceSous(salle, [2, 3])!
+    const xs = gauche.map((p) => p[0])
+    expect(Math.max(...xs)).toBeCloseTo(5, 6)
   })
 })

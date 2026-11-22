@@ -1,5 +1,25 @@
 import { describe, expect, it } from 'vitest'
-import { boiteOpaque, detourerMagenta, filtrerAssets, lireCatalogue, lumiereEnAlpha, raccorder, rangement } from './atelierAssets'
+import { readFileSync } from 'node:fs'
+import { join } from 'node:path'
+import {
+  appliquerRangement,
+  assetsManquants,
+  boiteOpaque,
+  comptesDesProfils,
+  lirePrives,
+  visiblesPour,
+  colonnesDuCatalogue,
+  detourerMagenta,
+  FAMILLES,
+  filtrerAssets,
+  filtrerObjets,
+  lireCatalogue,
+  lumiereEnAlpha,
+  raccorder,
+  rangement,
+  THEMES,
+  type AssetAtelier
+} from './atelierAssets'
 
 /** Une image w × h remplie d'une couleur. */
 function image(w: number, h: number, rgba: [number, number, number, number]): Uint8ClampedArray {
@@ -142,5 +162,142 @@ describe('rangement des assets', () => {
   it('lireCatalogue garde la sous-catégorie', () => {
     const [x] = lireCatalogue({ v: 1, assets: [{ id: 'l', type: 'objet', nom: 'L', categorie: 'Lumière', sousCategorie: 'Lampes', fichier: 'l.png' }] }, 'pack')
     expect(x.sousCategorie).toBe('Lampes')
+  })
+})
+
+describe('le catalogue des objets : thème, famille, rayon', () => {
+  const o = (id: string, categorie: string, sousCategorie?: string, source: 'pack' | 'moi' = 'pack'): AssetAtelier => ({
+    id: `${source}:${id}`,
+    source,
+    type: 'objet',
+    nom: id,
+    categorie,
+    sousCategorie,
+    fichier: id + '.png'
+  })
+  const rangementJson = {
+    v: 1,
+    objets: {
+      'objets/lustre': { theme: 'Classique', famille: 'Lumière', rayon: 'Plafonniers' },
+      'objets/lanterne-rouge': { theme: 'Restaurant', famille: 'Lumière', rayon: 'Plafonniers' },
+      'objets/box': { theme: 'Restaurant', famille: 'Mobilier', rayon: 'Assises' },
+      'objets/chaise': { theme: 'Classique', famille: 'Mobilier', rayon: 'Assises' }
+    }
+  }
+  const brut = [
+    o('objets/lustre', 'Lumière', 'Plafonniers'),
+    o('objets/lanterne-rouge', 'Restaurant', 'Plafonds'),
+    o('objets/box', 'Restaurant', 'Salle'),
+    o('objets/chaise', 'Mobilier', 'Assises'),
+    o('objets/inconnu', 'Bazar', 'Truc'),
+    o('mon-coffre', 'Mobilier', undefined, 'moi'),
+    o('ma-chose', 'Divers', undefined, 'moi')
+  ]
+  const assets = appliquerRangement(brut, JSON.stringify(rangementJson))
+
+  it('pose famille, rayon et thème sur les objets du pack, et sur eux seuls', () => {
+    expect(assets[1]).toMatchObject({ categorie: 'Lumière', sousCategorie: 'Plafonniers', theme: 'Restaurant' })
+    expect(assets[4]).toEqual(brut[4])
+    expect(assets[5]).toEqual(brut[5])
+    expect(appliquerRangement(brut, '{abîmé')).toBe(brut)
+  })
+
+  it('les colonnes suivent l’ordre prévu, ne gardent que ce qui a des objets, et finissent par Mes objets', () => {
+    expect(colonnesDuCatalogue(assets, null)).toEqual([
+      { famille: 'Mobilier', rayons: ['Assises'] },
+      { famille: 'Lumière', rayons: ['Plafonniers'] },
+      { famille: 'Bazar', rayons: ['Truc'] },
+      { famille: 'Mes objets', rayons: ['Mobilier'] }
+    ])
+  })
+
+  it('un décor filtre les colonnes et la grille ; les imports vont avec tous les décors', () => {
+    expect(colonnesDuCatalogue(assets, 'Restaurant').map((c) => c.famille)).toEqual([
+      'Mobilier',
+      'Lumière',
+      /* Un objet sans rangement n'a pas de thème : il reste visible partout. */
+      'Bazar',
+      'Mes objets'
+    ])
+    expect(filtrerObjets(assets, { theme: 'Restaurant', famille: 'Lumière' }).map((a) => a.id)).toEqual([
+      'pack:objets/lanterne-rouge'
+    ])
+    expect(filtrerObjets(assets, { famille: 'Mes objets' }).map((a) => a.id)).toEqual(['moi:mon-coffre', 'moi:ma-chose'])
+    expect(filtrerObjets(assets, { famille: 'Mes objets', rayon: 'Mobilier' }).map((a) => a.id)).toEqual(['moi:mon-coffre'])
+    expect(filtrerObjets(assets, { recherche: 'plafon' }).length).toBe(2)
+  })
+
+  it('le pack livré : chaque objet a sa place, dans une famille, un rayon et un thème connus', () => {
+    const racine = join(__dirname, '../../resources/atelier')
+    const pack = lireCatalogue(readFileSync(join(racine, 'catalogue.json'), 'utf8'), 'pack').filter(
+      (a) => a.type === 'objet'
+    )
+    const r = JSON.parse(readFileSync(join(racine, 'rangement.json'), 'utf8'))
+    const sansPlace = pack.filter((a) => !r.objets[a.id.replace(/^pack:/, '')]).map((a) => a.id)
+    expect(sansPlace).toEqual([])
+    const horsCadre = Object.entries(r.objets as Record<string, { theme: string; famille: string; rayon: string }>)
+      .filter(
+        ([, v]) =>
+          !THEMES.includes(v.theme) || !FAMILLES.find((f) => f.famille === v.famille)?.rayons.includes(v.rayon)
+      )
+      .map(([k]) => k)
+    expect(horsCadre).toEqual([])
+  })
+})
+
+describe('les assets privés d’un profil', () => {
+  const a = (id: string, source: 'pack' | 'moi' = 'pack'): AssetAtelier => ({
+    id: `${source}:${id}`,
+    source,
+    type: 'objet',
+    nom: id,
+    categorie: 'Divers',
+    fichier: id + '.png'
+  })
+  const assets = [a('objets/lanterne'), a('objets/chaise'), a('objets/dragon'), a('objets/lanterne', 'moi')]
+  const prives = lirePrives(
+    JSON.stringify({ profils: ['Jules', 'Alexis'], assets: { Jules: ['objets/lanterne', 'objets/dragon', 'objets/absent'] } })
+  )
+
+  it('chaque profil voit le public et ses privés ; sans profil, le public seul', () => {
+    const ids = (p: string | null): string[] => visiblesPour(assets, prives, p).map((x) => x.id)
+    expect(ids('Jules')).toEqual(['pack:objets/lanterne', 'pack:objets/chaise', 'pack:objets/dragon', 'moi:objets/lanterne'])
+    expect(ids('Alexis')).toEqual(['pack:objets/chaise', 'moi:objets/lanterne'])
+    expect(ids(null)).toEqual(['pack:objets/chaise', 'moi:objets/lanterne'])
+  })
+
+  it('le compte des privés ne retient que ce qui existe dans le pack', () => {
+    expect(comptesDesProfils(assets, prives)).toEqual([
+      { nom: 'Jules', prives: 2 },
+      { nom: 'Alexis', prives: 0 }
+    ])
+  })
+
+  it('un fichier abîmé : aucun profil, rien de privé', () => {
+    expect(lirePrives('{oups')).toEqual({ profils: [], assets: {} })
+    expect(visiblesPour(assets, lirePrives('{oups'), null)).toHaveLength(4)
+  })
+
+  it('les assets d’une construction qui manquent au catalogue', () => {
+    const c = {
+      base: 'pack:sols/herbe',
+      sols: [{ assetId: '', gomme: true }, { assetId: 'pack:sols/dalles' }],
+      murs: [{ assetId: 'pack:murs/pierre', cote2: { assetId: 'pack:murs/laque' } }],
+      ouvertures: [],
+      objets: [{ assetId: 'pack:objets/dragon' }, { assetId: 'pack:objets/dragon' }]
+    }
+    const connus = new Set(['pack:sols/herbe', 'pack:sols/dalles', 'pack:murs/pierre'])
+    expect(assetsManquants(c, connus)).toEqual(['pack:murs/laque', 'pack:objets/dragon'])
+  })
+
+  it('le pack livré : les assets privés existent, et appartiennent à un seul profil', () => {
+    const racine = join(__dirname, '../../resources/atelier')
+    const pack = new Set(
+      lireCatalogue(readFileSync(join(racine, 'catalogue.json'), 'utf8'), 'pack').map((x) => x.id.replace(/^pack:/, ''))
+    )
+    const p = lirePrives(readFileSync(join(racine, 'prives.json'), 'utf8'))
+    const tous = p.profils.flatMap((n) => p.assets[n])
+    expect(tous.filter((id) => !pack.has(id))).toEqual([])
+    expect(new Set(tous).size).toBe(tous.length)
   })
 })

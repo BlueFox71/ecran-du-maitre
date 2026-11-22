@@ -15,7 +15,8 @@ import { chargerImages, type ImagesAtelier } from '../atelier/images'
 import { useConstruction, type ConstructionOuverte } from '../atelier/useConstruction'
 import { Toile, type Outil } from '../atelier/Toile'
 import { useEssaiAtelier } from '../atelier/Essai'
-import { IconMurs, IconPlus, IconTrash } from '../components/Icons'
+import { IconMurs, IconPlus, IconSoleil, IconTrash } from '../components/Icons'
+import { PROFIL_CHANGE } from '../components/ChoixProfil'
 import { EtapeSol } from '../atelier/etapes/Sol'
 import { EtapeMurs } from '../atelier/etapes/Murs'
 import { EtapeOuvertures } from '../atelier/etapes/Ouvertures'
@@ -49,6 +50,10 @@ export interface PropsEtape {
   /** Un asset vient d'être importé : on relit le catalogue. */
   recharger: () => Promise<void>
   grille: boolean
+  /** La place des outils de l'étape dans l'en-tête, juste à droite des onglets. */
+  barreOutils: HTMLElement | null
+  /** « Test lumière », tenu : la construction dans le noir, avec ce que les lampes éclairent. */
+  setTestLum: (v: boolean) => void
 }
 
 export function Atelier(): JSX.Element {
@@ -227,8 +232,17 @@ function Chantier({ place }: { place: Place }): JSX.Element {
   const toastErreur = useCallback((m: string) => s.toast(m, true), [s.toast])
   const co = useConstruction(place.id, parId, images, toastErreur)
   const [etape, setEtape] = useState<EtapeId>('sol')
+  /* À l'ouverture, un lieu déjà meublé s'ouvre sur ses objets : c'est là
+     qu'on revient le plus souvent. Une seule fois, au premier chargement. */
+  const ouvert = useRef(false)
+  useEffect(() => {
+    if (ouvert.current || !co.c) return
+    ouvert.current = true
+    if (co.c.objets.length) setEtape('deco')
+  }, [co.c])
   const [grille, setGrille] = useState(true)
   const [outil, setOutil] = useState<Outil | null>(null)
+  const [barreOutils, setBarreOutils] = useState<HTMLDivElement | null>(null)
   const [repeint, setRepeint] = useState(0)
   const [agrandir, setAgrandir] = useState(false)
   const [apercuTaille, setApercuTaille] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
@@ -248,6 +262,13 @@ function Chantier({ place }: { place: Place }): JSX.Element {
 
   useEffect(() => {
     void recharger()
+  }, [recharger])
+
+  /* Un autre profil : d'autres assets privés à montrer. */
+  useEffect(() => {
+    const k = (): void => void recharger()
+    window.addEventListener(PROFIL_CHANGE, k)
+    return () => window.removeEventListener(PROFIL_CHANGE, k)
   }, [recharger])
 
   /* Les raccourcis de l'atelier : annuler, rétablir, enregistrer. */
@@ -337,7 +358,9 @@ function Chantier({ place }: { place: Place }): JSX.Element {
         setOutil,
         repeindre: () => setRepeint((n) => n + 1),
         recharger,
-        grille
+        grille,
+        barreOutils,
+        setTestLum: essai.setTestLum
       }
     : null
 
@@ -367,6 +390,8 @@ function Chantier({ place }: { place: Place }): JSX.Element {
             </button>
           ))}
         </nav>
+        {/* Les étapes y posent leurs outils (l'objet choisi : plans, miroirs, alignements). */}
+        <div className="at-barre-outils" ref={setBarreOutils} />
         <span className="spacer" />
         <button className="btn btn-sm" aria-pressed={grille} onClick={() => setGrille(!grille)}>
           ▦ Grille
@@ -382,6 +407,28 @@ function Chantier({ place }: { place: Place }): JSX.Element {
           }
         >
           {essai.enTest ? 'Arrêter l’essai' : 'Essayer avec un pion'}
+        </button>
+        {/* Tenu, pas cliqué : on regarde, on lâche, on reprend où l'on était. */}
+        <button
+          className={`btn btn-sm${essai.testLum ? ' btn-on' : ''}`}
+          aria-pressed={essai.testLum}
+          disabled={essai.enTest || !essai.peutTesterLum}
+          title={
+            essai.peutTesterLum
+              ? 'Maintenir appuyé : la construction en cours dans le noir, avec ce que les lampes éclairent'
+              : 'Pose d’abord une lampe (étape Éclairage) : il n’y aurait rien à montrer'
+          }
+          onPointerDown={(e) => {
+            if (e.button !== 0) return
+            e.currentTarget.setPointerCapture(e.pointerId)
+            essai.setTestLum(true)
+          }}
+          onPointerUp={() => essai.setTestLum(false)}
+          onPointerCancel={() => essai.setTestLum(false)}
+          onLostPointerCapture={() => essai.setTestLum(false)}
+        >
+          <IconSoleil />
+          Test lumière
         </button>
         {niveaux.length > 1 ? (
           <span className="at-niveaux" title="Les niveaux de ce lieu">
@@ -497,7 +544,7 @@ function Chantier({ place }: { place: Place }): JSX.Element {
             assets={parId}
             images={images}
             versionImages={versionImages}
-            grille={grille && !essai.enTest}
+            grille={grille && !essai.enTest && !essai.testLum}
             outil={essai.enTest ? null : outil}
             repeindre={repeint}
             calque={essai.calque}
@@ -506,7 +553,7 @@ function Chantier({ place }: { place: Place }): JSX.Element {
         ) : (
           <div className="at-toile" />
         )}
-        <aside className="at-panneau">
+        <aside className={`at-panneau${etape === 'deco' && !essai.volet ? ' at-panneau-large' : ''}`}>
           {essai.volet ? (
             essai.volet
           ) : props ? (

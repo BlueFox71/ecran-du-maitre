@@ -149,6 +149,24 @@ export function Toile({
     ctx.strokeStyle = 'rgba(216, 169, 74, 0.6)'
     ctx.lineWidth = 1.5 / vue.echelle
     ctx.strokeRect(0, 0, c.largeur, c.hauteur)
+    /* Les murs invisibles : absents de l'image, montrés ici en pointillés —
+       rouges s'ils bloquent, bleus s'ils ne font que séparer deux pièces.
+       Pas pendant un essai : on y regarde ce que verront les joueurs. */
+    if (outil) {
+      ctx.save()
+      ctx.setLineDash([6 / vue.echelle, 5 / vue.echelle])
+      ctx.lineWidth = 2.5 / vue.echelle
+      ctx.lineCap = 'round'
+      for (const m of c.murs) {
+        if (!m.invisible || m.pts.length < 2) continue
+        ctx.strokeStyle = m.bloquant ? 'rgba(224, 108, 96, 0.95)' : 'rgba(110, 180, 235, 0.95)'
+        ctx.beginPath()
+        ctx.moveTo(m.pts[0][0], m.pts[0][1])
+        for (const p of m.pts.slice(1)) ctx.lineTo(p[0], p[1])
+        ctx.stroke()
+      }
+      ctx.restore()
+    }
     if (a) {
       /* Ce qui viendrait : teinté. Ce qui partirait : rouge. */
       ctx.save()

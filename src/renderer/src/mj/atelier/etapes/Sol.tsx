@@ -4,17 +4,19 @@
  */
 import { useEffect, useRef, useState } from 'react'
 import { nouvelId, type PointCase } from '@shared/atelier'
-import { rectangle, solSous, zoneARemplir } from '@shared/atelierOutils'
+import { matiereDuSolSous, rectangle, solSous, zoneARemplir } from '@shared/atelierOutils'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
+import { IconPipette } from '../../components/Icons'
 import { urlAsset } from '../images'
 import { ImportAsset } from '../ImportAsset'
 import { cercle, contour, pointille } from '../dessin'
+import { useStore } from '../../store'
 
 /** La taille du pinceau d'aérosol, par défaut, en cases (son rayon). */
 const RAYON_AEROSOL = 1
 
-type OutilSol = 'rect' | 'poly' | 'aerosol' | 'gomme' | 'remplir' | 'choisir'
+type OutilSol = 'rect' | 'poly' | 'aerosol' | 'gomme' | 'remplir' | 'choisir' | 'pipette'
 
 const OUTILS: { id: OutilSol; label: string; aide: string }[] = [
   { id: 'rect', label: 'Rectangle', aide: 'Glisse pour peindre un rectangle.' },
@@ -34,13 +36,21 @@ const OUTILS: { id: OutilSol; label: string; aide: string }[] = [
     label: 'Remplir',
     aide: 'Clique dans une pièce fermée par des murs pour peindre son sol d’un coup ; ailleurs, c’est toute la grille qui se remplit.'
   },
-  { id: 'choisir', label: 'Choisir', aide: 'Clique un sol pour le choisir ; une matière s’y applique, Suppr l’efface.' }
+  { id: 'choisir', label: 'Choisir', aide: 'Clique un sol pour le choisir ; une matière s’y applique, Suppr l’efface.' },
+  {
+    id: 'pipette',
+    label: 'Pipette',
+    aide: 'Clique un sol pour reprendre sa matière ; on revient ensuite à l’outil d’avant.'
+  }
 ]
 
 export function EtapeSol(props: PropsEtape): JSX.Element {
   const { co, assets, setOutil, repeindre } = props
   const sols = assets.filter((a) => a.type === 'sol')
+  const toast = useStore((s) => s.toast)
   const [outil, setOutilSol] = useState<OutilSol>('rect')
+  /* L'outil d'avant la pipette : on y revient une fois la matière prise. */
+  const avantPipette = useRef<OutilSol>('rect')
   const [matiere, setMatiere] = useState<string | null>(null)
   const [choisi, setChoisi] = useState<string | null>(null)
   const [baseOuverte, setBaseOuverte] = useState(false)
@@ -64,9 +74,21 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
     points.current = []
     depart.current = null
     setOutil({
-      curseur: outil === 'choisir' ? 'pointer' : 'crosshair',
+      curseur: outil === 'choisir' ? 'pointer' : outil === 'pipette' ? 'copy' : 'crosshair',
       onPointer: (type, p, _brut, _e, prise) => {
         souris.current = p
+        if (outil === 'pipette') {
+          if (type === 'down' && co.c) {
+            const id = matiereDuSolSous(co.c, _brut)
+            const a = id ? sols.find((x) => x.id === id) : undefined
+            if (!a) return void toast('Aucune matière ici : le fond est nu.')
+            setMatiere(a.id)
+            setOutilSol(avantPipette.current)
+            toast(`Matière reprise : ${a.nom}`)
+          }
+          if (type === 'droit') setOutilSol(avantPipette.current)
+          return
+        }
         if (type === 'droit' && (depart.current || trait.current)) {
           depart.current = null
           trait.current = null
@@ -199,7 +221,16 @@ export function EtapeSol(props: PropsEtape): JSX.Element {
         <span className="eyebrow">Outil</span>
         <div className="at-outils">
           {OUTILS.map((o) => (
-            <button key={o.id} className="btn btn-sm" aria-pressed={outil === o.id} onClick={() => setOutilSol(o.id)}>
+            <button
+              key={o.id}
+              className="btn btn-sm"
+              aria-pressed={outil === o.id}
+              onClick={() => {
+                if (o.id === 'pipette' && outil !== 'pipette') avantPipette.current = outil
+                setOutilSol(o.id)
+              }}
+            >
+              {o.id === 'pipette' ? <IconPipette /> : null}
               {o.label}
             </button>
           ))}

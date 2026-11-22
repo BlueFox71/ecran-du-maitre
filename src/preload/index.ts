@@ -812,6 +812,13 @@ const api = {
       call<Place>('atelier:enregistrer', placeId, c, png, cadre ?? null),
     /** Le pack livré puis les imports du MJ. Image : `jdr://atelier/<source>/<fichier>`. */
     assets: () => call<AssetAtelier[]>('atelier:assets'),
+    /** Les profils de l'atelier, le nombre d'assets privés de chacun, et celui de cette machine. */
+    profils: () =>
+      call<{ courant: string | null; liste: { nom: string; prives: number }[] }>('atelier:profils'),
+    /** Choisir le profil de cette machine : ses assets privés apparaissent, ceux des autres non. */
+    choisirProfil: (nom: string | null) => call<string | null>('atelier:choisirProfil', nom),
+    /** Les assets privés d'un profil, quel que soit celui de cette machine (mode développeur). */
+    assetsPrives: (nom: string) => call<AssetAtelier[]>('atelier:assetsPrives', nom),
     /** L'image est déjà recadrée et raccordée par l'atelier. */
     importer: (meta: Omit<AssetAtelier, 'id' | 'source' | 'fichier'>, png: Uint8Array) =>
       call<AssetAtelier>('atelier:importer', meta, png),

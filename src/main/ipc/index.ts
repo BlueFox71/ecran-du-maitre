@@ -763,6 +763,9 @@ export function registerIpc(): void {
   on('atelier:ajouterNiveau', (placeId: number) => atelier.ajouterNiveau(placeId))
   on('atelier:de', (placeId: number) => atelier.de(placeId))
   on('atelier:assets', () => atelierAssets.tousLesAssets())
+  on('atelier:profils', () => atelierAssets.profils())
+  on('atelier:choisirProfil', (nom: string | null) => atelierAssets.choisirProfil(nom))
+  on('atelier:assetsPrives', (nom: string) => atelierAssets.assetsPrivesDe(nom))
   on('atelier:importer', (meta: any, png: Uint8Array) => atelierAssets.importer(meta, png))
   on('atelier:retirerAsset', (id: string) => atelierAssets.retirer(id))
   on(

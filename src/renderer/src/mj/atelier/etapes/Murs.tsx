@@ -6,6 +6,7 @@ import { useEffect, useRef, useState } from 'react'
 import { inverserCotes, nouvelId, type MurBati, type PointCase } from '@shared/atelier'
 import {
   appliquerHabillage,
+  faceDuMurSous,
   fusionnerSuperpositions,
   habillageSous,
   murSous,
@@ -14,11 +15,13 @@ import {
 } from '@shared/atelierOutils'
 import type { PropsEtape } from '../../modules/Atelier'
 import { Palette } from '../Palette'
+import { IconPipette } from '../../components/Icons'
 import { useStore } from '../../store'
+import { lieuDansLaForme, nommerPiece, piecesDuPlan } from '../../pieces'
 import { ImportAsset } from '../ImportAsset'
 import { contour, poignee, pointille, trait } from '../dessin'
 
-type OutilMurs = 'tracer' | 'piece' | 'habiller' | 'choisir'
+type OutilMurs = 'tracer' | 'piece' | 'habiller' | 'nommer' | 'choisir' | 'pipette'
 
 const OUTILS: { id: OutilMurs; label: string; aide: string }[] = [
   {
@@ -32,7 +35,17 @@ const OUTILS: { id: OutilMurs; label: string; aide: string }[] = [
     label: 'Habiller une pièce',
     aide: 'Clique dans une pièce : tous ses murs prennent la matière et la couleur choisies, du côté de la pièce seulement. Alt + clic retire l’habillage.'
   },
-  { id: 'choisir', label: 'Choisir', aide: 'Clique un mur pour le choisir, glisse un coin pour le déplacer. Suppr l’efface.' }
+  {
+    id: 'nommer',
+    label: 'Nommer une pièce',
+    aide: 'Clique dans une pièce fermée par des murs, puis tape son nom : elle devient un lieu, le même que dans le plan du lieu et la liste des lieux.'
+  },
+  { id: 'choisir', label: 'Choisir', aide: 'Clique un mur pour le choisir, glisse un coin pour le déplacer. Suppr l’efface.' },
+  {
+    id: 'pipette',
+    label: 'Pipette',
+    aide: 'Clique un mur, du côté qui t’intéresse : sa matière et sa couleur deviennent celles des prochains murs. On revient ensuite à l’outil d’avant.'
+  }
 ]
 
 export const EPAISSEUR_DEFAUT = 0.4
@@ -47,7 +60,14 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
   const { co, assets, setOutil, repeindre } = props
   const murs = assets.filter((a) => a.type === 'mur')
   const toast = useStore((s) => s.toast)
+  const places = useStore((s) => s.places)
+  const refreshPlaces = useStore((s) => s.refreshPlaces)
+  /* La pièce qu'on est en train de nommer : son contour et le point cliqué (en cases). */
+  const [aNommer, setANommer] = useState<{ pts: PointCase[]; ancre: PointCase } | null>(null)
+  const [nomSaisi, setNomSaisi] = useState('')
   const [outil, setOutilMurs] = useState<OutilMurs>('piece')
+  /* L'outil d'avant la pipette : on y revient une fois la matière prise. */
+  const avantPipette = useRef<OutilMurs>('piece')
   const [matiere, setMatiere] = useState<string | null>(null)
   const [epaisseur, setEpaisseur] = useState(EPAISSEUR_DEFAUT)
   /* La couleur des prochains murs ; `null`, la matière telle quelle. */
@@ -56,6 +76,9 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
      que règlent les sections Couleur et Matière. */
   const [cote2Neuf, setCote2Neuf] = useState<{ assetId: string; teinte?: string } | null>(null)
   const [cote, setCote] = useState<1 | 2>(1)
+  /* Les prochains murs : invisibles (ils ne font que découper les pièces), et bloquants ou non. */
+  const [invisibleNeuf, setInvisibleNeuf] = useState(false)
+  const [bloquantNeuf, setBloquantNeuf] = useState(false)
   const [choisi, setChoisi] = useState<string | null>(null)
   const points = useRef<PointCase[]>([])
   const depart = useRef<PointCase | null>(null)
@@ -63,6 +86,26 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
   const souris = useRef<PointCase | null>(null)
   const matiereSure = matiere ?? murs[0]?.id ?? null
   const murChoisi = choisi ? co.c?.murs.find((m) => m.id === choisi) ?? null : null
+
+  /* Les pièces se nomment en fractions du plan enregistré : il faut qu'il existe,
+     et que le terrain n'ait pas changé de taille depuis. */
+  const lieu = places.find((q) => q.id === props.place.id) ?? props.place
+  const nommable = !!lieu.mapItemId && !co.agrandi
+  const enFractions = (pts: PointCase[]): [number, number][] =>
+    co.c ? pts.map(([x, y]) => [x / co.c!.largeur, y / co.c!.hauteur] as [number, number]) : []
+  const pieces = piecesDuPlan(lieu, places)
+  const nomDeLaPiece = (pts: PointCase[]): string | null => lieuDansLaForme(pieces, enFractions(pts))?.name ?? null
+  const baptiser = async (): Promise<void> => {
+    const nom = nomSaisi.trim()
+    if (!aNommer || !nom) return
+    const [ancre] = enFractions([aNommer.ancre])
+    if (await nommerPiece(lieu, places, enFractions(aNommer.pts), ancre, nom, toast)) {
+      await refreshPlaces()
+      toast(`Pièce nommée : ${nom}`)
+      setANommer(null)
+      setNomSaisi('')
+    }
+  }
 
   const poser = (pts: PointCase[]): void => {
     const net = pts.filter((p, i, t) => !i || Math.hypot(p[0] - t[i - 1][0], p[1] - t[i - 1][1]) > 1e-6)
@@ -73,8 +116,12 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
       pts: net,
       epaisseur,
       ...(teinte ? { teinte } : {}),
-      ...(cote2Neuf ? { cote2: cote2Neuf } : {})
+      ...(cote2Neuf ? { cote2: cote2Neuf } : {}),
+      ...(invisibleNeuf ? { invisible: true, ...(bloquantNeuf ? { bloquant: true } : {}) } : {})
     }
+    /* Un mur invisible se pose tel quel : tiré le long d'un vrai mur, il ne
+       doit pas en effacer un morceau. */
+    if (invisibleNeuf) return co.modifier((c) => ({ ...c, murs: [...c.murs, m] }))
     /* Un mur posé par-dessus un autre n'est pas construit deux fois : la
        partie qui se superpose est retirée (une pièce fermée garde la sienne). */
     co.modifier((c) => fusionnerSuperpositions({ ...c, murs: [...c.murs, m] }))
@@ -99,9 +146,25 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
     points.current = []
     depart.current = null
     setOutil({
-      curseur: outil === 'choisir' ? 'pointer' : 'crosshair',
+      curseur: outil === 'choisir' ? 'pointer' : outil === 'pipette' ? 'copy' : 'crosshair',
       onPointer: (type, p, _brut, _e, prise) => {
         souris.current = p
+        if (outil === 'pipette') {
+          if (type === 'down' && co.c) {
+            const f = faceDuMurSous(co.c, _brut, Math.max(prise, 0.2))
+            const a = f ? murs.find((x) => x.id === f.assetId) : undefined
+            if (!f || !a) return void toast('Aucun mur ici.')
+            /* La matière va aux prochains murs, pas au mur choisi : on le lâche. */
+            setChoisi(null)
+            setCote(1)
+            setMatiere(a.id)
+            setTeinte(f.teinte ?? null)
+            setOutilMurs(avantPipette.current)
+            toast(`Matière reprise : ${a.nom}${f.teinte ? ', avec sa couleur' : ''}`)
+          }
+          if (type === 'droit') setOutilMurs(avantPipette.current)
+          return
+        }
         /* Clic droit : on range l'outil et on revient à la sélection (le
            tracé en cours est terminé, une pièce entamée abandonnée). En
            sélection, il annule le coin qu'on glisse ou désélectionne. */
@@ -133,6 +196,15 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
             const r = rectangle(depart.current, p)
             if (r) poser([...r, r[0]])
             depart.current = null
+          }
+        } else if (outil === 'nommer') {
+          if (type === 'down' && co.c && nommable) {
+            const piece = pieceSous(co.c, _brut)
+            if (!piece) toast('Clique dans une pièce fermée par des murs.')
+            else {
+              setANommer({ pts: piece, ancre: _brut })
+              setNomSaisi(nomDeLaPiece(piece) ?? '')
+            }
           }
         } else if (outil === 'habiller') {
           if (type === 'down' && co.c && pieceSous(co.c, _brut)) {
@@ -183,9 +255,28 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
           trait(ctx, pts, ep)
           pointille(ctx, pts, echelle)
         }
-        if (outil === 'habiller' && p && co.c) {
+        if ((outil === 'habiller' || outil === 'nommer') && p && co.c) {
           const piece = pieceSous(co.c, p)
           if (piece) contour(ctx, piece, echelle, true)
+        }
+        if (outil === 'nommer' && co.c) {
+          if (aNommer) contour(ctx, aNommer.pts, echelle)
+          /* Les noms déjà donnés, au point qui désigne chaque pièce. */
+          ctx.save()
+          ctx.font = `600 ${13 / echelle}px system-ui, sans-serif`
+          ctx.textAlign = 'center'
+          ctx.textBaseline = 'middle'
+          ctx.lineWidth = 3 / echelle
+          ctx.strokeStyle = 'rgba(0, 0, 0, 0.8)'
+          ctx.fillStyle = '#f3e3c0'
+          for (const q of pieces) {
+            if (!q.ancre) continue
+            const x = q.ancre[0] * co.c.largeur
+            const y = q.ancre[1] * co.c.hauteur
+            ctx.strokeText(q.name, x, y)
+            ctx.fillText(q.name, x, y)
+          }
+          ctx.restore()
         }
         if (outil === 'piece' && depart.current && p) {
           const r = rectangle(depart.current, p)
@@ -211,7 +302,7 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
       }
     })
     return () => setOutil(null)
-  }, [outil, matiereSure, epaisseur, teinte, cote2Neuf, cote, choisi, co.c])
+  }, [outil, matiereSure, epaisseur, teinte, cote2Neuf, cote, choisi, co.c, aNommer, places, nommable, invisibleNeuf, bloquantNeuf])
 
   useEffect(() => {
     const k = (e: KeyboardEvent): void => {
@@ -295,12 +386,51 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
         <span className="eyebrow">Outil</span>
         <div className="at-outils">
           {OUTILS.map((o) => (
-            <button key={o.id} className="btn btn-sm" aria-pressed={outil === o.id} onClick={() => setOutilMurs(o.id)}>
+            <button
+              key={o.id}
+              className="btn btn-sm"
+              aria-pressed={outil === o.id}
+              onClick={() => {
+                if (o.id === 'pipette' && outil !== 'pipette') avantPipette.current = outil
+                setOutilMurs(o.id)
+              }}
+            >
+              {o.id === 'pipette' ? <IconPipette /> : null}
               {o.label}
             </button>
           ))}
         </div>
         <p className="at-aide">{OUTILS.find((o) => o.id === outil)!.aide}</p>
+        {outil === 'nommer' && !nommable ? (
+          <p className="at-alerte">
+            {co.agrandi
+              ? 'Le terrain a changé de taille : enregistre d’abord, pour que les pièces se placent juste.'
+              : 'Enregistre une première fois : les pièces se nomment sur le plan enregistré.'}
+          </p>
+        ) : null}
+        {outil === 'nommer' && aNommer ? (
+          <form
+            className="at-ligne"
+            onSubmit={(e) => {
+              e.preventDefault()
+              void baptiser()
+            }}
+          >
+            <input
+              className="at-champ"
+              autoFocus
+              placeholder="Le nom de la pièce…"
+              value={nomSaisi}
+              onChange={(e) => setNomSaisi(e.target.value)}
+              onKeyDown={(e) => {
+                if (e.key === 'Escape') setANommer(null)
+              }}
+            />
+            <button className="btn btn-sm btn-brass" type="submit" disabled={!nomSaisi.trim()}>
+              Nommer
+            </button>
+          </form>
+        ) : null}
         <ul className="at-raccourcis">
           <li>Clic droit : revenir à la sélection (en sélection : annuler un coin qu’on glisse, ou désélectionner)</li>
         </ul>
@@ -343,6 +473,48 @@ export function EtapeMurs(props: PropsEtape): JSX.Element {
           }}
         />
       </label>
+      <div className="at-section">
+        <label className="at-case">
+          <input
+            type="checkbox"
+            checked={murChoisi ? !!murChoisi.invisible : invisibleNeuf}
+            onChange={(e) => {
+              const v = e.target.checked
+              if (murChoisi)
+                changerMur((m) => {
+                  const { invisible: _i, bloquant: _b, ...reste } = m
+                  return v ? { ...reste, invisible: true, ...(m.bloquant ? { bloquant: true } : {}) } : reste
+                })
+              else setInvisibleNeuf(v)
+            }}
+          />
+          Mur invisible{murChoisi ? '' : ' (prochains murs)'}
+        </label>
+        {(murChoisi ? murChoisi.invisible : invisibleNeuf) ? (
+          <>
+            <label className="at-case">
+              <input
+                type="checkbox"
+                checked={murChoisi ? !!murChoisi.bloquant : bloquantNeuf}
+                onChange={(e) => {
+                  const v = e.target.checked
+                  if (murChoisi)
+                    changerMur((m) => {
+                      const { bloquant: _b, ...reste } = m
+                      return v ? { ...reste, bloquant: true } : reste
+                    })
+                  else setBloquantNeuf(v)
+                }}
+              />
+              Bloque le passage et la vue
+            </label>
+            <p className="at-aide">
+              Il n’est pas peint sur le plan : il sépare deux pièces sous un même toit (la salle, le comptoir, la
+              cuisine). Dans l’atelier, il se voit en pointillés — bleus s’il ne bloque rien, rouges s’il bloque.
+            </p>
+          </>
+        ) : null}
+      </div>
       <div className="at-section">
         <label className="at-case">
           <input type="checkbox" checked={deux} onChange={(e) => basculerDeux(e.target.checked)} />

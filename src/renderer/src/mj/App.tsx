@@ -14,6 +14,7 @@ import { Sonorisation } from './components/Sonorisation'
 import { Sonotheque } from './modules/Sonotheque'
 import { useSons } from './sons'
 import { Ident } from './components/Ident'
+import { ChoixProfil } from './components/ChoixProfil'
 import { CacheMJ } from './components/CacheMJ'
 import { Home } from './components/Home'
 import { Toasts } from './components/Toasts'
@@ -318,8 +319,11 @@ export function App(): JSX.Element {
 
         <div className="rail-foot">
           <div className="session-row">
-            <span className="eyebrow">Version</span>
-            <b>{s.version || '—'}</b>
+            <ChoixProfil />
+            <span className="session-version">
+              <span className="eyebrow">Version</span>
+              <b>{s.version || '—'}</b>
+            </span>
           </div>
         </div>
       </aside>

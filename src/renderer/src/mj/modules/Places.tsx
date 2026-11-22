@@ -17,6 +17,7 @@ import { urlPortraitMj } from '../../shared/avatarsMj'
 import { nomDuMj } from '@shared/reglages'
 import { createPortal } from 'react-dom'
 import { useStore } from '../store'
+import { nommerPiece } from '../pieces'
 import {
   IconAudio,
   IconCadrage,
@@ -2997,31 +2998,9 @@ function FicheLieu({
    * et le point qui la désigne.
    */
   const nommerForme = async (f: Forme, nom: string): Promise<void> => {
-    /* Pièce unique : la forme, c'est le lieu — la renommer, c'est le renommer. */
-    if (unique) {
-      await window.jdr.places.upsert({ id: p.id, tier: p.tier, parentId: p.parentId, name: nom })
-      await onRelire()
-      return
-    }
-    if (!(await enEtage())) return
-    const deja = lieuDeLaForme(f)
-    if (deja) {
-      await window.jdr.places.upsert({
-        id: deja.id,
-        name: nom,
-        tier: 'lieu',
-        parentId: p.id
-      })
-      await window.jdr.places.zone(deja.id, f.pts, f.centre)
-    } else {
-      const neuf = await window.jdr.places.upsert({
-        tier: 'lieu',
-        parentId: p.id,
-        name: nom
-      })
-      await window.jdr.places.zone(neuf.id, f.pts, f.centre)
-    }
-    await onRelire()
+    /* La même règle que dans l'atelier : pièce unique renommée, sinon le lieu
+       devient étage et la pièce y naît (ou est renommée). Voir ../pieces.ts. */
+    if (await nommerPiece(p, s.places, f.pts, f.centre, nom, s.toast)) await onRelire()
   }
 
   /**

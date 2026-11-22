@@ -20,6 +20,8 @@ export interface AssetAtelier {
   categorie: string
   /** Le rayon dans la catégorie : « Lampes », « Arbres »… Absent : rangé à la racine. */
   sousCategorie?: string
+  /** Objet du pack : le décor où il va (« Classique », « Restaurant »…), lu dans `rangement.json`. */
+  theme?: string
   /** Relatif au dossier de sa source. */
   fichier: string
   /** Sol, mur : combien de cases une tuile couvre. */
@@ -242,4 +244,188 @@ export function filtrerAssets(
       (!f.sous || a.sousCategorie === f.sous) &&
       (!q || plat(a.nom).includes(q) || plat(a.sousCategorie ?? '').includes(q))
   )
+}
+
+/* ---------------- le catalogue des objets : thème, famille, rayon ---------------- */
+
+/** La famille des objets importés par le MJ : leur catégorie y devient un rayon. */
+export const MES_OBJETS = 'Mes objets'
+
+/** Les décors, dans l'ordre de la liste déroulante. */
+export const THEMES = ['Classique', 'Moderne', 'Restaurant', 'Concert', 'Enquête', 'Speakeasy', 'Ville']
+
+/** Les familles et leurs rayons, dans l'ordre des colonnes (celui des icônes). */
+export const FAMILLES: { famille: string; rayons: string[] }[] = [
+  { famille: 'Mobilier', rayons: ['Assises', 'Tables', 'Lits', 'Rangements', 'Bureau', 'Cheminées', 'Tapis', 'Paravents'] },
+  { famille: 'Cuisine et bain', rayons: ['Cuisine', 'Électroménager', 'Bain', 'Bar', 'Buffet'] },
+  { famille: 'Lumière', rayons: ['Lampes', 'Lampadaires', 'Plafonniers', 'Appliques', 'Bougies', 'Projecteurs'] },
+  {
+    famille: 'Déco et objets',
+    rayons: ['Décoration', 'Livres et papiers', 'Vaisselle', 'Nourriture', 'Instruments', 'Sonorisation', 'Indices', 'Armes']
+  },
+  { famille: 'Nature', rayons: ['Arbres', 'Végétation', 'Rochers', 'Bois mort', 'Toiles d’araignées'] },
+  { famille: 'Architecture', rayons: ['Escaliers', 'Scène', 'Colonnes', 'Cloisons'] },
+  { famille: 'Extérieur', rayons: ['Voirie', 'Marquages', 'Véhicules', 'Mobilier urbain', 'Ruelle'] },
+  { famille: 'Personnages', rayons: ['Personnel', 'Invités', 'Public', 'Corps', 'Ossements'] }
+]
+
+/**
+ * Le rangement des objets du pack (`rangement.json`) posé sur le catalogue :
+ * la famille devient la catégorie, le rayon la sous-catégorie, et le thème
+ * s'ajoute. Il vit à part du catalogue pour qu'une relance de la découpe des
+ * planches ne l'efface pas. Un objet sans entrée garde son rangement d'origine.
+ */
+export function appliquerRangement(assets: AssetAtelier[], brut: unknown): AssetAtelier[] {
+  let v: any = brut
+  if (typeof brut === 'string')
+    try {
+      v = JSON.parse(brut)
+    } catch {
+      return assets
+    }
+  const objets = v && typeof v.objets === 'object' && v.objets ? v.objets : null
+  if (!objets) return assets
+  return assets.map((a) => {
+    if (a.source !== 'pack' || a.type !== 'objet') return a
+    const r = objets[a.id.replace(/^pack:/, '')]
+    if (!r || !texte(r.famille) || !texte(r.rayon)) return a
+    return { ...a, categorie: r.famille, sousCategorie: r.rayon, ...(texte(r.theme) ? { theme: r.theme } : {}) }
+  })
+}
+
+/** La famille et le rayon où l'on range un objet : ses imports vont dans « Mes objets ». */
+export function placeDansLeCatalogue(a: AssetAtelier): { famille: string; rayon: string | null } {
+  if (a.source === 'moi') return { famille: MES_OBJETS, rayon: a.categorie === 'Divers' ? null : a.categorie }
+  return { famille: a.categorie, rayon: a.sousCategorie ?? null }
+}
+
+/** Un objet va-t-il avec ce décor ? Sans thème (un import), il va avec tous. */
+const dansLeTheme = (a: AssetAtelier, theme: string | null): boolean => !theme || !a.theme || a.theme === theme
+
+/**
+ * Les colonnes du catalogue pour un décor : les familles qui ont au moins un
+ * objet, et pour chacune ses rayons non vides — dans l'ordre de `FAMILLES`,
+ * puis ce qui n'y est pas prévu, puis « Mes objets ».
+ */
+export function colonnesDuCatalogue(
+  assets: AssetAtelier[],
+  theme: string | null
+): { famille: string; rayons: string[] }[] {
+  const vus = new Map<string, Set<string>>()
+  for (const a of assets) {
+    if (!dansLeTheme(a, theme)) continue
+    const { famille, rayon } = placeDansLeCatalogue(a)
+    if (!vus.has(famille)) vus.set(famille, new Set())
+    if (rayon) vus.get(famille)!.add(rayon)
+  }
+  const ordre = (famille: string, rayons: Set<string>): string[] => {
+    const prevus = FAMILLES.find((f) => f.famille === famille)?.rayons ?? []
+    return [...prevus.filter((r) => rayons.has(r)), ...[...rayons].filter((r) => !prevus.includes(r))]
+  }
+  const familles = [
+    ...FAMILLES.map((f) => f.famille).filter((f) => vus.has(f)),
+    ...[...vus.keys()].filter((f) => f !== MES_OBJETS && !FAMILLES.some((x) => x.famille === f)),
+    ...(vus.has(MES_OBJETS) ? [MES_OBJETS] : [])
+  ]
+  return familles.map((famille) => ({ famille, rayons: ordre(famille, vus.get(famille)!) }))
+}
+
+/** Les objets d'un décor, d'une famille, d'un rayon, et dont le nom contient la recherche. */
+export function filtrerObjets(
+  assets: AssetAtelier[],
+  f: { theme?: string | null; famille?: string | null; rayon?: string | null; recherche?: string }
+): AssetAtelier[] {
+  const q = plat(f.recherche?.trim() ?? '')
+  return assets.filter((a) => {
+    const p = placeDansLeCatalogue(a)
+    return (
+      dansLeTheme(a, f.theme ?? null) &&
+      (!f.famille || p.famille === f.famille) &&
+      (!f.rayon || p.rayon === f.rayon) &&
+      (!q || plat(a.nom).includes(q) || plat(p.rayon ?? '').includes(q))
+    )
+  })
+}
+
+/* ---------------- les assets privés d'un profil ---------------- */
+
+/**
+ * Les profils de l'atelier et leurs assets privés (`prives.json`, à côté du
+ * catalogue) : un asset privé ne se montre qu'à son profil — le restaurant de
+ * la prochaine séance reste caché aux joueurs qui ouvrent l'application.
+ */
+export interface PrivesAtelier {
+  profils: string[]
+  /** Par profil, les identifiants (sans `pack:`) de ses assets privés. */
+  assets: Record<string, string[]>
+}
+
+/** `prives.json` tel qu'il sort du disque ; abîmé, personne n'a rien de privé. */
+export function lirePrives(brut: unknown): PrivesAtelier {
+  let v: any = brut
+  if (typeof brut === 'string')
+    try {
+      v = JSON.parse(brut)
+    } catch {
+      return { profils: [], assets: {} }
+    }
+  const profils = Array.isArray(v?.profils) ? v.profils.filter(texte).map((p: string) => p.trim()) : []
+  const assets: Record<string, string[]> = {}
+  for (const p of profils) {
+    const l = v?.assets?.[p]
+    assets[p] = Array.isArray(l) ? l.filter(texte) : []
+  }
+  return { profils, assets }
+}
+
+/** Le profil à qui appartient un asset du pack, s'il est privé. */
+function proprietaire(a: AssetAtelier, prives: PrivesAtelier): string | null {
+  if (a.source !== 'pack') return null
+  const id = a.id.replace(/^pack:/, '')
+  return prives.profils.find((p) => prives.assets[p]?.includes(id)) ?? null
+}
+
+/** Ce que voit un profil : les assets publics, et ses assets privés à lui. */
+export function visiblesPour(assets: AssetAtelier[], prives: PrivesAtelier, profil: string | null): AssetAtelier[] {
+  return assets.filter((a) => {
+    const p = proprietaire(a, prives)
+    return !p || p === profil
+  })
+}
+
+/** Les profils et le nombre d'assets privés de chacun (ceux qui existent dans le pack). */
+export function comptesDesProfils(
+  assets: AssetAtelier[],
+  prives: PrivesAtelier
+): { nom: string; prives: number }[] {
+  return prives.profils.map((nom) => ({
+    nom,
+    prives: assets.filter((a) => proprietaire(a, prives) === nom).length
+  }))
+}
+
+/**
+ * Les assets dont une construction a besoin et qui manquent à ce catalogue
+ * (privés d'un autre profil, ou retirés) : leurs identifiants, sans doublon.
+ */
+export function assetsManquants(
+  c: {
+    base?: string | null
+    sols: { assetId: string; gomme?: boolean }[]
+    murs: { assetId: string; cote2?: { assetId: string } }[]
+    habillages?: { assetId: string }[]
+    ouvertures: { assetId: string }[]
+    objets: { assetId: string }[]
+  },
+  connus: Set<string>
+): string[] {
+  const ids = [
+    ...(c.base ? [c.base] : []),
+    ...c.sols.filter((s) => !s.gomme).map((s) => s.assetId),
+    ...c.murs.flatMap((m) => [m.assetId, ...(m.cote2 ? [m.cote2.assetId] : [])]),
+    ...(c.habillages ?? []).map((h) => h.assetId),
+    ...c.ouvertures.map((o) => o.assetId),
+    ...c.objets.map((o) => o.assetId)
+  ]
+  return [...new Set(ids.filter((id) => id && !connus.has(id)))]
 }

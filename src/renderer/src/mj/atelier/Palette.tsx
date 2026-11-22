@@ -9,12 +9,27 @@
  * L'icône d'un rayon est une image du pack (`icones/<nom>.png`) ; tant qu'elle
  * n'existe pas, on montre la vignette d'un objet du rayon.
  */
-import { useState, useSyncExternalStore } from 'react'
-import { filtrerAssets, rangement, type AssetAtelier } from '@shared/atelierAssets'
+import { useState, useSyncExternalStore, type ReactNode } from 'react'
+import {
+  colonnesDuCatalogue,
+  filtrerAssets,
+  filtrerObjets,
+  placeDansLeCatalogue,
+  rangement,
+  THEMES,
+  type AssetAtelier
+} from '@shared/atelierAssets'
 import { urlAsset } from './images'
 
 /** Le rangement choisi, retenu tant que l'application est ouverte — un par palette (sols, objets…). */
-type Memoire = { categorie: string | null; sous: string | null; recherche: string; chercher: boolean }
+type Memoire = {
+  categorie: string | null
+  sous: string | null
+  recherche: string
+  chercher: boolean
+  /** Le catalogue des objets : le décor choisi (`null` : tous). */
+  theme?: string | null
+}
 const memoires = new Map<string, Memoire>()
 const ecoutes = new Set<() => void>()
 const memoireDe = (cle: string): Memoire => {
@@ -226,6 +241,181 @@ export function Palette({
     <div className="at-rangement">
       {filtres}
       {grille}
+    </div>
+  )
+}
+
+/* ============================================================
+   Le catalogue des objets : thème, familles, rayons, grille
+   ============================================================ */
+
+/**
+ * Le pictogramme d'une famille ou d'un rayon : l'icône blanche du pack
+ * (assombrie en thème clair), sinon la vignette d'un objet du rayon.
+ */
+function Picto({ nom, repli }: { nom: string; repli: AssetAtelier | undefined }): JSX.Element {
+  const [manque, setManque] = useState(false)
+  if (!manque)
+    return (
+      <img className="at-picto" src={`jdr://atelier/pack/icones/${slug(nom)}.png`} alt="" onError={() => setManque(true)} />
+    )
+  return repli ? <img src={urlAsset(repli)} alt="" /> : <span className="at-icone-vide" />
+}
+
+/**
+ * Les objets de la Déco, rangés comme dans un éditeur de cartes : le décor
+ * en liste déroulante, une colonne de familles, une colonne de rayons pour la
+ * famille ouverte, et à droite la recherche et une grille de grandes
+ * vignettes, le nom au survol. La recherche porte sur tout le décor.
+ */
+export function CatalogueObjets({
+  assets,
+  choisi,
+  choisis,
+  onChoisir,
+  apres
+}: {
+  assets: AssetAtelier[]
+  choisi: string | null
+  choisis?: string[]
+  onChoisir: (a: AssetAtelier) => void
+  /** Ce qui suit la grille, dans la même zone qui défile (l'import d'une image). */
+  apres?: ReactNode
+}): JSX.Element {
+  const [m, changer] = useRangement('catalogue-objets')
+  const theme = m.theme && THEMES.includes(m.theme) ? m.theme : null
+  const colonnes = colonnesDuCatalogue(assets, theme)
+  /* Une famille, un rayon retenus qui n'existent pas dans ce décor : on revient à tout. */
+  const famille = colonnes.some((c) => c.famille === m.categorie) ? m.categorie : null
+  const rayons = colonnes.find((c) => c.famille === famille)?.rayons ?? []
+  const rayon = m.sous && rayons.includes(m.sous) ? m.sous : null
+  const recherche = m.recherche.trim()
+  const liste = filtrerObjets(assets, recherche ? { theme, recherche } : { theme, famille, rayon })
+  const estChoisi = (a: AssetAtelier): boolean => (choisis ? choisis.includes(a.id) : choisi === a.id)
+  const premier = (f: string, r?: string): AssetAtelier | undefined =>
+    assets.find((a) => {
+      const p = placeDansLeCatalogue(a)
+      return p.famille === f && (!r || p.rayon === r)
+    })
+
+  /* Sans recherche ni rayon, des titres discrets disent où l'on est dans la grille. */
+  const titreDe = (a: AssetAtelier): string => {
+    const p = placeDansLeCatalogue(a)
+    return famille ? (p.rayon ?? '') : p.famille
+  }
+  const ordre = (a: AssetAtelier): number => {
+    const p = placeDansLeCatalogue(a)
+    const f = colonnes.findIndex((c) => c.famille === p.famille)
+    const r = colonnes[f]?.rayons.indexOf(p.rayon ?? '') ?? 0
+    return f * 100 + r
+  }
+  const groupes: { titre: string; liste: AssetAtelier[] }[] = []
+  if (recherche || rayon) groupes.push({ titre: '', liste })
+  else
+    for (const a of [...liste].sort((x, y) => ordre(x) - ordre(y))) {
+      const t = titreDe(a)
+      const g = groupes[groupes.length - 1]
+      if (g && g.titre === t) g.liste.push(a)
+      else groupes.push({ titre: t, liste: [a] })
+    }
+
+  return (
+    <div className="at-catalogue">
+      <label className="at-theme">
+        <span className="eyebrow">Thème</span>
+        <select className="at-champ" value={theme ?? ''} onChange={(e) => changer({ theme: e.target.value || null })}>
+          <option value="">Tous les thèmes</option>
+          {THEMES.map((t) => (
+            <option key={t} value={t}>
+              {t}
+            </option>
+          ))}
+        </select>
+      </label>
+      <div className="at-catalogue-corps">
+        <div className="at-col-icones" role="group" aria-label="Familles">
+          <button
+            className="at-icone"
+            aria-pressed={!famille}
+            title="Tout"
+            onClick={() => changer({ categorie: null, sous: null, recherche: '' })}
+          >
+            <IconeTout />
+          </button>
+          {colonnes.map((c) => (
+            <button
+              key={c.famille}
+              className="at-icone"
+              aria-pressed={famille === c.famille}
+              title={c.famille}
+              onClick={() => changer({ categorie: c.famille, sous: null, recherche: '' })}
+            >
+              <Picto nom={c.famille} repli={premier(c.famille)} />
+            </button>
+          ))}
+        </div>
+        {famille && rayons.length ? (
+          <div className="at-col-icones" role="group" aria-label={`Rayons · ${famille}`}>
+            <button
+              className="at-icone"
+              aria-pressed={!rayon}
+              title={`Tout · ${famille}`}
+              onClick={() => changer({ sous: null, recherche: '' })}
+            >
+              <IconeTout />
+            </button>
+            {rayons.map((r) => (
+              <button
+                key={r}
+                className="at-icone"
+                aria-pressed={rayon === r}
+                title={r}
+                onClick={() => changer({ sous: r, recherche: '' })}
+              >
+                <Picto nom={r} repli={premier(famille, r)} />
+              </button>
+            ))}
+          </div>
+        ) : null}
+        <div className="at-catalogue-droite">
+          <div className="at-recherche-ligne">
+            <IconeLoupe />
+            <input
+              className="at-champ at-recherche"
+              type="search"
+              placeholder={theme ? `Chercher · ${theme}` : 'Chercher un objet…'}
+              value={m.recherche}
+              onChange={(e) => changer({ recherche: e.target.value })}
+            />
+          </div>
+          <div className="at-catalogue-grille">
+            {liste.length ? (
+              groupes.map((g, i) => (
+                <div key={`${g.titre}-${i}`} className="at-groupe-objets">
+                  {g.titre ? <span className="eyebrow">{g.titre}</span> : null}
+                  <div className="at-vignettes">
+                    {g.liste.map((a) => (
+                      <button
+                        key={a.id}
+                        className="at-vignette"
+                        aria-pressed={estChoisi(a)}
+                        title={a.nom}
+                        aria-label={a.nom}
+                        onClick={() => onChoisir(a)}
+                      >
+                        <img src={urlAsset(a)} alt="" loading="lazy" />
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))
+            ) : (
+              <p className="at-vide">Rien ne correspond.</p>
+            )}
+            {apres}
+          </div>
+        </div>
+      </div>
     </div>
   )
 }
