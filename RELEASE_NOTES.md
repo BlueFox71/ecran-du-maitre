@@ -1,13 +1,18 @@
-<!-- version: 1.10.0 -->
+<!-- version: 1.11.0 -->
 ### Nouveautés
-- **Chaque séance a ses propres objets.** Familles, objets, inventaires et pochette appartiennent désormais à une séance. Une nouvelle séance démarre vide : plus d'objets, de documents ni de pochette hérités des séances d'avant.
-- **Importer depuis une séance précédente.** Un nouveau bouton, dans Objets et dans la Pochette, ouvre une fenêtre où tu choisis la séance d'origine, puis ce que tu reprends : une famille entière d'une case, ou objet par objet ; un onglet de la pochette entier, ou document par document.
-- **Des copies indépendantes.** Ce que tu importes est copié : renommer un objet, changer son image ou ses effets dans la nouvelle séance ne touche pas l'ancienne, et inversement.
-- **Un objet arrive là d'où il partait.** Un objet qui partait du Camion au début de l'autre séance arrive dans le Camion, recopié. Un objet qu'un personnage portait arrive dans la réserve : les joueurs repartent les mains vides, et tu leur donnes ce que tu veux. Les documents importés arrivent cachés et non lus, prêts à être montrés.
-- **Un guide pour écrire la séance à plusieurs.** Chaque séance a désormais, dans le dossier `.ecran-du-maitre` de la campagne, un fichier `GUIDE-ECRITURE-SEANCE.md` : le mode d'emploi pour un co-auteur ou un assistant qui écrit la séance en fichiers (PNJ, lieux, moments, arborescence, annexes), et ce qu'il doit préparer pour toi (objets, pochette). Il reprend la fiche de personnage de ta campagne et se met à jour tout seul.
+- **Un nouveau catalogue d'objets dans l'atelier.** Choisis un thème dans la liste (Classique, Moderne, Concert, Enquête, Ville…), puis une famille et un rayon dans deux colonnes d'icônes. Les objets s'affichent en grandes vignettes, avec leur nom au survol et une recherche en haut.
+- **Une barre d'outils pour l'objet choisi**, dans l'en-tête de l'atelier : premier plan, arrière-plan, quart de tour à gauche ou à droite, miroir horizontal ou vertical, dupliquer, supprimer. Avec plusieurs objets choisis, des boutons pour les aligner (à gauche, au centre, à droite, en haut, au milieu, en bas).
+- **Étirer un objet dans un seul sens**, par les poignées au milieu de ses côtés : une table plus longue sans être plus large. **Le pousser au clavier** avec les flèches, d'un dixième de case (Maj : d'une case).
+- **Des murs invisibles.** Ils séparent deux pièces sous un même toit (une salle et son comptoir, par exemple) sans être dessinés sur le plan. Ils bloquent le passage et la vue, ou rien du tout, au choix.
+- **Nommer les pièces depuis l'atelier**, à l'étape Murs : la pièce devient un lieu, le même que dans le plan du lieu et la liste des lieux.
+- **Une pipette** dans les étapes Sol et Murs, pour reprendre la matière (et la couleur) d'un sol ou d'un mur déjà posé.
+- **« Test lumière » dans l'en-tête de l'atelier** : maintiens le bouton pour voir ta construction dans le noir, avec ce que les lampes éclairent.
+- **Des profils.** En bas à gauche, à côté du numéro de version, choisis ton profil : certains assets de l'atelier sont réservés à un profil, et n'apparaissent qu'à lui.
 
 ### Améliorations
-- **Dupliquer une séance emporte ses objets et sa pochette.** « Dupliquer » les remet à leur place de départ, documents cachés. « La suite » les reprend tels que la partie les a laissés.
-- **Reprendre un lieu ou un PNJ d'une autre séance** emporte aussi ses objets, en copies.
-- **Tes séances existantes gardent tout.** À l'ouverture, chacune reçoit sa propre copie des objets qu'elle utilisait, et la pochette est recopiée dans chacune pour que rien ne se perde. Une copie de sauvegarde de la campagne est faite juste avant.
-- **Les familles se retouchent librement**, puisqu'elles ne sont plus partagées : le masquage d'une famille d'une séance à l'autre disparaît.
+- **Un objet qui bloque la vue se voit en entier** : une étagère n'est plus plongée dans le noir, c'est ce qui se trouve derrière qui reste caché. Pareil pour la lumière des lampes.
+- **Un plan déjà meublé s'ouvre directement sur l'onglet Objets.**
+- **L'atelier refuse d'enregistrer un lieu dont certains assets manquent à ton profil**, plutôt que de remplacer son plan par une image incomplète.
+
+### Corrections
+- **La lumière ne traverse plus l'angle de deux murs** : une lampe « tout autour » pouvait éclairer en biseau l'intérieur d'une pièce voisine.
