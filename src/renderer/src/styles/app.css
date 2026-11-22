@@ -27071,6 +27071,48 @@ button.at-titre:hover {
   color: var(--text-faint);
 }
 
+/* ---- Annexes : déposer un document glissé depuis la Bibliothèque ---- */
+.nav-item.drop-annexe,
+.pane.drop-annexe {
+  background: var(--brass-wash);
+  outline: 2px dashed var(--brass);
+  outline-offset: -2px;
+}
+/* Un PDF ou une image en annexe se lit en grand, dans la page même. */
+.annexe-fichier {
+  display: block;
+  width: 100%;
+  height: calc(100vh - 230px);
+  min-height: 420px;
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  background: #fff;
+}
+.annexe-image {
+  display: flex;
+  justify-content: center;
+}
+.annexe-image img {
+  max-width: 100%;
+  max-height: calc(100vh - 230px);
+  object-fit: contain;
+  border-radius: 6px;
+}
+/* Un Word en annexe : on l'ouvre avec son logiciel. */
+.annexe-ouvrir {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
+  padding: 60px 24px;
+  text-align: center;
+  color: var(--text-dim);
+}
+.annexe-ouvrir .note {
+  max-width: 460px;
+  font-size: 12px;
+}
+
 /* ---- Importer depuis une séance ---- */
 .import-seance .seg {
   display: flex;
@@ -27155,44 +27197,4 @@ button.at-titre:hover {
 .imp-ligne .sub {
   font-size: 11px;
   color: var(--text-faint);
-/* ---- Annexes : déposer un document glissé depuis la Bibliothèque ---- */
-.nav-item.drop-annexe,
-.pane.drop-annexe {
-  background: var(--brass-wash);
-  outline: 2px dashed var(--brass);
-  outline-offset: -2px;
-}
-/* Un PDF ou une image en annexe se lit en grand, dans la page même. */
-.annexe-fichier {
-  display: block;
-  width: 100%;
-  height: calc(100vh - 230px);
-  min-height: 420px;
-  border: 1px solid var(--line-soft);
-  border-radius: 6px;
-  background: #fff;
-}
-.annexe-image {
-  display: flex;
-  justify-content: center;
-}
-.annexe-image img {
-  max-width: 100%;
-  max-height: calc(100vh - 230px);
-  object-fit: contain;
-  border-radius: 6px;
-}
-/* Un Word en annexe : on l'ouvre avec son logiciel. */
-.annexe-ouvrir {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 14px;
-  padding: 60px 24px;
-  text-align: center;
-  color: var(--text-dim);
-}
-.annexe-ouvrir .note {
-  max-width: 460px;
-  font-size: 12px;
 }
