@@ -35,6 +35,12 @@ interface Case {
   tuile?: number
   /** Ne pas raccorder : un motif régulier (damier) se brouillerait en deux grilles décalées. */
   brut?: boolean
+  /**
+   * La boîte de l'élément dans la planche, en pixels [x, y, l, h], à la place
+   * de sa case de grille : pour un élément fait de morceaux séparés (les
+   * bandes d'un passage piéton), qu'aucune isolation ne garderait entier.
+   */
+  zone?: [number, number, number, number]
 }
 
 /**
@@ -396,7 +402,141 @@ const RANGEMENT: Record<string, [string, string]> = {
   'briques-suie': ['Brique', ''],
   'pierre-sombre': ['Pierre', ''],
   'platre-boiserie': ['Bois', ''],
-  'briques': ['Brique', '']
+  'briques': ['Brique', ''],
+  'asphalte-neuf': ['Ville', ''],
+  'asphalte-use': ['Ville', ''],
+  'asphalte-mouille': ['Ville', ''],
+  'dalles-trottoir': ['Ville', ''],
+  'trottoir-beton': ['Ville', ''],
+  'paves-autobloquants': ['Ville', ''],
+  'beton-parking': ['Ville', ''],
+  'asphalte-rapiece': ['Ville', ''],
+  'bande-podotactile': ['Ville', ''],
+  'beton-desactive': ['Ville', ''],
+  'paves-granit': ['Ville', ''],
+  'beton-ruelle': ['Ville', ''],
+  'bordure-trottoir': ['Ville', 'Voirie'],
+  'bordure-angle': ['Ville', 'Voirie'],
+  'bateau-trottoir': ['Ville', 'Voirie'],
+  'grille-egout': ['Ville', 'Voirie'],
+  'plaque-egout': ['Ville', 'Voirie'],
+  'tache-huile': ['Ville', 'Voirie'],
+  'nid-de-poule': ['Ville', 'Voirie'],
+  'passage-pieton': ['Ville', 'Marquages'],
+  'place-parking': ['Ville', 'Marquages'],
+  'fleche-tout-droit': ['Ville', 'Marquages'],
+  'fleche-tourner': ['Ville', 'Marquages'],
+  'logo-handicape': ['Ville', 'Marquages'],
+  'ligne-discontinue': ['Ville', 'Marquages'],
+  'double-ligne-jaune': ['Ville', 'Marquages'],
+  'voiture-berline': ['Ville', 'Véhicules'],
+  'voiture-citadine': ['Ville', 'Véhicules'],
+  camionnette: ['Ville', 'Véhicules'],
+  scooter: ['Ville', 'Véhicules'],
+  'velo-arceau': ['Ville', 'Véhicules'],
+  lampadaire: ['Ville', 'Mobilier urbain'],
+  potelet: ['Ville', 'Mobilier urbain'],
+  'poubelle-rue': ['Ville', 'Mobilier urbain'],
+  'banc-public': ['Ville', 'Mobilier urbain'],
+  'bouche-incendie': ['Ville', 'Mobilier urbain'],
+  horodateur: ['Ville', 'Mobilier urbain'],
+  cone: ['Ville', 'Mobilier urbain'],
+  'conteneur-ordures': ['Ville', 'Ruelle'],
+  cartons: ['Ville', 'Ruelle'],
+  'moquette-nuages': ['Restaurant', ''],
+  'moquette-treillis': ['Restaurant', ''],
+  'parquet-laque-rouge': ['Restaurant', ''],
+  'terrazzo-jade': ['Restaurant', ''],
+  'carrelage-cuisine-rouge': ['Restaurant', ''],
+  'carrelage-cuisine-gris': ['Restaurant', ''],
+  'carrelage-cuisine-gras': ['Restaurant', ''],
+  'damier-beige-rouge': ['Restaurant', ''],
+  'mur-laque-rouge': ['Restaurant', ''],
+  'mur-papier-peint-rouge': ['Restaurant', ''],
+  'mur-faience-cuisine': ['Restaurant', ''],
+  'mur-bambou': ['Restaurant', ''],
+  'table-banquet': ['Restaurant', 'Salle'],
+  'buffet-chauffe-plats': ['Restaurant', 'Salle'],
+  'box-banquettes': ['Restaurant', 'Salle'],
+  'comptoir-accueil': ['Restaurant', 'Salle'],
+  'table-ronde-quatre': ['Restaurant', 'Salle'],
+  'table-carree-deux': ['Restaurant', 'Salle'],
+  'aquarium-homards': ['Restaurant', 'Salle'],
+  'chariot-dim-sum': ['Restaurant', 'Salle'],
+  'banc-attente': ['Restaurant', 'Salle'],
+  'table-carree-quatre': ['Restaurant', 'Salle'],
+  'table-six': ['Restaurant', 'Salle'],
+  'box-marbre': ['Restaurant', 'Salle'],
+  'tabouret-laque': ['Restaurant', 'Salle'],
+  'comptoir-caisse': ['Restaurant', 'Salle'],
+  'bassin-koi': ['Restaurant', 'Salle'],
+  'paravent-laque': ['Restaurant', 'Décor chinois'],
+  'paravent-fleurs': ['Restaurant', 'Décor chinois'],
+  autel: ['Restaurant', 'Décor chinois'],
+  'lion-gardien': ['Restaurant', 'Décor chinois'],
+  'vase-porcelaine': ['Restaurant', 'Décor chinois'],
+  'bambou-pot': ['Restaurant', 'Décor chinois'],
+  'lanterne-papier': ['Restaurant', 'Décor chinois'],
+  'lanterne-soie': ['Restaurant', 'Décor chinois'],
+  'chat-porte-bonheur': ['Restaurant', 'Décor chinois'],
+  'brule-encens': ['Restaurant', 'Décor chinois'],
+  'enveloppes-rouges': ['Restaurant', 'Décor chinois'],
+  'piano-woks': ['Restaurant', 'Cuisine'],
+  'piano-deux-woks': ['Restaurant', 'Cuisine'],
+  'table-preparation': ['Restaurant', 'Cuisine'],
+  plonge: ['Restaurant', 'Cuisine'],
+  'frigo-pro': ['Restaurant', 'Cuisine'],
+  'plan-refrigere': ['Restaurant', 'Cuisine'],
+  'paniers-vapeur': ['Restaurant', 'Cuisine'],
+  'cuiseur-riz': ['Restaurant', 'Cuisine'],
+  friteuse: ['Restaurant', 'Cuisine'],
+  'marmite-bouillon': ['Restaurant', 'Cuisine'],
+  'etagere-inox': ['Restaurant', 'Cuisine'],
+  'etagere-vaisselle': ['Restaurant', 'Cuisine'],
+  'vitrine-canards': ['Restaurant', 'Cuisine'],
+  'canards-laques': ['Restaurant', 'Cuisine'],
+  'sacs-riz': ['Restaurant', 'Cuisine'],
+  'cagette-legumes': ['Restaurant', 'Cuisine'],
+  'poubelle-cuisine': ['Restaurant', 'Cuisine'],
+  'chariot-vaisselle': ['Restaurant', 'Cuisine'],
+  'plateau-tournant': ['Restaurant', 'Plats'],
+  'canard-laque': ['Restaurant', 'Plats'],
+  'bol-riz': ['Restaurant', 'Plats'],
+  'dim-sum': ['Restaurant', 'Plats'],
+  'wok-nouilles': ['Restaurant', 'Plats'],
+  'service-the': ['Restaurant', 'Plats'],
+  'boites-emporter': ['Restaurant', 'Plats'],
+  sauces: ['Restaurant', 'Plats'],
+  'biscuits-chinois': ['Restaurant', 'Plats'],
+  'bouteilles-biere': ['Restaurant', 'Plats'],
+  'wok-ingredients-crus': ['Restaurant', 'Buffet'],
+  'wok-bar-sauces': ['Restaurant', 'Buffet'],
+  'wok-ligne-cuisson': ['Restaurant', 'Buffet'],
+  'wok-passe': ['Restaurant', 'Buffet'],
+  'statue-moine': ['Restaurant', 'Décor chinois'],
+  'statue-chat': ['Restaurant', 'Décor chinois'],
+  'paravent-riz': ['Mobilier', 'Paravents'],
+  'paravent-jade': ['Mobilier', 'Paravents'],
+  'tapis-sas': ['Restaurant', 'Décor chinois'],
+  'bureau-deux-ecrans': ['Moderne', 'Bureau'],
+  'imprimante-bureau': ['Moderne', 'Bureau'],
+  'classeur-metal': ['Moderne', 'Bureau'],
+  'etagere-classeurs': ['Moderne', 'Bureau'],
+  'armoire-bureau': ['Moderne', 'Bureau'],
+  'toilettes-pmr': ['Moderne', 'Bain'],
+  urinoirs: ['Moderne', 'Bain'],
+  'vasques-toilettes': ['Moderne', 'Bain'],
+  'table-a-langer': ['Moderne', 'Bain'],
+  'derouleur-papier-wc': ['Moderne', 'Bain'],
+  'distributeur-papier-wc': ['Moderne', 'Bain'],
+  'seche-mains': ['Moderne', 'Bain'],
+  'seche-mains-lame': ['Moderne', 'Bain'],
+  'distributeur-essuie-mains': ['Moderne', 'Bain'],
+  'distributeur-savon': ['Moderne', 'Bain'],
+  'poubelle-pedale': ['Moderne', 'Bain'],
+  'balai-wc': ['Moderne', 'Bain'],
+  'poubelle-essuie-mains': ['Moderne', 'Bain'],
+  'pack-papier-wc': ['Moderne', 'Bain']
 }
 
 interface Planche {
@@ -406,6 +546,8 @@ interface Planche {
   rows: number
   type: TypeAsset | ((c: Case) => TypeAsset)
   categorie: string
+  /** La sous-catégorie de toute la planche (ce que `RANGEMENT` dit d'une case prime). */
+  sousCategorie?: string
   dossier: string
   /** Rogner les bords d'une texture, pour ne rien garder du liseré. */
   retrait?: number
@@ -989,6 +1131,585 @@ const PLANCHES: Planche[] = [
     ]
   },
   {
+    fichier: 'planches/lot 32.png',
+    fond: 'magenta',
+    lignes: [4, 5, 5],
+    cols: 5,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Ville',
+    dossier: 'objets',
+    /* Des cases qui débordent de la grille, des marquages en morceaux : chaque élément a sa zone. */
+    cases: [
+      { id: 'bordure-trottoir', nom: 'Bordure de trottoir', l: 2, zone: [5, 140, 470, 110] },
+      { id: 'bordure-angle', nom: 'Bordure d’angle', l: 1.5, zone: [482, 48, 245, 252] },
+      { id: 'bateau-trottoir', nom: 'Bateau (trottoir abaissé)', l: 2, zone: [735, 145, 455, 110] },
+      { id: 'grille-egout', nom: 'Grille d’égout', l: 0.6, zone: [1205, 78, 325, 222] },
+      { id: 'passage-pieton', nom: 'Passage piéton', l: 2.5, zone: [35, 375, 310, 300] },
+      { id: 'place-parking', nom: 'Place de parking', l: 1.7, zone: [410, 365, 240, 305] },
+      { id: 'fleche-tout-droit', nom: 'Flèche tout droit', l: 0.6, zone: [750, 362, 140, 310] },
+      { id: 'fleche-tourner', nom: 'Flèche tourner', l: 0.9, zone: [975, 362, 232, 310] },
+      { id: 'logo-handicape', nom: 'Pictogramme handicapé', l: 0.9, zone: [1250, 372, 275, 290] },
+      { id: 'ligne-discontinue', nom: 'Ligne discontinue', l: 3, zone: [10, 815, 320, 65] },
+      { id: 'double-ligne-jaune', nom: 'Double ligne jaune', l: 2, zone: [335, 800, 300, 95] },
+      { id: 'plaque-egout', nom: 'Plaque d’égout', l: 0.5, zone: [645, 715, 255, 265] },
+      { id: 'tache-huile', nom: 'Tache d’huile', l: 1, zone: [910, 715, 300, 250] },
+      { id: 'nid-de-poule', nom: 'Nid-de-poule', l: 0.8, zone: [1220, 735, 310, 240] }
+    ]
+  },
+  {
+    fichier: 'planches/lot 33.png',
+    fond: 'magenta',
+    isoler: true,
+    lignes: [4, 5, 5],
+    cols: 5,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Ville',
+    dossier: 'objets',
+    cases: [
+      { id: 'voiture-berline', nom: 'Berline', l: 3, pas: true },
+      { id: 'voiture-citadine', nom: 'Citadine', l: 2.5, pas: true },
+      { id: 'camionnette', nom: 'Camionnette', l: 3.6, pas: true, vue: true },
+      { id: 'scooter', nom: 'Scooter', l: 1.2, pas: true },
+      { id: 'lampadaire', nom: 'Lampadaire', l: 0.8 },
+      { id: 'potelet', nom: 'Potelet', l: 0.15 },
+      { id: 'poubelle-rue', nom: 'Poubelle de rue', l: 0.4, pas: true },
+      { id: 'banc-public', nom: 'Banc public', l: 1.2, pas: true },
+      { id: 'conteneur-ordures', nom: 'Conteneur à ordures', l: 1.3, pas: true },
+      { id: 'bouche-incendie', nom: 'Bouche d’incendie', l: 0.3 },
+      { id: 'horodateur', nom: 'Horodateur', l: 0.3, pas: true },
+      { id: 'velo-arceau', nom: 'Vélo à l’arceau', l: 1.2, pas: true },
+      { id: 'cone', nom: 'Cône de chantier', l: 0.3 },
+      { id: 'cartons', nom: 'Cartons empilés', l: 0.8, pas: true }
+    ]
+  },
+  {
+    fichier: 'planches/lot 34.png',
+    fond: 'magenta',
+    isoler: true,
+    lignes: [4, 5, 5],
+    cols: 5,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Restaurant',
+    dossier: 'objets',
+    /* La dernière rangée n'est pas calée sur la grille : chaque élément a sa zone. */
+    cases: [
+      { id: 'table-banquet', nom: 'Table de banquet (8 places)', l: 2.2, pas: true },
+      { id: 'buffet-chauffe-plats', nom: 'Buffet à chauffe-plats', l: 1.6, pas: true },
+      { id: 'box-banquettes', nom: 'Box à banquettes', l: 1.3, pas: true },
+      { id: 'comptoir-accueil', nom: 'Comptoir d’accueil', l: 1.4, pas: true },
+      { id: 'table-ronde-quatre', nom: 'Table ronde (4 places)', l: 1.4, pas: true },
+      { id: 'table-carree-deux', nom: 'Table carrée (2 places)', l: 0.9, pas: true },
+      { id: 'aquarium-homards', nom: 'Aquarium à homards', l: 1.2, pas: true },
+      { id: 'paravent-laque', nom: 'Paravent laqué', l: 1.4, pas: true, vue: true },
+      { id: 'autel', nom: 'Autel', l: 0.6, pas: true },
+      { id: 'lion-gardien', nom: 'Lion gardien', l: 0.6, pas: true, zone: [40, 700, 195, 290] },
+      { id: 'vase-porcelaine', nom: 'Vase de porcelaine', l: 0.4, pas: true, zone: [270, 700, 200, 290] },
+      { id: 'bambou-pot', nom: 'Bambou en pot', l: 0.5, pas: true, zone: [495, 670, 215, 320] },
+      { id: 'chariot-dim-sum', nom: 'Chariot à dim sum', l: 0.8, pas: true, zone: [745, 715, 320, 270] },
+      { id: 'banc-attente', nom: 'Banc d’attente', l: 1.1, pas: true, zone: [1100, 720, 415, 250] }
+    ]
+  },
+  {
+    fichier: 'planches/lot 35.png',
+    fond: 'magenta',
+    isoler: true,
+    lignes: [4, 5, 5],
+    cols: 5,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Restaurant',
+    dossier: 'objets',
+    cases: [
+      { id: 'piano-woks', nom: 'Piano à woks', l: 1.6, pas: true },
+      { id: 'table-preparation', nom: 'Table de préparation', l: 1.4, pas: true },
+      { id: 'plonge', nom: 'Plonge double', l: 1.2, pas: true },
+      { id: 'frigo-pro', nom: 'Frigo professionnel', l: 1, pas: true, vue: true },
+      { id: 'paniers-vapeur', nom: 'Paniers vapeur', l: 0.5, pas: true },
+      { id: 'cuiseur-riz', nom: 'Cuiseur à riz', l: 0.4, pas: true },
+      { id: 'friteuse', nom: 'Friteuse', l: 0.5, pas: true },
+      { id: 'marmite-bouillon', nom: 'Marmite de bouillon', l: 0.6, pas: true },
+      { id: 'etagere-inox', nom: 'Étagère inox', l: 1.2, pas: true, vue: true },
+      { id: 'canards-laques', nom: 'Canards laqués suspendus', l: 0.8 },
+      { id: 'sacs-riz', nom: 'Sacs de riz', l: 0.8, pas: true },
+      { id: 'cagette-legumes', nom: 'Cagette de légumes', l: 0.5 },
+      { id: 'poubelle-cuisine', nom: 'Poubelle de cuisine', l: 0.4, pas: true },
+      { id: 'chariot-vaisselle', nom: 'Chariot de vaisselle', l: 0.7, pas: true }
+    ]
+  },
+  {
+    fichier: 'planches/lot 36.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 5,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Restaurant',
+    dossier: 'objets',
+    /* Les éléments en plusieurs morceaux (bouteilles, boîtes et sac, fumée) ont leur zone. */
+    cases: [
+      { id: 'lanterne-papier', nom: 'Lanterne de papier', l: 0.4 },
+      { id: 'lanterne-soie', nom: 'Grande lanterne de soie', l: 0.6 },
+      { id: 'plateau-tournant', nom: 'Plateau tournant garni', l: 0.9 },
+      { id: 'canard-laque', nom: 'Canard laqué', l: 0.4 },
+      { id: 'bol-riz', nom: 'Bol de riz', l: 0.15 },
+      { id: 'dim-sum', nom: 'Paniers de dim sum', l: 0.35 },
+      { id: 'wok-nouilles', nom: 'Wok de nouilles', l: 0.4 },
+      { id: 'service-the', nom: 'Service à thé', l: 0.3 },
+      { id: 'chat-porte-bonheur', nom: 'Chat porte-bonheur', l: 0.15 },
+      { id: 'boites-emporter', nom: 'Boîtes à emporter', l: 0.3, zone: [1230, 362, 296, 296] },
+      { id: 'sauces', nom: 'Sauces', l: 0.2 },
+      { id: 'biscuits-chinois', nom: 'Biscuits chinois', l: 0.15 },
+      { id: 'bouteilles-biere', nom: 'Bouteilles de bière', l: 0.2, zone: [630, 710, 250, 275] },
+      { id: 'brule-encens', nom: 'Brûle-encens', l: 0.2, zone: [925, 660, 265, 320] },
+      { id: 'enveloppes-rouges', nom: 'Enveloppes rouges', l: 0.2 }
+    ]
+  },
+  {
+    fichier: 'planches/lot 37.png',
+    fond: 'magenta',
+    isoler: true,
+    lignes: [5, 5, 5, 6],
+    cols: 6,
+    rows: 4,
+    type: 'objet',
+    categorie: 'Restaurant',
+    dossier: 'objets',
+    /* Une première version de la salle et de la cuisine : n'en restent que les
+       variantes ; la 2e rangée, décalée sur la grille, a ses zones. */
+    cases: [
+      null,
+      { id: 'table-carree-quatre', nom: 'Table carrée (4 places)', l: 1.2, pas: true },
+      { id: 'table-six', nom: 'Table rectangulaire (6 places)', l: 1.6, pas: true },
+      { id: 'box-marbre', nom: 'Box à table de marbre', l: 1.4, pas: true },
+      { id: 'tabouret-laque', nom: 'Tabouret laqué', l: 0.3 },
+      { id: 'comptoir-caisse', nom: 'Comptoir-caisse', l: 2.2, pas: true, zone: [15, 360, 495, 180] },
+      { id: 'paravent-fleurs', nom: 'Paravent aux cerisiers', l: 1.4, pas: true, vue: true, zone: [530, 340, 295, 200] },
+      { id: 'bassin-koi', nom: 'Bassin à koïs', l: 1.4, pas: true, zone: [845, 355, 330, 175] },
+      null,
+      null,
+      { id: 'vitrine-canards', nom: 'Vitrine à canards laqués', l: 1.4, pas: true },
+      null,
+      { id: 'piano-deux-woks', nom: 'Piano à deux woks', l: 1.3, pas: true },
+      null,
+      null,
+      null,
+      { id: 'etagere-vaisselle', nom: 'Étagère à vaisselle', l: 1, pas: true, vue: true },
+      null,
+      { id: 'plan-refrigere', nom: 'Plan de travail réfrigéré', l: 1.3, pas: true },
+      null,
+      null
+    ]
+  },
+  {
+    fichier: 'planches/murs 7.png',
+    fond: 'magenta',
+    isoler: 'case',
+    cols: 1,
+    rows: 4,
+    type: 'mur',
+    categorie: 'Murs',
+    dossier: 'murs',
+    retrait: 6,
+    raccord: 'long',
+    cases: [
+      { id: 'mur-laque-rouge', nom: 'Laque rouge', tuile: 2.5 },
+      { id: 'mur-papier-peint-rouge', nom: 'Papier peint rouge et or', tuile: 2.5 },
+      { id: 'mur-faience-cuisine', nom: 'Faïence de cuisine', tuile: 2.5 },
+      { id: 'mur-bambou', nom: 'Bambou', tuile: 2.5 }
+    ]
+  },
+  {
+    /* Des tuiles plus hautes que larges : l'atelier garde leurs proportions. */
+    fichier: 'planches/sols 7.png',
+    fond: 'magenta',
+    isoler: 'case',
+    cols: 4,
+    rows: 2,
+    type: 'sol',
+    categorie: 'Sols',
+    dossier: 'sols',
+    retrait: 16,
+    raccord: 'deux',
+    cases: [
+      { id: 'moquette-nuages', nom: 'Moquette rouge aux nuages', tuile: 2 },
+      { id: 'moquette-treillis', nom: 'Moquette bordeaux à treillis', tuile: 2, brut: true },
+      { id: 'parquet-laque-rouge', nom: 'Parquet laqué rouge', tuile: 1.5, brut: true },
+      { id: 'terrazzo-jade', nom: 'Terrazzo jade', tuile: 2 },
+      { id: 'carrelage-cuisine-rouge', nom: 'Carrelage de cuisine rouge', tuile: 1.5, brut: true },
+      { id: 'carrelage-cuisine-gris', nom: 'Carrelage de cuisine gris', tuile: 1.5, brut: true },
+      { id: 'carrelage-cuisine-gras', nom: 'Carrelage de cuisine gras', tuile: 1.5, brut: true },
+      { id: 'damier-beige-rouge', nom: 'Damier beige et rouge', tuile: 1.5, brut: true }
+    ]
+  },
+  {
+    fichier: 'planches/lot 38.png',
+    fond: 'magenta',
+    isoler: true,
+    lignes: [3, 4, 5],
+    cols: 5,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Restaurant',
+    sousCategorie: 'Buffet',
+    dossier: 'objets',
+    cases: [
+      { id: 'buffet-chaud', nom: 'Îlot de buffet chaud', l: 3, pas: true },
+      { id: 'buffet-fruits-de-mer', nom: 'Buffet de fruits de mer', l: 3, pas: true },
+      { id: 'buffet-sushis', nom: 'Buffet de sushis', l: 3, pas: true },
+      { id: 'station-teppanyaki', nom: 'Station teppanyaki', l: 2, pas: true },
+      { id: 'station-wok', nom: 'Station wok', l: 2, pas: true },
+      { id: 'buffet-desserts', nom: 'Buffet de desserts', l: 2, pas: true },
+      { id: 'bar-salades-fruits', nom: 'Bar à salades et fruits', l: 2, pas: true },
+      { id: 'station-soupes', nom: 'Station à soupes', l: 1.2, pas: true },
+      { id: 'station-dim-sum', nom: 'Station à dim sum', l: 1.2, pas: true },
+      { id: 'congelateur-glaces', nom: 'Congélateur à glaces', l: 1.2, pas: true },
+      { id: 'station-boissons', nom: 'Station boissons', l: 1.2, pas: true },
+      { id: 'distributeurs-assiettes', nom: 'Distributeurs d’assiettes', l: 0.9, pas: true }
+    ]
+  },
+  {
+    fichier: 'planches/lot 39.png',
+    fond: 'magenta',
+    isoler: true,
+    lignes: [4, 5, 5],
+    cols: 5,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Restaurant',
+    sousCategorie: 'Salle',
+    dossier: 'objets',
+    /* Les tables dont les chaises ne touchent pas le plateau ont leur zone. */
+    cases: [
+      { id: 'box-moderne', nom: 'Box moderne', l: 1.3, pas: true },
+      { id: 'table-six-moderne', nom: 'Table pour six', l: 1.6, pas: true, zone: [415, 70, 355, 300] },
+      { id: 'table-ronde-marbre', nom: 'Table ronde en marbre (8 places)', l: 2.2, pas: true, zone: [775, 2, 396, 392] },
+      { id: 'accueil-moderne', nom: 'Accueil moderne', l: 1.4, pas: true },
+      { id: 'table-noire-quatre', nom: 'Table noire (4 places)', l: 1.2, pas: true, zone: [25, 425, 235, 260] },
+      { id: 'table-ronde-deux', nom: 'Table ronde (2 places)', l: 0.9, pas: true, zone: [285, 465, 270, 175] },
+      { id: 'table-haute-tabourets', nom: 'Table haute et tabourets', l: 1, pas: true, zone: [565, 420, 325, 240] },
+      { id: 'claustra-chene', nom: 'Claustra en chêne', l: 1.5, pas: true },
+      { id: 'jardiniere-graminees', nom: 'Jardinière de graminées', l: 1.2, pas: true },
+      { id: 'suspensions-trio', nom: 'Trio de suspensions', l: 0.8 },
+      { id: 'suspension-lineaire', nom: 'Suspension linéaire', l: 1.2 },
+      { id: 'chariot-debarrassage', nom: 'Chariot de débarrassage', l: 0.8, pas: true },
+      { id: 'borne-commande', nom: 'Borne de commande', l: 0.4, pas: true },
+      { id: 'retour-plateaux', nom: 'Retour des plateaux', l: 1.2, pas: true }
+    ]
+  },
+  {
+    fichier: 'planches/lot 40.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 5,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Restaurant',
+    sousCategorie: 'Décor chinois',
+    dossier: 'objets',
+    cases: [
+      { id: 'plafond-lanternes', nom: 'Plafond de lanternes', l: 1.5 },
+      { id: 'lanterne-tambour', nom: 'Lanterne tambour blanche', l: 0.6 },
+      { id: 'bonsai', nom: 'Bonsaï', l: 0.6, pas: true },
+      { id: 'orchidees', nom: 'Coupe d’orchidées', l: 0.4 },
+      { id: 'dragon-dore', nom: 'Dragon doré', l: 0.8, pas: true },
+      { id: 'jardin-zen', nom: 'Jardin zen', l: 1.5, pas: true },
+      { id: 'fontaine-galets', nom: 'Fontaine de galets', l: 0.8, pas: true },
+      { id: 'vasque-poissons', nom: 'Vasque à poissons', l: 0.7, pas: true },
+      { id: 'prunier-fleuri', nom: 'Prunier en fleurs', l: 0.8, pas: true, zone: [950, 355, 280, 275] },
+      { id: 'arbre-jade', nom: 'Arbre de jade', l: 0.6, pas: true },
+      { id: 'tapis-rond-nuages', nom: 'Tapis rond aux nuages', l: 2 },
+      { id: 'tapis-couloir-jade', nom: 'Tapis de couloir jade', l: 3 },
+      { id: 'vitrine-porcelaines', nom: 'Vitrine de porcelaines', l: 1.2, pas: true, vue: true },
+      { id: 'lion-moderne', nom: 'Lion moderne', l: 0.6, pas: true },
+      { id: 'centre-de-table', nom: 'Centre de table', l: 0.3 }
+    ]
+  },
+  {
+    /* Le buffet la nuit, restaurant fermé : des modules double face qu'on aligne
+       bout à bout. Leur longueur est choisie pour qu'ils aient tous la même
+       profondeur. */
+    fichier: 'planches/lot 41.png',
+    fond: 'magenta',
+    isoler: true,
+    lignes: [5, 5, 4],
+    cols: 5,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Restaurant',
+    sousCategorie: 'Buffet fermé',
+    /* Les cases 3-4 et 7-8 se touchent presque : une zone chacune. */
+    dossier: 'objets',
+    cases: [
+      { id: 'buffet-vide-froid', nom: 'Buffet fermé : bacs réfrigérés', l: 1.7, pas: true },
+      { id: 'buffet-vide-glace', nom: 'Buffet fermé : banc à glace', l: 1.7, pas: true },
+      { id: 'buffet-vide-sushis', nom: 'Buffet fermé : ardoises à sushis', l: 1.7, pas: true, zone: [617, 88, 301, 260] },
+      { id: 'buffet-vide-lampes', nom: 'Buffet fermé : lampes chauffantes', l: 1.7, pas: true, zone: [919, 70, 302, 278] },
+      { id: 'buffet-vide-vapeur', nom: 'Buffet fermé : paniers vapeur', l: 1.7, pas: true },
+      { id: 'buffet-vide-bain-marie', nom: 'Buffet fermé : bains-marie fermés', l: 1.7, pas: true },
+      { id: 'buffet-vide-bacs-retires', nom: 'Buffet fermé : bacs retirés', l: 1.7, pas: true, zone: [314, 402, 301, 262] },
+      { id: 'buffet-vide-desserts', nom: 'Buffet fermé : présentoirs à desserts', l: 1.7, pas: true, zone: [616, 402, 302, 262] },
+      { id: 'buffet-vide-fruits', nom: 'Buffet fermé : fruits', l: 1.7, pas: true },
+      { id: 'buffet-glaces-cadenas', nom: 'Buffet : bahut à glaces cadenassé', l: 1.7, pas: true },
+      { id: 'buffet-bonbons', nom: 'Buffet : bar à bonbons', l: 2.33, pas: true },
+      { id: 'buffet-condiments', nom: 'Buffet : condiments et chips', l: 2.53, pas: true },
+      { id: 'buffet-embout-gauche', nom: 'Buffet : embout gauche (assiettes)', l: 1.67, pas: true },
+      { id: 'buffet-embout-droit', nom: 'Buffet : embout droit', l: 1.73, pas: true }
+    ]
+  },
+  {
+    /* Le stand wok, le grand bar, le décor : restaurant fermé, tout est rangé. */
+    fichier: 'planches/lot 42.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 5,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Restaurant',
+    sousCategorie: 'Bar',
+    dossier: 'objets',
+    cases: [
+      { id: 'wok-ingredients-crus', nom: 'Wok : comptoir d’ingrédients', l: 2, pas: true },
+      { id: 'wok-bar-sauces', nom: 'Wok : bar à sauces', l: 2, pas: true },
+      { id: 'wok-ligne-cuisson', nom: 'Wok : plancha et woks', l: 3, pas: true },
+      /* À cheval sur deux cases de grille. */
+      { id: 'wok-passe', nom: 'Wok : passe', l: 1.5, pas: true, zone: [1110, 92, 236, 242] },
+      { id: 'tabouret-bar-moderne', nom: 'Tabouret de bar moderne', l: 0.35 },
+      { id: 'bar-comptoir-long', nom: 'Grand comptoir de bar', l: 3.3, pas: true },
+      { id: 'bar-comptoir-angle', nom: 'Angle du grand comptoir', l: 1.18, pas: true },
+      { id: 'bar-arriere-cafe', nom: 'Arrière-bar : café et verres', l: 1.95, pas: true },
+      { id: 'bar-arriere-pression', nom: 'Arrière-bar : pression et bouteilles', l: 1.9, pas: true },
+      { id: 'bar-caisse', nom: 'Bout de comptoir caisse', l: 1.6, pas: true },
+      { id: 'statue-moine', nom: 'Statue de moine', l: 1, pas: true },
+      { id: 'statue-chat', nom: 'Statue de chat', l: 0.9, pas: true },
+      { id: 'paravent-riz', nom: 'Paravent papier de riz', l: 1.6, pas: true, vue: true },
+      { id: 'paravent-jade', nom: 'Paravent treillis jade', l: 1.4, pas: true, vue: true },
+      { id: 'tapis-sas', nom: 'Tapis de sas', l: 1.3 }
+    ]
+  },
+  {
+    /* Le bar à bonbons : les trois modules à bocaux de la première rangée ne
+       sont pas retenus, le mur de distributeurs les remplace. */
+    fichier: 'planches/lot 43.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 3,
+    rows: 2,
+    type: 'objet',
+    categorie: 'Restaurant',
+    sousCategorie: 'Buffet fermé',
+    dossier: 'objets',
+    cases: [
+      null,
+      null,
+      null,
+      { id: 'bonbons-mur-distributeurs', nom: 'Mur de distributeurs de bonbons', l: 2.8, pas: true },
+      { id: 'bonbons-sachets', nom: 'Comptoir à sachets', l: 1, pas: true },
+      { id: 'bonbons-embout', nom: 'Bonbons : embout', l: 1.79, pas: true }
+    ]
+  },
+  {
+    /* Plafonds chinois, bureau, toilettes. L'escalier (case 11) est en
+       perspective : refait à part. Les éléments en plusieurs morceaux ont leur zone. */
+    fichier: 'planches/lot 44.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 5,
+    rows: 4,
+    type: 'objet',
+    categorie: 'Restaurant',
+    sousCategorie: 'Plafonds',
+    dossier: 'objets',
+    cases: [
+      { id: 'plafond-dragon-soie', nom: 'Dragon de soie au plafond', l: 4, zone: [0, 60, 398, 130] },
+      { id: 'lanterne-palais-rouge', nom: 'Grande lanterne de palais', l: 1 },
+      { id: 'rangee-lanternes', nom: 'Rangée de cinq lanternes', l: 2.5, zone: [630, 98, 300, 70] },
+      { id: 'lanterne-hexagonale', nom: 'Lanterne hexagonale peinte', l: 0.8, zone: [952, 12, 262, 245] },
+      { id: 'plafond-ombrelles', nom: 'Ombrelles suspendues', l: 1.8 },
+      { id: 'couronne-lanternes', nom: 'Couronne de lanternes', l: 1.8 },
+      { id: 'branches-prunier', nom: 'Branches de prunier suspendues', l: 1.6, zone: [295, 270, 340, 230] },
+      { id: 'plafond-rubans', nom: 'Rubans de soie au plafond', l: 2 },
+      { id: 'plafonnier-lineaire', nom: 'Plafonnier linéaire', l: 1.5 },
+      { id: 'spots-laiton', nom: 'Rampe de trois spots', l: 0.8 },
+      null,
+      { id: 'bureau-deux-ecrans', nom: 'Bureau à deux écrans', l: 1.2, pas: true, zone: [362, 528, 330, 262] },
+      { id: 'imprimante-bureau', nom: 'Imprimante de bureau', l: 0.7, pas: true },
+      { id: 'classeur-metal', nom: 'Classeur métallique', l: 0.5, pas: true },
+      { id: 'etagere-classeurs', nom: 'Étagère à classeurs', l: 1.2, pas: true },
+      { id: 'toilettes-pmr', nom: 'Toilettes accessibles', l: 1, pas: true },
+      { id: 'urinoirs', nom: 'Urinoirs', l: 1, pas: true },
+      { id: 'vasques-toilettes', nom: 'Double vasque des toilettes', l: 1.5, pas: true },
+      { id: 'table-a-langer', nom: 'Table à langer', l: 0.6, pas: true },
+      { id: 'armoire-bureau', nom: 'Armoire de bureau', l: 1, pas: true }
+    ]
+  },
+  {
+    /* Le vieil escalier caché, en trois états : le haut en haut de l'image. */
+    fichier: 'planches/lot 45.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 3,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Architecture',
+    sousCategorie: 'Escaliers',
+    dossier: 'objets',
+    cases: [
+      { id: 'escalier-ancien', nom: 'Vieil escalier en bois', l: 1 },
+      { id: 'escalier-ancien-casse', nom: 'Vieil escalier aux marches cassées', l: 1 },
+      { id: 'escalier-ancien-palier', nom: 'Vieil escalier et son palier', l: 1.3 }
+    ]
+  },
+  {
+    /* The Nine Lives, le speakeasy muré sous le Jardin de Jade. Les éléments en
+       morceaux (os, gravats, guirlande, chaise renversée) ont leur zone. */
+    fichier: 'planches/lot 46.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 5,
+    rows: 4,
+    type: 'objet',
+    categorie: 'Speakeasy',
+    sousCategorie: 'The Nine Lives',
+    dossier: 'objets',
+    cases: [
+      { id: 'corps-rosalind', nom: 'Corps momifié en robe des années 20', l: 0.8 },
+      { id: 'chat-squelette-enroule', nom: 'Squelette de chat enroulé', l: 0.3, zone: [338, 58, 175, 135] },
+      { id: 'chat-squelette-allonge', nom: 'Squelette de chat allongé', l: 0.45, zone: [562, 58, 300, 175] },
+      { id: 'chats-squelettes-blottis', nom: 'Trois squelettes de chats', l: 0.6, zone: [903, 22, 280, 210] },
+      { id: 'gravats-briques', nom: 'Gravats de briques', l: 1, zone: [1228, 18, 305, 232] },
+      { id: 'piano-droit', nom: 'Piano droit', l: 1, pas: true, vue: true },
+      { id: 'banquette-piano-droit', nom: 'Banquette de piano', l: 0.6, pas: true },
+      { id: 'gramophone', nom: 'Gramophone', l: 0.6, pas: true },
+      { id: 'guirlande-fleurs-sechees', nom: 'Guirlande de fleurs séchées', l: 2, zone: [828, 328, 368, 145] },
+      { id: 'enseigne-nine-lives', nom: 'Enseigne du chat à neuf queues', l: 1.2 },
+      { id: 'comptoir-acajou', nom: 'Comptoir en acajou', l: 2, pas: true },
+      { id: 'comptoir-acajou-angle', nom: 'Angle du comptoir en acajou', l: 0.8, pas: true },
+      { id: 'arriere-bar-miroir', nom: 'Arrière-bar au miroir fendu', l: 2, pas: true },
+      { id: 'tonneaux-whiskey', nom: 'Tonneaux de whiskey', l: 1, pas: true },
+      { id: 'photo-famille-1925', nom: 'Photo de famille encadrée', l: 0.25 },
+      { id: 'table-annees-20', nom: 'Table ronde des années 20', l: 0.7, pas: true },
+      { id: 'chaise-bistrot-renversee', nom: 'Chaise bistrot renversée', l: 0.5, zone: [338, 805, 228, 172] },
+      { id: 'chaise-bistrot', nom: 'Chaise bistrot', l: 0.4 },
+      { id: 'table-poker', nom: 'Table de poker', l: 1.2, pas: true },
+      { id: 'lustre-art-deco', nom: 'Lustre Art déco', l: 1 }
+    ]
+  },
+  {
+    /* Le poste caisse du grand bar (lot 42) : même profondeur que le comptoir, 1,46. */
+    fichier: 'planches/lot 47.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 3,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Restaurant',
+    sousCategorie: 'Bar',
+    dossier: 'objets',
+    cases: [
+      { id: 'bar-comptoir-caisse', nom: 'Grand comptoir : caisse', l: 2.13, pas: true, zone: [20, 300, 580, 420] },
+      { id: 'bar-comptoir-caisse-bout', nom: 'Grand comptoir : caisse en bout', l: 2.33, pas: true, zone: [610, 300, 630, 420] },
+      { id: 'bar-comptoir-abattant', nom: 'Grand comptoir : abattant', l: 0.89, zone: [1260, 300, 260, 420] }
+    ]
+  },
+  {
+    /* Restaurant fermé : tables de préparation vides ; accessoires des toilettes (Moderne / Bain). */
+    fichier: 'planches/lot 48.png',
+    fond: 'magenta',
+    isoler: true,
+    cols: 5,
+    rows: 3,
+    type: 'objet',
+    categorie: 'Restaurant',
+    sousCategorie: 'Cuisine',
+    dossier: 'objets',
+    cases: [
+      { id: 'table-prep-vide', nom: 'Table de préparation vide', l: 1.4, pas: true, zone: [4, 40, 299, 290] },
+      { id: 'table-prep-longue', nom: 'Longue table de préparation vide', l: 2, pas: true, zone: [311, 40, 299, 290] },
+      { id: 'table-prep-dosseret', nom: 'Table de préparation à dosseret, vide', l: 1.4, pas: true, zone: [618, 40, 299, 290] },
+      { id: 'table-prep-angle', nom: 'Table de préparation d’angle, vide', l: 1.4, pas: true, zone: [925, 40, 299, 290] },
+      { id: 'ilot-prep-evier', nom: 'Îlot de préparation et lave-mains', l: 1.8, pas: true, zone: [1232, 40, 300, 290] },
+      { id: 'derouleur-papier-wc', nom: 'Dérouleur de papier toilette', l: 0.2, zone: [4, 360, 299, 310] },
+      { id: 'distributeur-papier-wc', nom: 'Distributeur de papier toilette', l: 0.25, zone: [311, 360, 299, 310] },
+      { id: 'seche-mains', nom: 'Sèche-mains', l: 0.22, zone: [618, 360, 299, 310] },
+      { id: 'seche-mains-lame', nom: 'Sèche-mains à lame', l: 0.3, zone: [925, 360, 299, 310] },
+      { id: 'distributeur-essuie-mains', nom: 'Distributeur d’essuie-mains', l: 0.25, zone: [1232, 360, 300, 310] },
+      { id: 'distributeur-savon', nom: 'Distributeur de savon', l: 0.12, zone: [4, 695, 299, 310] },
+      { id: 'poubelle-pedale', nom: 'Poubelle à pédale', l: 0.22, zone: [311, 695, 299, 310] },
+      { id: 'balai-wc', nom: 'Balai de toilettes', l: 0.12, zone: [618, 695, 299, 310] },
+      { id: 'poubelle-essuie-mains', nom: 'Poubelle à essuie-mains', l: 0.3, zone: [925, 695, 299, 310] },
+      { id: 'pack-papier-wc', nom: 'Pack de papier toilette', l: 0.3, zone: [1232, 695, 300, 310] }
+    ]
+  },
+  {
+    fichier: 'planches/murs 8.png',
+    fond: 'magenta',
+    isoler: 'case',
+    cols: 1,
+    rows: 4,
+    type: 'mur',
+    categorie: 'Restaurant',
+    dossier: 'murs',
+    retrait: 6,
+    raccord: 'long',
+    cases: [
+      { id: 'mur-tasseaux-chene', nom: 'Tasseaux de chêne', tuile: 2.5 },
+      { id: 'mur-noir-laiton', nom: 'Panneaux noirs et laiton', tuile: 2.5 },
+      { id: 'mur-vert-jade', nom: 'Vert jade', tuile: 2.5 },
+      { id: 'mur-marbre-blanc', nom: 'Marbre blanc', tuile: 2.5 }
+    ]
+  },
+  {
+    fichier: 'planches/sols 8.png',
+    fond: 'magenta',
+    isoler: 'case',
+    cols: 4,
+    rows: 2,
+    type: 'sol',
+    categorie: 'Restaurant',
+    dossier: 'sols',
+    retrait: 16,
+    raccord: 'deux',
+    cases: [
+      { id: 'gres-anthracite', nom: 'Grès anthracite grand format', tuile: 2, brut: true },
+      { id: 'beton-cire', nom: 'Béton ciré', tuile: 2 },
+      { id: 'parquet-chene-large', nom: 'Parquet de chêne large', tuile: 1.5, brut: true },
+      { id: 'marbre-grand-format', nom: 'Marbre blanc grand format', tuile: 2, brut: true },
+      { id: 'hexagones-noirs', nom: 'Hexagones noirs', tuile: 1, brut: true },
+      { id: 'pierre-beige', nom: 'Pierre beige', tuile: 2, brut: true },
+      { id: 'parquet-chene-fume', nom: 'Parquet de chêne fumé', tuile: 1.5, brut: true },
+      { id: 'dalles-moquette', nom: 'Dalles de moquette grise', tuile: 2, brut: true }
+    ]
+  },
+  {
+    fichier: 'planches/sols 6.png',
+    fond: 'magenta',
+    isoler: 'case',
+    cols: 4,
+    rows: 3,
+    type: 'sol',
+    categorie: 'Sols',
+    dossier: 'sols',
+    retrait: 16,
+    raccord: 'deux',
+    cases: [
+      { id: 'asphalte-neuf', nom: 'Asphalte neuf', tuile: 2 },
+      { id: 'asphalte-use', nom: 'Asphalte usé', tuile: 2 },
+      { id: 'asphalte-mouille', nom: 'Asphalte mouillé', tuile: 2 },
+      { id: 'dalles-trottoir', nom: 'Dalles de trottoir', tuile: 2, brut: true },
+      { id: 'trottoir-beton', nom: 'Trottoir en béton', tuile: 2, brut: true },
+      { id: 'paves-autobloquants', nom: 'Pavés autobloquants', tuile: 1.5, brut: true },
+      { id: 'beton-parking', nom: 'Béton de parking', tuile: 2 },
+      { id: 'asphalte-rapiece', nom: 'Asphalte rapiécé', tuile: 2 },
+      { id: 'bande-podotactile', nom: 'Bande podotactile', tuile: 1, brut: true },
+      { id: 'beton-desactive', nom: 'Béton désactivé', tuile: 1.5 },
+      { id: 'paves-granit', nom: 'Pavés de granit', tuile: 1.5, brut: true },
+      { id: 'beton-ruelle', nom: 'Béton de ruelle', tuile: 2 }
+    ]
+  },
+  {
     fichier: 'planches/sols 2.png',
     fond: 'magenta',
     isoler: 'case',
@@ -1387,6 +2108,26 @@ const PLANCHES: Planche[] = [
     ]
   },
   {
+    /* Les portes du sous-sol du Jardin de Jade ; la porte murée percée est en deux morceaux. */
+    fichier: 'planches/ouvertures 5.png',
+    fond: 'magenta',
+    cols: 2,
+    rows: 3,
+    type: 'porte',
+    categorie: 'Portes et fenêtres',
+    dossier: 'ouvertures',
+    centrerMontants: true,
+    isoler: 'case',
+    cases: [
+      { id: 'porte-muree', nom: 'Porte murée' },
+      { id: 'porte-muree-percee', nom: 'Porte murée, percée', zone: [795, 118, 718, 162] },
+      { id: 'porte-speakeasy', nom: 'Porte de speakeasy' },
+      { id: 'porte-capitonnee', nom: 'Porte capitonnée' },
+      { id: 'porte-cave-pourrie', nom: 'Porte de cave pourrie' },
+      { id: 'porte-art-deco', nom: 'Porte double Art déco' }
+    ]
+  },
+  {
     fichier: 'planches/fenetres 1.png',
     fond: 'magenta',
     cols: 2,
@@ -1476,6 +2217,100 @@ const PLANCHES: Planche[] = [
       { id: 'ossements', nom: 'Ossements' },
       { id: 'mes-objets', nom: 'Mes objets' }
     ]
+  },
+  /* Les pictogrammes blancs du rangement par familles et rayons (22/11/2026) :
+     ils remplacent les icônes illustrées ci-dessus, même nom de fichier quand
+     le rayon est le même. Voir docs/atelier/prompts-icones-catalogue.md. */
+  {
+    fichier: 'planches/icones 3.png',
+    fond: 'magenta',
+    icones: true,
+    cols: 5,
+    rows: 4,
+    type: 'objet',
+    categorie: '',
+    dossier: 'icones',
+    cases: [
+      { id: 'mobilier', nom: 'Mobilier' },
+      { id: 'cuisine-et-bain', nom: 'Cuisine et bain' },
+      { id: 'lumiere', nom: 'Lumière' },
+      { id: 'deco-et-objets', nom: 'Déco et objets' },
+      { id: 'nature', nom: 'Nature' },
+      { id: 'architecture', nom: 'Architecture' },
+      { id: 'exterieur', nom: 'Extérieur' },
+      { id: 'personnages', nom: 'Personnages' },
+      { id: 'mes-objets', nom: 'Mes objets' },
+      { id: 'assises', nom: 'Assises' },
+      { id: 'tables', nom: 'Tables' },
+      { id: 'lits', nom: 'Lits' },
+      { id: 'rangements', nom: 'Rangements' },
+      { id: 'bureau', nom: 'Bureau' },
+      { id: 'cheminees', nom: 'Cheminées' },
+      { id: 'tapis', nom: 'Tapis' },
+      { id: 'paravents', nom: 'Paravents' },
+      { id: 'cuisine', nom: 'Cuisine' },
+      { id: 'electromenager', nom: 'Électroménager' },
+      { id: 'bain', nom: 'Bain' }
+    ]
+  },
+  {
+    fichier: 'planches/icones 4.png',
+    fond: 'magenta',
+    icones: true,
+    cols: 5,
+    rows: 4,
+    type: 'objet',
+    categorie: '',
+    dossier: 'icones',
+    cases: [
+      { id: 'bar', nom: 'Bar' },
+      { id: 'buffet', nom: 'Buffet' },
+      { id: 'lampes', nom: 'Lampes' },
+      { id: 'lampadaires', nom: 'Lampadaires' },
+      { id: 'plafonniers', nom: 'Plafonniers' },
+      { id: 'appliques', nom: 'Appliques' },
+      { id: 'bougies', nom: 'Bougies' },
+      { id: 'projecteurs', nom: 'Projecteurs' },
+      { id: 'decoration', nom: 'Décoration' },
+      { id: 'livres-et-papiers', nom: 'Livres et papiers' },
+      { id: 'vaisselle', nom: 'Vaisselle' },
+      { id: 'nourriture', nom: 'Nourriture' },
+      { id: 'instruments', nom: 'Instruments' },
+      { id: 'sonorisation', nom: 'Sonorisation' },
+      { id: 'indices', nom: 'Indices' },
+      { id: 'armes', nom: 'Armes' },
+      { id: 'arbres', nom: 'Arbres' },
+      { id: 'vegetation', nom: 'Végétation' },
+      { id: 'rochers', nom: 'Rochers' },
+      { id: 'bois-mort', nom: 'Bois mort' }
+    ]
+  },
+  {
+    fichier: 'planches/icones 5.png',
+    fond: 'magenta',
+    icones: true,
+    cols: 5,
+    rows: 3,
+    type: 'objet',
+    categorie: '',
+    dossier: 'icones',
+    cases: [
+      { id: 'toiles-d-araignees', nom: 'Toiles d’araignées' },
+      { id: 'escaliers', nom: 'Escaliers' },
+      { id: 'scene', nom: 'Scène' },
+      { id: 'colonnes', nom: 'Colonnes' },
+      { id: 'cloisons', nom: 'Cloisons' },
+      { id: 'voirie', nom: 'Voirie' },
+      { id: 'marquages', nom: 'Marquages' },
+      { id: 'vehicules', nom: 'Véhicules' },
+      { id: 'mobilier-urbain', nom: 'Mobilier urbain' },
+      { id: 'ruelle', nom: 'Ruelle' },
+      { id: 'personnel', nom: 'Personnel' },
+      { id: 'invites', nom: 'Invités' },
+      { id: 'public', nom: 'Public' },
+      { id: 'corps', nom: 'Corps' },
+      { id: 'ossements', nom: 'Ossements' }
+    ]
   }
 ]
 
@@ -1539,8 +2374,18 @@ for (const pl of PLANCHES) {
     }
     const cx = Math.round(col * cwi)
     const cy = Math.round(rang * ch)
-    let cellule = rogner(img, cx, cy, Math.round(cwi), Math.round(ch))
-    if (el) {
+    let cellule = c.zone
+      ? rogner(img, ...c.zone)
+      : rogner(img, cx, cy, Math.round(cwi), Math.round(ch))
+    if (c.zone) {
+      /* Une zone qui coupe un élément : son bord n'est pas vide. */
+      const [zw, zh] = [c.zone[2], c.zone[3]]
+      let coupe = 0
+      for (let y = 0; y < zh; y++)
+        for (let x = 0; x < zw; x++)
+          if ((x === 0 || y === 0 || x === zw - 1 || y === zh - 1) && cellule.data[(y * zw + x) * 4 + 3] > 64) coupe++
+      if (coupe) console.warn(`! ${pl.fichier} case ${i + 1} : la zone coupe un élément (${coupe} px au bord)`)
+    } else if (el) {
       /* L'élément le plus lourd dont le centre tombe dans cette case. */
       let meilleur = 0
       el.infos.forEach((f, e) => {
@@ -1566,7 +2411,7 @@ for (const pl of PLANCHES) {
           if (el.etiquette[b] !== meilleur) cellule.data[(y * w + x) * 4 + 3] = 0
         }
     }
-    if (pl.isoler === 'case') {
+    if (pl.isoler === 'case' && !c.zone) {
       /* Le plus grand élément d'un seul tenant de la case : les voisins qui
          débordent un peu dedans sont effacés. */
       const ec = elements(cellule)
@@ -1605,7 +2450,7 @@ for (const pl of PLANCHES) {
     const fichier = `${pl.dossier}/${c.id}.png`
     mkdirSync(dirname(join(PACK, fichier)), { recursive: true })
     writeFileSync(join(PACK, fichier), PNG.sync.write(piece))
-    const [categorie, sousCategorie] = RANGEMENT[c.id] ?? [pl.categorie, undefined]
+    const [categorie, sousCategorie] = RANGEMENT[c.id] ?? [pl.categorie, pl.sousCategorie]
     const entree: Record<string, unknown> = { id: `${pl.dossier}/${c.id}`, type, nom: c.nom, categorie, fichier }
     if (sousCategorie) entree.sousCategorie = sousCategorie
     if (type === 'sol' || type === 'mur') entree.tuile = c.tuile ?? 2
@@ -1648,14 +2493,31 @@ for (const pl of PLANCHES) {
   catalogue.push({ id: 'murs/uni-blanc', type: 'mur', nom: 'Mur uni (à colorer)', categorie: 'Plâtre et béton', fichier: 'murs/uni-blanc.png', tuile: 2.5 })
 }
 
+/* Les assets du catalogue qui ne sortent d'aucune planche d'ici (ajoutés
+   autrement, comme le pack concert et enquête) : gardés tels quels, sans quoi
+   une relance les effacerait. */
+{
+  const ancien = join(PACK, 'catalogue.json')
+  if (existsSync(ancien)) {
+    const produits = new Set(catalogue.map((e) => e.id))
+    const garde = (JSON.parse(readFileSync(ancien, 'utf8')).assets as Record<string, unknown>[]).filter(
+      (e) => !produits.has(e.id)
+    )
+    catalogue.push(...garde)
+    if (garde.length) console.log(`${garde.length} assets hors planches, gardés`)
+  }
+}
+
 /* L'ordre de la palette : les sols, murs et ouvertures d'abord, puis les objets
    par catégorie et sous-catégorie, dans un ordre qui se lit. */
-const ORDRE_CATEGORIES = ['Mobilier', 'Lumière', 'Objets', 'Architecture', 'Nature', 'Macabre', 'Moderne']
+const ORDRE_CATEGORIES = ['Mobilier', 'Lumière', 'Objets', 'Architecture', 'Nature', 'Macabre', 'Moderne', 'Ville', 'Restaurant']
 const ORDRE_SOUS = [
   'Lits', 'Assises', 'Tables', 'Rangements', 'Cuisine', 'Bain', 'Cheminées', 'Tapis', 'Paravents', 'Musique',
   'Lampes', 'Lampadaires', 'Plafonniers', 'Appliques', 'Bougies',
   'Livres et papiers', 'Nourriture', 'Vaisselle', 'Décoration', 'Électroménager',
-  'Arbres', 'Végétation', 'Rochers', 'Bois mort', 'Toiles d’araignées'
+  'Arbres', 'Végétation', 'Rochers', 'Bois mort', 'Toiles d’araignées',
+  'Voirie', 'Marquages', 'Véhicules', 'Mobilier urbain', 'Ruelle',
+  'Salle', 'Buffet', 'Cuisine', 'Plats', 'Décor chinois'
 ]
 const rang = (e: Record<string, unknown>): [number, number] => {
   if (e.type !== 'objet') return [-1, 0]
