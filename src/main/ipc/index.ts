@@ -10,6 +10,7 @@ import * as lumieres from '../db/repos/lumieres'
 import * as timeline from '../db/repos/timeline'
 import * as trame from '../db/repos/trame'
 import { synchroniserArborescencesBientot } from '../arborescenceTexte'
+import { ecrireGuide } from '../guideEcriture'
 import * as fiche from '../db/repos/ficheLieu'
 import * as chars from '../db/repos/characters'
 import * as players from '../db/repos/players'
@@ -846,6 +847,8 @@ export function registerIpc(): void {
     tours.fin()
     display.refreshJoueurs()
     mobile.broadcast()
+    /* Le mode d'emploi pour qui écrit la séance en fichiers. */
+    ecrireGuide(id)
   }
   on('timeline:createSession', (label: string, date?: string) => {
     const s = timeline.createSession(label, date)
@@ -890,7 +893,12 @@ export function registerIpc(): void {
       return s
     }
   )
-  on('timeline:updateSession', (id: number, patch: any) => timeline.updateSession(id, patch))
+  on('timeline:updateSession', (id: number, patch: any) => {
+    const r = timeline.updateSession(id, patch)
+    /* Renommée, ou rangée dans un autre dossier : son guide suit. */
+    ecrireGuide(id)
+    return r
+  })
   /* Déplacer une séance change qui est « d'avant » : le hors-jeu peut en
      dépendre, l'écran et les téléphones relisent leurs joueurs. */
   on('timeline:placerSeance', (id: number, refId: number, sens: 'avant' | 'apres') => {

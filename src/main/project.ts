@@ -13,7 +13,7 @@ import Database from 'better-sqlite3'
 import { copyFileSync, existsSync, mkdirSync, readdirSync, renameSync, rmSync } from 'node:fs'
 import { basename, join } from 'node:path'
 import { BrowserWindow, app, dialog } from 'electron'
-import { activeCampaignId, closeDb, dataRoot, getDb, isDbOpen, openDbAt } from './db'
+import { activeCampaignId, activeSessionId, closeDb, dataRoot, getDb, isDbOpen, openDbAt } from './db'
 import * as carnet from './carnet'
 import * as mobile from './mobile'
 import * as display from './display'
@@ -27,6 +27,7 @@ import { alignerNomsDesTextes } from './db/repos/timeline'
 import { synchroniserLieux } from './lieuxTexte'
 import { synchroniserPnj } from './pnjTexte'
 import { synchroniserArborescences } from './arborescenceTexte'
+import { ecrireGuide } from './guideEcriture'
 import * as reglages from './db/repos/reglages'
 import { lireCampagne } from '@shared/reglages'
 import type { ProjectInfo } from '@shared/types'
@@ -110,6 +111,8 @@ export function openProject(dir: string): ProjectInfo {
   synchroniserLieux()
   synchroniserPnj()
   synchroniserArborescences()
+  /* Le guide d'écriture de la séance ouverte, à jour de cette version. */
+  ecrireGuide(activeSessionId())
   fsLib.rangerAncienBlocNotes()
   fsLib.startWatch()
   /* Si cette campagne avait ouvert l'accès aux portables, il se rallume : ses
