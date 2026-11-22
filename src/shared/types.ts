@@ -633,6 +633,11 @@ export interface SkillSpec {
 }
 
 export interface TemplateSpec {
+  /**
+   * La fiche a été posée par un choix de règles (voir `@shared/wow`) : `wow`,
+   * c'est la fiche d'Azeroth. Absente, une fiche ordinaire.
+   */
+  systeme?: 'wow'
   /** Dé par défaut pour les jets de compétence. */
   rollSystem: 'd100-under' | 'd20-plus'
   /**

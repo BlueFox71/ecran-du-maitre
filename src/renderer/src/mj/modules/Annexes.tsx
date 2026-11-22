@@ -1,6 +1,14 @@
 import { useRef, useState } from 'react'
 import { useStore } from '../store'
-import { IconClose, IconDoc, IconLink, IconPen, IconPlus, IconSearch } from '../components/Icons'
+import {
+  IconClose,
+  IconLink,
+  IconPen,
+  IconPlus,
+  IconSearch,
+  kindIcon
+} from '../components/Icons'
+import { cibleAnnexe, peutEtreAnnexe } from '../annexeGlisser'
 import { SousMenuPreparation } from '../components/SousMenuPreparation'
 import { TexteEnPlace } from '../components/TexteEnPlace'
 import type { UiItem } from '../../../../preload/index'
@@ -83,7 +91,9 @@ export function Annexes(): JSX.Element {
 
       <div className="annexes-grid">
         {/* ---- la liste ---- */}
-        <aside className="pane">
+        {/* La liste reçoit aussi un document glissé (depuis le rail replié ou
+            une autre fenêtre de l'app) : même geste que l'entrée « Annexes ». */}
+        <aside className="pane" {...cibleAnnexe()}>
           <div className="pane-head">
             <span className="eyebrow">Sous la main</span>
             <div className="spacer" />
@@ -98,7 +108,7 @@ export function Annexes(): JSX.Element {
             <button
               className="btn btn-ghost btn-sm"
               onClick={() => setChoix(true)}
-              title="Prendre un texte déjà dans la campagne"
+              title="Prendre un document de la Bibliothèque (texte, PDF, image, Word…)"
             >
               <IconPlus />
               Ajouter
@@ -118,7 +128,7 @@ export function Annexes(): JSX.Element {
                 >
                   <span className="t">
                     <span className="ttl">{a.title}</span>
-                    {a.relPath ? <span className="sub">{dossierDe(a)}</span> : null}
+                    {a.relPath ? <span className="sub">{sousTitre(a)}</span> : null}
                   </span>
                   <span
                     className="annexe-oter"
@@ -135,7 +145,10 @@ export function Annexes(): JSX.Element {
                 </button>
               ))}
               {s.annexes.length === 0 ? (
-                <p className="vide">Aucun document. Ajoute le premier.</p>
+                <p className="vide">
+                  Aucun document. Ajoute le premier, ou glisse-le depuis la Bibliothèque sur
+                  « Annexes » dans le menu de gauche.
+                </p>
               ) : null}
             </div>
           </div>
@@ -146,7 +159,7 @@ export function Annexes(): JSX.Element {
           {doc ? (
             <div className="pane-body annexes-corps">
               <h4 className="a-titre">
-                <IconDoc />
+                {kindIcon(doc.kind)}
                 {/* Le nom se corrige là où on le lit : Entrée valide, Échap renonce. */}
                 <input
                   key={doc.title}
@@ -167,16 +180,29 @@ export function Annexes(): JSX.Element {
                   }}
                 />
                 <span className="spacer" />
-                <button
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => s.openInEditor(doc.id)}
-                  title="Ouvrir dans l’Éditeur complet"
-                >
-                  <IconPen />
-                  Éditeur
-                </button>
+                {doc.kind === 'doc' ? (
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => s.openInEditor(doc.id)}
+                    title="Ouvrir dans l’Éditeur complet"
+                  >
+                    <IconPen />
+                    Éditeur
+                  </button>
+                ) : doc.relPath ? (
+                  <button
+                    className="btn btn-ghost btn-sm"
+                    onClick={() => void window.jdr.items.openWith(doc.relPath!)}
+                    title="Ouvrir avec le logiciel de Windows (Word, lecteur PDF…)"
+                  >
+                    <IconLink />
+                    Ouvrir à part
+                  </button>
+                ) : null}
               </h4>
-              {enEdition === doc.id ? (
+              {doc.kind !== 'doc' ? (
+                <LectureFichier doc={doc} />
+              ) : enEdition === doc.id ? (
                 <TexteEnPlace
                   key={doc.id}
                   item={doc}
@@ -227,6 +253,57 @@ export function Annexes(): JSX.Element {
   )
 }
 
+/* Un document qui n'est pas un texte de l'app se lit tel quel : le PDF dans
+   le lecteur de Chromium, l'image en entier. Un Word ou un autre fichier ne se
+   lit pas ici : on l'ouvre avec son logiciel. */
+function LectureFichier({ doc }: { doc: UiItem }): JSX.Element {
+  if (!doc.url) return <p className="vide-grand">Ce fichier est introuvable sur le disque.</p>
+  if (doc.kind === 'pdf') return <iframe className="annexe-fichier" title={doc.title} src={doc.url} />
+  if (doc.kind === 'image')
+    return (
+      <div className="annexe-image">
+        <img src={doc.url} alt={doc.title} />
+      </div>
+    )
+  return (
+    <div className="annexe-ouvrir">
+      <p>Ce document ({genreDe(doc).toLowerCase()}) ne s’affiche pas ici : il s’ouvre avec son logiciel.</p>
+      <button
+        className="btn btn-primary"
+        onClick={() => doc.relPath && void window.jdr.items.openWith(doc.relPath)}
+      >
+        <IconLink />
+        Ouvrir « {doc.title} »
+      </button>
+      <p className="note">
+        Astuce&nbsp;: un PDF se lit directement ici. Enregistre ton document en PDF pour l’avoir
+        sous les yeux sans quitter l’Écran.
+      </p>
+    </div>
+  )
+}
+
+/* Un même document existe souvent en Word et en PDF, sous le même nom : le
+   genre du fichier, à côté du dossier, dit lequel est lequel. */
+const GENRES: Record<string, string> = {
+  pdf: 'PDF',
+  doc: 'Word',
+  docx: 'Word',
+  odt: 'Writer',
+  md: 'Texte brut',
+  txt: 'Texte brut',
+  rtf: 'Texte',
+  html: 'Texte'
+}
+function genreDe(it: UiItem): string {
+  if (it.kind === 'image') return 'Image'
+  const ext = (it.relPath ?? '').split('.').pop()?.toLowerCase() ?? ''
+  return GENRES[ext] ?? (it.kind === 'doc' ? 'Texte' : ext ? ext.toUpperCase() : 'Fichier')
+}
+function sousTitre(it: UiItem): string {
+  return `${dossierDe(it)} · ${genreDe(it)}`
+}
+
 function dossierDe(it: UiItem): string {
   const p = it.relPath ?? ''
   const i = p.lastIndexOf('/')
@@ -252,8 +329,10 @@ function ChoixDoc({
   const [q, setQ] = useState('')
 
   const mot = q.trim().toLowerCase()
+  /* Pas seulement les textes écrits ici : un PDF, une image ou un Word de la
+     Bibliothèque se gardent aussi sous la main. */
   const liste = s.fichiers
-    .filter((i) => i.kind === 'doc' && !exclure.includes(i.id))
+    .filter((i) => peutEtreAnnexe(i.kind) && !exclure.includes(i.id))
     .filter((i) => !mot || `${i.title} ${i.relPath ?? ''}`.toLowerCase().includes(mot))
     .slice(0, 200)
 
@@ -272,7 +351,7 @@ function ChoixDoc({
               type="text"
               autoFocus
               value={q}
-              placeholder="Chercher un texte par son nom ou son dossier"
+              placeholder="Chercher un document par son nom ou son dossier"
               onChange={(e) => setQ(e.target.value)}
             />
           </label>
@@ -280,16 +359,16 @@ function ChoixDoc({
           <div className="liste-docs">
             {liste.map((it) => (
               <button key={it.id} className="doc-row" onClick={() => onPick(it)}>
-                <IconDoc />
+                {kindIcon(it.kind)}
                 <span className="t">
                   <span className="ttl">{it.title}</span>
-                  <span className="sub">{dossierDe(it)}</span>
+                  <span className="sub">{sousTitre(it)}</span>
                 </span>
               </button>
             ))}
             {liste.length === 0 ? (
               <p className="vide">
-                {mot ? 'Aucun texte ne correspond.' : 'Aucun texte disponible.'}
+                {mot ? 'Aucun document ne correspond.' : 'Aucun document disponible.'}
               </p>
             ) : null}
           </div>

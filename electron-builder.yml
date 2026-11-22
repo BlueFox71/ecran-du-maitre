@@ -25,6 +25,10 @@ extraResources:
   # Le pack d'assets de l'atelier des lieux : lu à l'exécution, comme l'icône.
   - from: resources/atelier
     to: atelier
+  # Le jeu World of Warcraft (Arbre de talents, Aventure, éditeur de cartes) :
+  # servi par l'Écran lui-même. Ses données restent dans leur dossier du disque.
+  - from: resources/wow
+    to: wow
 win:
   target:
     - target: nsis

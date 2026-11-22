@@ -29,6 +29,8 @@ import { synchroniserPnj } from './pnjTexte'
 import { synchroniserArborescences } from './arborescenceTexte'
 import { ecrireGuide } from './guideEcriture'
 import * as reglages from './db/repos/reglages'
+import * as chars from './db/repos/characters'
+import { CLE_FICHE_AVANT_WOW, FICHE_WOW, type Regles } from '@shared/wow'
 import { lireCampagne } from '@shared/reglages'
 import type { ProjectInfo } from '@shared/types'
 
@@ -127,8 +129,11 @@ export function openProject(dir: string): ProjectInfo {
  * rafraîchir vingt morceaux d'état dans le bon ordre, on repart d'une page
  * neuve sur la nouvelle base.
  */
-export function switchTo(dir: string): ProjectInfo {
+export function switchTo(dir: string, avantRechargement?: () => void): ProjectInfo {
   const info = openProject(dir)
+  /* Ce qui doit être posé avant que l'interface relise la campagne (les règles
+     choisies à la création, par exemple). */
+  avantRechargement?.()
   /* Le combat de l'autre campagne s'arrête là. */
   tours.fin()
   prepa.oublier()
@@ -172,8 +177,27 @@ async function dire(message: string): Promise<void> {
   })
 }
 
-/** Créer : le dossier choisi devient la campagne, vide ou déjà rempli. */
-export async function promptNew(): Promise<ProjectInfo | null> {
+/**
+ * Les règles choisies à la création : posées sur la campagne, et pour WoW la
+ * fiche d'Azeroth — seulement si aucun personnage n'y a encore de chiffres
+ * (un dossier qui tenait déjà une campagne garde alors sa fiche).
+ */
+function poserRegles(regles: Regles): void {
+  reglages.poser('regles', regles)
+  if (regles !== 'wow') return
+  const n = (
+    getDb().prepare(`SELECT COUNT(*) AS n FROM character WHERE campaign_id = ?`).get(activeCampaignId()) as {
+      n: number
+    }
+  ).n
+  const fiche = chars.campaignSheet()
+  if (n > 0 || fiche.spec.systeme === 'wow') return
+  reglages.poser(CLE_FICHE_AVANT_WOW, JSON.stringify(fiche.spec))
+  chars.saveCampaignSheet({ name: fiche.name, spec: FICHE_WOW })
+}
+
+/** Créer : le dossier choisi devient la campagne, vide ou déjà rempli, avec les règles choisies. */
+export async function promptNew(regles?: Regles): Promise<ProjectInfo | null> {
   const res = await dialog.showOpenDialog(fenetre()!, {
     title: 'Où poser cette campagne ?',
     defaultPath: defaultParentDir(),
@@ -188,7 +212,8 @@ export async function promptNew(): Promise<ProjectInfo | null> {
     await dire(refus)
     return null
   }
-  return switchTo(dir)
+  if (regles !== 'wow' && regles !== 'fantomes') return switchTo(dir)
+  return switchTo(dir, () => poserRegles(regles))
 }
 
 /** Ouvrir : seulement un dossier qui contient déjà une campagne. */

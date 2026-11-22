@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>Éditeur de cartes — JDR World of Warcraft</title>
+<style>
+:root{
+  --bg:#12100e; --panel:#1c1917; --panel2:#262220; --line:#3a332e;
+  --ink:#f3ece2; --ink-dim:#a89c8d; --gold:#ffd76a; --accent:#ffb648; --rouge:#e0524a;
+  --wfont:"Friz Quadrata TT","Palatino Linotype","Book Antiqua",Georgia,serif;
+}
+*{box-sizing:border-box}
+html,body{height:100%;margin:0}
+body{font:13px/1.45 "Segoe UI",system-ui,-apple-system,sans-serif;background:var(--bg);color:var(--ink);overflow:hidden;
+  display:flex;flex-direction:column;-webkit-user-select:none;user-select:none}
+button,input,select,textarea{font:inherit;color:inherit}
+input,textarea,select{-webkit-user-select:text;user-select:text}
+button{background:var(--panel2);border:1px solid var(--line);border-radius:6px;padding:5px 10px;cursor:pointer;white-space:nowrap}
+button:hover{border-color:#5a4f45;background:#2e2926}
+button.on,button:active{border-color:var(--gold);color:var(--gold)}
+button.prim{background:#4a3612;border-color:#8a6a2a;color:var(--gold)}
+button.danger{color:#ff9088}
+input[type=text],input[type=number],select,textarea{background:#0f0d0c;border:1px solid var(--line);border-radius:5px;padding:4px 6px;width:100%}
+input[type=number]{width:70px}
+input[type=color]{width:34px;height:26px;padding:0;border:1px solid var(--line);border-radius:5px;background:none;cursor:pointer}
+input[type=range]{width:100%;accent-color:var(--accent)}
+textarea{resize:vertical;min-height:70px}
+h1{font:600 16px var(--wfont);color:var(--gold);margin:0;letter-spacing:.5px;white-space:nowrap}
+
+/* ---------------- barre du haut ---------------- */
+#barre{display:flex;align-items:center;gap:6px;padding:6px 10px;background:linear-gradient(#211c18,#191512);border-bottom:1px solid var(--line);flex-wrap:wrap}
+#barre .sep{width:1px;height:22px;background:var(--line);margin:0 4px}
+#nomCarte{width:220px;font-weight:600;background:transparent;border-color:transparent}
+#nomCarte:hover,#nomCarte:focus{border-color:var(--line);background:#0f0d0c}
+#statut{margin-left:auto;font-size:12px;color:var(--ink-dim);padding:3px 9px;border:1px solid var(--line);border-radius:20px;cursor:default}
+#statut.ok{color:#9be09b;border-color:#2e5a2e}
+#statut.err{color:#ff9088;border-color:#6a2a2a}
+#table.on{background:#14381a;border-color:#3c9a4a;color:#a8f0b0}
+
+/* ---------------- corps ---------------- */
+#corps{flex:1;display:flex;min-height:0}
+#outils{width:50px;background:var(--panel);border-right:1px solid var(--line);display:flex;flex-direction:column;align-items:center;padding:6px 0;gap:3px;overflow-y:auto}
+#outils button{width:38px;height:36px;padding:0;display:grid;place-items:center;border-color:transparent;background:transparent}
+#outils button:hover{background:var(--panel2);border-color:var(--line)}
+#outils button.on{background:#3a2c14;border-color:var(--gold)}
+#outils svg{width:20px;height:20px;stroke:currentColor;fill:none;stroke-width:1.7;stroke-linecap:round;stroke-linejoin:round}
+#outils .sep{width:28px;height:1px;background:var(--line);margin:3px 0}
+#scene{flex:1;position:relative;min-width:0;overflow:hidden;touch-action:none}
+#cv{position:absolute;inset:0;width:100%;height:100%;display:block}
+#infos{position:absolute;left:8px;bottom:8px;display:flex;gap:6px;align-items:center;font-size:12px;color:var(--ink-dim)}
+#infos span{background:rgba(18,16,14,.85);border:1px solid var(--line);border-radius:5px;padding:2px 7px}
+#infos button{background:rgba(18,16,14,.85);padding:2px 8px}
+#aideOutil{position:absolute;left:50%;top:8px;transform:translateX(-50%);background:rgba(18,16,14,.88);border:1px solid var(--line);border-radius:6px;padding:4px 12px;font-size:12px;color:var(--ink-dim);pointer-events:none;max-width:80%;text-align:center}
+#aideOutil:empty{display:none}
+#bulle{position:absolute;pointer-events:none;background:rgba(10,8,6,.92);border:1px solid #6a5a3a;border-radius:6px;padding:3px 8px;font-weight:600;color:var(--gold);font-size:12px;display:none;white-space:nowrap}
+
+/* ---------------- panneau de droite ---------------- */
+#panneau{width:300px;background:var(--panel);border-left:1px solid var(--line);overflow-y:auto;overflow-x:hidden}
+.sec{border-bottom:1px solid var(--line)}
+.sec>h2{margin:0;padding:8px 12px;font:600 12px var(--wfont);letter-spacing:.6px;text-transform:uppercase;color:var(--gold);cursor:pointer;display:flex;justify-content:space-between;align-items:center}
+.sec>h2::after{content:"▾";color:var(--ink-dim)}
+.sec.ferme>h2::after{content:"▸"}
+.sec.ferme>.cont{display:none}
+.cont{padding:4px 12px 12px;display:flex;flex-direction:column;gap:8px}
+.ligne{display:flex;align-items:center;gap:8px}
+.ligne>label:first-child{flex:0 0 80px;color:var(--ink-dim)}
+.ligne>*{min-width:0}
+.ligne.wrap{flex-wrap:wrap}
+.vide{color:var(--ink-dim);font-style:italic}
+.grillePal{display:grid;grid-template-columns:repeat(4,1fr);gap:5px}
+.pal{border:2px solid transparent;border-radius:6px;padding:2px;cursor:pointer;background:#0f0d0c;text-align:center;font-size:10px;color:var(--ink-dim);line-height:1.1}
+.pal:hover{border-color:#5a4f45}
+.pal.on{border-color:var(--gold);color:var(--gold)}
+.pal img,.pal .sw{width:100%;aspect-ratio:1;display:block;border-radius:4px;margin-bottom:2px;object-fit:contain}
+.pal .sw{background-size:64px 64px}
+.cat{font-size:11px;color:var(--ink-dim);margin:4px 0 -2px;text-transform:uppercase;letter-spacing:.5px}
+.boutons{display:flex;gap:5px;flex-wrap:wrap}
+.calque{display:flex;align-items:center;gap:6px;padding:3px 0}
+.calque span{flex:1}
+.calque button{padding:2px 6px;min-width:28px}
+.calque input[type=range]{width:70px}
+.choix{display:flex;gap:0;flex:1;min-width:0}
+.choix button{border-radius:0;flex:1;padding:4px 4px;min-width:0;overflow:hidden;text-overflow:ellipsis}
+.choix button:first-child{border-radius:6px 0 0 6px}
+.choix button:last-child{border-radius:0 6px 6px 0}
+.petit{font-size:11px;color:var(--ink-dim)}
+
+/* ---------------- fenêtres ---------------- */
+#voile{position:fixed;inset:0;background:rgba(0,0,0,.6);display:grid;place-items:center;z-index:10;padding:16px}
+#voile[hidden]{display:none}
+#modale{background:var(--panel);border:1px solid #5a4a30;border-radius:10px;box-shadow:0 20px 60px rgba(0,0,0,.6);width:min(640px,100%);max-height:90vh;display:flex;flex-direction:column}
+#modale>header{padding:12px 16px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:10px}
+#modale>header h1{flex:1}
+#modale .corpsM{padding:14px 16px;overflow-y:auto;display:flex;flex-direction:column;gap:10px}
+#modale footer{padding:10px 16px;border-top:1px solid var(--line);display:flex;justify-content:flex-end;gap:8px}
+.liste{display:flex;flex-direction:column;gap:6px}
+.liste .el{display:flex;align-items:center;gap:8px;padding:8px 10px;background:var(--panel2);border:1px solid var(--line);border-radius:7px}
+.liste .el b{flex:1}
+.liste .el.cour{border-color:var(--gold)}
+.modeles{display:grid;grid-template-columns:repeat(auto-fill,minmax(130px,1fr));gap:8px}
+.modeles button{white-space:normal;padding:10px;text-align:left;display:flex;flex-direction:column;gap:3px;height:100%}
+.modeles button b{color:var(--gold);font-family:var(--wfont)}
+.modeles button span{font-size:11px;color:var(--ink-dim)}
+.galerie{display:grid;grid-template-columns:repeat(auto-fill,minmax(84px,1fr));gap:6px}
+.galerie img{width:100%;aspect-ratio:1;object-fit:cover;border-radius:6px;border:2px solid transparent;cursor:pointer;background:#0f0d0c}
+.galerie img:hover{border-color:var(--gold)}
+#toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#2a2218;border:1px solid #8a6a2a;color:var(--gold);padding:8px 16px;border-radius:8px;z-index:20;pointer-events:none;opacity:0;transition:opacity .25s}
+#toast.vu{opacity:1}
+
+/* ---------------- vue des joueurs ---------------- */
+body.joueur #outils,body.joueur #panneau,body.joueur .mj{display:none!important}
+body.joueur #barre{padding:4px 8px}
+body.joueur #nomCarte{pointer-events:none;width:auto;flex:1;font-family:var(--wfont);color:var(--gold);font-size:15px}
+body:not(.joueur) .joueurSeul{display:none!important}
+
+@media (max-width:900px){
+  #panneau{width:250px}
+  #nomCarte{width:140px}
+}
+</style>
+</head>
+<body>
+<header id="barre">
+  <h1>⚔ Cartes</h1>
+  <input id="nomCarte" type="text" title="Nom de la carte" spellcheck="false">
+  <span class="sep mj"></span>
+  <button class="mj" data-act="nouvelle" title="Nouvelle carte">Nouvelle</button>
+  <button class="mj" data-act="ouvrir" title="Ouvrir une carte (Ctrl+O)">Ouvrir</button>
+  <button class="mj" data-act="generer" title="Tirer un donjon, une grotte, un extérieur">Générer…</button>
+  <button class="mj" data-act="image" title="Importer une image de fond (ou glisse-la sur la carte)">Image…</button>
+  <button class="mj" data-act="exporter" title="Exporter en PNG ou en .json">Exporter…</button>
+  <span class="sep mj"></span>
+  <button class="mj" data-act="annuler" title="Annuler (Ctrl+Z)">↶</button>
+  <button class="mj" data-act="refaire" title="Refaire (Ctrl+Y)">↷</button>
+  <span class="sep mj"></span>
+  <button class="mj" id="table" data-act="table" title="Afficher cette carte sur les écrans des joueurs">📡 Montrer aux joueurs</button>
+  <button class="mj" data-act="recentrer" title="Centrer la vue des joueurs sur ce que tu regardes">🎯 Centrer les joueurs</button>
+  <button class="mj" data-act="lienJoueurs" title="L'adresse de la vue des joueurs">🔗</button>
+  <button class="joueurSeul" data-act="ajuster" title="Voir toute la carte">⤢ Toute la carte</button>
+  <button class="joueurSeul" data-act="mesureJoueur" title="Mesurer une distance">📏 Mesurer</button>
+  <button class="joueurSeul" data-act="pleinEcran" title="Plein écran">⛶</button>
+  <span id="statut">…</span>
+</header>
+<div id="corps">
+  <nav id="outils"></nav>
+  <main id="scene">
+    <canvas id="cv"></canvas>
+    <div id="aideOutil"></div>
+    <div id="bulle"></div>
+    <div id="infos">
+      <button data-act="zoomMoins" title="Dézoomer (-)">−</button>
+      <span id="zoom">100 %</span>
+      <button data-act="zoomPlus" title="Zoomer (+)">+</button>
+      <button data-act="ajuster" title="Voir toute la carte (0)">⤢</button>
+      <span id="coord" class="mj"></span>
+    </div>
+  </main>
+  <aside id="panneau"></aside>
+</div>
+<div id="voile" hidden><div id="modale"></div></div>
+<div id="toast"></div>
+<input type="file" id="fichier" accept="image/*" hidden>
+<input type="file" id="fichierJson" accept=".json,application/json" hidden>
+
+<script src="Editeur-de-cartes/textures.js"></script>
+<script src="Editeur-de-cartes/icones.js"></script>
+<script src="Editeur-de-cartes/parchemin.js"></script>
+<script src="Editeur-de-cartes/generateurs.js"></script>
+<script src="Editeur-de-cartes/carte.js"></script>
+<script src="Editeur-de-cartes/editeur.js"></script>
+</body>
+</html>

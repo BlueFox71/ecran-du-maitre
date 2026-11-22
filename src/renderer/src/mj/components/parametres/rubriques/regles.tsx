@@ -7,6 +7,43 @@ import { jaugeSanite, type TemplateSpec } from '@shared/types'
 import { Curseur } from '../briques'
 import { BrouillonMonnaies, type Brouillon } from '../contexte'
 import type { Reglage } from '../registre'
+import { REGLES } from '@shared/wow'
+
+/** Les règles de la campagne : choisies à sa création, elles ne se changent plus. */
+function ReglesDeLaTable(): JSX.Element {
+  const s = useStore()
+  const r = REGLES.find((x) => x.id === s.reglages.regles)
+  return <span className="pm-val">{r ? r.nom : 'pas encore choisies'}</span>
+}
+
+/** Le dossier du jeu WoW sur ce poste. */
+function DossierWow(): JSX.Element {
+  const s = useStore()
+  const [message, setMessage] = useState<string | null>(null)
+  return (
+    <>
+      <span className="pm-val" title={s.poste.wowDossier ?? ''}>
+        {s.poste.wowDossier ?? 'cherché tout seul'}
+      </span>
+      <button
+        className="btn btn-sm"
+        onClick={async () => {
+          const r = await window.jdr.wow.choisirDossier()
+          setMessage(r.message)
+          if (r.ok) await s.refreshReglages()
+        }}
+      >
+        Choisir…
+      </button>
+      {s.poste.wowDossier ? (
+        <button className="btn btn-sm btn-ghost" onClick={() => void s.poserPoste('wow.dossier', null)}>
+          Oublier
+        </button>
+      ) : null}
+      {message ? <span className="aide">{message}</span> : null}
+    </>
+  )
+}
 
 /* ============================================================
    Règles du jeu
@@ -89,6 +126,23 @@ export function SanteMentale(): JSX.Element {
 }
 
 export const reglages: Reglage[] = [
+  {
+    id: 'regles',
+    rubrique: 'regles',
+    nom: 'Règles de la campagne',
+    aide: 'Choisies à la création de la campagne, une fois pour toutes : elles ne se changent plus.',
+    mots: ['wow', 'warcraft', 'azeroth', 'fantômes', 'système', 'jeu', 'aventure'],
+    Cmd: ReglesDeLaTable
+  },
+  {
+    id: 'wow.dossier',
+    rubrique: 'regles',
+    nom: 'Données du jeu WoW',
+    aide: 'Le dossier où le jeu range ses sauvegardes (arbres, fiches des joueurs, cartes) et ses images. Le jeu lui-même est dans l’Écran.',
+    mots: ['wow', 'warcraft', 'serveur', 'aventure', 'arbre de talents', 'dossier'],
+    visible: (s) => s.reglages.regles === 'wow',
+    Cmd: DossierWow
+  },
   {
     id: 'fiche.jet',
     rubrique: 'regles',

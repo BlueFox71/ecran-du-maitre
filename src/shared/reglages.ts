@@ -22,6 +22,7 @@ import { LARGEUR_DEFAUT } from '@shared/ouvertures'
 import type { Transition } from '@shared/types'
 import { lireSm, SM_DEFAUT, type ReglageSm } from '@shared/santeMentale'
 import { lireMonnaies, monnaiesParDefaut, type ReglageMonnaies } from '@shared/monnaies'
+import type { Regles } from '@shared/wow'
 
 /** Ce que la base rend : des chaînes, et rien d'autre. */
 export type Brut = Record<string, string>
@@ -53,6 +54,11 @@ export interface ReglagesCampagne {
   sacCapacite: number
   /** L'assistant de santé mentale — voir `@shared/santeMentale`. */
   sm: ReglageSm
+  /**
+   * Les règles de la table — voir `@shared/wow`. `null` : jamais choisies,
+   * l'écran les demande à l'ouverture (et se comporte en chasse aux fantômes).
+   */
+  regles: Regles | null
 }
 
 export const CAMPAGNE_DEFAUT: ReglagesCampagne = {
@@ -72,7 +78,8 @@ export const CAMPAGNE_DEFAUT: ReglagesCampagne = {
   /* Sans limite : une campagne déjà commencée ne voit pas ses sacs se fermer
      tant que le MJ n'a rien réglé. */
   sacCapacite: 0,
-  sm: SM_DEFAUT
+  sm: SM_DEFAUT,
+  regles: null
 }
 
 export function lireCampagne(b: Brut): ReglagesCampagne {
@@ -91,7 +98,8 @@ export function lireCampagne(b: Brut): ReglagesCampagne {
        objets : c'est dans cette monnaie que leurs prix ont été repris. */
     monnaies: lireMonnaies(b['monnaies'], b['objets.unite']),
     sacCapacite: Math.round(nombre(b, 'sac.capacite', CAMPAGNE_DEFAUT.sacCapacite, 0, 999)),
-    sm: lireSm(b['sm'])
+    sm: lireSm(b['sm']),
+    regles: b['regles'] === 'wow' || b['regles'] === 'fantomes' ? b['regles'] : null
   }
 }
 
@@ -126,6 +134,8 @@ export interface ReglagesPoste {
   mjImage: string | null
   /** Les entrées de « Matière » masquées dans le rail (menu Affichage). */
   railMasques: MatiereRail[]
+  /** Le dossier « Application » du jeu World of Warcraft ; null, on le cherche. */
+  wowDossier: string | null
 }
 
 /** Les entrées de « Matière » que le menu Affichage peut masquer dans le rail. */
@@ -147,7 +157,8 @@ export const POSTE_DEFAUT: ReglagesPoste = {
   mjPrenom: '',
   mjNom: '',
   mjImage: null,
-  railMasques: []
+  railMasques: [],
+  wowDossier: null
 }
 
 /** Les bornes de la loupe du texte : en deçà on ne lit plus, au-delà une ligne ne tient plus. */
@@ -168,7 +179,8 @@ export function lirePoste(b: Brut): ReglagesPoste {
     mjImage: /^(avatar:[a-z-]+|jdr:\/\/profil\/.+)$/.test(b['mj.image'] ?? '') ? b['mj.image'] : null,
     railMasques: (b['rail.masques'] ?? '')
       .split(',')
-      .filter((x): x is MatiereRail => MATIERES_RAIL.some((m) => m.id === x))
+      .filter((x): x is MatiereRail => MATIERES_RAIL.some((m) => m.id === x)),
+    wowDossier: b['wow.dossier']?.trim() || null
   }
 }
 

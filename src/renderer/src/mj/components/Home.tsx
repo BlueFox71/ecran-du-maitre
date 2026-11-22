@@ -1,5 +1,6 @@
 import { useStore } from '../store'
 import { IconClose, IconFolder, IconPlus } from './Icons'
+import { nouvelleCampagne } from './NouvelleCampagne'
 
 /**
  * L'accueil : ce qu'on voit quand aucune campagne n'est ouverte.
@@ -23,10 +24,10 @@ export function Home(): JSX.Element {
         </div>
 
         <div className="gestes">
-          <button className="geste" onClick={() => void window.jdr.project.create()}>
+          <button className="geste" onClick={nouvelleCampagne}>
             <IconPlus />
             <b>Nouvelle campagne</b>
-            <span>Choisis un dossier : il devient la campagne.</span>
+            <span>Choisis ses règles, puis un dossier : il devient la campagne.</span>
           </button>
           <button className="geste" onClick={() => void window.jdr.project.open()}>
             <IconFolder />

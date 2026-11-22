@@ -16,6 +16,9 @@ import * as chars from '../db/repos/characters'
 import * as players from '../db/repos/players'
 import * as carnet from '../carnet'
 import * as mobile from '../mobile'
+import * as wow from '../wow'
+import * as wowFiches from '../wowFiches'
+import type { EnvoiWow, Regles } from '@shared/wow'
 import * as projet from '../project'
 import * as annexes from '../db/repos/annexes'
 import * as smEvenements from '../db/repos/smEvenements'
@@ -244,6 +247,52 @@ export function registerIpc(): void {
     return brut
   })
 
+  /* ---------------- World of Warcraft : le pont avec l'Aventure ---------------- */
+
+  /* Rien de tout cela n'écrit dans la base : le jeu tient ses propres fiches,
+     dans son dossier de données. */
+  on('wow:etat', () => wow.etat())
+  on('wow:demarrer', () => wow.demarrer())
+  on('wow:table', () => wow.table())
+  on('wow:envoyer', (ids: string[], quoi: EnvoiWow) => wow.envoyer(ids, quoi))
+  on('wow:qr', (url: string) => wow.qr(url))
+  /* L'adresse d'une page du jeu, que l'Écran montre dans sa fenêtre. */
+  on('wow:adresse', (page: string) => {
+    if (!['Arbre-de-talents.html', 'Editeur-de-cartes.html'].includes(page)) return null
+    return wow.adresseLocale(page)
+  })
+  on('wow:fenetreJoueur', (joueur: string) => wow.fenetreJoueur(joueur))
+  on('wow:simulateur', (publier: boolean) => wow.simulateur(!!publier))
+  on('wow:quetes', () => wow.quetesPreparees())
+  /* Les personnages créés dans l'Aventure, à associer à un joueur de l'Écran. */
+  on('wow:aAssocier', () => wowFiches.aAssocier())
+  on('wow:associer', (characterId: number, choix: { playerId?: number | null; nouveau?: string | null }) =>
+    wowFiches.associer(characterId, choix)
+  )
+  on('wow:ouvrirDonnees', async () => {
+    await shell.openPath(wow.dossier())
+    return true
+  })
+  on('wow:choisirDossier', async () => {
+    const win = BrowserWindow.getFocusedWindow()
+    const options = {
+      title: 'Le dossier des données du jeu World of Warcraft (Sauvegardes, Images)',
+      properties: ['openDirectory' as const, 'createDirectory' as const]
+    }
+    const r = win ? await dialog.showOpenDialog(win, options) : await dialog.showOpenDialog(options)
+    const d = r.canceled ? null : r.filePaths[0]
+    if (!d) return { ok: false, message: null }
+    if (!wow.estDossierDonnees(d)) {
+      /* Un dossier neuf devient un dossier de données vide : le jeu y écrira. */
+      mkdirSync(join(d, 'Sauvegardes'), { recursive: true })
+      mkdirSync(join(d, 'Images'), { recursive: true })
+    }
+    carnet.poserReglagePoste('wow.dossier', d)
+    /* Le serveur passe sur ces données tout de suite. */
+    await wow.demarrer()
+    return { ok: true, message: null }
+  })
+
   /* ---------------- l'examen des médias ---------------- */
 
   /* Ce que la fenêtre des paramètres montre du graveur, et le geste qui le
@@ -261,7 +310,7 @@ export function registerIpc(): void {
 
   on('project:current', () => projet.currentProject())
   on('project:recents', () => carnet.recents())
-  on('project:new', () => projet.promptNew())
+  on('project:new', (regles?: Regles) => projet.promptNew(regles))
   on('project:open', () => projet.promptOpen())
   on('project:openPath', (dir: string): ProjectInfo | null =>
     dir === projet.currentDir() ? projet.currentProject() : projet.switchTo(dir)
@@ -341,6 +390,9 @@ export function registerIpc(): void {
   on('items:rename', (rel: string, name: string) => fsLib.renameEntry(rel, name))
   on('items:trash', (rel: string) => fsLib.trashEntry(rel))
   on('items:reveal', (rel: string) => fsLib.revealEntry(rel))
+  /* shell.openPath ouvre aussi bien un fichier qu'un dossier : avec le logiciel
+     que Windows lui associe, et seulement dans le dossier de campagne. */
+  on('items:openWith', (rel: string) => fsLib.openFolderInExplorer(rel))
   /* La page d'un PDF dont on tire sa vignette. Le dépôt efface la signature de
      l'examen ; c'est planifier() qui remet le graveur au travail. */
   on('items:thumbPage', (id: number, page: number) => {
@@ -1226,6 +1278,11 @@ export function registerIpc(): void {
     /* Un point de vie perdu doit se voir à l'écran dans la seconde. */
     const r = chars.adjustGauge(id, key, delta, reason, maxDelta ?? 0)
     display.refreshJoueurs()
+    /* Un personnage WoW : la fiche de l'Aventure suit (PV, ressource). */
+    if (delta !== 0 && (key === 'pv' || key === 'ressource')) {
+      const v = r.character.data.gauges[key]?.value
+      if (v !== undefined) wow.pousserFiche(id, key === 'pv' ? { pv: v } : { res: v })
+    }
     /* Un PNJ qui montre son état le change sur son pion. */
     if (r.character.kind === 'pnj' && r.character.etatVisible) display.refreshPions()
     return r
@@ -1259,8 +1316,11 @@ export function registerIpc(): void {
     return c
   })
   on('characters:setStat', (id: number, key: string, v: number) => {
+    const avant = chars.getCharacter(id)?.data.stats[key]
     const c = chars.setStat(id, key, v)
     mobile.broadcast()
+    /* Un personnage WoW : la caractéristique part dans sa fiche de l'Aventure. */
+    if (avant !== undefined && avant !== v) wow.pousserFiche(id, { car: { [key]: v }, ecarts: { [key]: v - avant } })
     return c
   })
   on('characters:setState', (id: number, key: string, on2: boolean) => chars.setState(id, key, on2))

@@ -5,6 +5,7 @@ import { IconCheck } from './Icons'
 import { useEchap } from '../echap'
 import type { Rubrique } from './parametres/registre'
 import { MATIERES_RAIL } from '@shared/reglages'
+import { nouvelleCampagne } from './NouvelleCampagne'
 
 /**
  * La barre de menus, en haut à gauche — là où tous les logiciels la mettent.
@@ -72,7 +73,7 @@ export function Menubar({
   return (
     <div className="menubar" ref={barre} role="menubar" onPointerDownCapture={noterChamp}>
       <Menu nom="Fichier" id="fichier" ouvert={ouvert} onOuvrir={setOuvert}>
-        <Mi label="Nouvelle campagne…" acc="Ctrl N" on={() => void window.jdr.project.create()} />
+        <Mi label="Nouvelle campagne…" acc="Ctrl N" on={nouvelleCampagne} />
         <Mi label="Ouvrir une campagne…" acc="Ctrl O" on={() => void window.jdr.project.open()} />
         <hr />
         <Mi label="Ouvrir le dossier de données" on={() => void window.jdr.app.openDataFolder()} />

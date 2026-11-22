@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { Brut } from '@shared/reglages'
+import type { EnvoiWow, JoueurWow, PersoAAssocier, QuetePreparee, Regles, ServeurWow } from '@shared/wow'
 import type { Modif } from '@shared/modifs'
 import type { EvenementSm } from '@shared/santeMentale'
 import type { Cible, Plage } from '@shared/surlignage'
@@ -156,6 +157,36 @@ const api = {
   },
 
   /**
+   * World of Warcraft : le serveur du jeu (l'Aventure des joueurs), sa table
+   * et la boîte des joueurs. Voir `main/wow.ts`.
+   */
+  wow: {
+    etat: () => call<ServeurWow>('wow:etat'),
+    demarrer: () => call<ServeurWow>('wow:demarrer'),
+    table: () => call<JoueurWow[]>('wow:table'),
+    envoyer: (ids: string[], quoi: EnvoiWow) => call<boolean>('wow:envoyer', ids, quoi),
+    qr: (url: string) => call<string>('wow:qr', url),
+    adresse: (page: 'Arbre-de-talents.html' | 'Editeur-de-cartes.html') =>
+      call<string | null>('wow:adresse', page),
+    fenetreJoueur: (joueur: string) => call<boolean>('wow:fenetreJoueur', joueur),
+    ouvrirDonnees: () => call<boolean>('wow:ouvrirDonnees'),
+    simulateur: (publier: boolean) => call<{ ok: boolean; texte: string }>('wow:simulateur', publier),
+    /** Les quêtes préparées de la campagne ouverte (quetes-wow.json). */
+    quetes: () => call<QuetePreparee[]>('wow:quetes'),
+    /** Les personnages créés dans l'Aventure qui attendent leur joueur. */
+    aAssocier: () => call<PersoAAssocier[]>('wow:aAssocier'),
+    associer: (characterId: number, choix: { playerId?: number | null; nouveau?: string | null }) =>
+      call<void>('wow:associer', characterId, choix),
+    /** Un personnage vient d'être créé dans l'Aventure. Renvoie le désabonnement. */
+    onAAssocier: (cb: () => void) => {
+      const h = (): void => cb()
+      ipcRenderer.on('wow:aAssocier', h)
+      return (): void => void ipcRenderer.removeListener('wow:aAssocier', h)
+    },
+    choisirDossier: () => call<{ ok: boolean; message: string | null }>('wow:choisirDossier')
+  },
+
+  /**
    * Le projet ouvert — un dossier de campagne. Changer de projet recharge
    * l'interface : les promesses de `new`, `open` et `openPath` ne se résolvent
    * donc jamais côté appelant quand la bascule a lieu.
@@ -163,7 +194,7 @@ const api = {
   project: {
     current: () => call<ProjectInfo | null>('project:current'),
     recents: () => call<RecentProject[]>('project:recents'),
-    create: () => call<ProjectInfo | null>('project:new'),
+    create: (regles?: Regles) => call<ProjectInfo | null>('project:new', regles),
     open: () => call<ProjectInfo | null>('project:open'),
     openPath: (dir: string) => call<ProjectInfo | null>('project:openPath', dir),
     update: (patch: { name?: string; system?: string | null }) =>
@@ -341,6 +372,8 @@ const api = {
     trash: (rel: string) => call<void>('items:trash', rel),
     importFiles: (folderRel = '') => call<UiItem[]>('items:import', folderRel),
     reveal: (relPath: string) => call<void>('items:reveal', relPath),
+    /** Ouvrir le fichier avec le logiciel de Windows (Word pour un .docx…). */
+    openWith: (relPath: string) => call<void>('items:openWith', relPath),
     /**
      * De quelle page d'un PDF on tire sa vignette. Elle se regrave ensuite
      * toute seule, et `library.onChanged` l'annonce.

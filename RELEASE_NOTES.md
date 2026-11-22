@@ -1,4 +1,4 @@
-<!-- version: 1.8.0 -->
+<!-- version: 1.10.0 -->
 ### Nouveautés
 - **Chaque séance a ses propres objets.** Familles, objets, inventaires et pochette appartiennent désormais à une séance. Une nouvelle séance démarre vide : plus d'objets, de documents ni de pochette hérités des séances d'avant.
 - **Importer depuis une séance précédente.** Un nouveau bouton, dans Objets et dans la Pochette, ouvre une fenêtre où tu choisis la séance d'origine, puis ce que tu reprends : une famille entière d'une case, ou objet par objet ; un onglet de la pochette entier, ou document par document.
