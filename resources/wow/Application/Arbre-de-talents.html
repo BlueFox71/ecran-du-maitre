@@ -13468,7 +13468,10 @@ function ouvrirCreation(opt) {
   /* On arrive sur humain guerrier, sauf pour un personnage déjà créé. */
   /* fx : l'éditeur d'effets ouvert ; pose : l'effet à poser ; sel : l'effet réglé. */
   const st = { race: opt.race || "humain", classe: opt.race && opt.classe || "guerrier", edit: false, fx: false, pose: "", sel: "",
-               prenom: opt.prenom || "", nom: opt.nom || "", sexe: opt.sexe || "" };
+               prenom: opt.prenom || "", nom: opt.nom || "", sexe: opt.sexe || "", joueur: opt.joueur || "" };
+  /* Côté MJ, le personnage est pour un joueur : « Créer Jokobo pour Gilibert ». */
+  const libelleGo = () => "Créer " + (st.prenom.trim() || "le personnage") +
+    (opt.mj && st.joueur.trim() ? " pour " + st.joueur.trim() : "");
   if (!raceCrea(st.race)) st.race = CREA.races[0].id;
   if (!jouable(raceCrea(st.race), st.classe)) st.classe = raceCrea(st.race).classes[0] || "";
   const v = document.createElement("div");
@@ -13695,8 +13698,10 @@ function ouvrirCreation(opt) {
         '<button data-sexe="' + s + '"' + (st.sexe === s ? ' class="on"' : "") + ">" + s + "</button>").join("") + "</div>" +
       '<div class="crNoms"><input type="text" data-id="prenom" placeholder="Prénom" value="' + h(st.prenom) + '">' +
         '<input type="text" data-id="nom" placeholder="Nom" value="' + h(st.nom) + '"></div>' +
+      (opt.mj ? '<div class="crNoms"><input type="text" data-id="joueur" placeholder="Joueur (prénom) — vide : fiche d’essai du MJ"' +
+                ' title="Le personnage part dans la fiche de ce joueur, et l’Écran du Maître le reçoit" value="' + h(st.joueur) + '"></div>' : "") +
       '<button class="crGo" data-act="creer"' + (ok ? "" : " disabled") + ">" +
-        (ok ? "Créer " + (st.prenom.trim() ? h(st.prenom.trim()) : "le personnage")
+        (ok ? h(libelleGo())
             : st.race && st.classe ? "Combinaison impossible" : "Choisis une race et une classe") + "</button>";
   }
   function rendu() {
@@ -13761,7 +13766,7 @@ function ouvrirCreation(opt) {
     if (act === "creer") {
       if (st.edit) sauveCreation();
       return fermer({ race: st.race, classe: st.classe, prenom: st.prenom.trim(), nom: st.nom.trim(), sexe: st.sexe,
-                      car: statsDepart(st.race, st.classe) });
+                      joueur: opt.mj ? st.joueur.trim() : "", car: statsDepart(st.race, st.classe) });
     }
   });
   /* Glisser l'illustration : le décalage est en % de l'écran, il tient quelle que soit la fenêtre. */
@@ -13785,7 +13790,7 @@ function ouvrirCreation(opt) {
   v.addEventListener("input", e => {
     const t = e.target;
     if (t.dataset.id) { st[t.dataset.id] = t.value; const go = v.querySelector(".crGo");
-      if (go && !go.disabled) go.textContent = "Créer " + (st.prenom.trim() || "le personnage"); return; }
+      if (go && !go.disabled) go.textContent = libelleGo(); return; }
     if (t.dataset.f) return ecrit(t.dataset.f, t.dataset.lignes ? t.value.split("\n").map(s => s.trim()).filter(Boolean) : t.value);
     if (t.dataset.fxk) return regleFx(t);
   });
@@ -13876,6 +13881,7 @@ async function creationDepuisBouton() {
   const r = await ouvrirCreation({ mj: !JOUEUR, race: raceDeNom(perso.race), classe: CLASS_ID,
                                    prenom: perso.prenom, nom: perso.nom, sexe: perso.sexe });
   if (!r) return;
+  if (!JOUEUR && r.joueur) return creerPourJoueur(r);
   if (r.classe !== CLASS_ID) {
     /* Un joueur qui change de classe recommence : il le sait avant que ça parte. */
     const nouvelle = (CLASSES.find(c => c.id === r.classe) || {}).name;
@@ -13886,6 +13892,41 @@ async function creationDepuisBouton() {
   const dejaFait = perso.race || CARACS.some(([k]) => (parseInt(perso.car[k].pt) || 0) !== 0);
   if (dejaFait && !confirm("Remplacer la race et les caractéristiques de " + (perso.prenom || "ce personnage") + " (" + cls().name + ") ?")) return;
   appliqueCreation(r);
+}
+
+/* Le MJ crée le personnage d'un joueur : il doit finir dans la fiche de ce
+   joueur (Sauvegardes\Joueurs\<joueur>.json), la seule que l'Écran du Maître
+   suit — la fiche de la classe, côté MJ, n'est à personne. L'onglet passe un
+   instant sur la fiche du joueur, y pose la création, l'enregistre, puis
+   revient à la vue du MJ. */
+const SS_CREA_JOUEUR = j => "jdr-crea-pour-joueur:" + j;
+async function creerPourJoueur(r) {
+  const j = slug(r.joueur);
+  if (!j) return;
+  if (!DISK) {
+    toast("Pas de sauvegarde sur disque : ouvre l'Aventure depuis l'Écran du Maître pour créer le personnage d'un joueur.", 8000);
+    return;
+  }
+  const deja = await diskRead(SAVE_JOUEUR(j));
+  const p = deja && deja.progress && deja.progress.perso;
+  const nomDeja = p ? [p.prenom, p.nom].filter(Boolean).join(" ").trim() : "";
+  if (nomDeja && !confirm(r.joueur + " a déjà un personnage (" + nomDeja + "). Le remplacer par " + (r.prenom || "le nouveau") + " ?")) return;
+  if (S && tmpDirty) { persist(); persistPlay(); await flushTmp(); }
+  try { sessionStorage.setItem(SS_CREA_JOUEUR(j), JSON.stringify(Object.assign({}, r, { retour: location.href, remplace: !!deja }))); }
+  catch (e) { toast("Impossible de préparer la fiche de " + r.joueur + ".", 6000); return; }
+  const u = new URL(location.href);
+  u.searchParams.set("joueur", j);
+  u.searchParams.set("classe", r.classe);
+  location.replace(u.toString());
+}
+/* Côté fiche du joueur : une création laissée par le MJ, s'il y en a une (une seule fois). */
+function creationDuMj() {
+  try {
+    const k = SS_CREA_JOUEUR(JOUEUR), t = sessionStorage.getItem(k);
+    sessionStorage.removeItem(k);
+    const r = t ? JSON.parse(t) : null;
+    return r && CLASSES.some(c => c.id === r.classe) ? r : null;
+  } catch (e) { return null; }
 }
 
 (async function boot() {
@@ -13910,10 +13951,14 @@ async function creationDepuisBouton() {
   /* Un joueur sans personnage passe par la création. */
   let creaJoueur = null;
   if (JOUEUR) {
+    const duMj = creationDuMj();
     const fiche = await pickJoueur();
-    if (fiche && CLASSES.some(c => c.id === fiche.classe)) want = fiche.classe;
-    if (!CLASSES.some(c => c.id === want) || !(fiche || new URLSearchParams(location.search).get("classe")))
-      { creaJoueur = await ouvrirCreation({ obligatoire: true, prenom: NOM_JOUEUR }); want = creaJoueur.classe; }
+    if (duMj) { creaJoueur = duMj; want = duMj.classe; }
+    else {
+      if (fiche && CLASSES.some(c => c.id === fiche.classe)) want = fiche.classe;
+      if (!CLASSES.some(c => c.id === want) || !(fiche || new URLSearchParams(location.search).get("classe")))
+        { creaJoueur = await ouvrirCreation({ obligatoire: true, prenom: NOM_JOUEUR }); want = creaJoueur.classe; }
+    }
     sel.style.display = "none";
   }
   $("#diskState").addEventListener("click", () => {
@@ -13927,6 +13972,22 @@ async function creationDepuisBouton() {
   showDisk();
   await openClass(CLASSES.some(c => c.id === want) ? want : "paladin", true);
   if (creaJoueur) appliqueCreation(creaJoueur);
+  /* Une création du MJ : la fiche du joueur est écrite, on rend l'onglet au MJ. */
+  if (creaJoueur && creaJoueur.retour) {
+    tmpDirty = true;
+    await flushTmp();
+    if (tmpBroken) toast("La fiche de " + NOM_JOUEUR + " n'a pas pu être enregistrée : réessaie.", 8000);
+    else {
+      try { sessionStorage.setItem("jdr-crea-faite", (creaJoueur.prenom || "Le personnage") + " est maintenant le personnage de " + NOM_JOUEUR + "."); } catch (e) {}
+      location.replace(creaJoueur.retour);
+      return;
+    }
+  }
+  if (!JOUEUR) {
+    let fait = null;
+    try { fait = sessionStorage.getItem("jdr-crea-faite"); sessionStorage.removeItem("jdr-crea-faite"); } catch (e) {}
+    if (fait) toast(fait + " L'Écran du Maître va demander à quel joueur l'associer.", 7000);
+  }
   $("#btnCrea").addEventListener("click", SIMU ? creationSimu : creationDepuisBouton);
   /* « Tout éclairer » : l'arbre entier lisible, puis retour à la simulation. */
   $("#btnEclaire").addEventListener("click", () => {
