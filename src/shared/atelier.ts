@@ -17,6 +17,7 @@ import {
   type NatureOuverture,
   type PointMur
 } from './types'
+import { TEMPERATURE_MAX, TEMPERATURE_MIN, type TraitMesure } from './chasse'
 
 /** Un point en cases, l'origine en haut à gauche du terrain. */
 export type PointCase = [number, number]
@@ -131,6 +132,11 @@ export interface Construction {
   murs: MurBati[]
   ouvertures: OuvertureBatie[]
   objets: ObjetPose[]
+  /** Les calques de l'outil de chasse : traits peints, le dernier par-dessus (voir `chasse.ts`). */
+  emf?: TraitMesure[]
+  temperature?: TraitMesure[]
+  /** La température d'une pièce sans trait peint, en °C ; absente : celle par défaut. */
+  ambiante?: number
 }
 
 /** L'habillage d'une pièce : un point à l'intérieur, et la matière de ses murs. */
@@ -610,6 +616,26 @@ export function lireConstruction(brut: unknown): Construction {
     if (texte(h?.id) && texte(h?.assetId) && pt)
       habillages.push({ id: h.id, pt: pt[0], assetId: h.assetId, ...(couleurSure(h.teinte) ? { teinte: h.teinte } : {}) })
   }
+  /* Un calque de mesure : une gomme (`valeur: null`) est gardée, une valeur est
+     * ramenée par `normaliser` ; un trait sans id, sans points ou sans pinceau part. */
+  const calque = (brut: unknown, normaliser: (n: number) => number | null): TraitMesure[] => {
+    const traits: TraitMesure[] = []
+    for (const t of liste(brut)) {
+      const pts = points(t?.pts, 1)
+      if (!texte(t?.id) || !pts || !fini(t.rayon) || t.rayon <= 0) continue
+      if (t.valeur === null) traits.push({ id: t.id, valeur: null, rayon: t.rayon, pts })
+      else if (fini(t.valeur)) {
+        const valeur = normaliser(t.valeur)
+        if (valeur !== null) traits.push({ id: t.id, valeur, rayon: t.rayon, pts })
+      }
+    }
+    return traits
+  }
+  const emf = calque(v.emf, (n) => {
+    const niveau = Math.min(5, Math.round(n))
+    return niveau >= 1 ? niveau : null
+  })
+  const temperature = calque(v.temperature, (n) => Math.min(TEMPERATURE_MAX, Math.max(TEMPERATURE_MIN, n)))
   return {
     v: 1,
     ...(texte(v.base) ? { base: v.base } : {}),
@@ -620,7 +646,10 @@ export function lireConstruction(brut: unknown): Construction {
     sols,
     murs,
     ouvertures,
-    objets
+    objets,
+    ...(emf.length ? { emf } : {}),
+    ...(temperature.length ? { temperature } : {}),
+    ...(fini(v.ambiante) ? { ambiante: v.ambiante } : {})
   }
 }
 

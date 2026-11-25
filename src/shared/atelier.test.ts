@@ -415,3 +415,50 @@ describe('le mur invisible dans le calque', () => {
     expect(relu.murs.map((m) => [!!m.invisible, !!m.bloquant])).toEqual([[true, false], [true, true], [false, false]])
   })
 })
+
+describe('lireConstruction — calques de mesure', () => {
+  const t = (id: string, valeur: number | null, rayon = 1, pts: unknown = [[2, 2]]) => ({ id, valeur, rayon, pts })
+
+  it('garde les calques de mesure', () => {
+    const c = {
+      ...constructionVide(),
+      emf: [t('a', 4), t('g', null)],
+      temperature: [t('t', -5, 2, [[1, 1]]), t('h', null)],
+      ambiante: 12
+    }
+    const relu = lireConstruction(JSON.stringify(c))
+    expect(relu.emf).toEqual(c.emf)
+    expect(relu.temperature).toEqual(c.temperature)
+    expect(relu.ambiante).toBe(12)
+  })
+
+  it('borne et arrondit l’EMF, écarte le niveau 0', () => {
+    const brut = { ...constructionVide(), emf: [t('haut', 9), t('zero', 0), t('petit', 0.4), t('arrondi', 2.6)] }
+    expect(lireConstruction(brut).emf?.map((x) => [x.id, x.valeur])).toEqual([['haut', 5], ['arrondi', 3]])
+  })
+
+  it('borne la température à [-20, 35]', () => {
+    const brut = { ...constructionVide(), temperature: [t('f', -50), t('c', 80), t('n', 20)] }
+    expect(lireConstruction(brut).temperature?.map((x) => x.valeur)).toEqual([-20, 35, 20])
+  })
+
+  it('écarte les traits sans points, sans rayon valide ou sans id', () => {
+    const brut = {
+      ...constructionVide(),
+      emf: [t('a', 3, 1, null), t('b', 3, 0), t('c', 3, -1), t('', 3), t('d', 3, 1, [])],
+      temperature: [t('e', 10, Infinity), t('ok', 10)]
+    }
+    const relu = lireConstruction(brut)
+    expect(relu.emf).toBeUndefined()
+    expect(relu.temperature?.map((x) => x.id)).toEqual(['ok'])
+  })
+
+  it('ambiante absente ou non finie : absente ; une construction sans calques n’en gagne pas', () => {
+    expect(lireConstruction({ ...constructionVide(), ambiante: 'chaud' })).not.toHaveProperty('ambiante')
+    expect(lireConstruction({ ...constructionVide(), ambiante: null })).not.toHaveProperty('ambiante')
+    const nu = lireConstruction(constructionVide())
+    expect(nu).not.toHaveProperty('emf')
+    expect(nu).not.toHaveProperty('temperature')
+    expect(nu).not.toHaveProperty('ambiante')
+  })
+})

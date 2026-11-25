@@ -51,12 +51,9 @@ export interface AppareilChasse {
   gain: number
 }
 
-/** Les calques que porte une construction (ajoutés à `Construction` par l'atelier). */
-type AvecCalques = (Construction & {
-  emf?: TraitMesure[]
-  temperature?: TraitMesure[]
-  ambiante?: number
-}) | null
+/** Bornes d'une température peinte, en °C. */
+export const TEMPERATURE_MIN = -20
+export const TEMPERATURE_MAX = 35
 
 /**
  * La valeur peinte sous le point : on parcourt les traits du dernier au
@@ -71,12 +68,12 @@ export function mesureSous(traits: TraitMesure[] | undefined, p: PointCase): num
   return null
 }
 
-export function niveauEmfSous(c: AvecCalques, p: PointCase | null): number {
+export function niveauEmfSous(c: Construction | null, p: PointCase | null): number {
   if (!c || !p) return 0
   return mesureSous(c.emf, p) ?? 0
 }
 
-export function temperatureSous(c: AvecCalques, p: PointCase | null): number {
+export function temperatureSous(c: Construction | null, p: PointCase | null): number {
   const ambiante = c?.ambiante ?? AMBIANTE_DEFAUT
   if (!c || !p) return ambiante
   return mesureSous(c.temperature, p) ?? ambiante
