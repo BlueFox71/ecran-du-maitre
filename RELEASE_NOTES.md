@@ -1,13 +1,11 @@
-<!-- version: 1.12.0 -->
+<!-- version: 1.13.0 -->
 ### Nouveautés
-- **Simulation Objets : le matériel du chasseur de fantômes.** Une nouvelle page, sous Matière (seulement dans une campagne de chasse aux fantômes), pour faire vivre les objets de la chasse pendant la partie. Choisis un objet dans le menu du haut. Rien ne part vers l'écran des joueurs ni les portables : tout se passe sur ton poste.
-  - **L'EMF** : monte le niveau (ou lance une « approche ») et l'appareil s'allume LED par LED, avec un grésillement qui s'emballe.
-  - **Le thermomètre** : choisis une température, l'écran la rejoint en douceur, avec le petit bruit d'un vrai appareil.
-  - **La Spirit Box** : la radio balaie les fréquences ; tape une phrase et l'esprit la prononce au milieu du grésillement, avec les voix installées sur Windows. Règle la voix (grave, netteté, voix hachée, écho), le grésillement et la vitesse du balayage.
-  - **La planche de spiritisme** : appuie sur une lettre (ou une touche du clavier) et la goutte glisse jusqu'à elle.
-  - **Le tarot** : tire toi-même les 22 arcanes d'un jeu de photographies hantées ; chaque carte se retourne avec son texte.
-  - **Le livre d'écriture** : tape un texte, et une main invisible le trace au crayon dans le livre, lettre par lettre, dans l'écriture de ton choix.
+- **L'EMF et le thermomètre passent dans la main des joueurs.** Dans la fiche d'un objet, choisis son **outil de chasse** : l'objet prend alors la photo de l'appareil. Les joueurs le rangent dans l'inventaire partagé, le portent, et l'utilisent depuis le nouvel onglet **Objets** de leur téléphone : un bouton pour l'allumer ou l'éteindre, et un autre pour **le poser ici**.
+- **Poser et ramasser sur le plan.** Un appareil posé est dessiné vu de dessus sur la carte, avec une lueur qui suit son niveau, et il reste invisible dans le noir. Un EMF posé continue de mesurer. Un joueur ne peut le ramasser que s'il est assez près et sans mur entre eux ; si quelqu'un l'a déjà pris, il en est prévenu.
+- **Peins l'EMF et la température dans l'atelier.** À l'étape Objets de la construction d'un plan, peins des zones de niveau EMF de 1 à 5 et des températures, avec une température ambiante pour le reste du lieu. Les joueurs ne voient jamais ces zones, seulement ce que leurs appareils mesurent.
+- **Le grésillement de chaque EMF sort du PC.** Il est plus fort quand le pion le plus proche s'approche, étouffé à travers les murs, et muet au niveau 0.
+- **Prends la main sur un appareil.** En haut de Simulation Objets, « **Prendre le contrôle de cet objet** » te laisse piloter l'appareil à la place des mesures du plan (le fantôme attaque : niveau 5), puis « **Lâcher le contrôle** » le rend à la carte.
 
 ### Améliorations
-- **Plans et Atelier ne font plus qu'un.** L'onglet Atelier disparaît : un plan se donne depuis le volet d'un lieu, dans Lieux. Deux choix : **partir d'une image** (comme avant, les murs se tracent dessus) ou **construire le plan** avec les assets de l'atelier, dont les murs et les portes deviennent ceux du plan. En sortant de la construction, tu reviens sur le lieu, dans Lieux ou dans Plans.
-- **Fin des profils de l'atelier** : tous les assets sont visibles par tout le monde. Un lieu qui utilise un asset retiré du catalogue te le signale avant d'enregistrer.
+- **Sur l'EMF, la première LED verte reste allumée** quand l'appareil est en marche au niveau 0, comme sur un vrai appareil ; toutes les autres sont éteintes.
+- **Les pas des pions ne rechargent plus les téléphones** inutilement : ils ne sont prévenus que si ce qu'ils voient change.
