@@ -2,6 +2,7 @@ import { Fragment, useEffect, useLayoutEffect, useMemo, useRef, useState } from 
 import { createPortal } from 'react-dom'
 import { COLLAGE_CELLS, FRAME_NEUTRE, corpsDeCase, etatDeVie } from '@shared/types'
 import { Brouillard, regardsDes, sousUnRegard } from './Brouillard'
+import { MeteoAnimee } from './Ambiance'
 import { Visage } from './Visage'
 import { usePionsLisses } from './pionsLisses'
 import { barrieres, pasContraint, type Pt } from '@shared/murs'
@@ -189,7 +190,6 @@ export interface Repere {
  * donc identiques aux trois échelles.
  */
 export interface SlideExtras {
-  /** Le temps qu'il fait sur l'image : pluie, vent, feu, brouillard. */
   /**
    * Le calque d'ombre : murs, ouvertures et lumières du lieu diffusé.
    *
@@ -1636,6 +1636,30 @@ export function Framed({
     )
   })()
 
+  /* L'ambiance du lieu : la teinte sur l'image, sous l'ombre ; le temps par-dessus. */
+  const amb = brouillard?.ambiance ?? null
+  /* Le cadre tourné et zoomé fait un groupe à part : c'est donc lui qui se
+     mélange à l'image (multiplier, puis la couleur), et non ce qu'il contient. */
+  const teinteAmbiance =
+    amb?.teinte && amb.force > 0 && nat && repere ? (
+      <>
+        <div
+          className="brouillard-cadre ambiance-teinte"
+          style={{ ...repere.cadre, transform: repere.transform, background: amb.teinte, mixBlendMode: 'multiply', opacity: amb.force }}
+        />
+        <div
+          className="brouillard-cadre ambiance-teinte"
+          style={{ ...repere.cadre, transform: repere.transform, background: amb.teinte, mixBlendMode: 'color', opacity: amb.force * 0.3 }}
+        />
+      </>
+    ) : null
+  const meteoAmbiance =
+    amb && amb.meteo !== 'aucune' && nat && repere ? (
+      <div className="brouillard-cadre" style={{ ...repere.cadre, transform: repere.transform, overflow: 'hidden' }}>
+        <MeteoAnimee meteo={amb.meteo} force={amb.meteoForce} />
+      </div>
+    ) : null
+
   /**
    * Ce que le MJ survole, montré sur la carte.
    *
@@ -2218,8 +2242,10 @@ export function Framed({
       )}
       {/* Après l'image, jamais avant : peinte dessous, l'ombre ne se verrait
           pas. C'est le genre de détail qui ne se trouve qu'à l'écran. */}
+      {teinteAmbiance}
       {objetsVus}
       {ombre}
+      {meteoAmbiance}
       {piecesVues}
       {traits}
       {/* La case décochée, l'article parti : sa bulle part avec lui. */}

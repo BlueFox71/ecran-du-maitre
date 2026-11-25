@@ -13,6 +13,8 @@
  * - un pion d'essai posé : on vérifie ses murs sans quitter la fiche.
  */
 import { useEffect, useId, useMemo, useRef, useState } from 'react'
+import { CouleurDuLieu } from './CouleurDuLieu'
+import { AMBIANCE_NEUTRE, type Ambiance } from '@shared/ambiance'
 import {
   MUR_NATURES,
   NATURES_TRACABLES,
@@ -211,6 +213,11 @@ export const TORCHE = 0.14
    ============================================================ */
 
 export function useMurs(placeId: number): {
+  /** Le lieu dont c'est le plan. */
+  placeId: number
+  /** La couleur générale de la carte et sa météo. */
+  ambiance: Ambiance
+  reglerAmbiance: (patch: Partial<Ambiance>) => void
   /** Relire le plan tel que la base le rend — après un rognage, un calage. */
   relire: () => Promise<void>
   liste: Mur[]
@@ -392,6 +399,26 @@ export function useMurs(placeId: number): {
   const [loupe, setLoupe] = useState(true)
   const [apercuLum, setApercuLum] = useState(false)
   const [testLum, setTestLum] = useState(false)
+  /* La couleur générale et la météo : l'écran suit tout de suite, la base un peu après. */
+  const [ambiance, setAmbiance] = useState<Ambiance>(AMBIANCE_NEUTRE)
+  const ecritAmbiance = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    let vivant = true
+    void window.jdr.places.lireAmbiance(placeId).then((r) => {
+      if (vivant) setAmbiance(r ?? AMBIANCE_NEUTRE)
+    })
+    return () => {
+      vivant = false
+    }
+  }, [placeId])
+  const reglerAmbiance = (patch: Partial<Ambiance>): void => {
+    setAmbiance((avant) => {
+      const neuve = { ...avant, ...patch }
+      if (ecritAmbiance.current) clearTimeout(ecritAmbiance.current)
+      ecritAmbiance.current = setTimeout(() => void window.jdr.places.ambiance(placeId, neuve), 150)
+      return neuve
+    })
+  }
   const [gomme, setGomme] = useState(GOMME.rayon)
   const [noir, setNoir] = useState<number | null>(null)
   const [choisi, setChoisi] = useState<number | null>(null)
@@ -926,6 +953,9 @@ export function useMurs(placeId: number): {
     lumGarde,
     reglerLumGarde,
     astre,
+    placeId,
+    ambiance,
+    reglerAmbiance,
     astreLieu,
     reglerAstre,
     cielGeneral,
@@ -1120,9 +1150,7 @@ export function FormerPiece({
 }
 
 /**
- * « Test lumière » : tenu, pas cliqué — on regarde, on lâche, on reprend où
- * l'on était. La capture du pointeur garde le test tant que le doigt appuie,
- * même s'il glisse hors du bouton. Dans la barre des murs et dans celle d'une
+ * « Test lumière » : un clic l'allume, un autre l'éteint. Dans la barre des murs et dans celle d'une
  * lampe : c'est en réglant une lampe qu'on veut voir ce qu'elle donne.
  */
 export function BoutonTestLumiere({ m }: { m: ReturnType<typeof useMurs> }): JSX.Element {
@@ -1133,17 +1161,12 @@ export function BoutonTestLumiere({ m }: { m: ReturnType<typeof useMurs> }): JSX
       disabled={!m.lumieres.length && !m.astre}
       title={
         m.lumieres.length || m.astre
-          ? 'Maintenir appuyé : le plan dans le noir, avec ce que toutes les lampes éclairent — murs compris'
+          ? m.testLum
+            ? 'Cliquer pour revenir au plan éclairé'
+            : 'Cliquer : le plan dans le noir, avec ce que toutes les lampes éclairent — murs compris. Recliquer pour revenir.'
           : 'Pose d’abord une lumière : il n’y aurait rien à montrer'
       }
-      onPointerDown={(e) => {
-        if (e.button !== 0) return
-        e.currentTarget.setPointerCapture(e.pointerId)
-        m.setTestLum(true)
-      }}
-      onPointerUp={() => m.setTestLum(false)}
-      onPointerCancel={() => m.setTestLum(false)}
-      onLostPointerCapture={() => m.setTestLum(false)}
+      onClick={() => m.setTestLum(!m.testLum)}
     >
       <IconSoleil />
       Test lumière
@@ -4426,6 +4449,7 @@ function LumiereDuDehorsReglage({ m }: { m: ReturnType<typeof useMurs> }): JSX.E
         </span>
       ) : null}
       <LumiereDuDehorsBoutons m={m} voir />
+      <CouleurDuLieu ambiance={m.ambiance} regler={m.reglerAmbiance} />
       {m.espace ? (
         <div className="murs-rangee">
           <button

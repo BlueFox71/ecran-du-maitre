@@ -304,6 +304,9 @@ export interface MajFicheWow {
   totaux?: Record<string, number>
   pv?: number
   res?: number
+  /** Les maximums voulus par le MJ (totaux) : l'Aventure recale sa base pour y arriver. */
+  pvMax?: number
+  resMax?: number
   car?: Record<string, number>
   /** Hors ligne : l'écart voulu par le MJ, pour décaler les points de la fiche. */
   ecarts?: Record<string, number>

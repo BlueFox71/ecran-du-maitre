@@ -65,6 +65,7 @@ function modifsVieillis(): void {
   display.versMj('characters:relus', null)
   mobile.broadcast()
 }
+import type { Ambiance } from '@shared/ambiance'
 import type {
   Astre,
   ExamenFait,
@@ -576,6 +577,13 @@ export function registerIpc(): void {
     display.calqueABouge()
     return p
   })
+  /* La teinte et le temps de la carte se voient chez les joueurs : on le leur dit. */
+  on('places:ambiance', (id: number, a: Ambiance | null) => {
+    const r = places.setAmbiance(id, a)
+    display.calqueABouge()
+    return r
+  })
+  on('places:lireAmbiance', (id: number) => places.ambianceDe(id))
   /* Le ciel d'un espace tombe sur tous ses lieux, celui à l'écran compris. */
   on('places:cielEspace', (id: number, astre: Astre | null) => {
     const p = places.setCiel(id, astre)
@@ -1323,9 +1331,13 @@ export function registerIpc(): void {
     const r = chars.adjustGauge(id, key, delta, reason, maxDelta ?? 0)
     display.refreshJoueurs()
     /* Un personnage WoW : la fiche de l'Aventure suit (PV, ressource). */
-    if (delta !== 0 && (key === 'pv' || key === 'ressource')) {
-      const v = r.character.data.gauges[key]?.value
-      if (v !== undefined) wow.pousserFiche(id, key === 'pv' ? { pv: v } : { res: v })
+    if ((delta !== 0 || (maxDelta ?? 0) !== 0) && (key === 'pv' || key === 'ressource')) {
+      const g = r.character.data.gauges[key]
+      const v = g?.value
+      /* Le maximum aussi, quand le MJ l'a changé : sinon l'Aventure garde le sien et le renvoie. */
+      const max = (maxDelta ?? 0) !== 0 ? g?.max : undefined
+      if (v !== undefined)
+        wow.pousserFiche(id, key === 'pv' ? { pv: v, pvMax: max } : { res: v, resMax: max })
     }
     /* Un PNJ qui montre son état le change sur son pion. */
     if (r.character.kind === 'pnj' && r.character.etatVisible) display.refreshPions()

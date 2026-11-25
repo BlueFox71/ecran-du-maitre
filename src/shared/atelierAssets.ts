@@ -261,7 +261,7 @@ export const FAMILLES: { famille: string; rayons: string[] }[] = [
   { famille: 'Lumière', rayons: ['Lampes', 'Lampadaires', 'Plafonniers', 'Appliques', 'Bougies', 'Projecteurs', 'Braseros'] },
   {
     famille: 'Déco et objets',
-    rayons: ['Décoration', 'Livres et papiers', 'Vaisselle', 'Nourriture', 'Instruments', 'Sonorisation', 'Indices', 'Armes', 'Rituels']
+    rayons: ['Décoration', 'Livres et papiers', 'Vaisselle', 'Nourriture', 'Instruments', 'Sonorisation', 'Indices', 'Armes', 'Rituels', 'Échecs', 'Marqueurs', 'Effets']
   },
   { famille: 'Nature', rayons: ['Arbres', 'Végétation', 'Rochers', 'Cristaux', 'Bois mort', 'Toiles d’araignées'] },
   { famille: 'Architecture', rayons: ['Escaliers', 'Ponts', 'Portails', 'Scène', 'Colonnes', 'Cloisons', 'Débris'] },
@@ -300,7 +300,7 @@ export function placeDansLeCatalogue(a: AssetAtelier): { famille: string; rayon:
 }
 
 /** Les portes dessinées pour Azeroth : rangées avec les autres, elles n'ont ni thème ni catégorie à elles. */
-const OUVERTURES_AZEROTH = new Set(['porte-forteresse', 'porte-portail-ville', 'porte-taverne', 'porte-palissade-orque'])
+const OUVERTURES_AZEROTH = new Set(['porte-forteresse', 'porte-portail-ville', 'porte-taverne', 'porte-palissade-orque', 'porte-ogre', 'porte-karazhan'])
 
 /**
  * Un asset de World of Warcraft ? Les objets le disent par leur thème, les

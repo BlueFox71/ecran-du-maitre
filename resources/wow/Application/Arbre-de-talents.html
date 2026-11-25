@@ -750,7 +750,8 @@ body.objets #objets{display:block}
 #wChat .log .carte .tot{margin-top:-1px}
 #wChat .log .carte .dv{color:#fff;font-size:1.15em;font-weight:700}
 #wChat .log .carte .tm{color:#d8c89a;white-space:nowrap}
-#wChat .log .lienS{color:#71d5ff}
+#wChat .log .lienS{color:#71d5ff;cursor:help}
+#wChat .log .lienS:hover{text-decoration:underline}
 #wChat .log b{color:#ffd100;font-weight:600}
 /* la difficulté du prochain jet : s'allume quand elle est préparée */
 #wJet{display:flex;align-items:center;gap:3px;padding:3px 4px;background:rgba(0,0,0,.6);
@@ -795,6 +796,110 @@ body.objets #objets{display:block}
 #wChat .ent button{padding:2px 5px;font:600 10.5px "Segoe UI",sans-serif;background:#1e1a14;border:1px solid #4a4032;
   color:#e8d7a8;border-radius:3px}
 #wChat .ent button:hover{border-color:#ffd100;color:#fff}
+/* Plus grande, et discrète : les messages ne se montrent qu'au survol (ou
+   pendant qu'on écrit), et quelques secondes à leur arrivée, comme dans le jeu. */
+/* Jusqu'à 540 px, sans jamais passer sous la barre d'action (centrée, de largeur --basW). */
+#wChat{width:clamp(380px, calc(50% - var(--basW, 700px) / 2 - 24px), 540px)}
+#wChat .log{height:360px;font-size:14px;transition:opacity .4s}
+#wChat:not(:hover):not(:focus-within):not(.neuf) .log{opacity:0}
+#wJet{padding:5px 6px;gap:4px;font-size:12px}
+#wJet button{min-width:30px;padding:4px 7px;font-size:13px}
+#wJet b{min-width:28px;font-size:14px}
+#wJet select{font-size:13px;padding:3px 4px}
+#wChat .ent{gap:4px;padding:5px}
+#wChat .ent input{font-size:14px;padding:5px 7px}
+#wChat .ent button{padding:4px 8px;font-size:12.5px}
+/* Sans souris (tablette, téléphone), rien à survoler : les messages restent. */
+@media (hover:none){#wChat .log{opacity:1 !important}}
+
+/* --- le compteur (façon Recount / Details) : entre la barre d'action et les sacs --- */
+#wMetre{position:absolute;bottom:6px;left:calc(50% + var(--basW, 700px) / 2 + 12px);right:calc(var(--sacsW, 300px) + 22px);
+  max-width:330px;min-width:210px;z-index:5;display:flex;flex-direction:column;
+  background:linear-gradient(rgba(20,16,10,.92),rgba(8,6,4,.92));border:2px solid #6d5b3c;border-radius:6px;
+  box-shadow:0 0 0 1px #000,inset 0 1px 0 #8a7650,0 6px 20px rgba(0,0,0,.7);font:12px "Segoe UI",sans-serif;color:#e8d7a8}
+#wMetre .mh{display:flex;align-items:center;gap:2px;padding:3px 4px;border-bottom:1px solid #3c3223}
+#wMetre .mh button{padding:2px 7px;font:600 11px var(--wfont);background:transparent;border:1px solid transparent;border-radius:3px;color:#c8b88a;cursor:pointer}
+#wMetre .mh button.on{color:#ffd100;border-color:#6d5b3c;background:rgba(255,209,0,.08)}
+#wMetre .mh button:hover{color:#fff}
+#wMetre .mh .mesp{flex:1;background:none;border:0}
+#wMetre .mb{max-height:150px;overflow-y:auto;padding:3px;display:flex;flex-direction:column;gap:2px;scrollbar-width:thin}
+#wMetre.plie .mb,#wMetre.plie .mp{display:none}
+#wMetre .ml{position:relative;height:19px;border-radius:2px;background:rgba(255,255,255,.04);overflow:hidden}
+#wMetre .ml i{position:absolute;left:0;top:0;bottom:0;opacity:.75;border-radius:2px}
+#wMetre .ml span{position:absolute;inset:0;display:flex;align-items:center;justify-content:space-between;gap:6px;padding:0 6px;
+  color:#fff;text-shadow:0 1px 1px #000,0 0 2px #000;white-space:nowrap}
+#wMetre .ml span b{font-weight:600;overflow:hidden;text-overflow:ellipsis}
+#wMetre .ml.moi span b{color:#ffd100}
+#wMetre .vide{padding:6px;color:#8a7d64;text-align:center}
+#wMetre .mp{padding:2px 6px 4px;color:#8a7d64;font-size:10.5px;text-align:right}
+/* Pas la place entre la barre et les sacs : il monte au-dessus des sacs. */
+#wMetre.dessus{left:auto;right:10px;width:260px;bottom:calc(var(--sacsH, 52px) + 12px)}
+@media (max-width:700px){#wMetre{right:4px;width:210px;bottom:calc(var(--basH, 150px) + 6px)}#wMetre .mb{max-height:96px}}
+
+/* --- l'échange entre joueurs, comme dans le jeu --- */
+#wow .echange{width:560px}
+#wow .echange .bd{padding:8px 10px;display:flex;flex-direction:column;gap:8px}
+#wow .echange .cols{display:flex;gap:10px}
+#wow .echange .col{flex:1;display:flex;flex-direction:column;gap:5px;padding:6px;border:1px solid #3c3223;border-radius:4px;background:rgba(0,0,0,.35)}
+#wow .echange .col.ok{border-color:#1eff00;box-shadow:inset 0 0 12px rgba(30,255,0,.25)}
+#wow .echange .col h4{margin:0;font:600 13px var(--wfont);color:#ffd100;display:flex;justify-content:space-between}
+#wow .echange .col h4 small{color:#1eff00;font-size:11px}
+#wow .echange .ei{display:flex;align-items:center;gap:6px;padding:2px 4px;min-height:34px;border:1px solid #2b2419;border-radius:3px;background:rgba(0,0,0,.4)}
+#wow .echange .ei img{width:30px;height:30px;border-radius:3px;border:1px solid #000}
+#wow .echange .ei .nm{flex:1;font-size:12px}
+#wow .echange .ei .qt{color:#fff;font-size:11px}
+#wow .echange .ei.libre{color:#5d5140;font-size:11px;justify-content:center}
+#wow .echange .ei button{background:transparent;border:0;color:#ff5a4a;font-size:15px;cursor:pointer}
+#wow .echange select,#wow .echange input{background:#1e1a14;color:#e8d7a8;border:1px solid #4a4032;border-radius:3px;padding:3px 4px;font-size:12px}
+#wow .echange .arg{display:flex;align-items:center;gap:4px;font-size:12px}
+#wow .echange .arg input{width:52px}
+#wow .echange .po{color:#ffd100}#wow .echange .pa{color:#c0c0c0}#wow .echange .pc{color:#d08a4a}
+#wow .echange .pied{display:flex;justify-content:flex-end;gap:6px;align-items:center}
+#wow .echange .pied .info{flex:1;color:#c8b88a;font-size:12px}
+#wow .echange .joueurs{display:flex;flex-direction:column;gap:4px}
+#wow .echange .joueurs button{text-align:left}
+#wow .echange .msg{padding:10px;text-align:center;color:#e8d7a8}
+#wow button.wb.vert{background:linear-gradient(#1f7a12,#0d4206);color:#fff}
+@media (max-width:700px){#wow .echange .cols{flex-direction:column}}
+
+/* --- le jet de dé, au milieu de l'écran : un dé d'or qui roule, puis le verdict --- */
+#wRoll{position:fixed;left:50%;top:38%;transform:translate(-50%,-50%);z-index:65;pointer-events:none;
+  display:flex;flex-direction:column;align-items:center;gap:6px;font-family:var(--wfont, "Friz Quadrata", Georgia, serif);animation:wRollIn .25s ease-out}
+#wRoll{--wfont:"Friz Quadrata TT","Palatino Linotype","Book Antiqua",Georgia,serif}
+#wRoll::before{content:"";position:absolute;inset:-70px -150px;z-index:-1;background:radial-gradient(closest-side,rgba(0,0,0,.7),rgba(0,0,0,.35) 60%,transparent)}
+#wRoll.part{animation:wRollOut .5s ease-in forwards}
+#wRoll .rt{padding:4px 16px 5px;background:linear-gradient(#2a2319,#120e09);border:2px solid #b3914a;border-radius:5px;
+  box-shadow:0 0 0 1px #000,inset 0 1px 0 #8a7650,0 6px 18px rgba(0,0,0,.8);text-align:center;white-space:nowrap}
+#wRoll .rt b{display:block;color:#ffd100;font-size:17px;text-shadow:0 1px 2px #000}
+#wRoll .rt span{color:#e8d7a8;font-size:13px}
+#wRoll .rd{position:relative;width:118px;height:118px;filter:drop-shadow(0 0 16px rgba(255,190,60,.5)) drop-shadow(0 4px 6px #000)}
+#wRoll .rd svg{width:100%;height:100%;animation:wRollTourne .75s cubic-bezier(.3,.7,.4,1)}
+#wRoll .rd .n{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
+  font:700 40px var(--wfont, "Friz Quadrata", Georgia, serif);color:#fff;text-shadow:0 0 3px #000,0 2px 3px #000,0 0 10px rgba(0,0,0,.8)}
+#wRoll .rd .fc{position:absolute;right:-6px;top:-4px;padding:1px 7px;border-radius:9px;background:#e0b354;color:#120e09;
+  font:700 11px "Segoe UI",sans-serif;border:1px solid #000}
+#wRoll.pose .rd .n{animation:wRollPop .35s cubic-bezier(.2,1.8,.4,1)}
+#wRoll .onde{position:absolute;left:50%;top:50%;width:118px;height:118px;margin:-59px 0 0 -59px;border-radius:50%;
+  border:3px solid #ffd100;opacity:0}
+#wRoll.pose .onde{animation:wRollOnde .6s ease-out}
+#wRoll .rc{opacity:0;padding:2px 12px;background:rgba(8,6,4,.88);border:1px solid #6d5b3c;border-radius:4px;
+  color:#e8d7a8;font-size:14px;white-space:nowrap}
+#wRoll .rc b{color:#ffd100;font-size:18px}
+#wRoll .rv{opacity:0;font:700 40px var(--wfont, "Friz Quadrata", Georgia, serif);letter-spacing:.06em;text-transform:uppercase;
+  -webkit-text-stroke:1px #000;text-shadow:0 2px 3px #000}
+#wRoll .rv.ok{color:#1eff00}
+#wRoll .rv.ko{color:#ff3b2f}
+#wRoll .rv.crit{color:#ffb000;text-shadow:0 0 14px #ff7a00,0 2px 3px #000}
+#wRoll.pose .rc{opacity:1;transition:opacity .3s}
+#wRoll.pose .rv{animation:wRollEclat .5s cubic-bezier(.2,1.6,.4,1) forwards}
+@keyframes wRollIn{from{opacity:0;transform:translate(-50%,-50%) scale(.7)}}
+@keyframes wRollOut{to{opacity:0;transform:translate(-50%,-62%)}}
+@keyframes wRollTourne{from{transform:rotate(-540deg) scale(.5)}}
+@keyframes wRollPop{0%{transform:scale(1.9)}100%{transform:scale(1)}}
+@keyframes wRollOnde{0%{opacity:.9;transform:scale(.7)}100%{opacity:0;transform:scale(1.9)}}
+@keyframes wRollEclat{0%{opacity:0;transform:scale(2.2)}100%{opacity:1;transform:scale(1)}}
+@media (max-width:700px){#wRoll{top:34%}#wRoll .rd{width:92px;height:92px}#wRoll .rd .n{font-size:30px}#wRoll .rv{font-size:26px}}
+@media (prefers-reduced-motion:reduce){#wRoll,#wRoll *{animation:none !important}#wRoll .rc,#wRoll .rv{opacity:1}}
 
 /* --- l'info-bulle, la vraie : fond bleu nuit, bord gris --- */
 #wTip{position:fixed;z-index:70;display:none;pointer-events:none}
@@ -835,7 +940,7 @@ body.objets #objets{display:block}
 #wow .perso .poupee{display:flex;gap:8px;align-items:stretch}
 #wow .perso .col{display:flex;flex-direction:column;gap:4px}
 #wow .perso .modele{flex:1;position:relative;border:1px solid #3c3223;border-radius:3px;min-height:326px;
-  background:#07090c center/cover no-repeat;box-shadow:inset 0 0 30px #000}
+  background:#07090c center 8%/cover no-repeat;box-shadow:inset 0 0 30px #000}
 #wow .perso .modele .vide{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;
   text-align:center;color:#5d5140;font:12px var(--wfont);padding:20px;cursor:pointer}
 #wow .perso .armes{display:flex;justify-content:center;gap:6px;margin-top:6px}
@@ -995,13 +1100,13 @@ body{touch-action:manipulation;-webkit-tap-highlight-color:transparent}
 
 /* ---------- tablette, ou fenêtre étroite : la discussion monte au-dessus de la barre ---------- */
 @media (max-width:1400px){
-  #wChat{bottom:calc(var(--basH,100px) + 8px);width:320px}
-  #wChat .log{height:140px}
+  #wChat{bottom:calc(var(--basH,100px) + 8px);width:440px}
+  #wChat .log{height:240px}
   #wChat .ent{flex-wrap:wrap}
   #wChat .ent input{flex:1 1 100%}
 }
 @media (max-height:620px){
-  #wChat .log{height:80px}
+  #wChat .log{height:140px}
 }
 
 /* ---------- téléphone, tablette ou fiche de joueur : pas d'onglet Édition ---------- */
@@ -6334,7 +6439,7 @@ const TOUCHES = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6",
                  "Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal"];
 const TOUCHE_TXT = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="];
 /* Les fenêtres qui s'ouvrent depuis le menu, avec ce qui les redessine. */
-const FENETRES = ["perso", "grim", "quetes", "codex", "talents", "metiers"];
+const FENETRES = ["perso", "grim", "quetes", "codex", "talents", "metiers", "echange"];
 /* Les armes que chaque classe sait manier (onglet Compétences de la fiche). */
 const COMPETENCES_ARMES = {
   guerrier: [
@@ -6436,6 +6541,7 @@ function persoDefaut() {
     fen: { perso: { x: 410, y: 70, open: false }, grim: { x: 990, y: 70, open: false },
            quetes: { x: 460, y: 90, open: false }, codex: { x: 500, y: 110, open: false },
            talents: { x: 330, y: 50, open: false }, metiers: { x: 360, y: 40, open: false },
+           echange: { x: 520, y: 120, open: false },
            sacs: [false, false, false, false, false] },
     quetes: [],                                // { id, titre, donneur, lieu, texte, finie }
     codex: [],                                 // { id, cat, titre, texte }
@@ -6628,6 +6734,9 @@ function chat(html, c) {
   if (perso.chat.length > 80) perso.chat.splice(0, perso.chat.length - 80);
   const log = $("#wChat .log");
   if (log) { log.insertAdjacentHTML("beforeend", ligneChat(perso.chat[perso.chat.length - 1])); log.scrollTop = log.scrollHeight; }
+  /* Un message qui arrive se montre quelques secondes, même sans la souris dessus. */
+  const fen = $("#wChat");
+  if (fen) { fen.classList.add("neuf"); clearTimeout(chat.fondu); chat.fondu = setTimeout(() => fen.classList.remove("neuf"), 7000); }
   sauvePerso();
 }
 const ligneChat = l => /^<div class="carte">/.test(l.h)
@@ -6643,12 +6752,256 @@ const carte = (titre, droite, lignes) => '<div class="carte"><div class="ct"><sp
 /* Le jet sur deux lignes : le dé et chacun de ses modificateurs, puis le total
    contre la difficulté et le verdict. */
 function lignesJet(lab, d, faces, termes, total, dd, defaut, crit, note) {
+  const okJ = crit || (dd ? total >= dd : null);
+  annonceJet({ titre: titreJet || lab, sous: titreJet ? lab : "", faces: faces, de: d,
+               bonus: total - d, total: total, dd: dd || null, issue: crit ? "crit" : okJ === null ? null : okJ ? "ok" : "ko" });
+  titreJet = "";
   const mods = termes.map(x => '<span class="tm">' + (x.v > 0 ? "+" : "−") + Math.abs(x.v) + " " + h(x.nom) + "</span>").join(" ");
   const nat = d === 1 ? ' <span class="ko">1 naturel</span>' : faces === 20 && d === 20 ? ' <span class="ok">20 naturel</span>' : "";
   const ok = crit || (dd ? total >= dd : null);
   const verdict = crit ? '<span class="ok">★ CRITIQUE</span>' : ok === null ? "" : ok ? '<span class="ok">✔ RÉUSSITE</span>' : '<span class="ko">✖ ÉCHEC</span>';
   return ligneC("🎲", h(lab) + (faces !== 20 ? " (1D" + faces + ")" : "") + ' <b class="dv">' + d + "</b> " + mods + (note ? ' <span class="tm">' + h(note) + "</span>" : "") + nat) +
     (dd || termes.length ? ligneC("", (termes.length ? "= <b>" + total + "</b> " : "") + (dd ? "contre DD " + dd + (defaut ? " (par défaut)" : "") + " " : "") + verdict, "tot") : "");
+}
+/* ---------- le compteur : dégâts, soins, dés (façon Recount / Details) ----------
+   Chaque fiche compte ce qu'elle fait ; le compte part à la table avec sa
+   présence, et chacun voit le classement de tous. Les taux se comptent par
+   tour de combat (« Tour suivant ») : à table, c'est le tour qui fait le temps. */
+const cpt = () => {
+  const c = perso.compteur || (perso.compteur = {});
+  ["deg", "soin", "jets", "d20n", "d20s", "tours"].forEach(k => { if (!Number.isFinite(c[k])) c[k] = 0; });
+  return c;
+};
+let metreOnglet = "deg", metrePlie = false;
+const COULEURS_CLASSE = { guerrier: "#c79c6e", paladin: "#f58cba", chasseur: "#abd473", voleur: "#fff569", pretre: "#e8e8e8",
+                          chaman: "#0070de", mage: "#69ccf0", demoniste: "#9482c9", druide: "#ff7d0a" };
+const couleurMetre = id => COULEURS_CLASSE[cleNom(id || "").replace(/ /g, "")] || "#b3914a";
+const nb1 = v => (Math.round(v * 10) / 10).toLocaleString("fr-FR");
+/* Entre la barre d'action et les sacs s'il y a la place, sinon au-dessus des sacs. */
+function placeMetre() {
+  const box = $("#wMetre"), bas = $("#wBas"), sb = $("#wSacsBar"); if (!box || !bas) return;
+  let libre = 0;
+  if (sb && sb.offsetWidth) libre = (sb.getBoundingClientRect().left - bas.getBoundingClientRect().right) / (echelleW || 1) - 34;
+  else libre = (wow.clientWidth - (bas.offsetLeft + bas.offsetWidth / 2) - bas.offsetWidth / 2) - 34;
+  box.classList.toggle("dessus", libre < 210 && !etroit());
+}
+addEventListener("resize", () => { if (mode === "wow") placeMetre(); });
+function majMetreBientot() { clearTimeout(majMetreBientot.t); majMetreBientot.t = setTimeout(majMetre, 120); }
+function majMetre() {
+  const box = $("#wMetre"); if (!box) return;
+  const gens = [{ id: MOI_TABLE(), nom: nomTable(), classe: CLASS_ID, c: cpt(), moi: true }]
+    .concat(ALLIES.filter(a => a.id !== "mj" && a.compteur).map(a => ({ id: a.id, nom: a.nom, classe: a.classe, c: a.compteur })));
+  let lignes, pied = "";
+  if (metreOnglet === "des") {
+    const l = gens.filter(g => g.c.jets > 0).map(g => ({ g: g, moy: g.c.d20n ? g.c.d20s / g.c.d20n : 0 }))
+      .sort((a, b) => b.moy - a.moy || b.g.c.jets - a.g.c.jets);
+    lignes = l.map((x, i) => ({ g: x.g, pct: x.moy / 20 * 100,
+      txt: x.g.c.jets + " jet" + (x.g.c.jets > 1 ? "s" : "") + " · moy. " + (x.g.c.d20n ? nb1(x.moy) : "—"), rang: i + 1 }));
+    pied = "Moyenne des D20 lancés";
+  } else {
+    const k = metreOnglet, l = gens.filter(g => g.c[k] > 0).sort((a, b) => b.c[k] - a.c[k]);
+    const max = l.length ? l[0].c[k] : 1, tot = l.reduce((s, g) => s + g.c[k], 0) || 1;
+    lignes = l.map((g, i) => ({ g: g, pct: g.c[k] / max * 100, rang: i + 1,
+      txt: g.c[k].toLocaleString("fr-FR") + " (" + nb1(g.c[k] / Math.max(1, g.c.tours)) + "/t, " + Math.round(g.c[k] / tot * 100) + " %)" }));
+    pied = (k === "deg" ? "DPS" : "HPS") + " : par tour de combat";
+  }
+  box.className = metrePlie ? "plie" : "";
+  placeMetre();
+  box.innerHTML = '<div class="mh">' +
+      [["deg", "Dégâts"], ["soin", "Soins"], ["des", "Dés"]].map(([k, t]) => '<button data-mt="' + k + '"' + (metreOnglet === k ? ' class="on"' : "") + ">" + t + "</button>").join("") +
+      '<span class="mesp"></span><button data-act="metreRaz" title="Remettre votre compteur à zéro">&#10227;</button>' +
+      '<button data-act="metrePli" title="' + (metrePlie ? "Déplier" : "Replier") + '">' + (metrePlie ? "&#9650;" : "&#9660;") + "</button></div>" +
+    '<div class="mb">' + (lignes.length ? lignes.map(x =>
+      '<div class="ml' + (x.g.moi ? " moi" : "") + '"><i style="width:' + Math.max(2, x.pct).toFixed(1) + "%;background:" + couleurMetre(x.g.classe) + '"></i>' +
+      "<span><b>" + x.rang + ". " + h(x.g.nom) + "</b>" + x.txt + "</span></div>").join("")
+      : '<div class="vide">Rien encore : ' + (metreOnglet === "des" ? "aucun jet." : metreOnglet === "soin" ? "aucun soin." : "aucun dégât.") + "</div>") + "</div>" +
+    '<div class="mp">' + pied + "</div>";
+}
+
+/* ---------- l'échange entre joueurs ----------
+   Comme dans le jeu : chacun pose ses objets et ses pièces, voit ce que l'autre
+   propose, et l'échange se fait quand les deux ont accepté la même chose.
+   Toute modification annule les acceptations. Les messages passent par la
+   table de l'Écran (envoiTable), comme les sorts sur un allié. */
+let ech = null;
+const ECH_PLACES = 6;
+const sigOffre = o => JSON.stringify([o.objets.map(x => (x.it.id || x.it.nom) + "x" + (parseInt(x.it.qte) || 1)), o.argent | 0]);
+const sigEch = () => { const a = sigOffre(ech.moi), b = JSON.stringify([ech.lui.objets.map(x => (x.id || x.nom) + "x" + (parseInt(x.qte) || 1)), ech.lui.argent | 0]);
+  return MOI_TABLE() < ech.avec.id ? a + "|" + b : b + "|" + a; };
+function envoiEch(op, plus) { if (ech) envoiTable([ech.avec.id], Object.assign({ t: "ech", op: op, sid: ech.sid }, plus || {})); }
+function envoiOffre() {
+  ech.okMoi = false; ech.okLui = false;
+  envoiEch("offre", { objets: ech.moi.objets.map(x => x.it), argent: ech.moi.argent | 0 });
+  majEchange();
+}
+function finEch(txt, cls) { if (txt) chat(txt, cls || "sys"); ech = null; majEchange(); }
+function recoitEch(q, m) {
+  const qui = m.nom || m.de;
+  if (q.op === "demande") {
+    if (ech) return envoiTable([m.de], { t: "ech", op: "occupe", sid: q.sid });
+    ech = { sid: q.sid, avec: { id: m.de, nom: qui }, etape: "demande", moi: { objets: [], argent: 0 }, lui: { objets: [], argent: 0 }, okMoi: false, okLui: false };
+    chat(h(qui) + " vous propose un échange.", "sys");
+    if (mode === "wow") basculeFen("echange", true);
+    return;
+  }
+  if (!ech || ech.sid !== q.sid) return;
+  if (q.op === "accepte") { ech.etape = "ouvert"; chat(h(qui) + " accepte l'échange.", "sys"); return majEchange(); }
+  if (q.op === "refuse") return finEch(h(qui) + " refuse l'échange.");
+  if (q.op === "occupe") return finEch(h(qui) + " est déjà en train d'échanger.");
+  if (q.op === "annule") return finEch("Échange annulé" + (q.raison ? " : " + h(q.raison) : " par " + h(qui)) + ".", "err");
+  if (q.op === "offre") {
+    ech.lui = { objets: (Array.isArray(q.objets) ? q.objets : []).slice(0, ECH_PLACES).filter(o => o && o.nom), argent: Math.max(0, q.argent | 0) };
+    ech.okMoi = false; ech.okLui = false;
+    return majEchange();
+  }
+  if (q.op === "ok") {
+    ech.okLui = q.sig === sigEch();
+    if (ech.okLui && ech.okMoi) return concluEch();
+    return majEchange();
+  }
+}
+/* Ce que j'offre est-il toujours dans mes sacs, et ai-je la place pour ce que je reçois ? */
+function verifieEch() {
+  for (const x of ech.moi.objets) { const it = objetA(x.loc); if (!it || it.id !== x.it.id) return "un objet proposé n'est plus dans vos sacs"; }
+  if ((ech.moi.argent | 0) > bourse()) return "vous n'avez plus assez d'argent";
+  const libres = perso.contenu.flat().filter(x => !x).length + ech.moi.objets.length;
+  if (ech.lui.objets.length > libres) return "vos sacs sont trop pleins";
+  return "";
+}
+function concluEch() {
+  const pb = verifieEch();
+  if (pb) { envoiEch("annule", { raison: nomTable() + " : " + pb }); return finEch("Échange annulé : " + pb + ".", "err"); }
+  const donne = [], recu = [];
+  ech.moi.objets.forEach(x => { poseA(x.loc, null); donne.push(lienObjet(x.it) + ((parseInt(x.it.qte) || 1) > 1 ? " x" + x.it.qte : "")); });
+  if (ech.moi.argent) { payer(ech.moi.argent, "l'échange"); donne.push(piecesTxt(ech.moi.argent)); }
+  ech.lui.objets.forEach(it => { const n = parseInt(it.qte) || 1; versSacs(normaliseObjet(Object.assign({}, it)), n); recu.push(lienObjet(it) + (n > 1 ? " x" + n : "")); });
+  if (ech.lui.argent) {
+    const a = perso.argent || (perso.argent = { po: 0, pa: 0, pc: 0 }), t = bourse() + (ech.lui.argent | 0);
+    a.po = Math.floor(t / 10000); a.pa = Math.floor(t / 100) % 100; a.pc = t % 100;
+    recu.push(piecesTxt(ech.lui.argent));
+  }
+  const avec = ech.avec.nom;
+  sauvePerso(); majSacs();
+  finEch("Échange conclu avec " + h(avec) + " — vous recevez : " + (recu.join(", ") || "rien") + " · vous donnez : " + (donne.join(", ") || "rien") + ".", "gain");
+  if (typeof majTout === "function") try { majTout(); } catch (e) {}
+}
+function actionEch(k, el) {
+  if (k === "echProp") {
+    const a = ALLIES.find(x => x.id === el.dataset.id); if (!a) return;
+    ech = { sid: uid("e"), avec: { id: a.id, nom: a.nom }, etape: "attente", moi: { objets: [], argent: 0 }, lui: { objets: [], argent: 0 }, okMoi: false, okLui: false };
+    envoiEch("demande"); chat("Vous proposez un échange à " + h(a.nom) + ".", "sys");
+    return majEchange();
+  }
+  if (!ech) return;
+  if (k === "echAcc") { ech.etape = "ouvert"; envoiEch("accepte"); return majEchange(); }
+  if (k === "echRef") { envoiEch("refuse"); return finEch(); }
+  if (k === "echAnn") { envoiEch("annule"); return finEch("Vous annulez l'échange.", "sys"); }
+  if (k === "echRet") { ech.moi.objets.splice(+el.dataset.i, 1); return envoiOffre(); }
+  if (k === "echOk") {
+    if (ech.okMoi) { ech.okMoi = false; envoiEch("offre", { objets: ech.moi.objets.map(x => x.it), argent: ech.moi.argent | 0 }); return majEchange(); }
+    const pb = verifieEch(); if (pb) return erreur("Impossible : " + pb + ".");
+    ech.okMoi = true; envoiEch("ok", { sig: sigEch() });
+    if (ech.okLui) return concluEch();
+    return majEchange();
+  }
+}
+function ajouteEch(v) {
+  if (!ech || ech.etape !== "ouvert" || !v) return;
+  if (ech.moi.objets.length >= ECH_PLACES) return erreur("Six objets au plus par échange.");
+  const [b, i] = v.split(",").map(Number), loc = { z: "sac", b: b, i: i }, it = objetA(loc);
+  if (!it || ech.moi.objets.some(x => memeLoc(x.loc, loc))) return;
+  if (it.lie) return erreur("« " + it.nom + " » est lié : il ne s'échange pas.");
+  ech.moi.objets.push({ loc: loc, it: clone(it) });
+  envoiOffre();
+}
+function argentEch() {
+  if (!ech) return;
+  const v = k => Math.max(0, parseInt(($('#wFenEchange [data-ech-arg="' + k + '"]') || {}).value) || 0);
+  let c = v("po") * 10000 + v("pa") * 100 + v("pc");
+  if (c > bourse()) { c = bourse(); erreur("Vous n'avez que " + piecesTxt(c) + "."); }
+  ech.moi.argent = c;
+  envoiOffre();
+}
+const ligneEch = (it, i, moi) => it
+  ? '<div class="ei" data-tipech="' + (moi ? "m" : "l") + i + '"><img src="' + h(assetURL(it.icone || "")) + '" alt="">' +
+    '<span class="nm">' + lienObjet(it) + "</span>" + ((parseInt(it.qte) || 1) > 1 ? '<span class="qt">x' + it.qte + "</span>" : "") +
+    (moi ? '<button data-act="echRet" data-i="' + i + '" title="Retirer de l\'échange">&times;</button>' : "") + "</div>"
+  : '<div class="ei libre">—</div>';
+const argentTxt = c => '<span class="po">' + Math.floor(c / 10000) + " po</span> <span class=\"pa\">" + (Math.floor(c / 100) % 100) + ' pa</span> <span class="pc">' + (c % 100) + " pc</span>";
+function majEchange() {
+  const box = $("#wFenEchange"); if (!box || !perso.fen.echange) return;
+  if (!perso.fen.echange.open) { box.innerHTML = ""; return; }
+  let corps;
+  if (!ech) {
+    const l = ALLIES.filter(a => a.id !== "mj");
+    corps = l.length
+      ? '<div class="msg">Avec qui voulez-vous échanger ?</div><div class="joueurs">' +
+        l.map(a => '<button class="wb gris" data-act="echProp" data-id="' + h(a.id) + '">&#8644; ' + h(a.nom) + "</button>").join("") + "</div>"
+      : '<div class="msg">Aucun autre joueur n\'est à la table pour le moment.</div>';
+  } else if (ech.etape === "attente") {
+    corps = '<div class="msg">En attente de la réponse de <b>' + h(ech.avec.nom) + "</b>…</div>" +
+      '<div class="pied"><button class="wb gris" data-act="echAnn">Annuler</button></div>';
+  } else if (ech.etape === "demande") {
+    corps = '<div class="msg"><b>' + h(ech.avec.nom) + "</b> vous propose un échange.</div>" +
+      '<div class="pied"><button class="wb gris" data-act="echRef">Refuser</button><button class="wb vert" data-act="echAcc">Accepter</button></div>';
+  } else {
+    const deja = new Set(ech.moi.objets.map(x => x.loc.b + "," + x.loc.i)), choix = [];
+    perso.contenu.forEach((sac, b) => sac.forEach((it, i) => { if (it && !deja.has(b + "," + i)) choix.push('<option value="' + b + "," + i + '">' + h(it.nom) + ((parseInt(it.qte) || 1) > 1 ? " x" + it.qte : "") + "</option>"); }));
+    const m = ech.moi.argent | 0;
+    const places = (l, moi) => Array.from({ length: ECH_PLACES }, (_, i) => ligneEch(moi ? (l[i] || {}).it : l[i], i, moi)).join("");
+    corps = '<div class="cols">' +
+      '<div class="col' + (ech.okMoi ? " ok" : "") + '"><h4>Vous' + (ech.okMoi ? "<small>✔ accepté</small>" : "") + "</h4>" + places(ech.moi.objets, true) +
+        (ech.moi.objets.length < ECH_PLACES ? '<select data-ech-add><option value="">+ Ajouter un objet de vos sacs…</option>' + choix.join("") + "</select>" : "") +
+        '<div class="arg"><input type="number" min="0" data-ech-arg="po" value="' + Math.floor(m / 10000) + '"><span class="po">po</span>' +
+          '<input type="number" min="0" max="99" data-ech-arg="pa" value="' + (Math.floor(m / 100) % 100) + '"><span class="pa">pa</span>' +
+          '<input type="number" min="0" max="99" data-ech-arg="pc" value="' + (m % 100) + '"><span class="pc">pc</span></div></div>' +
+      '<div class="col' + (ech.okLui ? " ok" : "") + '"><h4>' + h(ech.avec.nom) + (ech.okLui ? "<small>✔ accepté</small>" : "") + "</h4>" + places(ech.lui.objets, false) +
+        '<div class="arg">' + argentTxt(ech.lui.argent | 0) + "</div></div></div>" +
+      '<div class="pied"><span class="info">' + (ech.okMoi && !ech.okLui ? "En attente de " + h(ech.avec.nom) + "…" : ech.okLui && !ech.okMoi ? h(ech.avec.nom) + " a accepté : à vous." : "L'échange se fait quand vous acceptez tous les deux.") + "</span>" +
+        '<button class="wb gris" data-act="echAnn">Annuler</button><button class="wb' + (ech.okMoi ? " vert" : "") + '" data-act="echOk">' + (ech.okMoi ? "✔ Accepté" : "Échanger") + "</button></div>";
+  }
+  box.innerHTML = fenHTML("echange", "Échange" + (ech && ech.etape !== "attente" ? " avec " + h(ech.avec.nom) : ""), "echange", '<div class="bd">' + corps + "</div>");
+  placeFen(box.querySelector(".fen"));
+}
+
+/* ---------- le jet, au milieu de l'écran ----------
+   Un dé d'or qui roule et se pose sur son chiffre, le calcul, puis le verdict
+   en grandes lettres. Le même jet part à l'Écran du Maître, qui le montre sur
+   l'écran de la table. Un jet chasse le précédent. */
+let titreJet = "";
+function annonceJet(j) {
+  const c = cpt(); c.jets++;
+  if ((j.faces | 0) === 20 && (j.n || 1) === 1) { c.d20n++; c.d20s += j.de | 0; }
+  majMetreBientot();
+  try {
+    if (DISK) fetch("/__table/jet", { method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ de: MOI_TABLE(), nom: nomTable(), jet: j }) }).catch(() => {});
+  } catch (e) {}
+  if (mode !== "wow") return;
+  clearTimeout(annonceJet.t1); clearTimeout(annonceJet.t2); clearInterval(annonceJet.roule);
+  const vieux = document.getElementById("wRoll"); if (vieux) vieux.remove();
+  const el = document.createElement("div"); el.id = "wRoll";
+  const verdict = { crit: "Critique !", ok: "Réussite", ko: "Échec" }[j.issue] || "";
+  const face = (pts, c) => '<polygon points="' + pts + '" fill="' + c + '" stroke="#2a1c08" stroke-width="1.6" stroke-linejoin="round"/>';
+  el.innerHTML =
+    '<div class="rt"><b>' + h(nomPerso()) + "</b><span>" + h(j.titre) + (j.sous ? " · " + h(j.sous) : "") + "</span></div>" +
+    '<div class="rd"><svg viewBox="0 0 100 100" aria-hidden="true">' +
+      face("50,3 91,26 91,74 50,97 9,74 9,26", "#c9952f") + face("50,3 91,26 50,34 9,26", "#f2cf74") +
+      face("50,34 91,26 91,74 72,64", "#b07e22") + face("50,34 9,26 9,74 28,64", "#d9a843") +
+      face("28,64 72,64 50,97 9,74", "#9a6c1a") + face("72,64 91,74 50,97", "#86600f") + face("50,34 72,64 28,64", "#e8be5c") +
+    '</svg><span class="n">?</span>' + (j.faces !== 20 ? '<span class="fc">D' + (j.faces | 0) + "</span>" : "") + '<span class="onde"></span></div>' +
+    '<div class="rc">' + (j.bonus ? j.de + " " + (j.bonus > 0 ? "+ " + j.bonus : "− " + (-j.bonus)) + " = " : "") + "<b>" + j.total + "</b>" +
+      (j.dd ? " · contre " + j.dd : "") + "</div>" +
+    (verdict ? '<div class="rv ' + j.issue + '">' + verdict + "</div>" : "");
+  document.body.appendChild(el);
+  /* Le chiffre défile pendant que le dé roule, puis se pose. */
+  const n = el.querySelector(".n"), fin = Date.now() + 700;
+  annonceJet.roule = setInterval(() => {
+    if (Date.now() >= fin) { clearInterval(annonceJet.roule); n.textContent = j.de; el.classList.add("pose"); return; }
+    n.textContent = 1 + Math.floor(Math.random() * (j.faces || 20));
+  }, 55);
+  annonceJet.t1 = setTimeout(() => el.classList.add("part"), 3400);
+  annonceJet.t2 = setTimeout(() => el.remove(), 3950);
 }
 const nomPerso = () => (perso.prenom || perso.nom) ? (perso.prenom + " " + perso.nom).trim() : cls().name;
 const lienObjet = it => '<span class="q' + (it.qualite | 0) + '">[' + h(it.nom) + "]</span>";
@@ -6671,6 +7024,8 @@ function commandeChat(txt) {
     /* Un D20 tout seul, avec une difficulté ou un facteur préparés : c'est un jet. */
     const seul = /^1D(\d+)$/.exec(r.expr);
     if (seul && (jetDD || jetMod)) { jetFaces = +seul[1]; return chat(jetD20(null), "de"); }
+    const fr = /^\d+D(\d+)/.exec(r.expr);
+    annonceJet({ titre: "Jet libre", sous: r.expr, faces: fr ? +fr[1] : 20, n: r.des.length, de: r.total, bonus: 0, total: r.total, dd: null, issue: null });
     return chat(h(nomPerso()) + " obtient <b>" + r.total + "</b> (" + r.expr +
       (r.des.length > 1 ? " : " + r.des.join(" + ") : "") + ").", "sys");
   }
@@ -7094,6 +7449,7 @@ function jetSort(fx, ctx) {
   const termes = termesJet(fx.car, ctx.charges), total = d + termes.reduce((s, x) => s + x.v, 0);
   const seuil = Math.min(ctx.mods.seuil, fx.distance && ctx.mods.seuils.distance ? ctx.mods.seuils.distance : 99, fx.ecole && ctx.mods.seuils[fx.ecole] ? ctx.mods.seuils[fx.ecole] : 99);
   const dd = jetDD || DD_DEFAUT, defaut = !jetDD, crit = ctx.forceCrit || d === 20 || total >= seuil;
+  titreJet = fx.nom || "";
   const html = lignesJet(fx.jet, d, 20, termes, total, dd, defaut, crit);
   jetDD = 0; jetMod = 0; jetFaces = 20; majJet();
   return { d: d, total: total, crit: crit, ok: total >= dd || crit, html: html };
@@ -7126,6 +7482,7 @@ function lanceDegats(fx, ctx) {
   if (fixe) parts.push("bonus " + (fixe > 0 ? "+" : "") + fixe);
   total = Math.max(0, total + fixe + plus + plusCarac);
   const ecole = dg.ecole === "physique" ? "physiques" : dg.ecole === "sorts" ? "magiques" : "(" + dg.ecole + ")";
+  cpt().deg += total; majMetreBientot();
   return { total: total, html: ligneC("⚔", "<b>" + total + "</b> dégâts " + ecole + (dg.parTour ? " par tour" : "") + (fx.zone ? " à chaque ennemi touché" : "")) +
     detC(parts.join(" · ")) };
 }
@@ -7541,6 +7898,7 @@ function lancerSort(ref) {
     if (fx.desSoins.length) {
       const so = soinLance(fx.desSoins[0], fx, ctx);
       ctx.soin = so.total;
+      cpt().soin += so.total * cibles.length; majMetreBientot();
       cibles.forEach(id => {
         if (!id) { const r = soigne(so.total); lignes.push(ligneC("✚", "vous récupérez <b>" + r.gagne + "</b> PV") + detC(so.det + (r.recu ? " · soins reçus " + (r.recu > 0 ? "+" : "") + r.recu : ""))); }
         else { envoiTable([id], { t: "soin", n: so.total, sort: fx.nom }); lignes.push(ligneC("✚", h(nomCible(id, ref)) + " récupère <b>" + so.total + "</b> PV") + detC(so.det)); }
@@ -7688,7 +8046,9 @@ function tickAuras(finies) {
     const l = [];
     if (fx.dg && fx.dg.des) l.push(lanceDegats(fx, ctx).html);
     if (fx.desSoins.length) { const so = soinLance(fx.desSoins[0], fx, ctx);
-      ciblesDe({ cible: fx.cible === "groupe" ? "groupe" : "" }).forEach(id => versCible(id, { t: "soin", n: so.total, sort: fx.nom }));
+      const csT = ciblesDe({ cible: fx.cible === "groupe" ? "groupe" : "" });
+      csT.forEach(id => versCible(id, { t: "soin", n: so.total, sort: fx.nom }));
+      cpt().soin += so.total * csT.length; majMetreBientot();
       l.push(ligneC("✚", (fx.cible === "groupe" ? "le groupe récupère" : "vous récupérez") + " <b>" + so.total + "</b> PV") + detC(so.det)); }
     (fx.tick || []).forEach(f => f(ctx, a));
     ctx.lignes.forEach(t => l.push(ligneC("✦", t)));
@@ -7802,6 +8162,7 @@ const texteChat = s => { try { return (new DOMParser().parseFromString(String(s 
 function etatTable() {
   try {
     return {
+      compteur: cpt(),
       joueur: NOM_JOUEUR, prenom: perso.prenom || "", nom: perso.nom || "", nomPerso: nomPerso(), race: perso.race || "",
       sexe: perso.sexe || "", age: perso.age || "", histoire: String(perso.histoire || "").slice(0, 20000),
       /* Les caractéristiques telles que la feuille les montre (points, talents et objets compris). */
@@ -7834,6 +8195,8 @@ async function relaisTable() {
     const j = await r.json();
     ALLIES = j.presents || [];
     (j.courrier || []).forEach(recoit);
+    majMetre();
+    if (perso.fen.echange && perso.fen.echange.open && !ech) majEchange();
   } catch (e) {}
 }
 function envoiTable(a, quoi) {
@@ -7853,6 +8216,7 @@ function envoiAllies(fx) {
 }
 function recoit(m) {
   const q = m.quoi || {}, de = h(m.nom || m.de), duMj = m.de === "ecran-mj";
+  if (q.t === "ech") return recoitEch(q, m);
   if (q.t === "aura" && q.aura && q.aura.nom) {
     chat(duMj ? de + (q.aura.mal ? " vous inflige " : " vous accorde ") + "<span class=\"lienS\">[" + h(q.aura.nom) + "]</span>."
               : de + " vous fait bénéficier de <span class=\"lienS\">[" + h(q.aura.nom) + "]</span>.", q.aura.mal ? "err" : "gain");
@@ -7903,6 +8267,26 @@ function recoit(m) {
     /* Le MJ a corrigé la fiche dans l'Écran : PV, ressource, caractéristiques
        (des valeurs totales ; les points sont recalés pour y arriver). */
     const dit = [];
+    /* Les maximums d'abord (des totaux) : la base bouge, les bonus restent. */
+    if (Number.isFinite(+q.pvMax) && +q.pvMax > 0 && (+q.pvMax | 0) !== pvMax()) {
+      const autres = pvMax() - (parseInt(perso.pv.max) || 0);
+      perso.pv.max = (+q.pvMax | 0) - autres;
+      perso.pv.cur = Math.min(perso.pv.cur | 0, pvMax());
+      dit.push(pvMax() + " PV max");
+    }
+    if (Number.isFinite(+q.resMax) && +q.resMax > 0) {
+      recaleMana();
+      const voulu = +q.resMax | 0;
+      for (let i = 0; i < 3 && (perso.res.max | 0) !== voulu; i++) {
+        const ecart = voulu - (perso.res.max | 0);
+        if (manaPerso()) perso.res.plus = (parseInt(perso.res.plus) || 0) + ecart;
+        else if (perso.res.saisi != null) perso.res.saisi = (parseInt(perso.res.saisi) || 0) + ecart;
+        else perso.res.max = voulu;
+        recaleMana();
+      }
+      perso.res.cur = Math.min(perso.res.cur | 0, perso.res.max | 0);
+      dit.push((perso.res.max | 0) + " " + h(ressource()) + " max");
+    }
     if (Number.isFinite(+q.pv)) { perso.pv.cur = Math.max(0, Math.min(pvMax(), +q.pv | 0)); dit.push(perso.pv.cur + " PV"); }
     if (Number.isFinite(+q.res)) { perso.res.cur = Math.max(0, Math.min(perso.res.max | 0, +q.res | 0)); dit.push(perso.res.cur + " " + h(ressource())); }
     if (q.car && typeof q.car === "object") CARACS.forEach(([k, nom]) => {
@@ -11349,7 +11733,7 @@ function renderWow() {
       '<input type="text" id="wChatIn" placeholder="Entrée pour écrire · /roll 1d20 · /car force">' +
       ["4", "6", "8", "10", "12", "20", "100"].map(f => '<button data-d="' + f + '" title="Lancer 1D' + f + '">d' + f + "</button>").join("") +
     "</div></div>" +
-    '<div id="wBas"></div><div id="wFenPerso"></div><div id="wFenGrim"></div><div id="wFenQuetes"></div><div id="wFenCodex"></div><div id="wFenTalents"></div><div id="wFenMetiers"></div>' +
+    '<div id="wBas"></div><div id="wFenPerso"></div><div id="wFenGrim"></div><div id="wFenQuetes"></div><div id="wFenCodex"></div><div id="wFenTalents"></div><div id="wFenMetiers"></div><div id="wFenEchange"></div><div id="wMetre"></div>' +
     '<div id="wSacs"></div><div id="wSacsBar"></div><div id="wFenEdit"></div>' +
     '<div id="wCombat"></div><div id="wCast"></div><div id="wJauge"></div><div id="wAide">Touchez une case pour poser &middot; le décor pour annuler</div>';
   $("#wChat .log").innerHTML = perso.chat.map(ligneChat).join("");
@@ -11363,7 +11747,26 @@ function renderWow() {
   wow.querySelectorAll("#wChat [data-d]").forEach(b => b.addEventListener("click", () => commandeChat("/roll 1d" + b.dataset.d)));
   majTout(); majJet();
 }
-function majTout() { if (mode !== "wow") return; lanceDesTalents(); lanceDesVie(); majAurasRace(); majSous(); majUnit(); majCombat(); majAuras(); majBarres(); majPerso(); majGrim(); majQuetes(); majCodex(); majSacs(); majEdit(); majTalentsFen(); }
+function majTout() { if (mode !== "wow") return; lanceDesTalents(); lanceDesVie(); majAurasRace(); majSous(); majUnit(); majCombat(); majAuras(); majBarres(); majPerso(); majGrim(); majQuetes(); majCodex(); majSacs(); majEdit(); majTalentsFen(); majEchange(); majMetre(); }
+
+/* Le portrait rond du cadre : une illustration en pied (plus haute que large)
+   ne montrerait que le buste — on l'agrandit sur la tête, en haut de l'image.
+   La forme de chaque image se mesure une fois, puis le cadre se redessine. */
+const FORMES_PORTRAIT = {};
+function cadrePortrait(url) {
+  const f = FORMES_PORTRAIT[url];
+  if (f === undefined) {
+    FORMES_PORTRAIT[url] = 0;
+    const im = new Image();
+    im.onload = () => {
+      FORMES_PORTRAIT[url] = im.naturalHeight / (im.naturalWidth || 1);
+      if (FORMES_PORTRAIT[url] > 1.2 && mode === "wow") majUnit();
+    };
+    im.src = url;
+    return "";
+  }
+  return f > 1.2 ? "background-size:260%;background-position:58% 4%;" : "";
+}
 
 function majUnit() {
   const u = $("#wUnit"); if (!u) return;
@@ -11371,7 +11774,7 @@ function majUnit() {
   const pv = perso.pv, rs = perso.res, lvl = charLevel(), left = pointsLeft();
   const pct =(a, b) => Math.max(0, Math.min(100, b > 0 ? a / b * 100 : 0));
   u.innerHTML =
-    '<div class="por" data-act="perso" title="Fiche de personnage (C)" style="' + (perso.portrait ? "background-image:url(&quot;" + h(assetURL(perso.portrait)) + "&quot;)" : "") + '">' +
+    '<div class="por" data-act="perso" title="Fiche de personnage (C)" style="' + (perso.portrait ? "background-image:url(&quot;" + h(assetURL(perso.portrait)) + "&quot;);" + cadrePortrait(assetURL(perso.portrait)) : "") + '">' +
       (perso.portrait ? "" : '<span class="ini">' + h(nomPerso().charAt(0)) + "</span>") +
       '<div class="niv">' + lvl + "</div></div>" +
     '<div class="cad"><div class="nom">' + h(nomPerso()) + "</div>" +
@@ -11410,12 +11813,16 @@ function majBarres() {
         mb("talents", "&#10059;", "Talents", perso.fen.talents.open, "Talents (N)") +
         mb("metiers", "&#9874;", "Métiers", perso.fen.metiers.open, "Métiers (K)") +
         mb("quetes", "&#10071;", "Quêtes", perso.fen.quetes.open, "Journal de quêtes (L)") +
+        mb("echange", "&#8644;", "Échange", perso.fen.echange.open, "Échanger avec un joueur : objets et pièces") +
         mb("codex", "&#128214;", "Codex", perso.fen.codex.open, "Codex (J)") +
       "</div>" +
     "</div>";
   const sb = $("#wSacsBar"); if (sb) sb.innerHTML = '<div class="sacsBar" title="Vos sacs (touche B)">' + sacs + "</div>";
   /* La discussion et les sacs se posent au-dessus : ils lisent cette hauteur. */
   wow.style.setProperty("--basH", (bas.offsetHeight + 6) + "px");
+  wow.style.setProperty("--basW", bas.offsetWidth + "px");
+  if (sb) { wow.style.setProperty("--sacsW", sb.offsetWidth + "px"); wow.style.setProperty("--sacsH", (sb.offsetHeight + 6) + "px"); }
+  placeMetre();
 }
 
 /* --- les améliorations et affaiblissements, en haut à droite ---
@@ -11592,6 +11999,7 @@ function retireAura(a, txt) {
    d'abord — faute de ressource, elles tombent —, puis chacune perd un tour. */
 function tourSuivant() {
   const finies = [], rs = ressource().toLowerCase();
+  cpt().tours++; majMetreBientot();
   chat("— Tour suivant —", "sys");
   tourCombat();
   const m = manaPerso();
@@ -12365,7 +12773,24 @@ function tipSort(ref) {
   if (!s.connu) t += '<div class="ro">Pas encore appris</div>';
   return t;
 }
+/* Un nom entre crochets dans la discussion : le sort, le talent, le trait, l'effet
+   ou l'objet qui porte ce nom, avec sa fiche. */
+function tipLien(el) {
+  const nom = el.textContent.replace(/^[|]$/g, "").trim(), k = cleNom(nom);
+  if (!k) return "";
+  const sp = (S.spells || []).find(x => cleNom(x.name || "") === k); if (sp) return tipSort({ k: "s", id: sp.id });
+  const n = (S.nodes || []).find(x => x.title && cleNom(x.title) === k); if (n) return tipSort({ k: "t", id: n.id });
+  const ri = traitsRace().findIndex(t => cleNom(t.nom) === k); if (ri >= 0) return tipSort({ k: "r", i: ri });
+  const a = perso.auras.find(x => cleNom(x.nom || "") === k); if (a) return tipAura(a);
+  const o = tousObjets().find(x => x && cleNom(x.nom || "") === k); if (o) return tipObjet(o);
+  return "";
+}
 function tipPour(el) {
+  if (el.classList.contains("lienS")) return tipLien(el);
+  if (el.dataset.tipech && ech) {
+    const i = +el.dataset.tipech.slice(1), it = el.dataset.tipech[0] === "m" ? (ech.moi.objets[i] || {}).it : ech.lui.objets[i];
+    return it ? tipObjet(it) : "";
+  }
   const z = el.dataset.z;
   if (z === "ab") {
     const r = perso.barres[+el.dataset.b][+el.dataset.i];
@@ -12394,6 +12819,7 @@ function tipPour(el) {
   if (z === "gt") return '<div class="tn">' + h(el.dataset.gt) + "</div>";
   if (z === "au") {
     const a = perso.auras[+el.dataset.ai]; if (!a) return "";
+    if (a.race) return tipAura(a) + '<div class="aide">Trait racial permanent</div>';
     return tipAura(a) + '<div class="aide">Clic : options · clic droit : ' + (a.mal ? "options" : "annuler") + "</div>";
   }
   if (z === "aup") return '<div class="tn">' + (el.dataset.mal === "1" ? "Ajouter un affaiblissement" : "Ajouter une amélioration") +
@@ -12647,7 +13073,7 @@ function basculeFen(id, force) {
   f.open = force != null ? force : !f.open;
   if (f.open) f.z = ++zTop;
   sauvePerso(); majBarres();
-  ({ perso: majPerso, grim: majGrim, quetes: majQuetes, codex: majCodex, talents: majTalentsFen, metiers: majMetiersFen })[id]();
+  ({ perso: majPerso, grim: majGrim, quetes: majQuetes, codex: majCodex, talents: majTalentsFen, metiers: majMetiersFen, echange: majEchange })[id]();
 }
 function basculeSacs() {
   const tous = perso.fen.sacs[0] && perso.sacs.every((s, i) => !s || perso.fen.sacs[i + 1]);
@@ -12777,6 +13203,9 @@ addEventListener("pointercancel", () => {
   if (deplace) { deplace = null; sauvePerso(); }
 });
 wow.addEventListener("click", e => {
+  /* Au doigt, pas de survol : toucher le nom d'un sort dans la discussion montre sa fiche. */
+  const lien = e.target.closest("#wChat .lienS");
+  if (lien) { if (auDoigt()) montreTip(lien, e); return; }
   const act = e.target.closest("[data-act]"), x = e.target.closest("[data-x]"), xs = e.target.closest("[data-xs]");
   if (x) return basculeFen(x.dataset.x, false);
   const au = e.target.closest('#wAuras .slot[data-z]');
@@ -12784,7 +13213,8 @@ wow.addEventListener("click", e => {
     const mal = au.dataset.z === "aup" ? au.dataset.mal === "1" : !!(perso.auras[+au.dataset.ai] || {}).mal;
     if (tenu) return auraDepuisTenu(mal);
     if (au.dataset.z === "aup") return nouvelleAura(mal);
-    const a = perso.auras[+au.dataset.ai]; if (a) menuAura(e, a);
+    /* Un trait racial (Présence héroïque…) est permanent : pas d'options, rien à retirer. */
+    const a = perso.auras[+au.dataset.ai]; if (a && !a.race) menuAura(e, a);
     return;
   }
   if (xs) { perso.fen.sacs[+xs.dataset.xs] = false; sauvePerso(); majSacs(); majBarres(); return; }
@@ -12811,10 +13241,15 @@ wow.addEventListener("click", e => {
   if (gp) { grimPage += +gp.dataset.gp; return majGrim(); }
   const gt = e.target.closest("[data-gt]");
   if (gt) { grimTab = gt.dataset.gt; grimPage = 0; return majGrim(); }
+  const mt = e.target.closest("[data-mt]");
+  if (mt) { metreOnglet = mt.dataset.mt; metrePlie = false; return majMetre(); }
   if (act) {
     const k = act.dataset.act;
     if (FENETRES.includes(k)) return basculeFen(k);
     if (k === "qNouv" || k === "qFinie" || k === "qSuppr") return actionQuete(k);
+    if (/^ech[A-Z]/.test(k)) return actionEch(k, act);
+    if (k === "metreRaz") { if (confirm("Remettre votre compteur (dégâts, soins, dés) à zéro ?")) { perso.compteur = {}; sauvePerso(); majMetre(); } return; }
+    if (k === "metrePli") { metrePlie = !metrePlie; return majMetre(); }
     if (k === "cxNouv" || k === "cxSuppr" || k === "cxRevele") return actionCodex(k);
     if (k === "talents") return basculeFen("talents");
     if (k === "tour") return tourSuivant();
@@ -12860,6 +13295,8 @@ wow.addEventListener("contextmenu", e => {
   if (z === "au") {
     /* Comme dans le jeu : le clic droit annule une amélioration ; un affaiblissement ouvre ses options. */
     const a = perso.auras[+s.dataset.ai]; if (!a) return;
+    /* Un trait racial est permanent : on ne l'annule pas. */
+    if (a.race) return erreur("« " + a.nom + " » est un trait racial permanent : il ne s'annule pas.");
     return a.mal ? menuAura(e, a) : retireAura(a, "est annulé");
   }
   if (z === "sac" || z === "eq" || z === "bs") {
@@ -12899,12 +13336,14 @@ wow.addEventListener("input", e => {
 });
 wow.addEventListener("change", e => {
   if (e.target.id === "wJetDe") { jetFaces = +e.target.value || 20; return majJet(); }
+  if (e.target.hasAttribute("data-ech-add")) return ajouteEch(e.target.value);
+  if (e.target.dataset.echArg) return argentEch();
   if (e.target.dataset.f === "niveau") ecritChamp("niveau", e.target.value);
   if (e.target.dataset.e === "conso" && editObj) { editObj.it.conso = e.target.checked; majApercu(); }
 });
 wow.addEventListener("pointerover", e => {
   if (e.pointerType !== "mouse") return;
-  const s = e.target.closest(".slot[data-z], [data-tipsac]");
+  const s = e.target.closest(".slot[data-z], [data-tipsac], #wChat .lienS, [data-tipech]");
   if (s) montreTip(s, e); else cacheTip();
 });
 wow.addEventListener("pointerleave", e => { if (e.pointerType === "mouse") cacheTip(); });

@@ -104,6 +104,7 @@ import type {
   Transition,
   StatsEcran
 } from '@shared/types'
+import type { Ambiance } from '@shared/ambiance'
 
 /**
  * Un élément tel que le voit l'interface : avec ses URL jdr:// prêtes à
@@ -609,6 +610,9 @@ const api = {
     cielEspace: (id: number, astre: Astre | null) =>
       call<Place | null>('places:cielEspace', id, astre),
     ciel: (id: number) => call<CielDuLieu>('places:ciel', id),
+    /** La teinte générale de la carte et le temps qu'il y fait ; `null`, la carte telle quelle. */
+    ambiance: (id: number, a: Ambiance | null) => call<Ambiance | null>('places:ambiance', id, a),
+    lireAmbiance: (id: number) => call<Ambiance | null>('places:lireAmbiance', id),
     nord: (id: number, nord: number) => call<CielDuLieu>('places:nord', id, nord),
     /** Jusqu'ou le regard porte ici, en part de la largeur ; `null`, sans limite. */
     regardPortee: (id: number, portee: number | null) =>

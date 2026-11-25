@@ -3340,6 +3340,346 @@
    "theme": "Azeroth",
    "famille": "Architecture",
    "rayon": "Portails"
+  },
+  "objets/arbre-corrompu": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Arbres"
+  },
+  "objets/champignons-fel": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Végétation"
+  },
+  "objets/mare-corruption": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Rituels"
+  },
+  "objets/cadavre-furbolg": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Corps"
+  },
+  "objets/tente-satyre": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/pentagramme": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Rituels"
+  },
+  "objets/totem-furbolg": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/autel-ombres": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Rituels"
+  },
+  "objets/crane-demon": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Ossements"
+  },
+  "objets/bougies-noires": {
+   "theme": "Azeroth",
+   "famille": "Lumière",
+   "rayon": "Bougies"
+  },
+  "objets/trone-ogre": {
+   "theme": "Azeroth",
+   "famille": "Mobilier",
+   "rayon": "Assises"
+  },
+  "objets/marmite-ogre": {
+   "theme": "Azeroth",
+   "famille": "Cuisine et bain",
+   "rayon": "Cuisine"
+  },
+  "objets/livres-eparpilles": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Livres et papiers"
+  },
+  "objets/piege-pointes": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Armes"
+  },
+  "objets/tas-or": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Décoration"
+  },
+  "objets/biblio-elfique": {
+   "theme": "Azeroth",
+   "famille": "Mobilier",
+   "rayon": "Rangements"
+  },
+  "objets/statue-elfique": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Décoration"
+  },
+  "objets/cristal-arcane": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Cristaux"
+  },
+  "objets/pilier-arcane": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Colonnes"
+  },
+  "objets/fantome-serviteur": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Personnel"
+  },
+  "objets/cercle-arcane": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Rituels"
+  },
+  "objets/armure-animee": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Décoration"
+  },
+  "objets/globe-celeste": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Décoration"
+  },
+  "objets/echec-roi-blanc": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Échecs"
+  },
+  "objets/echec-roi-noir": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Échecs"
+  },
+  "objets/echec-pion-blanc": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Échecs"
+  },
+  "objets/echec-pion-noir": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Échecs"
+  },
+  "objets/echec-cavalier-blanc": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Échecs"
+  },
+  "objets/echec-cavalier-noir": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Échecs"
+  },
+  "objets/echec-tour-blanche": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Échecs"
+  },
+  "objets/echec-tour-noire": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Échecs"
+  },
+  "objets/echec-fou-blanc": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Échecs"
+  },
+  "objets/echec-fou-noir": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Échecs"
+  },
+  "objets/echec-dame-blanche": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Échecs"
+  },
+  "objets/echec-dame-noire": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Échecs"
+  },
+  "objets/telescope-astral": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Instruments"
+  },
+  "objets/biblio-arcane": {
+   "theme": "Azeroth",
+   "famille": "Mobilier",
+   "rayon": "Rangements"
+  },
+  "objets/piano-spectral": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Instruments"
+  },
+  "objets/banquet-hante": {
+   "theme": "Azeroth",
+   "famille": "Mobilier",
+   "rayon": "Tables"
+  },
+  "objets/chandelier-violet": {
+   "theme": "Azeroth",
+   "famille": "Lumière",
+   "rayon": "Bougies"
+  },
+  "objets/rideau-scene": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Scène"
+  },
+  "objets/livres-flottants": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Livres et papiers"
+  },
+  "objets/faille-temporelle": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Portails"
+  },
+  "objets/sablier-geant": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Décoration"
+  },
+  "objets/arbre-marais": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Arbres"
+  },
+  "objets/dragonide-mort": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Corps"
+  },
+  "objets/porte-naissante": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Portails"
+  },
+  "objets/bulle-medivh": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Invités"
+  },
+  "objets/pierre-soutien": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Rituels"
+  },
+  "objets/ruines-orques": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Débris"
+  },
+  "objets/ossements-dragon": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Ossements"
+  },
+  "objets/porte-tenebres": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Portails"
+  },
+  "objets/statue-demon": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Décoration"
+  },
+  "objets/tente-alliance": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/tente-horde": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/roche-fumante": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Rochers"
+  },
+  "objets/crane-geant": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Ossements"
+  },
+  "objets/cristal-fel-geant": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Cristaux"
+  },
+  "objets/mrk-quete": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Marqueurs"
+  },
+  "objets/mrk-interrogation": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Marqueurs"
+  },
+  "objets/mrk-danger": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Marqueurs"
+  },
+  "objets/mrk-fleche": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Marqueurs"
+  },
+  "objets/eff-brume": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Effets"
+  },
+  "objets/eff-ombre-nuage": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Effets"
+  },
+  "objets/eff-cercle-soin": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Effets"
+  },
+  "objets/eff-zone-givre": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Effets"
+  },
+  "objets/eff-zone-feu": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Effets"
+  },
+  "objets/eff-aura-ombre": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Effets"
   }
  }
 }

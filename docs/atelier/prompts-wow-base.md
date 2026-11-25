@@ -385,3 +385,418 @@ Row 2:
 | 4 | `cage-demoniaque` | Cage démoniaque | 1,5 | P |
 | 5 | `banniere-legion` | Bannière de la Légion | 0,8 | P |
 | 6 | `corruption-sol` | Corruption gangrenée | 2 | — |
+
+# Acte 4 — Gangrebois et Jaedenar
+
+## Bilan des 2 planches (sols 15, lot 64)
+
+- **`sols 15`** ✅ terre corrompue, boue toxique, eau polluée (tuile 3).
+- **`lot 64`** : 6 objets sur 10 gardés ✅ arbre corrompu, champignons gangrenés, mare de
+  corruption, furbolg mort, tente de satyre, pentagramme (l'arbre, la tente et le
+  pentagramme, violets, passent en `magenta-violet`).
+  À refaire :
+  - le **totem furbolg** : de face, debout ;
+  - l'**autel des Ombres** : de trois-quarts, bannière pendue en façade ;
+  - le **crâne de démon** : vu de face, comme un masque ;
+  - les **bougies noires** : de profil, on voit la hauteur des bougies.
+
+## `lot 65.png` — Acte 4, à refaire (2 + 2) ✅ fait (1er essai, les 4 gardés)
+
+Prompt prêt à coller dans `Prompts assets ChatGPT.txt` (campagne 4), entre ▼▼▼ et ▲▲▲.
+
+```
+Create ONE image, 1536x1024, a sprite sheet of EXACTLY 4 separate assets for a top-down tabletop
+RPG battle map in the World of Warcraft style (stylized hand-painted, saturated colors, chunky
+exaggerated shapes), for a corrupted forest of the Burning Legion (dark stone, old wood, bone,
+glowing fel-green runes).
+
+BACKGROUND: solid pure magenta (#FF00FF) everywhere around the items, NOT transparent,
+NOT a gradient. No pink, magenta or purple inside an item. Items do not touch or
+overlap; leave at least 60 pixels of clear magenta between items. Every item has a
+HARD, CRISP outline: no mist, no smoke, no haze, no soft glow bleeding onto the background.
+
+CAMERA: strictly orthographic, straight down from the sky (90°), like a floor plan or a
+map icon. We see ONLY THE TOP of each object: NOTHING stands up, nothing hangs, no front
+faces, no sides, no perspective, no 3/4 view. Flat even lighting from above: NO cast
+shadows. No text, no letters, no grid, no people.
+
+ITEMS, 2 rows of 2, each item centered in its quarter of the image:
+Row 1:
+1. A furbolg totem seen EXACTLY from above, as a bird directly above sees it: the round
+   flat top of a thick wooden pole (a disk with tree rings) at the center, a bear skull
+   lying FLAT on top of it with its snout pointing down the image, two short crossbeams
+   forming a plus sign, a few feathers lying flat on the ground around the base, a ring of
+   mossy stones around it. NOT tall, NOT seen from the front.
+2. A Shadow Council altar seen EXACTLY from above: a perfect circle of black stone slabs,
+   a glowing fel-green rune circle engraved on its flat top, five black candle tops (small
+   dark disks with a tiny yellow flame dot seen from above) evenly spaced around the rim,
+   curved black horns lying flat and pointing outward. No banner, no front face, NOT 3/4.
+Row 2:
+3. A huge horned demon skull lying on the ground, seen EXACTLY from above: we see the TOP
+   of the cranium (a rounded bone dome with green fel cracks), the snout and upper fangs
+   pointing down the image, two big curved horns spreading flat to the left and right.
+   We do NOT see the eye sockets or the face: it is a view of the top of the head.
+4. A group of five black ritual candles seen EXACTLY from above: five dark round disks of
+   different sizes (the tops of the candles), each with a small bright yellow-orange flame
+   seen from above as a teardrop dot at its center, black wax drips spreading flat on the
+   ground around them like puddles. We do NOT see the height of the candles.
+```
+
+| Case | id | Nom | Largeur (cases) | Bloque |
+|---|---|---|---|---|
+| 1 | `totem-furbolg` | Totem furbolg | 1 | P |
+| 2 | `autel-ombres` | Autel des Ombres | 2 | P |
+| 3 | `crane-demon` | Crâne de démon | 2 | P |
+| 4 | `bougies-noires` | Bougies noires | 0,8 | — |
+
+# Acte 5 — Hache-tripes
+
+## Bilan des 4 planches (sols 16, murs 14, ouvertures 9, lot 66)
+
+- **`sols 16`** ✅ dalles elfiques moussues, marbre fissuré d'Eldre'Thalas (tuile 3).
+- **`murs 14`** ✅ mur elfique au lierre (coupé sans ses deux piliers), mur d'ogre (tuile 3).
+- **`ouvertures 9`** ✅ porte d'ogre aux crânes (ajoutée au filtre WoW).
+- **`lot 66`** : 5 objets sur 9 gardés ✅ trône d'ogre, marmite d'ogre, livres éparpillés,
+  piège à pointes, tas d'or (en `magenta-violet` pour ses gemmes).
+  À refaire :
+  - la **bibliothèque elfique** : de face, colonnes et étagères debout ;
+  - la **statue elfique** : la femme vue de face, pas le dessus de sa tête ;
+  - le **cristal arcanique** : debout, on voit sa hauteur ;
+  - le **pilier arcanique** : de profil, une colonne debout.
+
+## `lot 67.png` — Acte 5, à refaire (2 + 2) ✅ fait (1er essai, les 4 gardés)
+
+Prompt prêt à coller dans `Prompts assets ChatGPT.txt` (campagne 4), entre ▼▼▼ et ▲▲▲.
+
+```
+Create ONE image, 1536x1024, a sprite sheet of EXACTLY 4 separate assets for a top-down tabletop
+RPG battle map in the World of Warcraft style (stylized hand-painted, saturated colors, chunky
+exaggerated shapes), for the ruined night elf / Highborne library city of Dire Maul (white and
+pale grey-blue marble, turquoise and gold inlays, ivy, glowing violet arcane runes).
+
+BACKGROUND: solid pure magenta (#FF00FF) everywhere around the items, NOT transparent,
+NOT a gradient. Items do not touch or overlap; leave at least 60 pixels of clear magenta
+between items. Every item has a HARD, CRISP outline: no mist, no smoke, no haze, no soft
+glow bleeding onto the background.
+
+CAMERA: strictly orthographic, straight down from the sky (90°), like a floor plan or a
+map icon, as a bird directly above sees it. We see ONLY THE TOP of each object: NOTHING
+stands up, nothing hangs, no front faces, no sides, no columns seen along their height,
+no perspective, no 3/4 view. Flat even lighting from above: NO cast shadows. No text,
+no letters, no grid, no people.
+
+ITEMS, 2 rows of 2, each item centered in its quarter of the image:
+Row 1:
+1. A ruined elven library seen EXACTLY from above: a long rectangle of marble floor
+   framed by the flat TOPS of tall bookshelves along its edges (we see only the top
+   planks of the shelves as thin dark-wood strips with the tops of book spines in a row),
+   two shelves toppled flat on the floor with books spilled around them, broken marble
+   slabs and ivy. NO columns, NO arch, NOT seen from the front.
+2. A statue of a Highborne elf woman seen EXACTLY from above: the TOP of her head (hair
+   tied up in a bun, two long pointed ears sticking out left and right), her shoulders
+   and her long robe spreading as a flat circle around her, on a round marble pedestal
+   with a gold and turquoise rim. We do NOT see her face, only the top of her head.
+Row 2:
+3. A floating arcane crystal on its pedestal seen EXACTLY from above: a round marble
+   pedestal with gold inlays and a circle of glowing violet runes, and at its center the
+   violet crystal seen end-on, a hexagon whose facets converge to its tip at the center
+   like a star. We do NOT see the length of the crystal.
+4. An arcane stone pillar seen EXACTLY from above: the flat octagonal TOP of a grey stone
+   pillar, with a violet glowing rune engraved on its top face and a thin gold rim, set on
+   a slightly larger octagonal base. It reads as two concentric octagons. We do NOT see
+   the height of the pillar.
+```
+
+| Case | id | Nom | Largeur (cases) | Bloque |
+|---|---|---|---|---|
+| 1 | `biblio-elfique` | Bibliothèque elfique en ruine | 3 | P V |
+| 2 | `statue-elfique` | Statue d'elfe haut-né | 1,5 | P |
+| 3 | `cristal-arcane` | Cristal arcanique | 1,5 | P |
+| 4 | `pilier-arcane` | Pilier arcanique | 1 | P V |
+
+Le cristal et le pilier sont violets : à découper en `magenta-violet`.
+
+# Acte 6 — Karazhan
+
+## Bilan des 5 planches (sols 17, sols 18, murs 15, ouvertures 10, lot 68)
+
+- **`sols 17`** ✅ parquet de Karazhan, tapis royal violet (motif encadré : il se répète
+  en carreaux de tapis), dalles aux runes arcaniques (tuile 3).
+- **`sols 18`** ✅ l'échiquier de marbre, 6 × 6 cases (tuile 12 : deux cases de plan par
+  case d'échecs).
+- **`murs 15`** ✅ mur de la tour, boiseries aux tentures violettes. Coupés au milieu des
+  piliers d'extrémité : deux tuiles bout à bout refont un pilier entier.
+- **`ouvertures 10`** ✅ porte gothique de Karazhan (ajoutée au filtre WoW).
+- **`lot 68`** : 16 objets sur 23 gardés ✅ les 12 pièces d'échecs (vues en plongée, lisibles
+  comme des pions ; nouveau rayon « Échecs »), fantôme de serviteur, cercle arcanique,
+  armure animée, globe céleste. Toute la planche en `magenta-violet`.
+  À refaire :
+  - le **télescope**, la **bibliothèque**, le **piano**, le **banquet**, le **chandelier**
+    et le **rideau** : de face ou de trois-quarts ;
+  - les **livres flottants** : leur aura brumeuse ressort en traînées au détourage.
+
+## `lot 69.png` — Acte 6, à refaire (4 + 3) ✅ fait (1er essai, les 7 gardés)
+
+Prompt prêt à coller dans `Prompts assets ChatGPT.txt` (campagne 4), entre ▼▼▼ et ▲▲▲.
+
+```
+Create ONE image, 1536x1024, a sprite sheet of EXACTLY 7 separate assets for a top-down tabletop
+RPG battle map in the World of Warcraft style (stylized hand-painted, saturated colors, chunky
+exaggerated shapes), for Karazhan, the haunted gothic tower of the mage Medivh (dark wood,
+brass, deep royal purple velvet, violet arcane magic).
+
+BACKGROUND: solid pure magenta (#FF00FF) everywhere around the items, NOT transparent,
+NOT a gradient. Purple is allowed, but only a DEEP violet leaning toward blue (royal purple,
+indigo), never pink, never magenta. Items do not touch or overlap; leave at least 50 pixels
+of clear magenta between items. Every item has a HARD, CRISP, fully opaque outline: no mist,
+no smoke, no aura, no haze, no soft glow bleeding onto the background.
+
+CAMERA: strictly orthographic, straight down from the sky (90°), like a floor plan or a
+map icon, as a bird directly above sees it. We see ONLY THE TOP of each object: NOTHING
+stands up, nothing hangs, no front faces, no sides, no legs, no perspective, no 3/4 view.
+Flat even lighting from above: NO cast shadows. No text, no letters, no grid, no people.
+
+ITEMS, row 1 has 4 items, row 2 has 3 items, evenly spaced:
+Row 1:
+1. A large brass astronomy telescope seen EXACTLY from above: a round wooden platform
+   with a brass compass rose, and the long brass tube lying across it seen from above as
+   a long tapered rectangle pointing diagonally, a round blue lens disk at its wide end.
+2. An arcane bookcase seen EXACTLY from above: a long narrow rectangle, the flat TOP of a
+   dark wood bookcase with gold trim, and along its front edge only the top ends of a
+   row of book spines (small colored rectangles in a line), two small violet crystals on
+   top. We do NOT see the shelves or the books from the front.
+3. A spectral grand piano seen EXACTLY from above: the classic grand piano outline (a
+   harp shape with one straight side and one curved side), its lid closed and seen flat
+   from above, pale translucent ghostly blue but with a HARD, CRISP, opaque outline, the
+   keyboard as a thin strip of black and white keys along the straight short end.
+4. A haunted banquet table seen EXACTLY from above: a long rectangle of dark wood with a
+   deep purple tablecloth runner, rotten food on plates, a roast boar, goblets, cobwebs,
+   and the round flat seats of 3 chairs on each long side seen from above. We do NOT
+   see the chair backs or the table legs.
+Row 2:
+5. A chandelier with violet flames lying flat on the floor seen EXACTLY from above: a
+   dark iron wheel (a ring with spokes like a cartwheel) with 6 candle cups on the ring,
+   each candle top a small disk with a violet flame seen from above as a teardrop dot.
+   NO chains, NOTHING hanging.
+6. A theatre stage curtain seen EXACTLY from above: a long thin horizontal strip, the
+   top of the gilded curtain rail with a golden mask in the middle, and just below it
+   the folds of red velvet seen from above as a wavy band of red ripples with gold fringe.
+   It is a long thin band, about 5 times wider than tall. We do NOT see the curtain hanging.
+7. Three open spellbooks lying flat on the floor seen EXACTLY from above, in a loose
+   triangle: open pages of cream parchment with violet runes, deep purple leather covers.
+   NO aura, NO swirl, NO glow around them: only the books, with hard crisp edges.
+```
+
+| Case | id | Nom | Largeur (cases) | Bloque |
+|---|---|---|---|---|
+| 1 | `telescope-astral` | Télescope astral | 2 | P |
+| 2 | `biblio-arcane` | Bibliothèque arcanique | 3 | P V |
+| 3 | `piano-spectral` | Piano spectral | 2.5 | P |
+| 4 | `banquet-hante` | Banquet hanté | 4 | P |
+| 5 | `chandelier-violet` | Chandelier aux flammes violettes | 1.5 | — |
+| 6 | `rideau-scene` | Rideau de scène | 5 | P V |
+| 7 | `livres-flottants` | Grimoires ouverts | 1.5 | — |
+
+Tout en `magenta-violet`.
+
+# Interlude — Le Noir Marécage
+
+## Bilan des 3 planches (deux de sols, une d'objets)
+
+- **`sols 19`** ✅ marais noir, sable des Grottes du temps aux dalles brisées (tuile 3).
+  L'autre planche de sols (« gravés », marais en portrait répété, sable aux grands arcs de
+  runes qui se raccordent mal) n'a pas servi.
+- **`lot 70`** : 4 objets sur 7 gardés ✅ faille temporelle, sablier géant (vu de profil
+  dans son cadre, lisible comme un sceau), arbre mort du marais, dragonide mort. Toute la
+  planche en `magenta-violet`. À refaire :
+  - la **porte naissante** : en deux moitiés vues de face, échafaudages et échelle debout ;
+  - la **bulle de Medivh** : le mage est vu de face, bras levés ;
+  - la **pierre de soutien** : de trois-quarts, on voit sa face gravée et les défenses dressées.
+
+## `lot 71.png` — Interlude, à refaire (3) ✅ fait (1er essai, les 3 gardés)
+
+Prompt prêt à coller dans `Prompts assets ChatGPT.txt` (campagne 4), entre ▼▼▼ et ▲▲▲.
+
+```
+Create ONE image, 1536x1024, a sprite sheet of EXACTLY 3 separate assets for a top-down tabletop
+RPG battle map in the World of Warcraft style (stylized hand-painted, saturated colors, chunky
+exaggerated shapes), for the Black Morass in the Caverns of Time (the Dark Portal being built
+by the orcs, the mage Medivh, orc Horde rune stones).
+
+BACKGROUND: solid pure magenta (#FF00FF) everywhere around the items, NOT transparent,
+NOT a gradient. Purple is allowed, but only a DEEP violet leaning toward blue (royal purple,
+indigo), never pink, never magenta. Items do not touch or overlap; leave at least 80 pixels
+of clear magenta between items. Every item has a HARD, CRISP, fully opaque outline: no mist,
+no smoke, no aura, no haze, no soft glow bleeding onto the background.
+
+CAMERA: strictly orthographic, straight down from the sky (90°), like a floor plan or a
+map icon, as a bird directly above sees it. We see ONLY THE TOP of each object: NOTHING
+stands up, no front faces, no sides, no perspective, no 3/4 view.
+Flat even lighting from above: NO cast shadows. No text, no letters, no grid.
+
+ITEMS, in ONE row of 3, evenly spaced:
+1. The Dark Portal under construction seen EXACTLY from above, like on an architect's plan:
+   a long thick horizontal bar made of huge square black stone blocks (the TOP of the
+   unfinished arch), with a GAP in the middle where the blocks are not yet placed, bright
+   fel-green light visible as crisp green cracks between the blocks. Around it, wooden
+   scaffolding seen from above as a flat grid of planks, a few stone blocks and crates
+   (seen as squares) on the ground. It is wide, about 3 times wider than tall.
+   We do NOT see the arch rising, no front of the portal, no ladders standing.
+2. Medivh's protective bubble seen EXACTLY from above: a perfect round disk of translucent
+   deep violet light with a HARD, CRISP, opaque outline and thin arcane rune lines. In its
+   center, a robed mage seen from DIRECTLY ABOVE: we see the round TOP of his dark hood,
+   his shoulders with brown feathered pauldrons, and his two arms spread out flat to the
+   sides like a star, his robe spread around him. We see the TOP of the head, NOT the face.
+3. An orc rune stone seen EXACTLY from above: the flat TOP face of a squat grey boulder,
+   an irregular rounded shape like a map icon, a big red orc Horde rune carved on that
+   top face, a thick rope tied around its outline, two ivory tusks lying flat on the
+   ground pointing outward, tufts of dry grass radiating around it on a patch of mud.
+   We do NOT see the side of the stone, nothing stands up.
+```
+
+| Case | id | Nom | Largeur (cases) | Bloque |
+|---|---|---|---|---|
+| 1 | `porte-naissante` | Porte des Ténèbres en construction | 6 | P V |
+| 2 | `bulle-medivh` | Bulle de Medivh | 3 | — |
+| 3 | `pierre-soutien` | Pierre de soutien orque | 1.5 | P |
+
+Tout en `magenta-violet`.
+
+# Acte 7 — Terres foudroyées
+
+## Bilan des 3 planches (sols 20, murs 16, lot 72)
+
+- **`sols 20`** ✅ terre rouge cendrée, roche volcanique aux veines rougeoyantes, lave en fusion (tuile 3).
+- **`murs 16`** ✅ falaise des Terres foudroyées (coupée sans ses bouts arrondis), rempart de la Légion
+  (coupé au milieu des piliers d'extrémité). Les deux en `brut` : le raccord en longueur fondait les
+  bouts en fantômes translucides.
+- **`lot 72`** : 2 objets sur 9 gardés ✅ ruines de forteresse orque, squelette de dragon. À refaire :
+  - la **Porte des Ténèbres** et la **statue de démon** : de face ;
+  - les **deux tentes**, la **roche fumante** et le **cristal fel** : de trois-quarts (la fumée de la
+    roche, en plus, se fondrait dans le magenta) ;
+  - le **crâne géant** : de profil, on voit la face.
+
+## `lot 73.png` — Acte 7, à refaire (3 + 4) ✅ fait (1er essai, les 7 gardés)
+
+Prompt prêt à coller dans `Prompts assets ChatGPT.txt` (campagne 4), entre ▼▼▼ et ▲▲▲.
+
+```
+Create ONE image, 1536x1024, a sprite sheet of EXACTLY 7 separate assets for a top-down tabletop
+RPG battle map in the World of Warcraft style (stylized hand-painted, saturated colors, chunky
+exaggerated shapes), for the Blasted Lands (red scorched earth, the closed Dark Portal, the Burning
+Legion's black stone and fel-green fire, Alliance and Horde war camps).
+
+BACKGROUND: solid pure magenta (#FF00FF) everywhere around the items, NOT transparent,
+NOT a gradient. No pink and no purple in the items. Use fel-green only where asked. Items do not touch or overlap; leave
+at least 60 pixels of clear magenta between items. Every item has a HARD, CRISP, fully
+opaque outline: NO smoke, NO steam, no mist, no aura, no soft glow bleeding onto the background.
+
+CAMERA: strictly orthographic, straight down from the sky (90°), like a floor plan or a
+map icon, as a bird directly above sees it. We see ONLY THE TOP of each object: NOTHING
+stands up, nothing hangs, no front faces, no sides, no perspective, no 3/4 view.
+Flat even lighting from above: NO cast shadows. No text, no letters, no grid.
+
+ITEMS, row 1 has 3 items, row 2 has 4 items, evenly spaced:
+Row 1:
+1. The Dark Portal of World of Warcraft, CLOSED, seen EXACTLY from above like on an
+   architect's plan. It stands on a huge raised square platform of dark grey-brown stone
+   slabs, with a wide staircase seen as parallel flat strips going down its front edge.
+   On the platform, the TOP of the colossal arch: a very long, very thick horizontal bar of
+   massive weathered stone blocks with jagged broken spikes along it, ending at each side in
+   an enormous stepped square pillar base. Along the middle of the bar, a thin straight
+   band of calm, glowing ICE-BLUE light (the closed portal surface seen edge-on from above,
+   crisp edges, no swirl). In front of each pillar base, a colossal crouching guardian statue
+   of dark stone seen from above: the top of its horned head and its huge hunched shoulders.
+   About 3 times wider than tall. NO green anywhere on this item. We do NOT see the portal
+   opening, no front face, no vortex facing us.
+2. A giant demon statue seen EXACTLY from above: a square black stone plinth with bronze
+   corner studs, and on it the statue seen from above: the top of a horned head (two
+   big curved horns as crescents), broad shoulders, two huge wings spread flat to the
+   sides like a bat seen from the sky. We see the TOP of the head, NOT the face.
+3. A large Alliance command tent seen EXACTLY from above: an octagon of blue canvas with
+   the roof seams as lines radiating from a golden central pole cap, gold trim along the
+   edge, a few crates (seen as squares) and two blue-and-gold banners lying flat on the
+   ground beside it. We do NOT see the walls, the door or any hanging banner.
+Row 2:
+4. A large Horde command tent seen EXACTLY from above: a round roof of red-brown hides
+   with the seams radiating from a central pole topped by bone tusks, big ivory tusks
+   lying flat around the edge pointing outward, crates seen as squares. We do NOT see the
+   walls, the entrance or any hanging banner.
+5. A volcanic rock seen EXACTLY from above: an irregular rounded cluster of black basalt
+   blocks seen from the top as flat polygons, with glowing orange-red lava cracks between
+   them as crisp lines, a ring of small black rocks around. NO smoke, NO steam, no glow halo.
+6. A giant's skull half buried, seen EXACTLY from above: we see the TOP of the cranium, a
+   big rounded dome of cracked ivory bone like an egg seen from above, with only the brow
+   ridge and two tusks poking out at the front edge, half sunk in a patch of red earth with
+   dry grass. We do NOT see the face, the eye sockets or the teeth.
+7. A gigantic fel crystal cluster seen EXACTLY from above: a star of bright fel-green
+   crystal points radiating outward from the center like a flower, each crystal seen from
+   above as a flat elongated hexagon with a lighter facet line, surrounded by a ring of
+   black rocks with green cracks. We do NOT see the crystals' height, nothing rises toward us.
+```
+
+| Case | id | Nom | Largeur (cases) | Bloque |
+|---|---|---|---|---|
+| 1 | `porte-tenebres` | La Porte des Ténèbres (fermée) | 8 | P V |
+| 2 | `statue-demon` | Statue de démon géante | 3 | P V |
+| 3 | `tente-alliance` | Tente de commandement de l'Alliance | 4 | P V |
+| 4 | `tente-horde` | Tente de commandement de la Horde | 4 | P V |
+| 5 | `roche-fumante` | Rocher volcanique | 2.5 | P |
+| 6 | `crane-geant` | Crâne de géant | 3 | P |
+| 7 | `cristal-fel-geant` | Cristal fel géant | 3 | P |
+
+# Bonus — effets et marqueurs
+
+## Bilan de la planche (lot 74)
+
+- **`lot 74`** : les 4 marqueurs gardés ✅ point d'exclamation, point d'interrogation, tête de mort,
+  flèche dorée (nouveau rayon « Marqueurs »). Les 6 effets semi-transparents (brume, ombre de nuage,
+  cercle de soin, givre, feu, aura d'ombre) se mêlent au magenta : refaits **sur fond noir**
+  (`fond: 'noir'`, la luminosité devient l'opacité). L'ombre de nuage est un nuage gris clair repeint
+  en noir par la découpe (`teinte: [0, 0, 0]`, `opacite`).
+
+## `lot 75.png` — les effets, sur fond noir (3 + 3) ✅ fait (1er essai, les 6 gardés)
+
+Prompt prêt à coller dans `Prompts assets ChatGPT.txt` (campagne 4), entre ▼▼▼ et ▲▲▲.
+
+```
+Create ONE image, 1536x1024, a sprite sheet of EXACTLY 6 separate glowing magic EFFECTS for a
+top-down tabletop RPG battle map in the World of Warcraft style (stylized hand-painted,
+saturated colors). These are light overlays that will be laid on top of the map.
+
+BACKGROUND: solid pure BLACK (#000000) everywhere around the effects, NOT a gradient, NOT a
+dark texture, no vignette, no stars. The effects are made ONLY of light and bright colors:
+NO black or dark outlines, NO dark shading, NO dark parts inside them (everything dark will
+become transparent). Each effect fades softly into the black at its edges. Effects do not
+touch or overlap; leave at least 60 pixels of pure black between them.
+
+CAMERA: strictly from above (90°), like effects painted on the floor of a map. No perspective,
+no 3/4 view, no objects, no characters, no text, no grid.
+
+EFFECTS, 2 rows of 3, evenly spaced, each about 400 pixels wide:
+Row 1:
+1. A patch of soft white mist seen from above: an irregular wide cloud of pale white-grey
+   wisps, brightest in the middle, fading softly to black at the edges.
+2. A single soft cloud shape seen from above: one rounded fluffy cloud of plain flat light
+   grey, uniform, with soft edges fading to black. No details, no color.
+3. A healing circle on the ground: a ring of bright warm golden holy light with small
+   glowing golden runes along it, a soft golden glow filling the inside, light rays.
+Row 2:
+4. A frost zone on the ground: an irregular round patch of icy light blue and white frost,
+   frost-fern patterns and small ice crystals, glowing pale cyan.
+5. A fire zone on the ground seen from above: a round patch of bright orange and yellow
+   flames and glowing embers, hottest yellow-white in the middle, flame tongues at the edge.
+6. A shadow aura on the ground: a swirling ring of glowing deep violet and purple magic
+   wisps, brighter violet sparks on the ring, a faint violet glow inside.
+```
+
+| Case | id | Nom | Largeur (cases) | Découpe |
+|---|---|---|---|---|
+| 1 | `eff-brume` | Nappe de brume | 4 | — |
+| 2 | `eff-ombre-nuage` | Ombre de nuage | 5 | teinte noire, opacité 0,7 |
+| 3 | `eff-cercle-soin` | Cercle de soin | 3 | — |
+| 4 | `eff-zone-givre` | Zone de givre | 3 | — |
+| 5 | `eff-zone-feu` | Zone de feu | 3 | — |
+| 6 | `eff-aura-ombre` | Aura d'ombre | 3 | — |
+
+Tout en `noir`, rayon « Effets ».

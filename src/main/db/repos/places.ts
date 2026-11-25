@@ -1,6 +1,7 @@
 import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { copierLigne } from '../copie'
 import { nomDuNiveauSuivant } from '@shared/atelier'
+import { ambianceVide, lireAmbiance, type Ambiance } from '@shared/ambiance'
 import { copierFiche } from './ficheLieu'
 import { fixerInitial } from './objets'
 import { rattacherASeance } from './copieSeance'
@@ -421,6 +422,23 @@ export function setAstre(id: number, astre: Astre | null): Place | null {
 export function setCiel(espaceId: number, astre: Astre | null): Place | null {
   ecrireAstre(espaceId, 'ciel', 'ciel_cap', astre)
   return getPlace(espaceId)
+}
+
+/** L'ambiance de la carte de ce lieu : sa teinte générale et le temps qu'il y fait. */
+export function ambianceDe(id: number): Ambiance | null {
+  const r = getDb().prepare(`SELECT ambiance FROM place WHERE id = ?`).get(id) as { ambiance: string | null } | undefined
+  if (!r?.ambiance) return null
+  const a = lireAmbiance(r.ambiance)
+  return ambianceVide(a) ? null : a
+}
+
+/** Régler l'ambiance ; `null` ou une ambiance vide l'efface. */
+export function setAmbiance(id: number, a: Ambiance | null): Ambiance | null {
+  const lue = a ? lireAmbiance(a) : null
+  getDb()
+    .prepare(`UPDATE place SET ambiance = ? WHERE id = ?`)
+    .run(lue && !ambianceVide(lue) ? JSON.stringify(lue) : null, id)
+  return ambianceDe(id)
 }
 
 function ecrireAstre(id: number, col: string, colCap: string, astre: Astre | null): void {
@@ -924,7 +942,7 @@ const CALQUES = ['mur', 'lumiere', 'son_zone', 'annotation', 'pion'] as const
 
 /** Les réglages de carte qu'un étage tient pour ses pièces. */
 const REGLAGES_CARTE =
-  'pion_size, pion_main, echelle, lum_garde, regard_portee, ouv_largeur, astre, astre_cap, nord'
+  'pion_size, pion_main, echelle, lum_garde, regard_portee, ouv_largeur, astre, astre_cap, nord, ambiance'
 
 /** Le premier contenant, en remontant, dont l'étage est admis au-dessus de `tier`. */
 function contenantAdmis(depart: number | null, tier: PlaceTier): number | null {

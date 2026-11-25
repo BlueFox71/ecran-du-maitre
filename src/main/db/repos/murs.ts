@@ -223,6 +223,7 @@ export function calqueDe(placeId: number | null): CalqueBrouillard {
     regardOuverture: lireCampagne(reglages.tous()).mursAngle,
     porteurs: lumieres.porteursDeLumiere(placeId == null ? null : echelleDe(placeId).metres),
     astre: placeId == null ? null : places.cielDe(placeId).astre,
+    ambiance: placeId == null ? null : places.ambianceDe(placeId),
     objets: objetsVus(placeId),
     pieces: placeId == null ? [] : piecesVues(placeId)
   }

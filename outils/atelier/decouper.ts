@@ -43,6 +43,12 @@ interface Case {
   zone?: [number, number, number, number]
   /** Dans sa zone, ne garder que le plus grand élément d'un seul tenant (un voisin déborde dedans). */
   seul?: boolean
+  /**
+   * Repeindre l'élément d'une seule couleur en gardant sa transparence, puis la
+   * multiplier par `opacite` : une ombre de nuage faite d'un nuage blanc sur fond noir.
+   */
+  teinte?: [number, number, number]
+  opacite?: number
 }
 
 /**
@@ -2669,6 +2675,438 @@ const PLANCHES: Planche[] = [
     cases: [{ id: 'arche-ruines', nom: 'Arche elfique en ruine', l: 4 }]
   },
   {
+    /* Acte 4, Gangrebois et Jaedenar : trois textures séparées par un liseré magenta. */
+    fichier: 'planches/sols 15.png',
+    fond: 'aucun',
+    cols: 1,
+    rows: 1,
+    type: 'sol',
+    categorie: 'Azeroth',
+    dossier: 'sols',
+    raccord: 'deux',
+    cases: [
+      { id: 'terre-corrompue', nom: 'Terre corrompue de Gangrebois', tuile: 3, zone: [11, 11, 700, 700] },
+      { id: 'boue-toxique', nom: 'Boue toxique', tuile: 3, zone: [736, 11, 700, 700] },
+      { id: 'eau-polluee', nom: 'Eau polluée', tuile: 3, zone: [1460, 11, 700, 700] }
+    ]
+  },
+  {
+    /* Acte 4 : le totem furbolg, l'autel des Ombres, le crâne de démon et les bougies,
+       dessinés de face ou de trois-quarts, sont laissés (à refaire dans lot 65). */
+    fichier: 'planches/lot 64.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Nature',
+    sousCategorie: 'Végétation',
+    dossier: 'objets',
+    cases: [
+      { id: 'champignons-fel', nom: 'Champignons gangrenés', l: 1.5, pas: true, zone: [428, 16, 300, 300] },
+      { id: 'mare-corruption', nom: 'Mare de corruption', l: 3, zone: [756, 16, 384, 304] },
+      { id: 'cadavre-furbolg', nom: 'Furbolg mort', l: 2.5, zone: [1148, 48, 384, 276] }
+    ]
+  },
+  {
+    /* Les cases violettes de lot 64 : détourées à part pour garder leur couleur. */
+    fichier: 'planches/lot 64.png',
+    fond: 'magenta-violet',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Nature',
+    sousCategorie: 'Arbres',
+    dossier: 'objets',
+    cases: [
+      { id: 'arbre-corrompu', nom: 'Arbre corrompu de Gangrebois', l: 3, pas: true, vue: true, zone: [14, 6, 404, 330] },
+      { id: 'tente-satyre', nom: 'Tente de satyre', l: 3, pas: true, vue: true, zone: [764, 332, 354, 344] },
+      { id: 'pentagramme', nom: 'Pentagramme', l: 3, zone: [956, 668, 358, 350] }
+    ]
+  },
+  {
+    /* Les quatre objets de lot 64 dessinés de face, refaits vus de dessus. */
+    fichier: 'planches/lot 65.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Déco et objets',
+    sousCategorie: 'Rituels',
+    dossier: 'objets',
+    cases: [
+      { id: 'totem-furbolg', nom: 'Totem furbolg', l: 1.5, pas: true, zone: [157, 10, 485, 486] },
+      { id: 'autel-ombres', nom: 'Autel des Ombres', l: 2, pas: true, zone: [893, 5, 469, 506] },
+      { id: 'crane-demon', nom: 'Crâne de démon', l: 2, pas: true, zone: [103, 533, 602, 473] },
+      { id: 'bougies-noires', nom: 'Bougies noires', l: 1, zone: [861, 541, 506, 452] }
+    ]
+  },
+  {
+    /* Acte 5, Hache-tripes : deux textures séparées par un liseré magenta. */
+    fichier: 'planches/sols 16.png',
+    fond: 'aucun',
+    cols: 1,
+    rows: 1,
+    type: 'sol',
+    categorie: 'Azeroth',
+    dossier: 'sols',
+    raccord: 'deux',
+    cases: [
+      { id: 'dalles-mousse', nom: 'Dalles elfiques moussues', tuile: 3, zone: [16, 16, 856, 856] },
+      { id: 'marbre-fissure', nom: 'Marbre fissuré d’Eldre’Thalas', tuile: 3, zone: [902, 16, 856, 856] }
+    ]
+  },
+  {
+    /* Coupés sans leurs bouts (les piliers du mur elfique, les pierres arrondies de l'ogre). */
+    fichier: 'planches/murs 14.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'mur',
+    categorie: 'Azeroth',
+    dossier: 'murs',
+    retrait: 4,
+    raccord: 'long',
+    cases: [
+      { id: 'mur-eldre-thalas', nom: 'Mur elfique au lierre', tuile: 3, zone: [180, 96, 1820, 208] },
+      { id: 'mur-ogre', nom: 'Mur d’ogre', tuile: 3, zone: [96, 428, 1980, 204] }
+    ]
+  },
+  {
+    fichier: 'planches/ouvertures 9.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'porte',
+    categorie: 'Portes et fenêtres',
+    dossier: 'ouvertures',
+    centrerMontants: true,
+    cases: [{ id: 'porte-ogre', nom: 'Porte d’ogre aux crânes', zone: [32, 148, 2108, 416] }]
+  },
+  {
+    /* Acte 5 : la bibliothèque, la statue, le cristal et le pilier arcaniques, dessinés de
+       face ou debout, sont laissés (à refaire dans lot 67). */
+    fichier: 'planches/lot 66.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Mobilier',
+    sousCategorie: 'Assises',
+    dossier: 'objets',
+    cases: [
+      { id: 'trone-ogre', nom: 'Trône d’ogre', l: 2, pas: true, zone: [28, 12, 384, 336] },
+      { id: 'marmite-ogre', nom: 'Marmite d’ogre', l: 2, pas: true, zone: [448, 8, 372, 344] },
+      { id: 'livres-eparpilles', nom: 'Livres éparpillés', l: 1.5, zone: [1356, 24, 352, 316] },
+      { id: 'piege-pointes', nom: 'Piège à pointes', l: 1.5, zone: [1000, 372, 328, 332] }
+    ]
+  },
+  {
+    /* Le tas d'or de lot 66 : ses gemmes violettes gardent leur couleur. */
+    fichier: 'planches/lot 66.png',
+    fond: 'magenta-violet',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Déco et objets',
+    sousCategorie: 'Décoration',
+    dossier: 'objets',
+    cases: [{ id: 'tas-or', nom: 'Tas de pièces d’or', l: 1.5, zone: [1444, 376, 372, 336] }]
+  },
+  {
+    /* Les quatre objets de lot 66 dessinés debout, refaits vus de dessus. */
+    fichier: 'planches/lot 67.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Mobilier',
+    sousCategorie: 'Rangements',
+    dossier: 'objets',
+    cases: [
+      { id: 'biblio-elfique', nom: 'Bibliothèque elfique en ruine', l: 4, zone: [22, 17, 830, 490] },
+      { id: 'statue-elfique', nom: 'Statue d’elfe haut-né', l: 1.5, pas: true, zone: [924, 10, 500, 493] }
+    ]
+  },
+  {
+    /* Le cristal et le pilier de lot 67, violets : détourés à part pour garder leur couleur. */
+    fichier: 'planches/lot 67.png',
+    fond: 'magenta-violet',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Nature',
+    sousCategorie: 'Cristaux',
+    dossier: 'objets',
+    cases: [
+      { id: 'cristal-arcane', nom: 'Cristal arcanique', l: 1.5, pas: true, zone: [174, 504, 497, 493] },
+      { id: 'pilier-arcane', nom: 'Pilier arcanique', l: 1, pas: true, vue: true, zone: [942, 543, 417, 419] }
+    ]
+  },
+  {
+    /* Acte 6, Karazhan : trois textures séparées par un liseré magenta. */
+    fichier: 'planches/sols 17.png',
+    fond: 'aucun',
+    cols: 1,
+    rows: 1,
+    type: 'sol',
+    categorie: 'Azeroth',
+    dossier: 'sols',
+    raccord: 'deux',
+    cases: [
+      { id: 'parquet-manoir', nom: 'Parquet de Karazhan', tuile: 3, zone: [22, 18, 680, 680] },
+      { id: 'tapis-royal', nom: 'Tapis royal violet', tuile: 3, zone: [746, 18, 680, 680] },
+      { id: 'dalles-mystiques', nom: 'Dalles aux runes arcaniques', tuile: 3, zone: [1470, 18, 680, 680] }
+    ]
+  },
+  {
+    /* L'échiquier de Karazhan : 6 × 6 cases de marbre, deux cases de plan par case d'échecs. */
+    fichier: 'planches/sols 18.png',
+    fond: 'aucun',
+    cols: 1,
+    rows: 1,
+    type: 'sol',
+    categorie: 'Azeroth',
+    dossier: 'sols',
+    cases: [{ id: 'echiquier-karazhan', nom: 'Échiquier de marbre', tuile: 12 }]
+  },
+  {
+    /* Coupés au milieu des piliers d'extrémité : deux tuiles mises bout à bout refont un pilier entier. */
+    fichier: 'planches/murs 15.png',
+    fond: 'magenta-violet',
+    cols: 1,
+    rows: 1,
+    type: 'mur',
+    categorie: 'Azeroth',
+    dossier: 'murs',
+    retrait: 4,
+    raccord: 'long',
+    cases: [
+      { id: 'mur-tour-karazhan', nom: 'Mur de la tour de Karazhan', tuile: 3, zone: [128, 108, 1917, 216] },
+      { id: 'mur-boiseries', nom: 'Boiseries aux tentures violettes', tuile: 3, zone: [121, 476, 1927, 160] }
+    ]
+  },
+  {
+    fichier: 'planches/ouvertures 10.png',
+    fond: 'magenta-violet',
+    cols: 1,
+    rows: 1,
+    type: 'porte',
+    categorie: 'Portes et fenêtres',
+    dossier: 'ouvertures',
+    centrerMontants: true,
+    cases: [{ id: 'porte-karazhan', nom: 'Porte gothique de Karazhan', zone: [28, 236, 2116, 280] }]
+  },
+  {
+    /* Acte 6 : le télescope, la bibliothèque, le piano, le banquet, le chandelier, le
+       rideau et les livres flottants (aura brumeuse), dessinés de face ou de trois-quarts, sont laissés (à refaire dans lot 69).
+       Tout en magenta-violet : beaucoup de violet (robes, orbes, runes). */
+    fichier: 'planches/lot 68.png',
+    fond: 'magenta-violet',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Déco et objets',
+    sousCategorie: 'Échecs',
+    dossier: 'objets',
+    cases: [
+      { id: 'echec-roi-blanc', nom: 'Roi blanc (échecs de Karazhan)', l: 1.5, pas: true, zone: [22, 2, 212, 252] },
+      { id: 'echec-roi-noir', nom: 'Roi noir (échecs de Karazhan)', l: 1.5, pas: true, zone: [266, 0, 244, 254] },
+      { id: 'echec-pion-blanc', nom: 'Pion blanc (échecs de Karazhan)', l: 1.2, pas: true, zone: [558, 26, 164, 220] },
+      { id: 'echec-pion-noir', nom: 'Pion noir (échecs de Karazhan)', l: 1.2, pas: true, zone: [806, 26, 188, 220] },
+      { id: 'echec-cavalier-blanc', nom: 'Cavalier blanc (échecs de Karazhan)', l: 1.5, pas: true, zone: [1054, 0, 200, 252] },
+      { id: 'echec-cavalier-noir', nom: 'Cavalier noir (échecs de Karazhan)', l: 1.5, pas: true, zone: [1306, 2, 204, 252] },
+      { id: 'echec-tour-blanche', nom: 'Tour blanche (échecs de Karazhan)', l: 1.5, pas: true, zone: [14, 250, 232, 256] },
+      { id: 'echec-tour-noire', nom: 'Tour noire (échecs de Karazhan)', l: 1.5, pas: true, zone: [262, 254, 248, 252] },
+      { id: 'echec-fou-blanc', nom: 'Fou blanc (échecs de Karazhan)', l: 1.5, pas: true, zone: [558, 262, 180, 236] },
+      { id: 'echec-fou-noir', nom: 'Fou noir (échecs de Karazhan)', l: 1.5, pas: true, zone: [794, 258, 212, 248] },
+      { id: 'echec-dame-blanche', nom: 'Dame blanche (échecs de Karazhan)', l: 1.5, pas: true, zone: [1066, 254, 180, 252] },
+      { id: 'echec-dame-noire', nom: 'Dame noire (échecs de Karazhan)', l: 1.5, pas: true, zone: [1310, 254, 196, 252] },
+      { id: 'fantome-serviteur', nom: 'Fantôme de serviteur', l: 1, zone: [406, 766, 188, 252] },
+      { id: 'cercle-arcane', nom: 'Cercle arcanique', l: 3, zone: [634, 762, 260, 256] },
+      { id: 'armure-animee', nom: 'Armure animée', l: 1.2, pas: true, zone: [930, 770, 256, 240] },
+      { id: 'globe-celeste', nom: 'Globe céleste', l: 1.5, pas: true, zone: [1230, 762, 272, 260] }
+    ]
+  },
+  {
+    /* Les sept objets de lot 68 dessinés de face, refaits vus de dessus. */
+    fichier: 'planches/lot 69.png',
+    fond: 'magenta-violet',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Déco et objets',
+    sousCategorie: 'Décoration',
+    dossier: 'objets',
+    cases: [
+      { id: 'telescope-astral', nom: 'Télescope astral', l: 2, pas: true, zone: [26, 106, 344, 352] },
+      { id: 'biblio-arcane', nom: 'Bibliothèque arcanique', l: 3, pas: true, vue: true, zone: [390, 218, 344, 160] },
+      { id: 'piano-spectral', nom: 'Piano spectral', l: 2.5, pas: true, zone: [782, 114, 280, 320] },
+      { id: 'banquet-hante', nom: 'Banquet hanté', l: 4, pas: true, zone: [1102, 122, 400, 328] },
+      { id: 'chandelier-violet', nom: 'Chandelier aux flammes violettes', l: 1.5, zone: [54, 570, 320, 360] },
+      { id: 'rideau-scene', nom: 'Rideau de scène', l: 5, pas: true, vue: true, zone: [434, 670, 564, 144] },
+      { id: 'livres-flottants', nom: 'Grimoires ouverts', l: 1.5, zone: [1046, 578, 468, 332] }
+    ]
+  },
+  {
+    /* Interlude, le Noir Marécage : deux textures séparées par un liseré magenta. */
+    fichier: 'planches/sols 19.png',
+    fond: 'aucun',
+    cols: 1,
+    rows: 1,
+    type: 'sol',
+    categorie: 'Azeroth',
+    dossier: 'sols',
+    raccord: 'deux',
+    cases: [
+      { id: 'marais-noir', nom: 'Marais noir', tuile: 3, zone: [6, 6, 872, 872] },
+      { id: 'sable-grottes', nom: 'Sable des Grottes du temps', tuile: 3, zone: [896, 6, 872, 872] }
+    ]
+  },
+  {
+    /* Interlude : la porte naissante, la bulle de Medivh et la pierre de soutien,
+       dessinées de face, sont laissées (à refaire dans lot 71). La faille ne garde
+       que son grand morceau (l'arbre déborde dans sa boîte), sans les éclats volants. */
+    fichier: 'planches/lot 70.png',
+    fond: 'magenta-violet',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Déco et objets',
+    sousCategorie: 'Décoration',
+    dossier: 'objets',
+    cases: [
+      { id: 'faille-temporelle', nom: 'Faille temporelle', l: 3, seul: true, zone: [100, 405, 450, 410] },
+      { id: 'sablier-geant', nom: 'Sablier géant', l: 3, pas: true, zone: [694, 421, 403, 382] },
+      { id: 'arbre-marais', nom: 'Arbre mort du marais', l: 4, pas: true, seul: true, zone: [366, 781, 467, 470] },
+      { id: 'dragonide-mort', nom: 'Dragonide du Vol infini mort', l: 2, zone: [843, 825, 405, 419] }
+    ]
+  },
+  {
+    /* Les trois objets de lot 70 dessinés de face, refaits vus de dessus. */
+    fichier: 'planches/lot 71.png',
+    fond: 'magenta-violet',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Déco et objets',
+    sousCategorie: 'Décoration',
+    dossier: 'objets',
+    cases: [
+      { id: 'porte-naissante', nom: 'Porte des Ténèbres en construction', l: 6, pas: true, vue: true, zone: [17, 333, 633, 378] },
+      { id: 'bulle-medivh', nom: 'Bulle de Medivh', l: 3, zone: [664, 310, 413, 409] },
+      { id: 'pierre-soutien', nom: 'Pierre de soutien orque', l: 1.5, pas: true, zone: [1082, 326, 442, 388] }
+    ]
+  },
+  {
+    /* Acte 7, Terres foudroyées : trois textures séparées par un liseré magenta. */
+    fichier: 'planches/sols 20.png',
+    fond: 'aucun',
+    cols: 1,
+    rows: 1,
+    type: 'sol',
+    categorie: 'Azeroth',
+    dossier: 'sols',
+    raccord: 'deux',
+    cases: [
+      { id: 'terre-rouge', nom: 'Terre rouge cendrée', tuile: 3, zone: [23, 21, 676, 676] },
+      { id: 'roche-volcanique', nom: 'Roche volcanique aux veines rougeoyantes', tuile: 3, zone: [747, 21, 676, 676] },
+      { id: 'lave', nom: 'Lave en fusion', tuile: 3, zone: [1472, 21, 676, 676] }
+    ]
+  },
+  {
+    /* La falaise coupée sans ses bouts arrondis ; le rempart au milieu des piliers
+       d'extrémité, pour que deux tuiles bout à bout refassent un pilier entier. */
+    fichier: 'planches/murs 16.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'mur',
+    categorie: 'Azeroth',
+    dossier: 'murs',
+    retrait: 4,
+    raccord: 'long',
+    cases: [
+      { id: 'mur-falaise-foudroyee', nom: 'Falaise des Terres foudroyées', tuile: 3, brut: true, zone: [150, 63, 1880, 258] },
+      { id: 'mur-rempart-neant', nom: 'Rempart de la Légion à pointes', tuile: 3, brut: true, zone: [160, 415, 1859, 258] }
+    ]
+  },
+  {
+    /* Acte 7 : la Porte des Ténèbres, la statue de démon, les deux tentes, la roche
+       fumante, le crâne géant et le cristal fel, dessinés de face ou de trois-quarts,
+       sont laissés (à refaire dans lot 73). */
+    fichier: 'planches/lot 72.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Déco et objets',
+    sousCategorie: 'Décoration',
+    dossier: 'objets',
+    cases: [
+      { id: 'ruines-orques', nom: 'Ruines de forteresse orque', l: 5, pas: true, seul: true, zone: [1010, 9, 500, 347] },
+      { id: 'ossements-dragon', nom: 'Squelette de dragon', l: 5, zone: [494, 681, 561, 327] }
+    ]
+  },
+  {
+    /* Les sept objets de lot 72 dessinés de face, refaits vus de dessus (la Porte des Ténèbres fermée, en bleu). */
+    fichier: 'planches/lot 73.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Déco et objets',
+    sousCategorie: 'Décoration',
+    dossier: 'objets',
+    cases: [
+      { id: 'porte-tenebres', nom: 'La Porte des Ténèbres (fermée)', l: 8, pas: true, vue: true, zone: [3, 83, 685, 406] },
+      { id: 'statue-demon', nom: 'Statue de démon géante', l: 3, pas: true, vue: true, zone: [696, 83, 449, 368] },
+      { id: 'tente-alliance', nom: 'Tente de commandement de l’Alliance', l: 4, pas: true, vue: true, zone: [1148, 69, 384, 405] },
+      { id: 'tente-horde', nom: 'Tente de commandement de la Horde', l: 4, pas: true, vue: true, zone: [8, 552, 392, 368] },
+      { id: 'roche-fumante', nom: 'Rocher volcanique', l: 2.5, pas: true, zone: [411, 567, 330, 341] },
+      { id: 'crane-geant', nom: 'Crâne de géant', l: 3, pas: true, zone: [754, 564, 369, 360] },
+      { id: 'cristal-fel-geant', nom: 'Cristal fel géant', l: 3, pas: true, zone: [1135, 551, 390, 372] }
+    ]
+  },
+  {
+    /* Bonus : les marqueurs de MJ. Les six effets semi-transparents de la planche
+       (brume, ombre de nuage, soin, givre, feu, aura) se mêlent au magenta : laissés,
+       à refaire sur fond noir dans lot 75. */
+    fichier: 'planches/lot 74.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Déco et objets',
+    sousCategorie: 'Marqueurs',
+    dossier: 'objets',
+    cases: [
+      { id: 'mrk-quete', nom: 'Point d’exclamation de quête', l: 0.8, zone: [964, 420, 111, 252] },
+      { id: 'mrk-interrogation', nom: 'Point d’interrogation de quête', l: 0.8, zone: [1231, 424, 172, 248] },
+      { id: 'mrk-danger', nom: 'Marqueur de danger (tête de mort)', l: 1, seul: true, zone: [381, 704, 302, 308] },
+      { id: 'mrk-fleche', nom: 'Flèche directionnelle dorée', l: 1.5, zone: [814, 758, 315, 193] }
+    ]
+  },
+  {
+    /* Bonus : les effets, sur fond noir (la luminosité devient l'opacité). L'ombre de
+       nuage est le nuage gris clair repeint en noir. */
+    fichier: 'planches/lot 75.png',
+    fond: 'noir',
+    cols: 3,
+    rows: 2,
+    type: 'objet',
+    categorie: 'Déco et objets',
+    sousCategorie: 'Effets',
+    dossier: 'objets',
+    cases: [
+      { id: 'eff-brume', nom: 'Nappe de brume', l: 4 },
+      { id: 'eff-ombre-nuage', nom: 'Ombre de nuage', l: 5, teinte: [0, 0, 0], opacite: 0.7 },
+      { id: 'eff-cercle-soin', nom: 'Cercle de soin', l: 3 },
+      { id: 'eff-zone-givre', nom: 'Zone de givre', l: 3 },
+      { id: 'eff-zone-feu', nom: 'Zone de feu', l: 3 },
+      { id: 'eff-aura-ombre', nom: 'Aura d’ombre', l: 3 }
+    ]
+  },
+  {
     fichier: 'planches/icones 1.png',
     fond: 'magenta',
     icones: true,
@@ -2948,6 +3386,18 @@ for (const pl of PLANCHES) {
       const p = new Uint8ClampedArray(piece.data.buffer, piece.data.byteOffset, piece.data.length)
       const rac = raccorder(p, piece.width, piece.height, pl.raccord === 'long')
       piece.data = Buffer.from(rac.buffer, rac.byteOffset, rac.length)
+    }
+    if (c.teinte || c.opacite !== undefined) {
+      const [tr, tg, tb] = c.teinte ?? [-1, -1, -1]
+      const o = c.opacite ?? 1
+      for (let k = 0; k < piece.data.length; k += 4) {
+        if (tr >= 0) {
+          piece.data[k] = tr
+          piece.data[k + 1] = tg
+          piece.data[k + 2] = tb
+        }
+        piece.data[k + 3] = Math.round(piece.data[k + 3] * o)
+      }
     }
     /* Une icône de rayon : rangée à part, sous le nom du rayon, hors du catalogue. */
     if (pl.icones) {

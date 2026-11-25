@@ -2092,5 +2092,14 @@ export const MIGRATIONS: Migration[] = [
     /* Répartir ce qui était commun : voir repartition.ts. */
     sql: ``,
     run: repartirParSeance
+  },
+  {
+    id: 97,
+    sql: `
+    /* L'ambiance d'une carte : la couleur de sa lumiere generale et le temps
+       qu'il y fait (brouillard, pluie, neige...), en JSON. NULL : la carte
+       telle quelle. De l'ambiance seulement : rien de ce qui est vu ne change. */
+    ALTER TABLE place ADD COLUMN ambiance TEXT;
+    `
   }
 ]

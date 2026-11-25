@@ -36,6 +36,7 @@ import { reglagesPoste } from './carnet'
 import { currentProject } from './project'
 import * as serveur from './wowServeur'
 import * as fiches from './wowFiches'
+import * as display from './display'
 
 /**
  * Les quêtes préparées de la campagne ouverte : `quetes-wow.json`, dans son
@@ -96,6 +97,36 @@ export async function etat(): Promise<ServeurWow> {
     ancien: ancien !== null
   }
 }
+
+/**
+ * Un jet de l'Aventure tombe sur l'écran de la table et dans la Régie, comme
+ * les dés des téléphones — à la manière de WoW. En combat, les jets
+ * s'enchaînent : chacun s'en va seul au bout de quelques secondes.
+ */
+serveur.onJet((j) => {
+  /* L'onglet Aventure du MJ lui-même : ses essais ne vont pas sur l'écran des joueurs. */
+  if (j.id === 'mj' || j.id === ID_MJ) return
+  if (!isDbOpen()) return
+  const characterId = fiches.liensWow()[j.id]
+  const joueur =
+    (characterId != null ? players.listPlayers().find((p) => p.characterId === characterId) : null) ??
+    players.listPlayers().find((p) => slugJoueurWow(p.name) === j.id) ??
+    null
+  const perso = characterId != null ? chars.getCharacter(characterId)?.name : null
+  const de = display.poserDe({
+    joueur: joueur?.name ?? j.nom,
+    perso: perso || j.nom,
+    couleur: joueur?.color ?? null,
+    carac: j.titre,
+    code: null,
+    de: j.de,
+    bonus: j.bonus,
+    total: j.total,
+    faces: j.faces,
+    wow: { dd: j.dd, issue: j.issue }
+  })
+  setTimeout(() => display.retirerDe(de.id), 9000)
+})
 
 /** Lance le jeu sur le dossier de données (sans effet s'il tourne déjà). */
 export async function demarrer(): Promise<ServeurWow> {

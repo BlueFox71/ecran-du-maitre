@@ -320,6 +320,8 @@ export function versAventure(
       totaux: maj.totaux,
       pv: maj.pv,
       res: maj.res,
+      pvMax: maj.pvMax,
+      resMax: maj.resMax,
       car: maj.car,
       sexe: maj.sexe,
       age: maj.age,
@@ -334,6 +336,13 @@ export function versAventure(
     const j = JSON.parse(readFileSync(chemin, 'utf8'))
     const perso = j?.progress?.perso
     if (!perso) return false
+    /* Un maximum changé : seule l'Aventure connaît ses bonus du moment. On le lui
+       laisse au courrier (avec la valeur, qui se pose après le maximum). */
+    if (maj.pvMax !== undefined || maj.resMax !== undefined)
+      perso.courrierMj = [
+        ...(Array.isArray(perso.courrierMj) ? perso.courrierMj : []),
+        { t: 'fiche', pvMax: maj.pvMax, resMax: maj.resMax, pv: maj.pv, res: maj.res }
+      ]
     if (maj.pv !== undefined && perso.pv) perso.pv.cur = Math.max(0, Math.round(maj.pv))
     if (maj.res !== undefined && perso.res) perso.res.cur = Math.max(0, Math.round(maj.res))
     /* Hors ligne, on ne connaît pas les bonus du moment : on décale les points
