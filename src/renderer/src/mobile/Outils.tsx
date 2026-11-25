@@ -28,7 +28,8 @@ async function envoyer(
       body: JSON.stringify(corps)
     })
     if (r.ok) return null
-    return (await r.json().catch(() => ({}))).erreur ?? 'Le serveur a refusé.'
+    const erreur = (await r.json().catch(() => ({}))).erreur ?? 'Le serveur a refusé.'
+    return erreur === 'gele' ? 'L’écran est figé : rien ne part.' : erreur
   } catch {
     return 'Le serveur ne répond pas.'
   }
@@ -42,17 +43,22 @@ function lecture(o: OutilTelephone): string | null {
 
 /** L'appareil à l'écran, vivant : le niveau tremble, la température glisse. */
 function Appareil({ o }: { o: OutilTelephone }): JSX.Element {
-  const niveau = useNiveauVivant(o.valeur ?? 0, o.allume)
-  const temperature = useTemperatureVivante(o.valeur ?? 0)
   return (
     <div className="m-appareil">
-      {o.outil === 'emf' ? (
-        <PhotoEmf n={niveau} eteint={!o.allume} />
-      ) : (
-        <EcranThermometre t={temperature} eteint={!o.allume} />
-      )}
+      {o.outil === 'emf' ? <EmfVivant o={o} /> : <ThermometreVivant o={o} />}
     </div>
   )
+}
+
+/* Un composant par outil : chacun ne fait tourner que son animation. */
+function EmfVivant({ o }: { o: OutilTelephone }): JSX.Element {
+  const niveau = useNiveauVivant(o.valeur ?? 0, o.allume)
+  return <PhotoEmf n={niveau} eteint={!o.allume} />
+}
+
+function ThermometreVivant({ o }: { o: OutilTelephone }): JSX.Element {
+  const temperature = useTemperatureVivante(o.valeur ?? 0)
+  return <EcranThermometre t={temperature} eteint={!o.allume} />
 }
 
 export function Outils({

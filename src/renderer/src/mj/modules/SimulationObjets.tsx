@@ -7,7 +7,10 @@
  * voit qu'un à la fois. Les autres restent montés, cachés : changer d'objet
  * ne vide pas le livre ni n'éteint le thermomètre.
  *
- * Pour le MJ seul : rien ne part vers l'écran ni les portables.
+ * Les objets du menu sont pour le MJ seul : rien n'en part vers l'écran ni
+ * les portables. La liste des appareils en jeu, en tête, montre ceux que les
+ * joueurs ont en main ou ont posés ; en prendre le contrôle change ce que
+ * lisent leurs téléphones et ce qu'affiche la table.
  */
 import { useEffect, useState } from 'react'
 import { Emf } from './Emf'
@@ -103,8 +106,9 @@ export function SimulationObjets(): JSX.Element {
         <div>
           <h2>Simulation Objets</h2>
           <p>
-            Le matériel des chasseurs de fantômes, à essayer et à régler. Pour toi seul, rien ne part
-            vers l’écran ni les portables.
+            Le matériel des chasseurs de fantômes, à essayer et à régler pour toi seul. Les appareils
+            en jeu, eux, sont ceux des joueurs : en prendre le contrôle change ce que montrent leurs
+            portables et l’écran.
           </p>
         </div>
       </div>

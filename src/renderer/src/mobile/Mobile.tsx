@@ -3176,7 +3176,10 @@ function Plan({
         headers: { 'content-type': 'application/json' },
         body: JSON.stringify({ placementId })
       })
-      if (!r.ok) setRefus((await r.json().catch(() => ({}))).erreur ?? 'Impossible de le ramasser.')
+      if (!r.ok) {
+        const erreur = (await r.json().catch(() => ({}))).erreur ?? 'Impossible de le ramasser.'
+        setRefus(erreur === 'gele' ? 'L’écran est figé : rien ne part.' : erreur)
+      }
     } catch {
       setRefus('Le serveur ne répond pas.')
     }
@@ -3189,12 +3192,21 @@ function Plan({
     const y = (e.clientY - b.top) / b.height
     /* Un appareil posé sous le doigt : on propose de le ramasser (le pion, lui,
        se déplace par son anneau — un toucher sur la carte ne le fait pas marcher). */
-    const touche = (calque?.objets ?? []).find(
+    const proche = (calque?.objets ?? []).find(
       (o) =>
         o.outil &&
         etat.appareilsPoses?.some((a) => a.placementId === o.id) &&
         Math.hypot((o.x - x) * b.width, (o.y - y) * b.height) < 26
     )
+    /* Seulement s'il est sous un regard : la bulle passe au-dessus de l'ombre,
+       elle trahirait un appareil laissé dans le noir. Sans ombre dessinée
+       (plein jour, plan sans murs), tout se voit. */
+    const ombre = !!calque?.murs.length && !!nat && !etat.jour
+    const touche =
+      proche &&
+      (!ombre || sousUnRegard(regardsDes(calque!, yeux, nat!.w, nat!.h), proche.x * nat!.w, proche.y * nat!.h))
+        ? proche
+        : null
     if (touche) {
       setRefus(null)
       setRamasser(touche.id === ramasser?.id ? null : { id: touche.id, x: touche.x, y: touche.y })
