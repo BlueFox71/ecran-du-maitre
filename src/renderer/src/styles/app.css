@@ -28187,3 +28187,21 @@ button.at-titre:hover {
   grid-template-columns: minmax(0, 1fr);
   gap: 6px;
 }
+
+/* Les appareils de chasse en jeu, en tête de Simulation Objets. */
+.chasse-appareils { margin-bottom: 16px; }
+.chasse-appareils h3 { margin: 0 0 8px; font-size: 14px; }
+.chasse-appareils ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.chasse-vide { margin: 0; font-size: 12.5px; color: var(--text-dim); }
+.chasse-ligne {
+  display: flex; align-items: center; gap: 12px; padding: 6px 10px;
+  background: var(--surface); border: 1px solid var(--line-soft); border-radius: 10px;
+}
+.chasse-ligne.controle { border-color: var(--brass-line); background: var(--brass-wash); }
+.chasse-vignette { width: 40px; height: 48px; object-fit: contain; border-radius: 6px; background: var(--sunk); }
+.chasse-vignette.v-thermometre { object-fit: cover; object-position: 50% 14%; }
+.chasse-infos { display: flex; flex-direction: column; min-width: 0; flex: 1; }
+.chasse-ou { font-size: 12px; color: var(--text-dim); }
+.chasse-valeur { font-variant-numeric: tabular-nums; font-size: 13px; white-space: nowrap; }
+.chasse-valeur.eteint { color: var(--text-dim); }
+.chasse-curseur { width: 160px; }

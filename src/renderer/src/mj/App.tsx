@@ -11,6 +11,7 @@ import type { Rubrique } from './components/parametres/registre'
 import { FicheSeance, Carnet, DupliquerSeance } from './components/Fiches'
 import { FicheCampagne as FicheDeCampagne } from './modules/FicheCampagne'
 import { Sonorisation } from './components/Sonorisation'
+import { SonsChasse } from './chasse/SonsChasse'
 import { Sonotheque } from './modules/Sonotheque'
 import { useSons } from './sons'
 import { Ident } from './components/Ident'
@@ -405,6 +406,7 @@ export function App(): JSX.Element {
       </div>
 
       <Sonorisation />
+      <SonsChasse />
     </div>
     {dessus}
     </div>

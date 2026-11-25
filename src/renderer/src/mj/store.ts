@@ -12,6 +12,7 @@ import {
 import type { UiFolder, UiItem } from '../../../preload/index'
 import { dansLApp } from '@shared/dossierDeLApp'
 import { refusSac } from '@shared/sac'
+import type { AppareilChasse } from '@shared/chasse'
 import type {
   Beat,
   CampaignPlayer,
@@ -91,6 +92,8 @@ interface State {
   display: DisplayState | null
   /** Les tours vus du MJ — cachés compris. `null` hors combat. */
   tours: ToursMj | null
+  /** Les appareils de chasse en jeu (portés ou posés), tels que le moteur les calcule. */
+  chasse: AppareilChasse[]
   screens: ScreenInfo[]
   /**
    * Le visuel qu'on arrange — Visuel 1 ou Visuel 2. Il vit ici, et non dans la
@@ -303,6 +306,7 @@ export const useStore = create<State>((set, get) => ({
 
   display: null,
   tours: null,
+  chasse: [],
   screens: [],
   visuel: 1,
   transition: CAMPAGNE_DEFAUT.basculeMode,
@@ -460,6 +464,8 @@ export const useStore = create<State>((set, get) => ({
     api.display.onState((d) => set({ display: d }))
     set({ tours: await api.tours.etat() })
     api.tours.onState((t) => set({ tours: t }))
+    set({ chasse: await api.chasse.etat() })
+    api.chasse.onState((a) => set({ chasse: a }))
     /* La main passe à un joueur : la Régie regarde son lieu — le direct s'il
        y est, sinon le visuel libre où il vient d'être préparé. Sans changer
        de page : le MJ le trouve là en revenant à la Régie. */

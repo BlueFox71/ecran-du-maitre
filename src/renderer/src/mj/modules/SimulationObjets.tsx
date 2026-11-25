@@ -11,6 +11,7 @@
  */
 import { useEffect, useState } from 'react'
 import { Emf } from './Emf'
+import { Appareils } from '../chasse/Appareils'
 import { Livre } from '../chasse/Livre'
 import { Thermometre } from '../chasse/Thermometre'
 import { SpiritBox } from '../chasse/SpiritBox'
@@ -107,6 +108,8 @@ export function SimulationObjets(): JSX.Element {
           </p>
         </div>
       </div>
+
+      <Appareils />
 
       <nav className="simu-menu" aria-label="Objets à simuler">
         {OBJETS.map((o) => (
