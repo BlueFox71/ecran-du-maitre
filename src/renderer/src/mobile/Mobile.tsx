@@ -6,7 +6,8 @@ import { Brouillard, regardsDes, sousUnRegard } from '../shared/Brouillard'
 import { Visage } from '../shared/Visage'
 import { Piece } from '../shared/Piece'
 import { AppareilSurPlan, imageOutil } from '../shared/outilsChasse'
-import type { AppareilPose, OutilChasse } from '@shared/chasse'
+import type { AppareilPose, OutilChasse, OutilTelephone } from '@shared/chasse'
+import { Outils } from './Outils'
 import { D20 } from '../shared/D20'
 import { barrieres, pasContraint, RAYON_PION, seCroisent, type Pt } from '@shared/murs'
 import { bordsOuverture } from '@shared/ouvertures'
@@ -204,6 +205,8 @@ interface Etat {
   objets: ObjetTel[]
   /** Les appareils de chasse posés dans le lieu affiché, que le plan dessine. */
   appareilsPoses?: AppareilPose[]
+  /** Les outils de chasse qu'il porte ou qu'il a posés. Absent d'un serveur plus ancien. */
+  outils?: OutilTelephone[]
   emplacements: { cle: string; nom: string }[]
   /** Les inventaires ouverts, où chacun pioche. Absent d'un serveur plus ancien. */
   inventaires?: InventaireTel[]
@@ -265,7 +268,7 @@ interface Convive {
   appareils: number
 }
 
-type Onglet = 'fiche' | 'jet' | 'pion' | 'sac' | 'poche'
+type Onglet = 'fiche' | 'jet' | 'pion' | 'sac' | 'outils' | 'poche'
 
 /**
  * Le bouton retour du téléphone.
@@ -279,7 +282,7 @@ type Onglet = 'fiche' | 'jet' | 'pion' | 'sac' | 'poche'
  * Un volet fermé par son propre bouton reprend sa marque (`history.back()`),
  * pour qu'un retour suivant ne tombe pas dans le vide.
  */
-function useRetourFerme(ouvert: boolean, fermer: () => void): void {
+export function useRetourFerme(ouvert: boolean, fermer: () => void): void {
   const rappel = useRef(fermer)
   rappel.current = fermer
   useEffect(() => {
@@ -922,6 +925,7 @@ function Table({
         {onglet === 'jet' && !etat.spectateur && <Jet etat={etat} jeton={jeton} />}
         {onglet === 'pion' && <Plan etat={etat} jeton={jeton} ondes={ondes} />}
         {onglet === 'sac' && <Sac etat={etat} jeton={jeton} />}
+        {onglet === 'outils' && <Outils outils={etat.outils ?? []} jeton={jeton} api={API} />}
         {onglet === 'poche' && <Poche etat={etat} jeton={jeton} onMot={ouvrirMot} />}
       </main>
 
@@ -930,14 +934,17 @@ function Table({
       <nav className="m-onglets" role="tablist">
         {/* Un spectateur ne jette pas de dés : pas d'onglet Jet. */}
         {(etat.spectateur
-          ? (['fiche', 'pion', 'sac', 'poche'] as Onglet[])
-          : (['fiche', 'jet', 'pion', 'sac', 'poche'] as Onglet[])
-        ).map((o) => (
+          ? (['fiche', 'pion', 'sac', 'outils', 'poche'] as Onglet[])
+          : (['fiche', 'jet', 'pion', 'sac', 'outils', 'poche'] as Onglet[])
+        )
+          /* Objets : seulement quand il y a un outil de chasse à lire. */
+          .filter((o) => o !== 'outils' || (etat.outils ?? []).length > 0)
+          .map((o) => (
           <button key={o} role="tab" aria-selected={onglet === o} onClick={() => setOnglet(o)}>
             <span className="m-ic" aria-hidden="true">
-              {{ fiche: '▤', jet: '⬢', pion: '◉', sac: '▦', poche: '✉' }[o]}
+              {{ fiche: '▤', jet: '⬢', pion: '◉', sac: '▦', outils: '◈', poche: '✉' }[o]}
             </span>
-            {{ fiche: 'Fiche', jet: 'Jet', pion: 'Pion', sac: 'Sac', poche: 'Pochette' }[o]}
+            {{ fiche: 'Fiche', jet: 'Jet', pion: 'Pion', sac: 'Sac', outils: 'Objets', poche: 'Pochette' }[o]}
             {/* Un point, pas un compte : à la table on veut savoir qu'il s'est
                 passé quelque chose, pas combien de fois. */}
             {o === 'poche' && (etat.pochette.docs.some((d) => !d.lu) || enAttente.length > 0) ? (
@@ -2794,6 +2801,8 @@ function Plan({
   ondes: MobilePing[]
 }): JSX.Element {
   const [refus, setRefus] = useState<string | null>(null)
+  /* L'appareil posé que le doigt vient de toucher, et où il est (0 à 1). */
+  const [ramasser, setRamasser] = useState<{ id: number; x: number; y: number } | null>(null)
   const [calque, setCalque] = useState<CalqueBrouillard | null>(null)
   const [suivre, setSuivre] = useState(litSuivre)
   /* Le PNJ regardé qu'on agrandit d'un toucher ; le bouton retour le referme. */
@@ -3157,11 +3166,41 @@ function Plan({
     } else setRefus(null)
   }
 
+  /** Ramasser l'appareil touché ; le refus du serveur se lit en clair sous le plan. */
+  const ramasserAppareil = async (placementId: number): Promise<void> => {
+    setRamasser(null)
+    setRefus(null)
+    try {
+      const r = await fetch(`${API}/api/ramasser?t=${encodeURIComponent(jeton)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ placementId })
+      })
+      if (!r.ok) setRefus((await r.json().catch(() => ({}))).erreur ?? 'Impossible de le ramasser.')
+    } catch {
+      setRefus('Le serveur ne répond pas.')
+    }
+  }
+
   const tapoter = (e: React.PointerEvent): void => {
     const b = cadre.current?.getBoundingClientRect()
     if (!b) return
     const x = (e.clientX - b.left) / b.width
     const y = (e.clientY - b.top) / b.height
+    /* Un appareil posé sous le doigt : on propose de le ramasser (le pion, lui,
+       se déplace par son anneau — un toucher sur la carte ne le fait pas marcher). */
+    const touche = (calque?.objets ?? []).find(
+      (o) =>
+        o.outil &&
+        etat.appareilsPoses?.some((a) => a.placementId === o.id) &&
+        Math.hypot((o.x - x) * b.width, (o.y - y) * b.height) < 26
+    )
+    if (touche) {
+      setRefus(null)
+      setRamasser(touche.id === ramasser?.id ? null : { id: touche.id, x: touche.x, y: touche.y })
+      return
+    }
+    setRamasser(null)
     const now = Date.now()
     const t = tape.current
     /* Deux tapes en moins de 400 ms, à moins de 5 % l'une de l'autre. */
@@ -3356,6 +3395,16 @@ function Plan({
               )
             })}
           </svg>
+        ) : null}
+        {ramasser ? (
+          <button
+            className="m-ramasser"
+            style={{ left: `${ramasser.x * 100}%`, top: `${ramasser.y * 100}%` }}
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={() => void ramasserAppareil(ramasser.id)}
+          >
+            Ramasser
+          </button>
         ) : null}
         {calque?.murs.length && nat && !etat.jour ? (
           <div className="m-ombre">

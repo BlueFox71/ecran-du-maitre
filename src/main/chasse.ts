@@ -385,7 +385,7 @@ export function ramasserOutil(characterId: number, placementId: number): string 
   const pa = { x: pion.x * g.w, y: pion.y * g.h }
   const pb = { x: ex.pos.x * g.w, y: ex.pos.y * g.h }
   if (Math.hypot(pb.x - pa.x, pb.y - pa.y) > 3 * RAYON_PION * Math.max(g.w, g.h))
-    return 'Tu es trop loin pour le ramasser.'
+    return 'Approche-toi pour le ramasser.'
   if (g.murs.some((m) => seCroisent(pa, pb, m.a, m.b))) return 'Un mur te sépare de cet appareil.'
   donner(placementId, { port: 'pj', characterId })
   return null

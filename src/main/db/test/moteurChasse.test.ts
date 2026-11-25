@@ -394,7 +394,7 @@ it('ramasser trop loin est refusé', () => {
   const { pl } = posee()
   const loin = pj('Loin')
   addPion({ placeId: salle, characterId: loin, x: 0.7, y: 0.5 })
-  expect(chasse.ramasserOutil(loin, pl)).toMatch(/loin/)
+  expect(chasse.ramasserOutil(loin, pl)).toMatch(/Approche-toi/)
   expect(exemplaire(pl)!.port).toBe('lieu')
 })
 

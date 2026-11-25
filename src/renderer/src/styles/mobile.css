@@ -3239,3 +3239,199 @@ button.m-regarde-img {
 .m-stats-pied .dit {
   flex-basis: 100%;
 }
+
+/* ============================================================
+   Objets — les outils de chasse en main (mobile/Outils.tsx)
+   ============================================================ */
+/* « DSEG7 Classic » — keshikan, licence SIL OFL 1.1 : les chiffres à segments
+   de l'écran du thermomètre (le même que l'écran de la table). */
+@font-face {
+  font-family: 'DSEG7 Classic';
+  src: url('../assets/chasse/polices/DSEG7Classic-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+.m-outils {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+.m-outil-ligne {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 12px;
+  text-align: left;
+  color: var(--text);
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+}
+.m-outil-ligne.pose {
+  opacity: 0.8;
+}
+.m-outil-img {
+  flex: none;
+  width: 44px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+}
+.m-outil-img img {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+}
+.m-outil-texte {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+.m-outil-texte b {
+  font-size: 14px;
+  color: var(--text);
+}
+.m-outil-valeur {
+  color: var(--text);
+  font-weight: 600;
+}
+.m-outil-page {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.m-outil-retour {
+  align-self: flex-start;
+  padding: 6px 4px;
+  color: var(--text-faint);
+  font-size: 13px;
+}
+.m-outil-titre {
+  margin: 0;
+  font-size: 16px;
+}
+/* L'appareil se mesure en hauteur d'écran : il tient avec ses boutons. */
+.m-appareil .emf-photo,
+.m-appareil .thermo {
+  height: min(46svh, 400px);
+}
+.m-outil-actions {
+  display: flex;
+  gap: 8px;
+  width: 100%;
+}
+.m-outil-btn {
+  flex: 1;
+  padding: 11px 8px;
+  border-radius: 99px;
+  border: 1px solid var(--line-soft);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+}
+.m-outil-btn:disabled {
+  opacity: 0.5;
+}
+.m-outil-page .m-erreur {
+  width: 100%;
+}
+
+/* L'appareil en main : la photo, et pour chaque LED la lumière qui en déborde
+   (mêmes règles que l'écran de la table, qui n'a pas ce fichier). */
+.emf-photo {
+  position: relative;
+  aspect-ratio: 348 / 908;
+}
+.emf-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.6));
+}
+.emf-photo img.emf-allumee {
+  position: absolute;
+  inset: 0;
+  filter: none;
+}
+.emf-halo {
+  position: absolute;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--led) 55%, transparent) 0,
+    color-mix(in oklab, var(--led) 18%, transparent) 35%,
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+}
+.thermo {
+  position: relative;
+  aspect-ratio: 499 / 1520;
+  container-type: inline-size;
+}
+.thermo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.55));
+}
+.thermo-ecran {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 0 4.5cqw;
+  border-radius: 1.2cqw;
+  color: #0c2a33;
+  background: color-mix(in oklab, rgba(255, 255, 255, 0.85) calc(var(--froid) * 55%), transparent);
+  transition: background 1.2s ease;
+}
+.thermo-ecran.eteint {
+  background: rgba(14, 32, 38, 0.92);
+}
+.thermo-unite {
+  font: 700 7cqw/1 'Archivo', sans-serif;
+  opacity: 0.8;
+}
+.thermo-chiffres {
+  position: relative;
+  font: 700 15.5cqw/1.1 'DSEG7 Classic', monospace;
+  letter-spacing: 0.02em;
+}
+.thermo-fond {
+  position: absolute;
+  right: 0;
+  opacity: 0.08;
+}
+.thermo-valeur {
+  position: relative;
+}
+
+/* « Ramasser » : la bulle posée sur l'appareil touché, au-dessus de l'ombre. */
+.m-ramasser {
+  position: absolute;
+  z-index: 5;
+  translate: -50% calc(-100% - 22px);
+  padding: 8px 14px;
+  border-radius: 99px;
+  border: 1px solid var(--brass, #d8a94a);
+  background: var(--surface);
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
+}
