@@ -91,7 +91,9 @@ export function gainSon(distanceM: number, mursTraverses: number): number {
 /**
  * Où est un pion sur la carte, en fractions de celle-ci. Il est rangé en
  * fractions du cadre de l'écran des joueurs, où la carte entre entière,
- * centrée, avec des bandes là où les proportions diffèrent.
+ * centrée, avec des bandes là où les proportions diffèrent. Un pion dans une
+ * bande est hors de la carte : les fractions rendues peuvent sortir de [0, 1]
+ * (non bornées, exprès).
  */
 export function pionSurPlan(
   p: { x: number; y: number },
@@ -100,5 +102,5 @@ export function pionSurPlan(
 ): { x: number; y: number } {
   const x = ratioEcran > ratioCarte ? (p.x - 0.5) * (ratioEcran / ratioCarte) + 0.5 : p.x
   const y = ratioEcran < ratioCarte ? (p.y - 0.5) * (ratioCarte / ratioEcran) + 0.5 : p.y
-  return { x: Math.min(1, Math.max(0, x)), y: Math.min(1, Math.max(0, y)) }
+  return { x, y }
 }

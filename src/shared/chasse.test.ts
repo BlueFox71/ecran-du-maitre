@@ -84,6 +84,11 @@ describe('pionSurPlan', () => {
   it('écran plus large que la carte', () => {
     expect(pionSurPlan({ x: 0.75, y: 0.5 }, 1, 2)).toEqual({ x: 1, y: 0.5 })
   })
+  it('un pion dans une bande est hors de la carte (pas borné)', () => {
+    const q = pionSurPlan({ x: 0.9, y: 0.5 }, 1, 2)
+    expect(q.x).toBeCloseTo(1.3)
+    expect(q.y).toBe(0.5)
+  })
   it('écran plus haut que la carte', () => {
     expect(pionSurPlan({ x: 0.5, y: 0.75 }, 2, 1)).toEqual({ x: 0.5, y: 1 })
   })
