@@ -9,11 +9,29 @@
  */
 import { app, BrowserWindow } from 'electron'
 import { spawn } from 'node:child_process'
-import { existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs'
-import { dirname, join } from 'node:path'
+import { copyFileSync, existsSync, mkdirSync, readdirSync, readFileSync, statSync } from 'node:fs'
+import { dirname, extname, join } from 'node:path'
 import { toDataURL } from 'qrcode'
 import { lirePoste, nomDuMj } from '@shared/reglages'
-import type { EnvoiWow, EtatWow, JoueurWow, QuetePreparee, ServeurWow } from '@shared/wow'
+import type {
+  CatalogueObjetWow,
+  EffetFicheWow,
+  EnvoiWow,
+  EtatWow,
+  JoueurWow,
+  MajFicheWow,
+  ObjetFicheWow,
+  QuetePreparee,
+  ServeurWow
+} from '@shared/wow'
+import { CARACS_WOW, slugJoueurWow } from '@shared/wow'
+import { lireCampagne } from '@shared/reglages'
+import * as reglagesCampagne from './db/repos/reglages'
+import * as players from './db/repos/players'
+import * as chars from './db/repos/characters'
+import * as lib from './db/repos/library'
+import { absOf } from './library'
+import { isDbOpen } from './db'
 import { reglagesPoste } from './carnet'
 import { currentProject } from './project'
 import * as serveur from './wowServeur'
@@ -81,6 +99,8 @@ export async function etat(): Promise<ServeurWow> {
 
 /** Lance le jeu sur le dossier de données (sans effet s'il tourne déjà). */
 export async function demarrer(): Promise<ServeurWow> {
+  /* La bourse des fiches WoW parle en pièces d'or, d'argent et de cuivre. */
+  fiches.monnaiesDeWow()
   const d = dossier()
   if (existsSync(d)) await serveur.demarrer(d)
   const e = await etat()
@@ -99,17 +119,54 @@ function suivreLesFiches(): void {
     if (enCours || !serveur.portActuel()) return
     enCours = true
     table()
-      .then((t) => fiches.synchroniser(t))
+      .then((t) => {
+        fiches.synchroniser(t)
+        pousserPortraits(t)
+      })
       .catch((err) => console.error('[wow] fiches :', err))
       .finally(() => (enCours = false))
   }, 4000)
 }
 
+/**
+ * Le portrait d'un personnage se choisit sur sa fiche de l'Écran, plus dans
+ * l'Aventure : l'image est copiée dans Images\portraits\<joueur> (le serveur
+ * du jeu la sert de là), puis envoyée à son Aventure.
+ *
+ * L'adresse part de la racine du serveur (« Application/… ») : la page de
+ * l'Aventure a un <base href="../">. On la renvoie tant que l'Aventure (ou sa
+ * fiche enregistrée) ne montre pas celle-là — une Aventure rechargée avec
+ * l'ancienne en mémoire aurait pu la réécrire par-dessus — sans la renvoyer
+ * plus d'une fois toutes les 15 secondes.
+ */
+const portraitsEnvoyes = new Map<number, { src: string; quand: number }>()
+function pousserPortraits(t: JoueurWow[]): void {
+  if (!isDbOpen()) return
+  const montre = new Map(t.map((j) => [j.id, j.etat?.portrait]))
+  for (const [joueur, charId] of Object.entries(fiches.liensWow())) {
+    try {
+      const ch = chars.getCharacter(charId)
+      if (!ch?.portraitItemId) continue
+      const item = lib.getItem(ch.portraitItemId)
+      if (!item?.relPath) continue
+      const ext = (extname(item.relPath) || '.jpg').toLowerCase()
+      const src = `Application/Images/portraits/${joueur}${ext}?v=${item.id}-${item.bytes ?? 0}`
+      if (montre.get(joueur) === src) continue
+      const deja = portraitsEnvoyes.get(charId)
+      if (deja && deja.src === src && Date.now() - deja.quand < 15000) continue
+      const dest = join(dossier(), 'Images', 'portraits', joueur + ext)
+      mkdirSync(dirname(dest), { recursive: true })
+      if (!deja || deja.src !== src) copyFileSync(absOf(item.relPath), dest)
+      pousserFiche(charId, { portrait: src })
+      portraitsEnvoyes.set(charId, { src, quand: Date.now() })
+    } catch (err) {
+      console.error('[wow] portrait :', err)
+    }
+  }
+}
+
 /** Le MJ a changé une fiche dans l'Écran : elle part dans l'Aventure du joueur. */
-export function pousserFiche(
-  characterId: number,
-  maj: { pv?: number; res?: number; car?: Record<string, number>; ecarts?: Record<string, number> }
-): void {
+export function pousserFiche(characterId: number, maj: MajFicheWow): void {
   const id = fiches.joueurDe(characterId)
   if (!id) return
   fiches.versAventure(characterId, maj, {
@@ -117,6 +174,91 @@ export function pousserFiche(
     enLigne: !!serveur.portActuel() && serveur.presents().some((p) => p.id === id),
     deposer: (joueur, quoi) => serveur.deposer(ID_MJ, nomDuMj(lirePoste(reglagesPoste())), [joueur], quoi)
   })
+}
+
+/** Le MJ pose ou retire un effet depuis la fiche : il part dans l'Aventure du joueur. */
+export function effetFiche(characterId: number, effet: EffetFicheWow): boolean {
+  const id = fiches.joueurDe(characterId)
+  if (!id) return false
+  return fiches.effetVersAventure(characterId, effet, {
+    dossier: dossier(),
+    enLigne: !!serveur.portActuel() && serveur.presents().some((p) => p.id === id),
+    deposer: (joueur, quoi) => serveur.deposer(ID_MJ, nomDuMj(lirePoste(reglagesPoste())), [joueur], quoi)
+  })
+}
+
+/* ---------------- le catalogue d'objets du jeu ---------------- */
+
+/** Lu une fois (quelques Mo), à la première recherche. */
+let catalogue: Record<string, unknown>[] | null = null
+function lireCatalogue(): Record<string, unknown>[] {
+  if (catalogue) return catalogue
+  try {
+    const l = JSON.parse(readFileSync(join(serveur.dossierCode(), 'Donnees', 'catalogue-objets.json'), 'utf8'))
+    catalogue = Array.isArray(l) ? l.filter((o) => o && typeof o.nom === 'string') : []
+  } catch {
+    catalogue = []
+  }
+  return catalogue
+}
+
+const sansAccent = (s: string): string =>
+  s
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+/** Les objets du catalogue dont le nom contient la recherche : les plus courts (les plus proches) d'abord. */
+export function chercherObjets(texte: string): CatalogueObjetWow[] {
+  const q = sansAccent(texte.trim())
+  if (q.length < 2) return []
+  return lireCatalogue()
+    .filter((o) => sansAccent(String(o.nom)).includes(q))
+    .sort((a, b) => String(a.nom).length - String(b.nom).length)
+    .slice(0, 40)
+    .map((o) => ({
+      id: Number(o.id),
+      nom: String(o.nom),
+      qualite: Number(o.qualite) || 0,
+      niveau: Number(o.niveau) || Math.min(60, Number(o.ilvl) || 0),
+      type: String(o.type ?? '')
+    }))
+}
+
+/** Le MJ donne ou reprend un objet depuis la fiche : il part dans l'Aventure du joueur. */
+export function objetFiche(characterId: number, envoi: ObjetFicheWow): 'recu' | 'en-attente' | 'echec' {
+  const id = fiches.joueurDe(characterId)
+  if (!id) return 'echec'
+  let quoi: { t: 'objet'; o: Record<string, unknown>; n: number } | { t: 'retireObjet'; nom: string; n: number }
+  if (envoi.t === 'objet') {
+    const o = lireCatalogue().find((x) => Number(x.id) === envoi.id)
+    if (!o) return 'echec'
+    quoi = { t: 'objet', o, n: Math.max(1, envoi.n | 0) }
+  } else quoi = { t: 'retireObjet', nom: envoi.nom, n: Math.max(1, envoi.n | 0) }
+  return fiches.objetVersAventure(characterId, quoi, {
+    dossier: dossier(),
+    enLigne: !!serveur.portActuel() && serveur.presents().some((p) => p.id === id),
+    deposer: (joueur, q) => serveur.deposer(ID_MJ, nomDuMj(lirePoste(reglagesPoste())), [joueur], q)
+  })
+}
+
+/**
+ * Les mots du MJ (Écran → téléphones), dans une campagne WoW : ils arrivent
+ * aussi dans l'Aventure du joueur, puisque c'est elle qu'il a sous les yeux.
+ */
+export function motsVersAventure(lignes: { playerId: number; texte: string }[]): void {
+  if (!isDbOpen() || lireCampagne(reglagesCampagne.tous()).regles !== 'wow') return
+  for (const { playerId, texte } of lignes) {
+    const p = players.getPlayer(playerId)
+    if (!p) continue
+    const id = (p.characterId != null ? fiches.joueurDe(p.characterId) : null) ?? slugJoueurWow(p.name)
+    if (!id) continue
+    fiches.courrierVersAventure(id, { t: 'message', texte }, {
+      dossier: dossier(),
+      enLigne: !!serveur.portActuel() && serveur.presents().some((x) => x.id === id),
+      deposer: (joueur, q) => serveur.deposer(ID_MJ, nomDuMj(lirePoste(reglagesPoste())), [joueur], q)
+    })
+  }
 }
 
 export function arreter(): void {
@@ -135,18 +277,43 @@ export async function adresseLocale(page: string, joueur?: string): Promise<stri
 }
 
 /** Le résumé d'une fiche enregistrée : ce qu'on en sait sans l'Aventure ouverte. */
-function lireFiche(chemin: string): { classe: string; etat: Partial<EtatWow>; quand: string } | null {
+export function lireFiche(chemin: string): { classe: string; etat: Partial<EtatWow>; quand: string } | null {
   try {
     const j = JSON.parse(readFileSync(chemin, 'utf8'))
     const p = j?.progress ?? {}
     const perso = p.perso ?? {}
+    const apercu = j?.apercu && typeof j.apercu === 'object' ? j.apercu : null
+    const bonus: Record<string, number> = apercu?.carBonus ?? {}
+    /* Les caractéristiques : les points de la fiche, plus les bonus que l'Aventure a notés en l'enregistrant. */
+    const car = perso.car && typeof perso.car === 'object'
+      ? Object.fromEntries(
+          CARACS_WOW.filter(([k]) => perso.car[k]).map(([k]) => [
+            k,
+            (parseInt(perso.car[k].pt) || 0) + (Number(bonus[k]) || 0)
+          ])
+        )
+      : undefined
+    const objets = (Array.isArray(perso.contenu) ? perso.contenu : []).flat().filter(
+      (o: { nom?: unknown } | null) => o && typeof o.nom === 'string'
+    ) as { nom: string; qualite?: number; qte?: number }[]
     return {
       classe: String(j.classe ?? ''),
       quand: typeof j.savedAt === 'string' ? j.savedAt : statSync(chemin).mtime.toISOString(),
       etat: {
+        car,
+        equip: Object.entries(perso.equip ?? {})
+          .filter(([, o]) => o && typeof (o as { nom?: unknown }).nom === 'string')
+          .map(([c, o]) => ({ c, nom: (o as { nom: string }).nom, q: Number((o as { qualite?: number }).qualite) || 0 })),
+        sacs: objets.map((o) => ({ nom: o.nom, q: Number(o.qualite) || 0, qte: Math.max(1, parseInt(String(o.qte)) || 1) })),
+        talents: Array.isArray(apercu?.talents) ? apercu.talents : undefined,
+        sorts: Array.isArray(apercu?.sorts) ? apercu.sorts : undefined,
         nomPerso: [perso.prenom, perso.nom].filter(Boolean).join(' ').trim(),
         prenom: perso.prenom ?? '',
         race: perso.race ?? '',
+        sexe: typeof perso.sexe === 'string' ? perso.sexe : undefined,
+        age: perso.age != null ? String(perso.age) : undefined,
+        histoire: typeof perso.histoire === 'string' ? perso.histoire : undefined,
+        portrait: typeof perso.portrait === 'string' ? perso.portrait : undefined,
         classe: String(j.classe ?? ''),
         niveau: Number(p.level) || 1,
         pv: Number(perso.pv?.cur) || 0,
@@ -177,7 +344,9 @@ export async function table(): Promise<JoueurWow[]> {
   const dir = join(dossier(), 'Sauvegardes', 'Joueurs')
   let fichiers: string[] = []
   try {
-    fichiers = readdirSync(dir).filter((f) => f.toLowerCase().endsWith('.json'))
+    /* Seulement les fiches de joueurs : un identifiant de l'Aventure n'a ni point ni espace
+       (une copie « jules.avant-… .json » posée à côté n'est pas un joueur de plus). */
+    fichiers = readdirSync(dir).filter((f) => /^[a-z0-9-]+\.json$/i.test(f))
   } catch {
     /* pas encore de joueur */
   }

@@ -156,6 +156,74 @@ export interface EtatWow {
   argent?: { po?: number; pa?: number; pc?: number }
   auras: AuraWow[]
   journal: { t: string; c: string; x: string }[]
+  /** Ce qu'il porte : l'emplacement (« tete », « mainD »…), le nom, la qualité (0 à 5). */
+  equip?: { c: string; nom: string; q: number }[]
+  /** Ce qu'il transporte dans ses sacs. */
+  sacs?: { nom: string; q: number; qte: number }[]
+  talents?: { nom: string; rang: number; max: number }[]
+  sorts?: { nom: string; niveau: number }[]
+  /** L'image que son Aventure affiche (chemin dans les Images du jeu). */
+  portrait?: string
+  /** Ses totaux de combat : armure, défense, initiative, et une résistance par école. */
+  combat?: CombatWow
+}
+
+/** Les totaux de combat d'un personnage WoW (équipement, talents et effets compris). */
+export interface CombatWow {
+  armure: number
+  defense: number
+  initiative: number
+  resist: Record<string, number>
+}
+
+/** Les six écoles de magie, et ce qu'on lit sur la fiche. */
+export const ECOLES_WOW: [string, string][] = [
+  ['arcane', 'Arcane'],
+  ['feu', 'Feu'],
+  ['nature', 'Nature'],
+  ['givre', 'Givre'],
+  ['ombre', 'Ombre'],
+  ['sacre', 'Sacré']
+]
+
+/** Le panneau Aventure d'une fiche : ce que le personnage porte, transporte et sait. */
+export interface AventureWow {
+  equip: { c: string; nom: string; q: number }[]
+  sacs: { nom: string; q: number; qte: number }[]
+  talents: { nom: string; rang: number; max: number }[]
+  sorts: { nom: string; niveau: number }[]
+}
+
+/** Les emplacements de l'Aventure, dans l'ordre de la feuille de personnage. */
+export const EMPLACEMENTS_WOW: [string, string][] = [
+  ['tete', 'Tête'],
+  ['cou', 'Cou'],
+  ['epaules', 'Épaules'],
+  ['dos', 'Dos'],
+  ['torse', 'Torse'],
+  ['chemise', 'Chemise'],
+  ['tabard', 'Tabard'],
+  ['poignets', 'Poignets'],
+  ['mains', 'Mains'],
+  ['taille', 'Taille'],
+  ['jambes', 'Jambes'],
+  ['pieds', 'Pieds'],
+  ['doigt1', 'Doigt'],
+  ['doigt2', 'Doigt'],
+  ['bijou1', 'Bijou'],
+  ['bijou2', 'Bijou'],
+  ['mainD', 'Main droite'],
+  ['mainG', 'Main gauche'],
+  ['distance', 'À distance']
+]
+
+/** Une entrée du catalogue d'objets du jeu (Donnees\catalogue-objets.json), telle que l'Écran la cherche. */
+export interface CatalogueObjetWow {
+  id: number
+  nom: string
+  qualite: number
+  niveau: number
+  type: string
 }
 
 /** Un joueur de la table : en ligne (son état est frais) ou seulement sa fiche sur le disque. */
@@ -198,10 +266,80 @@ export type EnvoiWow =
   | { t: 'dd'; dd: number; mod: number; quoi?: string }
   | { t: 'message'; texte: string }
   | { t: 'tour' }
+  /** Le MJ commence ou termine le combat (les capacités « une fois par combat » reviennent à la fin). */
+  | { t: 'combat'; etat: 'debut' | 'fin' }
   | { t: 'quete'; quete: { titre: string; donneur?: string; lieu?: string; texte?: string } }
   | { t: 'queteFinie'; titre: string }
   /** Une fiche corrigée par le MJ dans l'Écran : valeurs totales. */
-  | { t: 'fiche'; pv?: number; res?: number; car?: Record<string, number> }
+  | {
+      t: 'fiche'
+      niveau?: number
+      /** Des totaux réglés par le MJ : `total.armure`, `total.resist.feu`… */
+      totaux?: Record<string, number>
+      /** L'image du personnage, posée sur sa fiche de l'Écran (chemin dans les Images de l'Aventure). */
+      portrait?: string
+      pv?: number
+      res?: number
+      car?: Record<string, number>
+      sexe?: string
+      age?: string
+      histoire?: string
+      argent?: ArgentWow
+    }
+
+/** La bourse de l'Aventure : pièces d'or, d'argent et de cuivre, comptées à part. */
+export interface ArgentWow {
+  po?: number
+  pa?: number
+  pc?: number
+}
+
+/** Ce que le MJ change sur la fiche d'un personnage WoW, et qui part dans son Aventure. */
+export interface MajFicheWow {
+  /** Le niveau : c'est la fiche de l'Écran qui le décide. */
+  niveau?: number
+  /** Le portrait de la fiche de l'Écran, copié dans les Images de l'Aventure. */
+  portrait?: string
+  /** Des totaux de combat réglés par le MJ : `total.armure`, `total.resist.feu`… */
+  totaux?: Record<string, number>
+  pv?: number
+  res?: number
+  car?: Record<string, number>
+  /** Hors ligne : l'écart voulu par le MJ, pour décaler les points de la fiche. */
+  ecarts?: Record<string, number>
+  sexe?: string
+  age?: string
+  histoire?: string
+  argent?: ArgentWow
+}
+
+/** Un objet donné (par son id dans le catalogue) ou repris par le MJ depuis la fiche. */
+export type ObjetFicheWow = { t: 'objet'; id: number; n: number } | { t: 'retireObjet'; nom: string; n: number }
+
+/** Un effet posé ou retiré par le MJ depuis la fiche d'un personnage WoW. */
+export type EffetFicheWow =
+  | { t: 'aura'; aura: { nom: string; desc?: string; mal: boolean; tours: number } }
+  | { t: 'retire'; nom: string }
+
+/**
+ * L'identifiant d'un joueur dans l'Aventure (son adresse ?joueur=…, le nom de
+ * sa fiche dans Sauvegardes\Joueurs) : comme le `slug` du jeu.
+ */
+export function slugJoueurWow(nom: string): string {
+  return (nom || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-zA-Z0-9]+/g, '-')
+    .replace(/^-|-$/g, '')
+    .toLowerCase()
+}
+
+/** Les pièces de l'Aventure, et leur monnaie dans l'Écran (même clé). */
+export const PIECES_WOW = [
+  { key: 'po', nom: 'Pièce d’or', abbr: 'po', teinte: 'or' },
+  { key: 'pa', nom: 'Pièce d’argent', abbr: 'pa', teinte: 'argent' },
+  { key: 'pc', nom: 'Pièce de cuivre', abbr: 'pc', teinte: 'cuivre' }
+] as const
 
 /** Un personnage créé dans l'Aventure, que le MJ doit associer à un joueur de l'Écran. */
 export interface PersoAAssocier {

@@ -41,6 +41,8 @@ interface Case {
    * bandes d'un passage piéton), qu'aucune isolation ne garderait entier.
    */
   zone?: [number, number, number, number]
+  /** Dans sa zone, ne garder que le plus grand élément d'un seul tenant (un voisin déborde dedans). */
+  seul?: boolean
 }
 
 /**
@@ -541,7 +543,14 @@ const RANGEMENT: Record<string, [string, string]> = {
 
 interface Planche {
   fichier: string
-  fond: 'magenta' | 'noir' | 'aucun'
+  /**
+   * `alpha` : la planche a déjà sa transparence, mais voilée (un halo à demi
+   * opaque autour des objets) ; on ne garde que ce qui dépasse `seuil`.
+   */
+  /** « magenta-violet » : des objets violets ou roses, que le détourage ordinaire virerait au bleu. */
+  fond: 'magenta' | 'magenta-violet' | 'noir' | 'aucun' | 'alpha'
+  /** Fond `alpha` : l'opacité en dessous de laquelle un pixel est du fond. */
+  seuil?: number
   cols: number
   rows: number
   type: TypeAsset | ((c: Case) => TypeAsset)
@@ -2167,6 +2176,498 @@ const PLANCHES: Planche[] = [
       { id: 'vitrine', nom: 'Vitrine' }
     ]
   },
+  /* ---------------- Azeroth (campagnes WoW), 1er essai : docs/atelier/prompts-wow-base.md ---------------- */
+  {
+    /* Une grille 3 × 2 de textures pleines, séparées par un liseré blanc. */
+    fichier: 'planches/sols 9.png',
+    fond: 'aucun',
+    cols: 3,
+    rows: 2,
+    type: 'sol',
+    categorie: 'Azeroth',
+    dossier: 'sols',
+    retrait: 12,
+    raccord: 'deux',
+    cases: [
+      { id: 'dalles-hurlevent', nom: 'Dalles de Hurlevent', tuile: 3 },
+      { id: 'paves-humains', nom: 'Pavés ronds', tuile: 2 },
+      { id: 'chemin-terre', nom: 'Chemin de terre', tuile: 3 },
+      { id: 'planches-taverne', nom: 'Plancher de taverne', tuile: 2 },
+      { id: 'dalles-donjon', nom: 'Dalles de donjon', tuile: 3 },
+      { id: 'herbe-elwynn', nom: 'Herbe d’Elwynn', tuile: 2 }
+    ]
+  },
+  {
+    fichier: 'planches/sols 10.png',
+    fond: 'aucun',
+    cols: 1,
+    rows: 1,
+    type: 'sol',
+    categorie: 'Azeroth',
+    dossier: 'sols',
+    raccord: 'deux',
+    cases: [{ id: 'dalles-blanches', nom: 'Dalles blanches', tuile: 3 }]
+  },
+  {
+    /* Râtelier et mannequin, vus de face : laissés, à refaire (lot 50). */
+    fichier: 'planches/lot 51.png',
+    fond: 'alpha',
+    seuil: 160,
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Extérieur',
+    sousCategorie: 'Camp',
+    dossier: 'objets',
+    cases: [
+      { id: 'feu-de-camp', nom: 'Feu de camp', l: 1, zone: [10, 78, 360, 368] },
+      { id: 'tente-voyageur', nom: 'Tente de voyageur', l: 1.5, pas: true, vue: true, zone: [358, 6, 440, 480] },
+      { id: 'sac-couchage', nom: 'Sac de couchage', l: 0.6, zone: [810, 22, 276, 472] },
+      { id: 'charrette', nom: 'Charrette', l: 1.2, pas: true, zone: [1100, 10, 426, 516] },
+      { id: 'caisse-ravitaillement', nom: 'Caisse de ravitaillement', l: 0.7, pas: true, zone: [40, 566, 364, 424] }
+    ]
+  },
+  {
+    /* Barricade et chevaux de frise, vus de face : laissés, à refaire (lot 50). */
+    fichier: 'planches/lot 52.png',
+    fond: 'alpha',
+    seuil: 160,
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Personnages',
+    sousCategorie: 'Corps',
+    dossier: 'objets',
+    cases: [
+      { id: 'catapulte-orque', nom: 'Catapulte orque', l: 2, pas: true, zone: [1030, 0, 500, 400] },
+      { id: 'cadavre-soldat-humain', nom: 'Soldat humain mort', l: 1.2, zone: [15, 395, 482, 345] },
+      { id: 'cadavre-orque', nom: 'Guerrier orque mort', l: 1.3, zone: [498, 400, 490, 335] },
+      { id: 'cadavre-sentinelle', nom: 'Sentinelle elfe de la nuit morte', l: 1.3, zone: [994, 425, 538, 278] },
+      { id: 'squelette-soldat', nom: 'Squelette de soldat', l: 1.2, zone: [68, 742, 652, 280] },
+      { id: 'ossements-epars', nom: 'Ossements épars', l: 1.2, zone: [790, 745, 620, 275] }
+    ]
+  },
+  {
+    /* Seuls le pont de bois et l'échelle sont vus de dessus ; le reste est à refaire (lot 50). */
+    fichier: 'planches/lot 53.png',
+    fond: 'alpha',
+    seuil: 230,
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Architecture',
+    sousCategorie: 'Ponts',
+    dossier: 'objets',
+    cases: [
+      { id: 'pont-bois', nom: 'Pont de bois', l: 3, zone: [648, 351, 888, 258] },
+      { id: 'echelle', nom: 'Échelle', l: 2, zone: [296, 906, 878, 114] }
+    ]
+  },
+  {
+    /* Portes d'Azeroth, 3e essai : la porte de forteresse, coupée à ses piliers (sans les
+       bouts de rempart de chaque côté). Le portail de ville, encore de face, est à refaire. */
+    fichier: 'planches/ouvertures 6.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'porte',
+    categorie: 'Portes et fenêtres',
+    dossier: 'ouvertures',
+    centrerMontants: true,
+    cases: [{ id: 'porte-forteresse', nom: 'Porte de forteresse', zone: [360, 72, 1452, 264] }]
+  },
+  {
+    /* Portes d'Azeroth, 4e essai : le portail de ville (linteau au lion, herse levée), coupé à
+       ses piliers. La porte de forteresse du haut double celle d'ouvertures 6 : laissée. */
+    fichier: 'planches/ouvertures 7.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'porte',
+    categorie: 'Portes et fenêtres',
+    dossier: 'ouvertures',
+    centrerMontants: true,
+    cases: [{ id: 'porte-portail-ville', nom: 'Portail de ville (herse)', zone: [462, 466, 1252, 254] }]
+  },
+  {
+    /* Murs d'Azeroth, 4e essai : enfin vus de dessus. Les ruines ont une brèche au milieu,
+       qui ferait un trou à chaque tuile : on n'en garde que la moitié gauche, intacte. */
+    fichier: 'planches/murs 9.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'mur',
+    categorie: 'Azeroth',
+    dossier: 'murs',
+    retrait: 4,
+    raccord: 'long',
+    cases: [
+      { id: 'mur-rempart-blanc', nom: 'Rempart de pierre blanche', tuile: 2.5, zone: [0, 22, 2172, 150] },
+      { id: 'mur-palissade-orque', nom: 'Palissade orque', tuile: 2.5, zone: [0, 214, 2172, 142] },
+      { id: 'mur-ruines-elfiques', nom: 'Ruines elfiques', tuile: 2.5, zone: [0, 390, 1116, 156] },
+      { id: 'mur-falaise', nom: 'Bord de falaise', tuile: 3, zone: [0, 564, 2172, 154] }
+    ]
+  },
+  {
+    /* Portes d'Azeroth : porte de taverne et porte de palissade orque, coupées à leurs poteaux. */
+    fichier: 'planches/ouvertures 8.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'porte',
+    categorie: 'Portes et fenêtres',
+    dossier: 'ouvertures',
+    centrerMontants: true,
+    cases: [
+      { id: 'porte-taverne', nom: 'Porte de taverne', zone: [84, 196, 1364, 204] },
+      { id: 'porte-palissade-orque', nom: 'Porte de palissade orque', zone: [64, 624, 1408, 224] }
+    ]
+  },
+  {
+    /* Camp et combat (prompts : Prompts assets ChatGPT.txt de la Campagne 4). */
+    fichier: 'planches/lot 50.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Extérieur',
+    sousCategorie: 'Camp',
+    dossier: 'objets',
+    cases: [
+      { id: 'barricade', nom: 'Barricade', l: 1.5, pas: true, zone: [10, 186, 370, 172] },
+      { id: 'chevaux-frise', nom: 'Chevaux de frise', l: 1.5, pas: true, zone: [390, 178, 380, 196] },
+      { id: 'ratelier-armes', nom: 'Râtelier d’armes', l: 1, pas: true, zone: [786, 170, 388, 160] },
+      { id: 'mannequin', nom: 'Mannequin d’entraînement', l: 0.5, pas: true, zone: [1206, 110, 320, 312] },
+      { id: 'coffre-tresor', nom: 'Coffre au trésor', l: 0.7, pas: true, zone: [10, 570, 370, 340] },
+      { id: 'puits', nom: 'Puits', l: 1, pas: true, zone: [390, 558, 380, 364] },
+      { id: 'lianes', nom: 'Lianes', l: 1.2, zone: [786, 558, 360, 360] },
+      { id: 'chope', nom: 'Chope de bière', l: 0.15, zone: [1162, 598, 368, 284] }
+    ]
+  },
+  {
+    /* Village. */
+    fichier: 'planches/lot 54.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Mobilier',
+    sousCategorie: 'Artisanat',
+    dossier: 'objets',
+    cases: [
+      { id: 'forge', nom: 'Forge', l: 1.2, pas: true, vue: true, zone: [26, 86, 348, 384] },
+      { id: 'enclume', nom: 'Enclume', l: 0.5, pas: true, zone: [390, 134, 336, 312] },
+      { id: 'etabli', nom: 'Établi', l: 1.2, pas: true, zone: [742, 174, 452, 248] },
+      { id: 'boite-lettres', nom: 'Boîte aux lettres', l: 0.3, pas: true, zone: [1230, 182, 280, 220] },
+      { id: 'panneau-quete', nom: 'Panneau de quêtes', l: 1.2, pas: true, zone: [22, 678, 460, 136] },
+      { id: 'pont-pierre', nom: 'Pont de pierre', l: 3, zone: [502, 582, 548, 312] },
+      { id: 'enseigne-auberge', nom: 'Enseigne d’auberge tombée', l: 0.6, zone: [1106, 586, 404, 332] }
+    ]
+  },
+  {
+    /* La taverne, 2e essai. La chope (de profil) et l'enseigne (debout) sont à refaire (lot 50). */
+    fichier: 'planches/lot 49.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Mobilier',
+    sousCategorie: 'Tables',
+    dossier: 'objets',
+    cases: [
+      { id: 'comptoir-taverne', nom: 'Comptoir de taverne', l: 2.5, pas: true, zone: [18, 22, 866, 334] },
+      { id: 'table-taverne', nom: 'Table de taverne', l: 1.5, pas: true, zone: [920, 14, 606, 376] },
+      { id: 'banc-taverne', nom: 'Banc de taverne', l: 1.2, zone: [38, 390, 578, 184] },
+      { id: 'tabouret-taverne', nom: 'Tabouret de taverne', l: 0.4, zone: [746, 382, 180, 188] },
+      { id: 'tonneau-biere', nom: 'Tonneau de bière en perce', l: 0.8, pas: true, zone: [48, 590, 312, 404] },
+      { id: 'cheminee-taverne', nom: 'Cheminée de taverne', l: 1.5, pas: true, vue: true, zone: [394, 570, 680, 448] }
+    ]
+  },
+  /* ---------------- Azeroth, priorité 2 : la Légion (Prompts assets ChatGPT.txt de la Campagne 4) ---------------- */
+  {
+    /* Trois textures côte à côte, séparées par un liseré magenta. */
+    fichier: 'planches/sols 11.png',
+    fond: 'aucun',
+    cols: 3,
+    rows: 1,
+    type: 'sol',
+    categorie: 'Azeroth',
+    dossier: 'sols',
+    retrait: 14,
+    raccord: 'deux',
+    cases: [
+      { id: 'roche-fel', nom: 'Roche gangrenée', tuile: 3 },
+      { id: 'flaque-fel', nom: 'Gangre liquide', tuile: 3 },
+      { id: 'vaisseau-legion', nom: 'Pont de vaisseau de la Légion', tuile: 3 }
+    ]
+  },
+  {
+    fichier: 'planches/murs 10.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'mur',
+    categorie: 'Azeroth',
+    dossier: 'murs',
+    retrait: 4,
+    raccord: 'long',
+    cases: [
+      { id: 'mur-legion', nom: 'Rempart de la Légion', tuile: 3, zone: [0, 84, 2172, 236] },
+      { id: 'mur-cristal-fel', nom: 'Paroi de cristaux gangrenés', tuile: 3, zone: [0, 448, 2172, 196] }
+    ]
+  },
+  {
+    /* Le pylône, les deux cristaux, la cage et la bannière, vus de face ou de trois-quarts, et la
+       tache de corruption, dont la brume prend le magenta du fond : laissés, refaits dans lot 56. */
+    fichier: 'planches/lot 55.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Déco et objets',
+    sousCategorie: 'Rituels',
+    dossier: 'objets',
+    cases: [
+      { id: 'portail-legion', nom: 'Portail de la Légion', l: 3, pas: true, zone: [0, 0, 392, 344] },
+      { id: 'cercle-invocation', nom: 'Cercle d’invocation', l: 2.5, zone: [1108, 12, 340, 336] },
+      { id: 'autel-sacrificiel', nom: 'Autel sacrificiel', l: 1.6, pas: true, zone: [1758, 4, 412, 344] },
+      { id: 'brasero-fel', nom: 'Brasero gangrené', l: 0.8, pas: true, zone: [2, 384, 268, 304] },
+      { id: 'debris-vaisseau', nom: 'Débris de vaisseau démoniaque', l: 2, pas: true, zone: [271, 380, 307, 312] },
+      { id: 'gangrecuve', nom: 'Gangrecuve', l: 1.6, pas: true, zone: [579, 364, 328, 344] },
+      { id: 'cadavre-gangregarde', nom: 'Gangregarde mort', l: 2, zone: [1456, 368, 442, 348] },
+      { id: 'cadavre-diablotin', nom: 'Diablotin mort', l: 0.6, zone: [1912, 464, 236, 160] }
+    ]
+  },
+  {
+    /* La Légion, 2e essai : ce que lot 55 avait de face ou de trois-quarts, enfin vu de dessus. */
+    fichier: 'planches/lot 56.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Déco et objets',
+    sousCategorie: 'Rituels',
+    dossier: 'objets',
+    cases: [
+      { id: 'pylone-fel', nom: 'Pylône gangrené', l: 1, pas: true, zone: [28, 20, 452, 460] },
+      { id: 'cristal-fel-petit', nom: 'Petits cristaux gangrenés', l: 0.8, zone: [566, 70, 380, 360] },
+      { id: 'cristal-fel-grand', nom: 'Grand cristal gangrené', l: 1.5, pas: true, zone: [998, 10, 520, 484] },
+      { id: 'cage-demoniaque', nom: 'Cage démoniaque', l: 1.5, pas: true, zone: [4, 488, 500, 504] },
+      { id: 'banniere-legion', nom: 'Bannière de la Légion', l: 1.5, zone: [500, 574, 524, 336] },
+      { id: 'corruption-sol', nom: 'Corruption gangrenée', l: 2, zone: [1026, 526, 496, 448] }
+    ]
+  },
+  {
+    /* Acte 1, Sombrivage et Orneval : quatre panneaux en hauteur, on prend un carré au milieu de chacun. */
+    fichier: 'planches/sols 12.png',
+    fond: 'aucun',
+    cols: 1,
+    rows: 1,
+    type: 'sol',
+    categorie: 'Azeroth',
+    dossier: 'sols',
+    raccord: 'deux',
+    cases: [
+      { id: 'herbe-mauve', nom: 'Herbe d’Orneval', tuile: 3, zone: [28, 112, 500, 500] },
+      { id: 'plage-sombrivage', nom: 'Plage de Sombrivage', tuile: 3, zone: [566, 112, 500, 500] },
+      { id: 'feuilles-bleues', nom: 'Feuilles bleues', tuile: 3, zone: [1105, 112, 500, 500] },
+      { id: 'pierre-elfique', nom: 'Dalles elfiques au croissant', tuile: 3, zone: [1644, 112, 500, 500] }
+    ]
+  },
+  {
+    /* Le mur elfique sans ses deux piliers ronds des bouts, qui se répéteraient à chaque tuile. */
+    fichier: 'planches/murs 11.png',
+    fond: 'magenta-violet',
+    cols: 1,
+    rows: 1,
+    type: 'mur',
+    categorie: 'Azeroth',
+    dossier: 'murs',
+    retrait: 4,
+    raccord: 'long',
+    cases: [
+      { id: 'mur-elfique', nom: 'Muret elfique', tuile: 3, zone: [300, 80, 1560, 220] },
+      { id: 'ronces-enchantees', nom: 'Ronces enchantées', tuile: 3, zone: [0, 410, 2172, 270] }
+    ]
+  },
+  {
+    /* Acte 1 : la lanterne lunaire, vue de profil, est laissée (refaite dans lot 58). */
+    fichier: 'planches/lot 57.png',
+    fond: 'magenta-violet',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Nature',
+    sousCategorie: 'Arbres',
+    dossier: 'objets',
+    cases: [
+      { id: 'arbre-orneval', nom: 'Arbre d’Orneval', l: 3, pas: true, vue: true, seul: true, zone: [4, 4, 436, 360] },
+      { id: 'saule-lunaire', nom: 'Saule lunaire', l: 2.5, pas: true, vue: true, seul: true, zone: [444, 12, 396, 320] },
+      { id: 'champignons-lumineux', nom: 'Champignons luminescents', l: 1, zone: [848, 24, 308, 292] },
+      { id: 'puits-lune', nom: 'Puits de lune', l: 2, pas: true, zone: [1164, 16, 368, 340] },
+      { id: 'statue-elune', nom: 'Statue d’Élune', l: 1.5, pas: true, zone: [12, 360, 352, 312] },
+      { id: 'maison-arbre', nom: 'Maison-arbre elfique', l: 3, pas: true, vue: true, seul: true, zone: [360, 320, 476, 356] },
+      { id: 'ruines-mousse', nom: 'Ruines elfiques moussues', l: 2, pas: true, zone: [1108, 372, 416, 292] },
+      { id: 'statue-sentinelle', nom: 'Statue de sentinelle', l: 1.2, pas: true, zone: [136, 668, 284, 340] },
+      { id: 'scierie-orque', nom: 'Scierie orque', l: 4, pas: true, seul: true, zone: [564, 660, 812, 352] }
+    ]
+  },
+  {
+    /* La lanterne lunaire de lot 57, refaite vue de dessus. */
+    fichier: 'planches/lot 58.png',
+    fond: 'magenta-violet',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Lumière',
+    sousCategorie: 'Lampadaires',
+    dossier: 'objets',
+    cases: [{ id: 'lanterne-lunaire', nom: 'Lanterne lunaire', l: 1, pas: true }]
+  },
+  {
+    /* Acte 2, Serres-Rocheuses et Désolace : trois textures séparées par un liseré magenta. */
+    fichier: 'planches/sols 13.png',
+    fond: 'aucun',
+    cols: 1,
+    rows: 1,
+    type: 'sol',
+    categorie: 'Azeroth',
+    dossier: 'sols',
+    raccord: 'deux',
+    cases: [
+      { id: 'roche-ocre', nom: 'Roche ocre des Serres-Rocheuses', tuile: 3, zone: [8, 12, 700, 700] },
+      { id: 'terre-sterile', nom: 'Terre stérile craquelée', tuile: 3, zone: [736, 12, 700, 700] },
+      { id: 'sable-desolace', nom: 'Sable de Désolace', tuile: 3, zone: [1464, 12, 700, 700] }
+    ]
+  },
+  {
+    fichier: 'planches/murs 12.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'mur',
+    categorie: 'Azeroth',
+    dossier: 'murs',
+    retrait: 4,
+    raccord: 'long',
+    cases: [{ id: 'falaise-rouge', nom: 'Falaise de grès rouge', tuile: 3, zone: [0, 150, 2172, 420] }]
+  },
+  {
+    /* Acte 2 : le totem tauren et l'arbre mort, dessinés de profil, sont laissés (refaits dans lot 60 et 61). */
+    fichier: 'planches/lot 59.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Extérieur',
+    sousCategorie: 'Camp',
+    dossier: 'objets',
+    cases: [
+      { id: 'tour-guet-orque', nom: 'Tour de guet orque', l: 2.5, pas: true, vue: true, zone: [8, 64, 300, 400] },
+      { id: 'tente-peaux', nom: 'Tente orque en peaux', l: 3, pas: true, vue: true, seul: true, zone: [308, 60, 316, 392] },
+      { id: 'mat-dirigeable', nom: 'Tour d’amarrage gobeline', l: 3, pas: true, zone: [916, 40, 312, 412] },
+      { id: 'dechiqueteuse', nom: 'Déchiqueteuse gobeline', l: 2.5, pas: true, zone: [1248, 80, 276, 400] },
+      { id: 'ossements-kodo', nom: 'Squelette de kodo', l: 4, zone: [0, 530, 304, 450] },
+      { id: 'yourte-centaure', nom: 'Yourte de centaure', l: 3.5, pas: true, vue: true, seul: true, zone: [300, 562, 336, 392] },
+      { id: 'cage-centaure', nom: 'Cage de bois', l: 1.5, pas: true, seul: true, zone: [628, 594, 280, 336] },
+      { id: 'rochers-rouges', nom: 'Rochers rouges', l: 2, pas: true, zone: [908, 578, 304, 356] }
+    ]
+  },
+  /* L'arbre mort et le totem de lot 59, refaits vus de dessus. */
+  {
+    fichier: 'planches/lot 60.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Nature',
+    sousCategorie: 'Bois mort',
+    dossier: 'objets',
+    cases: [{ id: 'arbre-mort-desolace', nom: 'Arbre mort de Désolace', l: 3, pas: true }]
+  },
+  {
+    fichier: 'planches/lot 61.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Extérieur',
+    sousCategorie: 'Camp',
+    dossier: 'objets',
+    cases: [{ id: 'totem-tauren', nom: 'Totem tauren', l: 1.5, pas: true }]
+  },
+  {
+    /* Acte 3, Azshara : trois textures séparées par un liseré magenta. */
+    fichier: 'planches/sols 14.png',
+    fond: 'aucun',
+    cols: 1,
+    rows: 1,
+    type: 'sol',
+    categorie: 'Azeroth',
+    dossier: 'sols',
+    raccord: 'deux',
+    cases: [
+      { id: 'herbe-automne', nom: 'Herbe d’automne d’Azshara', tuile: 3, zone: [8, 12, 700, 700] },
+      { id: 'marbre-ancien', nom: 'Marbre des Bien-nés', tuile: 3, zone: [735, 12, 700, 700] },
+      { id: 'eau-ruines', nom: 'Eau sur dalles englouties', tuile: 3, zone: [1462, 12, 700, 700] }
+    ]
+  },
+  {
+    /* Coupé à mi-mur entre les piliers 1-2 et 3-4 : le raccord tombe sur du mur nu. */
+    fichier: 'planches/murs 13.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'mur',
+    categorie: 'Azeroth',
+    dossier: 'murs',
+    retrait: 4,
+    raccord: 'long',
+    cases: [{ id: 'colonnade-zin-azshari', nom: 'Colonnade de Zin-Azshari', tuile: 3, zone: [470, 220, 1234, 290] }]
+  },
+  {
+    /* Acte 3 : l'arche en ruine, dessinée de face, est laissée (refaite dans lot 63). */
+    fichier: 'planches/lot 62.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Architecture',
+    sousCategorie: 'Colonnes',
+    dossier: 'objets',
+    cases: [
+      { id: 'colonne-brisee', nom: 'Colonne de marbre effondrée', l: 2.5, pas: true, zone: [12, 24, 412, 400] },
+      { id: 'statue-azshara', nom: 'Statue décapitée d’Azshara', l: 2, pas: true, zone: [444, 12, 428, 416] },
+      { id: 'arbre-rouge', nom: 'Arbre rouge d’Azshara', l: 3, pas: true, vue: true, zone: [888, 0, 444, 440] },
+      { id: 'autel-naga', nom: 'Autel naga', l: 2, pas: true, zone: [1352, 0, 400, 440] },
+      { id: 'coquillage-geant', nom: 'Coquillage géant', l: 1.8, pas: true, zone: [448, 452, 412, 408] },
+      { id: 'epave-bateau', nom: 'Épave de barque', l: 3, pas: true, zone: [860, 464, 468, 400] }
+    ]
+  },
+  {
+    /* Le corail de lot 62, violet : détouré à part pour garder sa couleur. */
+    fichier: 'planches/lot 62.png',
+    fond: 'magenta-violet',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Nature',
+    sousCategorie: 'Végétation',
+    dossier: 'objets',
+    cases: [{ id: 'corail', nom: 'Massif de corail', l: 1.5, pas: true, zone: [20, 456, 408, 408] }]
+  },
+  {
+    /* L'arche de lot 62, refaite vue de dessus. On passe dessous : elle ne bloque pas le pas. */
+    fichier: 'planches/lot 63.png',
+    fond: 'magenta',
+    cols: 1,
+    rows: 1,
+    type: 'objet',
+    categorie: 'Architecture',
+    sousCategorie: 'Portails',
+    dossier: 'objets',
+    cases: [{ id: 'arche-ruines', nom: 'Arche elfique en ruine', l: 4 }]
+  },
   {
     fichier: 'planches/icones 1.png',
     fond: 'magenta',
@@ -2352,8 +2853,18 @@ for (const pl of PLANCHES) {
   }
   const img = PNG.sync.read(readFileSync(join(SOURCES, pl.fichier)))
   const px = new Uint8ClampedArray(img.data.buffer, img.data.byteOffset, img.data.length)
+  if (pl.fond === 'alpha') {
+    const seuil = pl.seuil ?? 160
+    for (let i = 3; i < px.length; i += 4) px[i] = px[i] >= seuil ? 255 : 0
+  }
   const net =
-    pl.fond === 'magenta' ? detourerMagenta(px) : pl.fond === 'noir' ? lumiereEnAlpha(px) : px
+    pl.fond === 'magenta'
+      ? detourerMagenta(px)
+      : pl.fond === 'magenta-violet'
+        ? detourerMagentaViolet(px, img.width, img.height)
+        : pl.fond === 'noir'
+          ? lumiereEnAlpha(px)
+          : px
   img.data = Buffer.from(net.buffer, net.byteOffset, net.length)
 
   const cw = img.width / pl.cols
@@ -2411,7 +2922,7 @@ for (const pl of PLANCHES) {
           if (el.etiquette[b] !== meilleur) cellule.data[(y * w + x) * 4 + 3] = 0
         }
     }
-    if (pl.isoler === 'case' && !c.zone) {
+    if ((pl.isoler === 'case' && !c.zone) || c.seul) {
       /* Le plus grand élément d'un seul tenant de la case : les voisins qui
          débordent un peu dedans sont effacés. */
       const ec = elements(cellule)
@@ -2464,6 +2975,51 @@ for (const pl of PLANCHES) {
     catalogue.push(entree)
     console.log(`${fichier}  ${piece.width}×${piece.height}`)
   })
+}
+
+/* Le détourage magenta ôte à chaque pixel ce qu'il a de rose : un violet y perd son rouge et
+   vire au bleu. Ici, on ne détoure que le fond (le magenta franc relié au bord ou au magenta pur)
+   et une bande de quelques pixels autour ; le dedans des objets garde ses couleurs. */
+function detourerMagentaViolet(px: Uint8ClampedArray, w: number, h: number): Uint8ClampedArray {
+  const FRANC = 150
+  const PUR = 225
+  const BANDE = 3
+  const fond = new Uint8Array(w * h)
+  const pile: number[] = []
+  const pousser = (k: number): void => {
+    if (fond[k]) return
+    const m = Math.min(px[k * 4], px[k * 4 + 2]) - px[k * 4 + 1]
+    if (m < FRANC) return
+    fond[k] = 1
+    pile.push(k)
+  }
+  for (let x = 0; x < w; x++) (pousser(x), pousser((h - 1) * w + x))
+  for (let y = 0; y < h; y++) (pousser(y * w), pousser(y * w + w - 1))
+  /* Les trous enfermés dans un objet (entre deux branches) : le magenta pur y part aussi. */
+  for (let k = 0; k < w * h; k++) if (Math.min(px[k * 4], px[k * 4 + 2]) - px[k * 4 + 1] >= PUR) pousser(k)
+  while (pile.length) {
+    const k = pile.pop()!
+    const x = k % w
+    if (x > 0) pousser(k - 1)
+    if (x < w - 1) pousser(k + 1)
+    if (k >= w) pousser(k - w)
+    if (k < w * (h - 1)) pousser(k + w)
+  }
+  /* Distance au fond, par passes successives jusqu'à BANDE. */
+  const pres = new Uint8Array(fond)
+  for (let pas = 0; pas < BANDE; pas++) {
+    const avant = new Uint8Array(pres)
+    for (let k = 0; k < w * h; k++) {
+      if (avant[k]) continue
+      const x = k % w
+      if ((x > 0 && avant[k - 1]) || (x < w - 1 && avant[k + 1]) || (k >= w && avant[k - w]) || (k < w * (h - 1) && avant[k + w])) pres[k] = 1
+    }
+  }
+  const detoure = detourerMagenta(px)
+  const out = new Uint8ClampedArray(px)
+  for (let k = 0; k < w * h; k++)
+    if (pres[k]) for (let c = 0; c < 4; c++) out[k * 4 + c] = detoure[k * 4 + c]
+  return out
 }
 
 /* Le mur blanc : un enduit à peine grainé, fabriqué ici. Uni, il prend

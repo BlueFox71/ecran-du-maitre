@@ -2960,6 +2960,386 @@
    "theme": "Moderne",
    "famille": "Cuisine et bain",
    "rayon": "Bain"
+  },
+  "objets/feu-de-camp": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/tente-voyageur": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/sac-couchage": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/charrette": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/caisse-ravitaillement": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/catapulte-orque": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Armes"
+  },
+  "objets/cadavre-soldat-humain": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Corps"
+  },
+  "objets/cadavre-orque": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Corps"
+  },
+  "objets/cadavre-sentinelle": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Corps"
+  },
+  "objets/squelette-soldat": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Ossements"
+  },
+  "objets/ossements-epars": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Ossements"
+  },
+  "objets/pont-bois": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Ponts"
+  },
+  "objets/echelle": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Escaliers"
+  },
+  "objets/comptoir-taverne": {
+   "theme": "Azeroth",
+   "famille": "Cuisine et bain",
+   "rayon": "Bar"
+  },
+  "objets/tonneau-biere": {
+   "theme": "Azeroth",
+   "famille": "Cuisine et bain",
+   "rayon": "Bar"
+  },
+  "objets/table-taverne": {
+   "theme": "Azeroth",
+   "famille": "Mobilier",
+   "rayon": "Tables"
+  },
+  "objets/banc-taverne": {
+   "theme": "Azeroth",
+   "famille": "Mobilier",
+   "rayon": "Assises"
+  },
+  "objets/tabouret-taverne": {
+   "theme": "Azeroth",
+   "famille": "Mobilier",
+   "rayon": "Assises"
+  },
+  "objets/cheminee-taverne": {
+   "theme": "Azeroth",
+   "famille": "Mobilier",
+   "rayon": "Cheminées"
+  },
+  "objets/barricade": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/chevaux-frise": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/mannequin": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/ratelier-armes": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Armes"
+  },
+  "objets/coffre-tresor": {
+   "theme": "Azeroth",
+   "famille": "Mobilier",
+   "rayon": "Rangements"
+  },
+  "objets/puits": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Mobilier urbain"
+  },
+  "objets/boite-lettres": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Mobilier urbain"
+  },
+  "objets/panneau-quete": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Mobilier urbain"
+  },
+  "objets/lianes": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Végétation"
+  },
+  "objets/chope": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Vaisselle"
+  },
+  "objets/forge": {
+   "theme": "Azeroth",
+   "famille": "Mobilier",
+   "rayon": "Artisanat"
+  },
+  "objets/enclume": {
+   "theme": "Azeroth",
+   "famille": "Mobilier",
+   "rayon": "Artisanat"
+  },
+  "objets/etabli": {
+   "theme": "Azeroth",
+   "famille": "Mobilier",
+   "rayon": "Artisanat"
+  },
+  "objets/pont-pierre": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Ponts"
+  },
+  "objets/enseigne-auberge": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Décoration"
+  },
+  "objets/portail-legion": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Portails"
+  },
+  "objets/cercle-invocation": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Rituels"
+  },
+  "objets/autel-sacrificiel": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Rituels"
+  },
+  "objets/brasero-fel": {
+   "theme": "Azeroth",
+   "famille": "Lumière",
+   "rayon": "Braseros"
+  },
+  "objets/debris-vaisseau": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Débris"
+  },
+  "objets/gangrecuve": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Rituels"
+  },
+  "objets/cadavre-gangregarde": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Corps"
+  },
+  "objets/cadavre-diablotin": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Corps"
+  },
+  "objets/pylone-fel": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Rituels"
+  },
+  "objets/cristal-fel-petit": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Cristaux"
+  },
+  "objets/cristal-fel-grand": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Cristaux"
+  },
+  "objets/cage-demoniaque": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/banniere-legion": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Décoration"
+  },
+  "objets/corruption-sol": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Rituels"
+  },
+  "objets/arbre-orneval": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Arbres"
+  },
+  "objets/saule-lunaire": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Arbres"
+  },
+  "objets/champignons-lumineux": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Végétation"
+  },
+  "objets/puits-lune": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Rituels"
+  },
+  "objets/statue-elune": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Décoration"
+  },
+  "objets/maison-arbre": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Arbres"
+  },
+  "objets/ruines-mousse": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Débris"
+  },
+  "objets/statue-sentinelle": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Décoration"
+  },
+  "objets/scierie-orque": {
+   "theme": "Azeroth",
+   "famille": "Mobilier",
+   "rayon": "Artisanat"
+  },
+  "objets/lanterne-lunaire": {
+   "theme": "Azeroth",
+   "famille": "Lumière",
+   "rayon": "Lampadaires"
+  },
+  "objets/tour-guet-orque": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/tente-peaux": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/mat-dirigeable": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Véhicules"
+  },
+  "objets/dechiqueteuse": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Véhicules"
+  },
+  "objets/ossements-kodo": {
+   "theme": "Azeroth",
+   "famille": "Personnages",
+   "rayon": "Ossements"
+  },
+  "objets/yourte-centaure": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/cage-centaure": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/rochers-rouges": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Rochers"
+  },
+  "objets/arbre-mort-desolace": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Bois mort"
+  },
+  "objets/totem-tauren": {
+   "theme": "Azeroth",
+   "famille": "Extérieur",
+   "rayon": "Camp"
+  },
+  "objets/colonne-brisee": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Colonnes"
+  },
+  "objets/statue-azshara": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Décoration"
+  },
+  "objets/arbre-rouge": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Arbres"
+  },
+  "objets/autel-naga": {
+   "theme": "Azeroth",
+   "famille": "Déco et objets",
+   "rayon": "Rituels"
+  },
+  "objets/corail": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Végétation"
+  },
+  "objets/coquillage-geant": {
+   "theme": "Azeroth",
+   "famille": "Nature",
+   "rayon": "Rochers"
+  },
+  "objets/epave-bateau": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Débris"
+  },
+  "objets/arche-ruines": {
+   "theme": "Azeroth",
+   "famille": "Architecture",
+   "rayon": "Portails"
   }
  }
 }

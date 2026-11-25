@@ -457,6 +457,42 @@ body.craft #craft{display:block}
    l'or des titres (#ffd100), les qualités d'objet, le bleu des liens de sort. */
 body[data-mode="wow"] #toolbar .grpCanvas{display:none}
 body.wow #viewport,body.wow #zoomHud,body.wow #side{display:none}
+body.play #side{display:none}
+html:not(.simu) body.book #side{display:none}
+#wow .grim .sort.inconnu{opacity:.5;filter:grayscale(1)}
+html.surPlan,html.surPlan body{background:transparent}
+html.surPlan #fondPlan{position:fixed;inset:0;width:100%;height:100%;border:0;z-index:0;background:#000}
+html.surPlan #app{position:relative;z-index:1;pointer-events:none;background:transparent}
+html.surPlan #toolbar,html.surPlan #modeBar,html.surPlan #side{display:none !important}
+html.surPlan #main{background:transparent}
+html.surPlan #wow{background:none !important;pointer-events:none;position:fixed;left:0;top:0;flex:none}
+html.surPlan #wow > *{pointer-events:auto}
+html.surPlan #wow > #wErr{pointer-events:none}
+/* La fenêtre Métiers de l'Aventure : l'atelier (#craft) y est déplacé et s'y montre. */
+#wow .metiers .bd{padding:0}
+#wow .metiers #craft{display:block;width:min(940px,90vw);max-height:72vh;padding:14px 18px 24px;user-select:text}
+#wow .talents .bd{padding:8px 10px}
+#wow .talents .tete{font:13px var(--wfont);color:#f1e6cf;margin-bottom:6px}
+#wow .talents .tete .pts{color:#1eff00}
+#wow .talents .tarbre{overflow:hidden;background:rgba(0,0,0,.55);border:1px solid #5a4b30;border-radius:4px}
+#wow .talents .tplan{position:relative;overflow:hidden}
+#wow .talents .tfond{position:absolute;inset:0;background-size:cover;background-position:center;pointer-events:none}
+#wow .talents .tplan svg{position:absolute;left:0;top:0;pointer-events:none}
+#wow .talents .tn{position:absolute;width:32px;height:32px;border:2px solid #6b6b6b;border-radius:5px;background:#000;cursor:pointer;box-sizing:border-box}
+#wow .talents .tn.rond{border-radius:50%}
+#wow .talents .tn img{width:100%;height:100%;object-fit:cover;border-radius:inherit;display:block}
+#wow .talents .tn.ferme{filter:grayscale(1);opacity:.45}
+#wow .talents .tn.dispo{border-color:#1eff00}
+#wow .talents .tn.pris{border-color:#1eff00;box-shadow:0 0 6px rgba(30,255,0,.5)}
+#wow .talents .tn.max{border-color:#ffd100;box-shadow:0 0 6px rgba(255,209,0,.55)}
+#wow .talents .tn .rk{position:absolute;right:-8px;bottom:-8px;background:#000;color:#1eff00;font:600 10px/1.3 "Segoe UI",sans-serif;padding:0 3px;border-radius:3px;border:1px solid #444}
+#wow .talents .tn.max .rk{color:#ffd100}
+#wow .talents .tn.ferme .rk{color:#9d9d9d}
+#wow .talents .aideT{font:11px "Segoe UI",sans-serif;color:#a99f8a;margin-top:6px}
+#wow .grim .sort.inconnu .rg{color:#7a2a1a}
+#side .geListe{display:flex;flex-direction:column;gap:2px;max-height:280px;overflow-y:auto;margin-top:6px}
+#side .geListe button{text-align:left;display:flex;gap:6px;align-items:center;padding:4px 6px}
+#side .geListe button .pts{min-width:44px}
 #wow{
   --wgold:#ffd100; --wfont:"Friz Quadrata TT","Palatino Linotype","Book Antiqua",Georgia,serif;
   flex:1;position:relative;overflow:hidden;display:none;user-select:none;
@@ -2172,10 +2208,22 @@ async function diskRead(url) {
    et la date, qui sert à départager les copies au démarrage. */
 function payload() {
   /* Un joueur n'emporte que sa fiche : l'arbre est celui de la classe. */
-  if (JOUEUR) return { joueur: JOUEUR, classe: CLASS_ID, progress: progress(),
+  if (JOUEUR) return { joueur: JOUEUR, classe: CLASS_ID, progress: progress(), apercu: apercuFichier(),
                        savedAt: new Date().toISOString() };
   return Object.assign({}, S, { classe: CLASS_ID, progress: progress(),
                                 savedAt: new Date().toISOString() });
+}
+/* Ce que l'Écran du Maître ne sait pas recalculer d'un fichier seul, pour une
+   fiche fermée : les bonus des caractéristiques (équipement, talents — les
+   points, eux, sont dans la fiche, et le MJ peut les changer hors ligne), et
+   les noms des talents et des sorts. */
+function apercuFichier() {
+  try {
+    if (!S) return null;
+    const e = etatTable() || {};
+    return { carBonus: Object.fromEntries(CARACS.map(([k]) => [k, caracTotal(k) - (parseInt(perso.car[k].pt) || 0)])),
+             talents: e.talents || [], sorts: e.sorts || [] };
+  } catch (err) { return null; }
 }
 function stampNow() {
   const d = new Date(), p = v => String(v).padStart(2, "0");
@@ -2266,6 +2314,41 @@ let mode = "edit";                  // 'edit' | 'play' | 'book'
 /* Téléphone ou tablette (un doigt, pas de survol) : pas d'Édition. On y joue
    son personnage ; l'arbre se construit sur PC. */
 const MOBILE = matchMedia("(hover: none) and (pointer: coarse)").matches;
+/* ?fond=<adresse> : l'Écran du Maître ouvre l'Aventure d'un joueur sur son
+   téléphone, posée sur le plan que le MJ affiche (la vue « plan seul » du
+   téléphone). L'Aventure n'a alors plus de fond à elle, ni de bandeau : ses
+   fenêtres et ses barres se touchent, le reste laisse toucher le plan. */
+const FOND_PLAN = (() => {
+  try { const f = new URLSearchParams(location.search).get("fond"); return f && /^https?:\/\//.test(f) ? f : ""; }
+  catch (e) { return ""; }
+})();
+/* L'interface à l'échelle de l'écran, sur le plan : l'Aventure a été pensée
+   pour un écran de 1920 × 1080 ; sur une tablette ou un téléphone, elle garde
+   les mêmes proportions. #wow est mis en page à la taille de cet écran de
+   référence (ou presque), puis réduit (ou agrandi) d'un bloc par zoom. Les
+   positions calculées d'après la souris ou le doigt se divisent par echelleW. */
+let echelleW = 1;
+function echelleSurPlan() {
+  const w = document.getElementById("wow"); if (!w) return;
+  const k = Math.max(0.3, Math.min(2, Math.min(innerWidth / 1920, innerHeight / 1080)));
+  echelleW = k;
+  w.style.zoom = k;
+  w.style.width = (innerWidth / k) + "px";
+  w.style.height = (innerHeight / k) + "px";
+  if (mode === "wow") try { placeFenetres(); majSacs(); if (perso.fen.talents && perso.fen.talents.open) majTalentsFen(); } catch (err) {}
+}
+function installeFondPlan() {
+  if (!FOND_PLAN || document.getElementById("fondPlan")) return;
+  document.documentElement.classList.add("surPlan");
+  echelleSurPlan();
+  addEventListener("resize", echelleSurPlan);
+  const fr = document.createElement("iframe");
+  fr.id = "fondPlan";
+  fr.src = FOND_PLAN;
+  fr.title = "Le plan";
+  fr.setAttribute("allow", "fullscreen; vibrate");
+  document.body.insertBefore(fr, document.body.firstChild);
+}
 /* Le simulateur (site publié, voir construire-simulateur.js) : les données y sont
    embarquées dans SIMU_DONNEES. On y découvre les races et les classes —
    création sans rien créer, Jeu et Grimoire sans rien modifier. */
@@ -2983,25 +3066,27 @@ viewport.addEventListener("pointermove", e => {
   if (e.pointerType === "mouse") montreTipNoeud(e.target.closest(".node"), e.clientX, e.clientY);
 });
 /* Au doigt, l'info-bulle se pose au-dessus du doigt : en dessous, la main la cache. */
-function montreTipNoeud(el, cx, cy, doigt) {
+function montreTipNoeud(el, cx, cy, doigt, fenetre) {
+  montreTipNoeud.fenetre = !!(el && fenetre);
   if (!el) { tip.style.display = "none"; return; }
+  const enJeu = fenetre || mode === "play";
   const n = nodeById(el.dataset.id);
   if (!n || (!n.title && !n.desc)) { tip.style.display = "none"; return; }
   /* En mode Jeu, un talent encore fermé annonce le parent qu'il faut finir. */
   let req = "";
-  if (mode === "play" && !alloc[n.id] && !isAvailable(n)) {
+  if (enJeu && !alloc[n.id] && !isAvailable(n)) {
     const ps = parents(n.id).map(id => nodeById(id)).filter(Boolean);
     req = '<div class="r">Requis : ' + (ps.length
       ? ps.map(o => h(o.title) + " " + o.maxRank + "/" + o.maxRank).join(" ou ")
       : "aucun talent parent") + "</div>";
   }
   /* Un talent déjà pris rappelle à quel(s) niveau(x) chacun de ses rangs l'a été. */
-  if (mode === "play" && alloc[n.id]) {
+  if (enJeu && alloc[n.id]) {
     const lv = levelsOf(n.id);
     if (lv.length) req += '<div class="r">Pris au niveau ' + lv.join(", ") + "</div>";
   }
   tip.innerHTML = '<div class="t"></div><div class="d"></div>' +
-    (n.maxRank > 1 ? '<div class="r">Rang ' + (mode === "play" ? (alloc[n.id] || 0) : 0) + " / " + n.maxRank + "</div>" : "") +
+    (n.maxRank > 1 ? '<div class="r">Rang ' + (enJeu ? (alloc[n.id] || 0) : 0) + " / " + n.maxRank + "</div>" : "") +
     req;
   tip.querySelector(".t").textContent = n.title;
   tip.querySelector(".d").textContent = n.desc;
@@ -3140,7 +3225,7 @@ function renderSide() {
   if (Number.isInteger(sel.link)) return renderLinkPanel(S.links[sel.link], sel.link);
   if (selCount() > 1) return renderMultiPanel();
   const s = selSingle();
-  if (!s) return renderGlobalPanel();
+  if (!s) return bookSel && spellById(bookSel) ? renderSpellEditor(spellById(bookSel)) : renderGlobalPanel();
   return s.kind === "node" ? renderNodePanel(s.o) : renderTextPanel(s.o);
 }
 function bind(id, obj, key, transform) {
@@ -3594,7 +3679,19 @@ function setLevels(first, max) {
   pruneUnreachable();
   snapshot(); render();
 }
+/* Le panneau de l'Édition sans sélection : le grimoire de la classe, puis les réglages de l'arbre. */
 function renderGlobalPanel() {
+  renderGlobalPanelArbre();
+  const sorts = S.spells.slice().sort((a, b) => a.level - b.level || a.name.localeCompare(b.name, "fr"));
+  side.insertAdjacentHTML("afterbegin", "<h3>Grimoire de la classe</h3>" +
+    '<button id="ge_add" style="width:100%">+ Ajouter un sort</button>' +
+    '<div class="hint" style="margin-top:6px">' + sorts.length + " sort(s). Clique un sort pour le modifier.</div>" +
+    '<div class="geListe">' + sorts.map(x => '<button data-ge="' + h(x.id) + '">' +
+      '<span class="pts">' + (isManual(x) ? "quête" : "niv. " + x.level) + "</span>" + h(x.name) + "</button>").join("") + "</div><hr>");
+  $("#ge_add").addEventListener("click", addSpell);
+  side.querySelectorAll("[data-ge]").forEach(b => b.addEventListener("click", () => { bookSel = b.dataset.ge; renderSide(); }));
+}
+function renderGlobalPanelArbre() {
   const bg = S.meta.background, g = G();
   side.innerHTML = "<h3>Arbre</h3>" +
     '<label>Titre du document</label><input type="text" id="f_title" value="' + h(S.meta.title) + '">' +
@@ -3838,7 +3935,12 @@ const pointsLeft = () => Math.max(0, pointsEarned() - spent());
 /* Un seul point d'entrée pour changer le niveau, partagé par les deux modes.
    On ne descend pas sous le niveau déjà payé par les points dépensés : ce
    serait effacer des talents sans le dire. */
-function setCharLevel(v) {
+function setCharLevel(v, duMj) {
+  if (!SIMU && !duMj) {
+    toast("Le niveau se règle sur la fiche de l'Écran du Maître.", 4000);
+    render();
+    return;
+  }
   const want = Math.max(1, parseInt(v) || 1);
   const floor = spent() ? currentLevel() : 1;
   if (want < floor) {
@@ -3876,9 +3978,12 @@ function addPoint(n) {
     toast("Plus de points : niveau " + S.meta.levelMax + " atteint.");
     return;
   }
+  if (pointsLeft() <= 0) {
+    toast("Plus de point de talent à dépenser au niveau " + charLevel() + ". C'est le MJ qui monte le niveau, sur la fiche de l'Écran du Maître.", 5000);
+    return;
+  }
   alloc[n.id] = (alloc[n.id] || 0) + 1;
   order.push(n.id);
-  pLevel = Math.max(pLevel, currentLevel());   // dépenser au-delà fait monter d'un niveau
   lanceDesTalents(); lanceDesVie(); recaleMana();
   renderNodes(); renderLinks(); renderPlayPanel(); persistPlay();
 }
@@ -3891,6 +3996,9 @@ function removePoint(n) {
   renderNodes(); renderLinks(); renderPlayPanel(); persistPlay();
 }
 function renderPlayPanel() {
+  /* Plus de panneau en mode jeu : le niveau vient de la fiche de l'Écran du Maître. */
+  side.innerHTML = "";
+  return;
   const used = spent(), max = S.meta.maxPoints, lvl = charLevel(), left = pointsLeft();
   /* Les talents sont listés dans l'ordre où ils ont été pris : le panneau se
      lit comme la progression du personnage, niveau par niveau. */
@@ -4032,7 +4140,7 @@ function renderBook() {
         const st = spellStatus(s);
         return card({
           id: s.id, st: st, icon: s.icon, name: s.name, desc: s.desc, shape: s.shape,
-          unlock: isManual(s),
+          unlock: isManual(s) && SIMU,
           sub: (isManual(s) ? "À débloquer" : "Niveau " + s.level) + " &middot; " + shapeLabel(s.shape),
           pill: st === "known" ? "&#10004; Appris"
               : st === "todo" ? "&#9675; Débloquer" : "&#128274; Niv. " + s.level
@@ -4062,8 +4170,8 @@ function renderBook() {
     body = '<div class="bkEmpty" style="margin-top:22px">' + (S.spells.length || used
       ? "Rien ne correspond à ce filtre."
       : SIMU ? "Grimoire vide pour cette classe."
-      : "Grimoire vide.<br>Ajoute tes sorts hors arbre avec <b>+ Sort</b>, "
-        + "et monte des talents en <b>mode Jeu</b> : ils arrivent ici tout seuls.") + "</div>";
+      : "Grimoire vide.<br>Les sorts de la classe s'ajoutent dans le mode <b>Édition</b>, "
+        + "et les talents montés en <b>mode Jeu</b> arrivent ici tout seuls.") + "</div>";
   }
 
   const fBtn = (v, t) => '<button data-f="' + v + '"' + (bookFilter === v ? ' class="on"' : "") + ">" + t + "</button>";
@@ -4073,14 +4181,14 @@ function renderBook() {
       used + " / " + S.meta.maxPoints + " points de talent dépensés &middot; " +
       knownSpells().length + " / " + S.spells.length + " sorts connus</div>" +
     '<div class="bkBar">' +
-      '<label style="margin:0;display:flex;gap:6px;align-items:center;text-transform:none;font-size:13px;color:var(--ink)">' +
-        'Niveau du perso <input type="number" id="bk_lvl" min="1" value="' + lvl + '" style="width:70px"></label>' +
+      (SIMU ? '<label style="margin:0;display:flex;gap:6px;align-items:center;text-transform:none;font-size:13px;color:var(--ink)">' +
+        'Niveau du perso <input type="number" id="bk_lvl" min="1" value="' + lvl + '" style="width:70px"></label>' : "") +
       '<input type="text" id="bk_q" placeholder="filtrer&hellip;" value="' + h(bookQuery) + '">' +
       '<span class="segbar">' + fBtn("all", "Tout") + fBtn("known", "Appris") + fBtn("locked", "À venir") + "</span>" +
-      '<span style="flex:1"></span>' + (SIMU ? "" : '<button id="bk_add">+ Sort</button>') +
+      '<span style="flex:1"></span>' +
     "</div>" + body;
 
-  $("#bk_lvl").addEventListener("change", e => setCharLevel(e.target.value));
+  const bl = $("#bk_lvl"); if (bl) bl.addEventListener("change", e => setCharLevel(e.target.value));
   const q = $("#bk_q");
   q.addEventListener("input", e => {
     bookQuery = e.target.value; renderBook();
@@ -4088,12 +4196,11 @@ function renderBook() {
   });
   book.querySelectorAll("[data-f]").forEach(b =>
     b.addEventListener("click", () => { bookFilter = b.dataset.f; renderBook(); }));
-  if (!SIMU) $("#bk_add").addEventListener("click", addSpell);
   book.querySelectorAll("[data-unlock]").forEach(b => b.addEventListener("click", e => {
     e.stopPropagation();
     const s = spellById(b.dataset.unlock); if (s) toggleUnlocked(s);
   }));
-  book.querySelectorAll("[data-sp]").forEach(d => d.addEventListener("click", () => {
+  if (SIMU) book.querySelectorAll("[data-sp]").forEach(d => d.addEventListener("click", () => {
     const s = spellById(d.dataset.sp);
     bookSel = s ? (bookSel === s.id ? null : s.id) : null;   // une carte de talent n'est pas éditable
     renderBook(); renderSide();
@@ -4102,30 +4209,12 @@ function renderBook() {
 
 function renderBookPanel() {
   if (SIMU) return renderBookPanelSimu();
-  const s = bookSel ? spellById(bookSel) : null;
-  if (!s) {
-    const lvl = charLevel();
-    side.innerHTML = "<h3>Grimoire</h3>" +
-      '<div class="hint">Les talents montés dans l\'arbre s\'y ajoutent tout seuls. ' +
-      "Les sorts ci-dessous s'apprennent en montant de niveau, sans dépenser de point : " +
-      "dès que le niveau requis est atteint, le sort entre dans le grimoire. " +
-      "Ceux marqués <b>à débloquer</b> attendent au contraire un clic sur leur pastille " +
-      "— pour une récompense de quête, par exemple.</div>" +
-      '<hr><button id="bp_add" style="width:100%">+ Ajouter un sort</button>' +
-      '<div class="hint" style="margin-top:6px">Clique une carte de sort pour la modifier.</div>' +
-      '<hr><h3>Personnage</h3>' +
-      '<div style="font-size:22px;margin:6px 0 2px">Niveau <span class="pts">' + lvl + "</span></div>" +
-      '<div class="hint">' + spent() + " / " + S.meta.maxPoints + " points &middot; " +
-        knownSpells().length + " sort(s) connus</div>" +
-      '<div class="hint" style="margin-top:6px">Le niveau saisi monte tout seul si tu dépenses ' +
-        "plus de points que lui : 1 point par niveau à partir du " + S.meta.levelFirst + ".</div>" +
-      '<hr><button id="bp_copy" style="width:100%">Copier le grimoire</button>' +
-      '<button id="bp_print" style="width:100%;margin-top:8px">Imprimer le grimoire</button>';
-    $("#bp_add").addEventListener("click", addSpell);
-    $("#bp_copy").addEventListener("click", copyBook);
-    $("#bp_print").addEventListener("click", () => print());
-    return;
-  }
+  /* Plus de panneau au grimoire : il suit le niveau officiel du personnage, et
+     les sorts se créent et se modifient dans le mode Édition (le MJ). */
+  side.innerHTML = "";
+}
+/* L'éditeur d'un sort, dans le panneau du mode Édition. */
+function renderSpellEditor(s) {
   const st = spellStatus(s);
   side.innerHTML = "<h3>Sort</h3>" +
     '<label>Icône</label>' +
@@ -5134,8 +5223,30 @@ function coutHTML(r) {
   }).join("");
 }
 
+/* L'atelier (#craft) vit dans l'onglet Métiers, ou dans la fenêtre Métiers de l'Aventure quand elle est ouverte. */
+let craftMaison = null;
+const metiersEnFenetre = () => mode === "wow" && !!(perso.fen.metiers && perso.fen.metiers.open);
+function rangeCraft() {
+  const el = $("#craft"); if (!el) return;
+  if (!craftMaison) craftMaison = { parent: el.parentNode, avant: $("#wow") };
+  const hote = metiersEnFenetre() ? $("#wFenMetiers .metiersHote") : null;
+  if (hote) { if (el.parentNode !== hote) hote.appendChild(el); }
+  else if (el.parentNode !== craftMaison.parent) craftMaison.parent.insertBefore(el, craftMaison.avant);
+}
+function majMetiersFen() {
+  const box = $("#wFenMetiers"); if (!box) return;
+  const el = $("#craft");
+  /* L'atelier rentre à la maison avant qu'on refasse la fenêtre (sinon il partirait avec elle). */
+  if (craftMaison && el && el.parentNode !== craftMaison.parent) craftMaison.parent.insertBefore(el, craftMaison.avant);
+  if (!metiersEnFenetre()) { box.innerHTML = ""; return; }
+  box.innerHTML = fenHTML("metiers", "Métiers", "metiers", '<div class="bd"><div class="metiersHote"></div></div>');
+  rangeCraft();
+  renderCraft();
+  placeFen(box.querySelector(".fen"));
+}
 function renderCraft() {
-  if (mode !== "craft") return;
+  rangeCraft();
+  if (mode !== "craft" && !metiersEnFenetre()) return;
   if (!catalogueEtat) chargeCatalogue();     /* les matières et les recettes viennent du catalogue */
   const lvl = charLevel();
   const jobs = myJobs();
@@ -5152,8 +5263,8 @@ function renderCraft() {
       craft.sec.length + " secondaire(s) &middot; " +
       craft.items.length + " création(s) en réserve &middot; bourse " + enPieces(bourse()) + "</div>" +
     '<div class="bkBar">' +
-      '<label style="margin:0;display:flex;gap:6px;align-items:center;text-transform:none;font-size:13px;color:var(--ink)">' +
-        'Niveau du perso <input type="number" id="cf_lvl" min="1" value="' + lvl + '" style="width:70px"></label>' +
+      (!SIMU ? "" : '<label style="margin:0;display:flex;gap:6px;align-items:center;text-transform:none;font-size:13px;color:var(--ink)">' +
+        'Niveau du perso <input type="number" id="cf_lvl" min="1" value="' + lvl + '" style="width:70px"></label>') +
       '<span class="segbar">' + vBtn("recettes", "Atelier") + vBtn("sac", "Sac") + vBtn("creations", "Établi") + "</span>" +
     "</div>";
 
@@ -6223,7 +6334,7 @@ const TOUCHES = ["Digit1", "Digit2", "Digit3", "Digit4", "Digit5", "Digit6",
                  "Digit7", "Digit8", "Digit9", "Digit0", "Minus", "Equal"];
 const TOUCHE_TXT = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "0", "-", "="];
 /* Les fenêtres qui s'ouvrent depuis le menu, avec ce qui les redessine. */
-const FENETRES = ["perso", "grim", "quetes", "codex"];
+const FENETRES = ["perso", "grim", "quetes", "codex", "talents", "metiers"];
 /* Les armes que chaque classe sait manier (onglet Compétences de la fiche). */
 const COMPETENCES_ARMES = {
   guerrier: [
@@ -6324,6 +6435,7 @@ function persoDefaut() {
     barres: [Array(12).fill(null), Array(12).fill(null), Array(12).fill(null)],   // la 3e, à la souris
     fen: { perso: { x: 410, y: 70, open: false }, grim: { x: 990, y: 70, open: false },
            quetes: { x: 460, y: 90, open: false }, codex: { x: 500, y: 110, open: false },
+           talents: { x: 330, y: 50, open: false }, metiers: { x: 360, y: 40, open: false },
            sacs: [false, false, false, false, false] },
     quetes: [],                                // { id, titre, donneur, lieu, texte, finie }
     codex: [],                                 // { id, cat, titre, texte }
@@ -6907,7 +7019,7 @@ const CONDITIONS = {
   rate: [() => evtActif("rate"), "après une attaque esquivée ou parée par l'ennemi"],
   tue: [() => evtActif("tue"), "au tour suivant la mort d'un ennemi que vous avez tué"],
   camoufle: [() => perso.auras.some(a => a.tag === "camoufle"), "en étant camouflé"],
-  horsCombat: [() => !enCombat(), "hors combat (« Fin du combat » pour en sortir)"],
+  horsCombat: [() => !enCombat(), "hors combat (le MJ termine le combat)"],
   enCombat: [() => enCombat(), "en combat"],
   felin: [() => formeActive() === "felin", "en forme de félin"],
   ours: [() => formeActive() === "ours", "en forme d'ours"],
@@ -7592,9 +7704,7 @@ function majCombat() {
   z.innerHTML = EVENEMENTS.map(([k, lab, t]) =>
       '<button data-evt="' + k + '" title="' + h(t) + ' (cliquer quand le MJ l\'annonce)"' + (evtActif(k) ? ' class="on"' : "") + ">" + h(lab) + "</button>").join("") +
     '<button data-act="esquive" title="Lancer un jet d\'esquive (Dextérité) ; réussi, il compte comme « Esquivé »">Jet d\'esquive</button>' +
-    '<button data-act="subir" class="rouge" title="Entrer les dégâts que vous subissez">&minus; Dégâts</button>' +
     '<button data-act="tour" title="Fin du tour : régénération, effets sur la durée (touche T)">Tour suivant &#9203;</button>' +
-    '<button data-act="fincombat" title="Le combat est terminé : les capacités « une fois par combat » reviennent">Fin du combat</button>' +
     (c.dots.length || (c.etats || []).length ? '<span class="dots" title="Ce que vous avez posé sur l\'ennemi">' +
       c.dots.map(d => h(d.nom) + " " + d.tours + " t").concat((c.etats || []).map(e => h(e.nom) + " " + e.tours + " t")).join(" · ") + "</span>" : "") +
     "";
@@ -7693,14 +7803,24 @@ function etatTable() {
   try {
     return {
       joueur: NOM_JOUEUR, prenom: perso.prenom || "", nom: perso.nom || "", nomPerso: nomPerso(), race: perso.race || "",
-      sexe: perso.sexe || "", age: perso.age || "", histoire: String(perso.histoire || "").slice(0, 4000),
+      sexe: perso.sexe || "", age: perso.age || "", histoire: String(perso.histoire || "").slice(0, 20000),
       /* Les caractéristiques telles que la feuille les montre (points, talents et objets compris). */
       car: Object.fromEntries(CARACS.map(([k]) => [k, caracTotal(k)])),
       classe: CLASS_ID || "", classeNom: (cls() || {}).name || "", niveau: charLevel(),
       pv: perso.pv.cur | 0, pvMax: pvMax(), res: perso.res.cur | 0, resMax: perso.res.max | 0,
       resNom: ressource(), resType: classeRes(), argent: perso.argent,
       auras: (perso.auras || []).slice(0, 30).map(a => ({ nom: String(a.nom || ""), mal: !!a.mal, tours: a.tours | 0, pile: a.pile | 0, lbl: a.lbl || "" })),
-      journal: (perso.chat || []).slice(-15).map(l => ({ t: l.t || "", c: l.c || "", x: texteChat(l.h) }))
+      journal: (perso.chat || []).slice(-15).map(l => ({ t: l.t || "", c: l.c || "", x: texteChat(l.h) })),
+      /* Le panneau Aventure de la fiche du MJ : ce que le personnage porte, transporte et sait. */
+      equip: Object.entries(perso.equip || {}).filter(([, o]) => o).map(([c, o]) => ({ c: c, nom: String(o.nom || ""), q: o.qualite | 0 })),
+      sacs: tousObjets().slice(0, 150).map(o => ({ nom: String(o.nom || ""), q: o.qualite | 0, qte: parseInt(o.qte) || 1 })),
+      talents: S ? Object.entries(alloc).filter(([, r]) => r > 0).map(([id, r]) => { const n = nodeById(id);
+        return n ? { nom: String(n.title || ""), rang: r | 0, max: n.maxRank | 0 || 1 } : null; }).filter(Boolean) : [],
+      sorts: S ? knownSpells().map(s => ({ nom: String(s.name || ""), niveau: s.level | 0 })) : [],
+      portrait: perso.portrait || "",
+      combat: { armure: armureTotale(), defense: defenseTotale(),
+        initiative: (parseInt(perso.initiative) || 0) + bonusCombat("initiative"),
+        resist: Object.fromEntries(ECOLES_RESIST.map(([e]) => [e, resistance(e)])) }
     };
   } catch (e) { return null; }
 }
@@ -7762,6 +7882,9 @@ function recoit(m) {
     const n = parseInt(q.n) || 0, avant = perso.res.cur | 0;
     perso.res.cur = Math.max(0, Math.min(perso.res.max | 0, avant + n));
     chat(de + " : " + (n >= 0 ? "+" : "") + (perso.res.cur - avant) + " " + h(ressource()) + ".", n >= 0 ? "gain" : "err");
+  } else if (q.t === "combat") {
+    if (q.etat === "fin") finDuCombat();
+    else { entreEnCombat(); chat("— Début du combat —", "sys"); majCombat(); majBarres(); }
   } else if (q.t === "tour") {
     try { tourSuivant(); } catch (e) {}
   } else if (q.t === "quete" && q.quete && q.quete.titre) {
@@ -7787,10 +7910,60 @@ function recoit(m) {
       const autres = caracTotal(k) - (parseInt(perso.car[k].pt) || 0);
       perso.car[k].pt = (+q.car[k] | 0) - autres; dit.push(nom + " " + caracTotal(k));
     });
+    if (Number.isFinite(+q.niveau) && (+q.niveau | 0) !== charLevel()) {
+      setCharLevel(+q.niveau | 0, true);
+      dit.push("niveau " + charLevel());
+    }
+    if (typeof q.portrait === "string" && q.portrait !== perso.portrait) perso.portrait = q.portrait;
+    if (q.totaux && typeof q.totaux === "object") Object.entries(q.totaux).forEach(([p, v]) => {
+      if (!/^total\.(resist\.\w+|armure|defense|initiative)$/.test(p) || !Number.isFinite(+v)) return;
+      ecritChamp(p, String(+v | 0), true);
+      dit.push(p.replace(/^total\.(resist\.)?/, "").replace("sacre", "sacré") + " " + (+v | 0));
+    });
+    /* L'identité et la bourse, telles que le MJ les a écrites sur la fiche. */
+    if (typeof q.sexe === "string" && q.sexe !== (perso.sexe || "")) { perso.sexe = q.sexe; dit.push("sexe"); }
+    if (typeof q.age === "string" && q.age !== String(perso.age || "")) { perso.age = q.age; dit.push("âge"); }
+    if (typeof q.histoire === "string" && q.histoire !== String(perso.histoire || "")) { perso.histoire = q.histoire; dit.push("histoire"); }
+    if (q.argent && typeof q.argent === "object") {
+      const a = perso.argent, avant = (a.po | 0) + "/" + (a.pa | 0) + "/" + (a.pc | 0);
+      ["po", "pa", "pc"].forEach(k => { if (Number.isFinite(+q.argent[k])) a[k] = Math.max(0, +q.argent[k] | 0); });
+      if (avant !== (a.po | 0) + "/" + (a.pa | 0) + "/" + (a.pc | 0)) dit.push("bourse " + (a.po | 0) + " po " + (a.pa | 0) + " pa " + (a.pc | 0) + " pc");
+    }
     if (dit.length) chat(de + " a mis à jour votre fiche : " + dit.join(", ") + ".", "sys");
     if (typeof majTout === "function") try { majTout(); } catch (e) {}
+  } else if (q.t === "objet" || q.t === "retireObjet") {
+    objetDuMj(q, de);
   }
   sauvePerso(); if (mode === "wow") { majUnit(); majAuras(); }
+}
+/* Un objet que le MJ donne ou reprend depuis la fiche de l'Écran. `q.o` : la
+   fiche du catalogue (Donnees\catalogue-objets.json), `q.n` : combien. */
+function objetDuMj(q, de) {
+  const n = Math.max(1, Math.min(999, parseInt(q.n) || 1));
+  if (q.t === "objet" && q.o && q.o.nom) {
+    const proto = protoCat(q.o), reste = versSacs(proto, n);
+    const recu = n - (reste | 0);
+    if (recu > 0) chat((de || "Le MJ") + " vous donne : <b>" + h(proto.nom) + "</b>" + (recu > 1 ? " x" + recu : "") + ".", "gain");
+    if (reste > 0) chat("Vos sacs sont pleins : " + h(proto.nom) + (reste > 1 ? " x" + reste : "") + " est perdu.", "err");
+  } else if (q.t === "retireObjet" && q.nom) {
+    const avant = compteObjet(String(q.nom));
+    retireObjet(String(q.nom), n);
+    const pris = avant - compteObjet(String(q.nom));
+    if (pris > 0) chat((de || "Le MJ") + " vous reprend : <b>" + h(q.nom) + "</b>" + (pris > 1 ? " x" + pris : "") + ".", "sys");
+  }
+  if (typeof majTout === "function") try { majTout(); } catch (e) {}
+}
+/* Ce que le MJ a envoyé pendant que la fiche était fermée : l'Écran l'a laissé
+   dans le fichier du joueur (perso.courrierMj), on le reçoit à l'ouverture. */
+function courrierEnAttente() {
+  const l = Array.isArray(perso.courrierMj) ? perso.courrierMj : [];
+  if (!l.length) return;
+  delete perso.courrierMj;
+  l.forEach(q => { try {
+    if (q.t === "objet" || q.t === "retireObjet") objetDuMj(q, "Le MJ");
+    else recoit({ de: "ecran-mj", nom: "Le MJ", quoi: q });
+  } catch (e) {} });
+  sauvePerso();
 }
 setInterval(relaisTable, 3000);
 
@@ -11162,8 +11335,7 @@ function renderWow() {
   if (mode !== "wow" || !S) return;
   zTop = Math.max(20, ...FENETRES.map(k => perso.fen[k].z || 0), (perso.fen.edit || {}).z || 0);
   cacheTip(); fermeMenu();
-  wow.style.backgroundImage = perso.fond
-    ? "linear-gradient(rgba(0,0,0,.25),rgba(0,0,0,.45)), url(\"" + assetURL(perso.fond).replace(/"/g, "%22") + "\")" : "";
+  wow.style.backgroundImage = "";
   wow.innerHTML =
     '<div id="wUnit"></div><div id="wSous"></div><div id="wAuras"></div><div id="wErr"></div>' +
     '<div id="wChat"><div class="log"></div>' +
@@ -11177,7 +11349,7 @@ function renderWow() {
       '<input type="text" id="wChatIn" placeholder="Entrée pour écrire · /roll 1d20 · /car force">' +
       ["4", "6", "8", "10", "12", "20", "100"].map(f => '<button data-d="' + f + '" title="Lancer 1D' + f + '">d' + f + "</button>").join("") +
     "</div></div>" +
-    '<div id="wBas"></div><div id="wFenPerso"></div><div id="wFenGrim"></div><div id="wFenQuetes"></div><div id="wFenCodex"></div>' +
+    '<div id="wBas"></div><div id="wFenPerso"></div><div id="wFenGrim"></div><div id="wFenQuetes"></div><div id="wFenCodex"></div><div id="wFenTalents"></div><div id="wFenMetiers"></div>' +
     '<div id="wSacs"></div><div id="wSacsBar"></div><div id="wFenEdit"></div>' +
     '<div id="wCombat"></div><div id="wCast"></div><div id="wJauge"></div><div id="wAide">Touchez une case pour poser &middot; le décor pour annuler</div>';
   $("#wChat .log").innerHTML = perso.chat.map(ligneChat).join("");
@@ -11191,7 +11363,7 @@ function renderWow() {
   wow.querySelectorAll("#wChat [data-d]").forEach(b => b.addEventListener("click", () => commandeChat("/roll 1d" + b.dataset.d)));
   majTout(); majJet();
 }
-function majTout() { if (mode !== "wow") return; lanceDesTalents(); lanceDesVie(); majAurasRace(); majSous(); majUnit(); majCombat(); majAuras(); majBarres(); majPerso(); majGrim(); majQuetes(); majCodex(); majSacs(); majEdit(); }
+function majTout() { if (mode !== "wow") return; lanceDesTalents(); lanceDesVie(); majAurasRace(); majSous(); majUnit(); majCombat(); majAuras(); majBarres(); majPerso(); majGrim(); majQuetes(); majCodex(); majSacs(); majEdit(); majTalentsFen(); }
 
 function majUnit() {
   const u = $("#wUnit"); if (!u) return;
@@ -11199,7 +11371,7 @@ function majUnit() {
   const pv = perso.pv, rs = perso.res, lvl = charLevel(), left = pointsLeft();
   const pct =(a, b) => Math.max(0, Math.min(100, b > 0 ? a / b * 100 : 0));
   u.innerHTML =
-    '<div class="por" data-act="portrait" style="' + (perso.portrait ? "background-image:url(&quot;" + h(assetURL(perso.portrait)) + "&quot;)" : "") + '">' +
+    '<div class="por" data-act="perso" title="Fiche de personnage (C)" style="' + (perso.portrait ? "background-image:url(&quot;" + h(assetURL(perso.portrait)) + "&quot;)" : "") + '">' +
       (perso.portrait ? "" : '<span class="ini">' + h(nomPerso().charAt(0)) + "</span>") +
       '<div class="niv">' + lvl + "</div></div>" +
     '<div class="cad"><div class="nom">' + h(nomPerso()) + "</div>" +
@@ -11235,8 +11407,8 @@ function majBarres() {
       '<div class="micro">' +
         mb("perso", "&#9820;", "Perso", perso.fen.perso.open, "Personnage (C)") +
         mb("grim", "&#10022;", "Sorts", perso.fen.grim.open, "Grimoire (P)") +
-        mb("talents", "&#10059;", "Talents", false, "Arbre de talents (N)") +
-        mb("metiers", "&#9874;", "Métiers", false, "Métiers (K)") +
+        mb("talents", "&#10059;", "Talents", perso.fen.talents.open, "Talents (N)") +
+        mb("metiers", "&#9874;", "Métiers", perso.fen.metiers.open, "Métiers (K)") +
         mb("quetes", "&#10071;", "Quêtes", perso.fen.quetes.open, "Journal de quêtes (L)") +
         mb("codex", "&#128214;", "Codex", perso.fen.codex.open, "Codex (J)") +
       "</div>" +
@@ -11545,8 +11717,7 @@ function majPerso() {
     const a = armureEq(), bd = bonusCombat("defense"), bi = bonusCombat("initiative");
     corps =
       '<div class="poupee">' + col(CASES_G) +
-        '<div class="modele" data-act="portrait" style="' + (perso.portrait ? "background-image:url(&quot;" + h(assetURL(perso.portrait)) + "&quot;)" : "") + '">' +
-          (perso.portrait ? "" : '<div class="vide">Choisis ici l\'illustration de ton personnage</div>') + "</div>" +
+        '<div class="modele" style="' + (perso.portrait ? "background-image:url(&quot;" + h(assetURL(perso.portrait)) + "&quot;)" : "") + '"></div>' +
         col(CASES_D) + "</div>" +
       '<div class="armes">' + CASES_B.map(c => caseObjet({ z: "eq", c: c }, perso.equip[c], perso.equip[c] ? "" : CASES[c].ph, CASES[c].nom)).join("") + "</div>" +
       '<div class="stats">' +
@@ -11593,10 +11764,6 @@ function majPerso() {
     corps = '<div class="ident">' + f("Prénom", "prenom") + f("Nom", "nom") + f("Joueur", "joueur") +
       f("Race", "race") + f("Sexe", "sexe") + f("Âge", "age") + f("Taille", "taille") + f("Poids", "poids") +
       '<div><label>Classe</label><input type="text" value="' + h(cls().name) + '" disabled></div></div>' +
-      '<div style="display:flex;gap:8px;margin:10px 0 4px">' +
-        '<button class="wb gris" data-act="portrait">Choisir l\'illustration…</button>' +
-        '<button class="wb gris" data-act="fond">Choisir le fond d\'écran…</button>' +
-        (perso.fond ? '<button class="wb gris" data-act="sansfond">Sans fond</button>' : "") + "</div>" +
       '<label class="wx" style="margin:8px 0 3px;color:#ffd100;font-size:11px;text-transform:none">Histoire</label>' +
       '<textarea data-f="histoire">' + h(perso.histoire) + "</textarea>";
   } else {
@@ -11615,8 +11782,19 @@ function majPersoCases() {
     el.outerHTML = caseObjet({ z: "eq", c: c }, perso.equip[c], perso.equip[c] ? "" : CASES[c].ph, CASES[c].nom);
   });
 }
-function ecritChamp(path, v) {
+function ecritChamp(path, v, duMj) {
   if (path === "niveau") { setCharLevel(v); return; }
+  if (!SIMU && !duMj && /^total\.|^(armure|defense|initiative)$|^(manaTotal|regenTotal)$/.test(path)) {
+    toast("L'armure, la défense, l'initiative, les résistances et le mana se règlent sur la fiche de l'Écran du Maître.", 4000);
+    if (typeof majPerso === "function") majPerso();
+    return;
+  }
+  if (!SIMU && !duMj && /^(pt|total)car\.|^pv|^res\./.test(path)) {
+    toast(/car\./.test(path) ? "Les caractéristiques se règlent sur la fiche de l'Écran du Maître."
+      : "La vie et la ressource se règlent sur la fiche de l'Écran du Maître.", 4000);
+    if (typeof majPerso === "function") majPerso();
+    return;
+  }
   /* Les points tapés comprennent les talents : la part saisie est le reste. */
   const pk = /^ptcar\.(\w+)$/.exec(path);
   if (pk && perso.car[pk[1]]) {
@@ -11698,10 +11876,11 @@ function ecritChamp(path, v) {
 /* --- le grimoire --- */
 function entreesGrimoire() {
   const tabs = [];
+  /* Comme le livre du jeu : les sorts à venir y sont aussi, grisés, avec le niveau où ils arrivent. */
   spellCats().forEach(cat => {
-    const list = S.spells.filter(s => s.cat === cat && spellStatus(s) === "known")
+    const list = S.spells.filter(s => s.cat === cat)
       .sort((a, b) => a.level - b.level || a.name.localeCompare(b.name, "fr"))
-      .map(s => ({ ref: { k: "s", id: s.id } }));
+      .map(s => ({ ref: { k: "s", id: s.id }, inconnu: spellStatus(s) !== "known", sort: s }));
     if (list.length) tabs.push({ nom: cat, list: list });
   });
   const taken = S.nodes.filter(n => alloc[n.id])
@@ -11727,6 +11906,10 @@ function majGrim() {
   const pagesHTML = list.length ? ordre.map(e => {
     if (!e) return "<div></div>";
     const s = sortRef(e.ref);
+    if (e.inconnu) return '<div class="sort inconnu">' + caseHTML({ z: "gsx", attrs: ' data-ref="' + h(JSON.stringify(e.ref)) + '"',
+        icone: s.icone, cls: s.passif ? "passif" : "" }) +
+      '<div><div class="nm">' + h(s.nom) + '</div><div class="rg">' +
+        (isManual(e.sort) ? "À obtenir (quête, MJ)" : "Niveau " + e.sort.level) + "</div></div></div>";
     return '<div class="sort">' + caseHTML({ z: "gs", attrs: ' data-ref="' + h(JSON.stringify(e.ref)) + '"',
         icone: s.icone, cls: s.passif ? "passif" : "" }) +
       '<div><div class="nm">' + h(s.nom) + '</div><div class="rg">' + (s.passif ? "Passif" : h(s.rang)) + "</div></div></div>";
@@ -11742,6 +11925,108 @@ function majGrim() {
       }).join("") + "</div></div></div>");
   placeFen(box.querySelector(".fen"));
 }
+
+/* --- la fenêtre des talents, comme celle du jeu : l'arbre de la classe en
+       petit sur son image de fond, ses liens, les rangs pris ; clic gauche +1,
+       clic droit −1. --- */
+function majTalentsFen() {
+  const box = $("#wFenTalents"); if (!box) return;
+  if (!perso.fen.talents.open || !S || !S.nodes.length) {
+    box.innerHTML = perso.fen.talents.open && S ? fenHTML("talents", "Talents", "talents",
+      '<div class="bd"><div class="rien">Pas encore d\'arbre de talents pour cette classe.</div></div>') : "";
+    if (box.innerHTML) placeFen(box.querySelector(".fen"));
+    return;
+  }
+  const marge = 30;
+  const xs = S.nodes.map(n => n.x), ys = S.nodes.map(n => n.y);
+  const lT = Math.max(1, Math.max(...xs) - Math.min(...xs)), hT = Math.max(1, Math.max(...ys) - Math.min(...ys));
+  /* La place : la largeur de l'Aventure, et sa hauteur moins la barre du bas, l'en-tête et l'aide de la fenêtre. */
+  const basH = parseInt(getComputedStyle(wow).getPropertyValue("--basH")) || 120;
+  const placeL = Math.max(240, wow.clientWidth * 0.92 - 40), placeH = Math.max(200, (wow.clientHeight - basH) * 0.9 - 90);
+  const k = Math.min(0.5, (placeL - 2 * marge) / lT, (placeH - 2 * marge) / hT);
+  /* Les icônes suivent l'échelle (32 px à la taille normale), sans devenir illisibles. */
+  const ic = Math.max(18, Math.min(32, Math.round(64 * k)));
+  const x0 = Math.min(...xs) - marge / k, y0 = Math.min(...ys) - marge / k;
+  const larg = (Math.max(...xs) - x0) * k + marge, haut = (Math.max(...ys) - y0) * k + marge;
+  /* L'image de fond de l'arbre, à la dimension de l'arbre affiché. */
+  const bg = S.meta.background || {};
+  const teinte = hexa(bg.tint || "#000000", bg.tintAlpha || 0);
+  const fond = bg.src ? '<div class="tfond" style="opacity:' + (bg.opacity == null ? 1 : bg.opacity) +
+    ";background-image:linear-gradient(" + teinte + "," + teinte + "),url('" + h(assetURL(bg.src)) + "')" + '"></div>' : "";
+  const liens = S.links.map(l => {
+    const d = linkPath(l); if (!d) return "";
+    const on = alloc[l.a] && alloc[l.b];
+    return '<path d="' + d + '" stroke="' + (on ? linkColor(l) : "#4a423a") + '" stroke-width="' + S.meta.linkWidth +
+      '" fill="none" opacity="' + (on ? 1 : .55) + '"/>';
+  }).join("");
+  const noeuds = S.nodes.map(n => {
+    const r = alloc[n.id] || 0;
+    const cls = r >= n.maxRank ? "max" : r > 0 ? "pris" : isAvailable(n) && pointsLeft() > 0 ? "dispo" : "ferme";
+    return '<div class="tn ' + cls + (n.shape === "round" ? " rond" : "") + '" data-tn="' + h(n.id) + '" data-id="' + h(n.id) + '" style="left:' +
+      ((n.x - x0) * k - ic / 2) + "px;top:" + ((n.y - y0) * k - ic / 2) + "px;width:" + ic + "px;height:" + ic + 'px">' +
+      (n.icon ? '<img src="' + h(assetURL(n.icon)) + '" alt="" draggable="false">' : "") +
+      '<span class="rk">' + r + "/" + n.maxRank + "</span></div>";
+  }).join("");
+  const left = pointsLeft();
+  box.innerHTML = fenHTML("talents", "Talents — " + h(cls().name), "talents",
+    '<div class="bd"><div class="tete">Niveau ' + charLevel() + " · " +
+      (left ? '<b class="pts">' + left + " point" + (left > 1 ? "s" : "") + " à dépenser</b>" : "aucun point à dépenser") +
+      " · " + spent() + " dépensé" + (spent() > 1 ? "s" : "") + "</div>" +
+    '<div class="tarbre"><div class="tplan" style="width:' + larg + "px;height:" + haut + 'px">' + fond +
+      '<svg width="' + larg + '" height="' + haut + '"><g transform="scale(' + k + ") translate(" + (-x0) + "," + (-y0) + ')">' + liens + "</g></svg>" +
+      noeuds + "</div></div>" +
+    '<div class="aideT">Clic gauche : +1 rang · clic droit : −1 rang</div></div>');
+  placeFen(box.querySelector(".fen"));
+}
+/* Prendre ou rendre un rang depuis la fenêtre, et lire la description comme dans l'arbre :
+   à la souris au survol ; au doigt, toucher = lire, toucher encore = +1, appui long = −1. */
+(function () {
+  const talentSous = e => e.target.closest && e.target.closest("#wFenTalents [data-tn]");
+  let doigt = false, lu = null, appui = null, long = false;
+  const change = (n, plus) => {
+    if (plus) addPoint(n); else removePoint(n);
+    majTout(); majTalentsFen();
+  };
+  document.addEventListener("pointerdown", e => {
+    doigt = e.pointerType !== "mouse";
+    const el = talentSous(e); long = false;
+    clearTimeout(appui);
+    if (!el || !doigt) return;
+    appui = setTimeout(() => {
+      const n = nodeById(el.dataset.tn); if (!n) return;
+      long = true; lu = null; montreTipNoeud(null); change(n, false);
+    }, 550);
+  }, true);
+  document.addEventListener("pointerup", () => clearTimeout(appui), true);
+  document.addEventListener("pointercancel", () => clearTimeout(appui), true);
+  document.addEventListener("click", e => {
+    const el = talentSous(e);
+    if (!el) { if (doigt && lu) { lu = null; montreTipNoeud(null); } return; }
+    const n = nodeById(el.dataset.tn); if (!n) return;
+    e.preventDefault(); e.stopPropagation();
+    if (long) { long = false; return; }
+    if (doigt && lu !== n.id) {
+      lu = n.id;
+      const r = el.getBoundingClientRect();
+      montreTipNoeud(el, r.left + r.width / 2, r.top, true, true);
+      return;
+    }
+    lu = null; montreTipNoeud(null);
+    change(n, true);
+  }, true);
+  document.addEventListener("contextmenu", e => {
+    const el = talentSous(e); if (!el) return;
+    e.preventDefault(); e.stopPropagation();
+    if (doigt) return;                       /* l'appui long s'en charge */
+    const n = nodeById(el.dataset.tn); if (n) { montreTipNoeud(null); change(n, false); }
+  }, true);
+  document.addEventListener("pointermove", e => {
+    if (e.pointerType !== "mouse") return;
+    const el = talentSous(e);
+    if (el) montreTipNoeud(el, e.clientX, e.clientY, false, true);
+    else if (montreTipNoeud.fenetre) montreTipNoeud(null);
+  });
+})();
 
 /* --- les sacs, empilés en bas à droite comme dans le jeu --- */
 function majSacs() {
@@ -11765,8 +12050,9 @@ function majSacs() {
   /* On mesure puis on empile : de bas en haut, une nouvelle colonne quand ça déborde. */
   const W = wow.clientWidth, H = wow.clientHeight, bas = $("#wBas");
   const br = bas.getBoundingClientRect(), wr = wow.getBoundingClientRect();
-  const libre = W - (br.right - wr.left) > 210, sbar = $("#wSacsBar");
-  const depart = () => H - Math.max(libre ? 10 : (wr.bottom - br.top) + 10, sbar ? (wr.bottom - sbar.getBoundingClientRect().top) + 8 : 10);
+  const libre = W - (br.right - wr.left) / echelleW > 210, sbar = $("#wSacsBar");
+  const depart = () => H - Math.max(libre ? 10 : (wr.bottom - br.top) / echelleW + 10,
+    sbar ? (wr.bottom - sbar.getBoundingClientRect().top) / echelleW + 8 : 10);
   let x = W - 10, y = depart(), colW = 0;
   const top = 10;
   box.querySelectorAll(".fen.sac").forEach(f => {
@@ -12091,6 +12377,20 @@ function tipPour(el) {
     return tipSort(r) + '<div class="aide">' + (+el.dataset.b === 2 ? "Clic" : "Clic ou touche " + (+el.dataset.b ? "Maj+" : "") + TOUCHE_TXT[+el.dataset.i]) + " : lancer · glisser : déplacer</div>";
   }
   if (z === "gs") return tipSort(JSON.parse(el.dataset.ref)) + '<div class="aide">Clic : lancer · glisser vers une barre d\'action</div>';
+  if (z === "tn") {
+    const n = nodeById(el.dataset.tn); if (!n) return "";
+    const r = alloc[n.id] || 0;
+    return '<div class="tn">' + h(n.title) + "</div>" + '<div class="aide">Rang ' + r + "/" + n.maxRank + "</div>" +
+      (n.desc ? '<div style="white-space:pre-wrap;margin-top:4px">' + h(n.desc) + "</div>" : "") +
+      '<div class="aide" style="margin-top:4px">' + (r >= n.maxRank ? "Rang maximum." : !isAvailable(n)
+        ? "Verrouillé : montez d'abord son talent parent au rang maximum." : pointsLeft() > 0 ? "Clic : +1 rang."
+        : "Plus de point : le MJ monte le niveau.") + (r ? " · Clic droit : −1." : "") + "</div>";
+  }
+  if (z === "gsx") {
+    const r = JSON.parse(el.dataset.ref), sp = spellById(r.id);
+    return tipSort(r) + '<div class="aide">' + (sp && isManual(sp) ? "S'obtient par une quête ou le MJ."
+      : "S'apprend au niveau " + (sp ? sp.level : "?") + " (vous êtes niveau " + charLevel() + ").") + "</div>";
+  }
   if (z === "gt") return '<div class="tn">' + h(el.dataset.gt) + "</div>";
   if (z === "au") {
     const a = perso.auras[+el.dataset.ai]; if (!a) return "";
@@ -12189,7 +12489,7 @@ function ouvreJauge(el, k) {
     '<button data-dj="plein" title="Remettre au maximum">Max</button>' +
     '<button data-dj="vide" title="Remettre à zéro">0</button>';
   j.classList.add("open");
-  j.style.left = (r.left - wr.left) + "px"; j.style.top = (r.bottom - wr.top + 4) + "px";
+  j.style.left = ((r.left - wr.left) / echelleW) + "px"; j.style.top = ((r.bottom - wr.top) / echelleW + 4) + "px";
   const maj = () => { majUnit(); sauvePerso(); j.querySelector("[data-jc]").value = g.cur | 0; };
   j.querySelectorAll("[data-dj]").forEach(b => b.addEventListener("click", () => {
     const d = b.dataset.dj;
@@ -12206,7 +12506,7 @@ function ouvreArgent(el) {
   j.innerHTML = [["po", "or"], ["pa", "argent"], ["pc", "cuivre"]].map(([k, t]) =>
     '<input type="number" data-ag="' + k + '" value="' + (a[k] | 0) + '" title="' + t + '"><i class="piece ' + k + '"></i>').join(" ");
   j.classList.add("open"); j.dataset.pour = "argent";
-  j.style.left = Math.max(4, r.right - wr.left - 250) + "px"; j.style.top = Math.max(4, r.top - wr.top - 42) + "px";
+  j.style.left = Math.max(4, (r.right - wr.left) / echelleW - 250) + "px"; j.style.top = Math.max(4, (r.top - wr.top) / echelleW - 42) + "px";
   j.querySelectorAll("[data-ag]").forEach(i => i.addEventListener("input", () => {
     a[i.dataset.ag] = Math.max(0, parseInt(i.value) || 0); sauvePerso();
     const ag = wow.querySelector('.argent[data-act="argent"]');
@@ -12238,19 +12538,17 @@ function majQuetes() {
   if (!perso.fen.quetes.open) { box.innerHTML = ""; return; }
   if (!queteDe(queteSel)) queteSel = (perso.quetes.find(q => !q.finie) || perso.quetes[0] || {}).id || "";
   const q = queteDe(queteSel);
+  /* Les quêtes viennent du MJ (l'Écran du Maître les envoie, et les termine) : le journal se lit, il ne s'écrit pas. */
   const page = q
-    ? '<input class="titre" data-qf="titre" value="' + h(q.titre) + '" placeholder="Titre de la quête">' +
+    ? '<div class="titre">' + h(q.titre || "Quête sans titre") + "</div>" +
       '<div class="etat">' + (q.finie ? "Quête terminée" : "Quête en cours") + "</div>" +
-      '<label>Donnée par</label><input class="court" data-qf="donneur" value="' + h(q.donneur) + '" placeholder="Qui l\'a confiée">' +
-      '<label>Lieu</label><input class="court" data-qf="lieu" value="' + h(q.lieu) + '" placeholder="Où elle se déroule">' +
-      '<label>Description et objectifs</label><textarea data-qf="texte" placeholder="Ce qu\'il faut faire, ce qu\'on a appris, la récompense promise…">' + h(q.texte) + "</textarea>" +
-      '<div class="pied"><button class="wb gris" data-act="qSuppr">Abandonner</button>' +
-        '<button class="wb" data-act="qFinie">' + (q.finie ? "Reprendre la quête" : "Terminer la quête") + "</button></div>"
-    : '<div class="vide">Le journal est vide.<br>Ajoute ta première quête.</div>';
+      (q.donneur ? '<label>Donnée par</label><div class="court">' + h(q.donneur) + "</div>" : "") +
+      (q.lieu ? '<label>Lieu</label><div class="court">' + h(q.lieu) + "</div>" : "") +
+      (q.texte ? '<label>Description et objectifs</label><div class="texteQ" style="white-space:pre-wrap">' + h(q.texte) + "</div>" : "")
+    : '<div class="vide">Le journal est vide.<br>Le MJ vous confiera vos quêtes.</div>';
   box.innerHTML = fenHTML("quetes", "Journal de quêtes", "journal",
     '<div class="bd"><div style="display:flex;flex-direction:column;width:210px;flex:none">' +
-      '<div class="liste" style="flex:1;width:auto">' + listeQuetes() + "</div>" +
-      '<div class="actions"><button class="wb" data-act="qNouv" style="flex:1">+ Nouvelle quête</button></div></div>' +
+      '<div class="liste" style="flex:1;width:auto">' + listeQuetes() + "</div></div>" +
     '<div class="page">' + page + "</div></div>");
   placeFen(box.querySelector(".fen"));
 }
@@ -12349,7 +12647,7 @@ function basculeFen(id, force) {
   f.open = force != null ? force : !f.open;
   if (f.open) f.z = ++zTop;
   sauvePerso(); majBarres();
-  ({ perso: majPerso, grim: majGrim, quetes: majQuetes, codex: majCodex })[id]();
+  ({ perso: majPerso, grim: majGrim, quetes: majQuetes, codex: majCodex, talents: majTalentsFen, metiers: majMetiersFen })[id]();
 }
 function basculeSacs() {
   const tous = perso.fen.sacs[0] && perso.sacs.every((s, i) => !s || perso.fen.sacs[i + 1]);
@@ -12362,7 +12660,7 @@ function basculeSacs() {
    le menu des actions s'ouvrent ensemble. */
 let dernierPointeur = "mouse";
 const auDoigt = () => dernierPointeur !== "mouse";
-const etroit = () => matchMedia("(max-width: 700px)").matches;
+const etroit = () => !FOND_PLAN && matchMedia("(max-width: 700px)").matches;
 let longTimer = 0;
 function suitCurseur(x, y) {
   const c = $("#wCurseur"); if (!c || !tenu) return;
@@ -12374,7 +12672,7 @@ let deplace = null;
 function commenceDeplacement(e, fen) {
   if (etroit()) return;                   // sur un téléphone, les fenêtres prennent l'écran
   const id = fen.dataset.fen, f = perso.fen[id];
-  deplace = { id: id, el: fen, dx: e.clientX - fen.offsetLeft, dy: e.clientY - fen.offsetTop };
+  deplace = { id: id, el: fen, dx: e.clientX / echelleW - fen.offsetLeft, dy: e.clientY / echelleW - fen.offsetTop };
   f.z = ++zTop; fen.style.zIndex = f.z;
   e.preventDefault();
 }
@@ -12438,8 +12736,8 @@ addEventListener("pointermove", e => {
   suitCurseur(e.clientX, e.clientY);
   if (deplace) {
     const W = wow.clientWidth, H = wow.clientHeight, el = deplace.el;
-    const x = Math.max(-el.offsetWidth + 80, Math.min(W - 80, e.clientX - deplace.dx));
-    const y = Math.max(0, Math.min(H - 30, e.clientY - deplace.dy));
+    const x = Math.max(-el.offsetWidth + 80, Math.min(W - 80, e.clientX / echelleW - deplace.dx));
+    const y = Math.max(0, Math.min(H - 30, e.clientY / echelleW - deplace.dy));
     el.style.left = x + "px"; el.style.top = y + "px";
     perso.fen[deplace.id].x = x; perso.fen[deplace.id].y = y;
     return;
@@ -12501,7 +12799,8 @@ wow.addEventListener("click", e => {
   const ev = e.target.closest("[data-evt]");
   if (ev) return signaleEvt(ev.dataset.evt);
   const jg = e.target.closest("[data-jauge]");
-  if (jg) return ouvreJauge(jg, jg.dataset.jauge);
+  /* La vie et la ressource d'un joueur se règlent sur sa fiche de l'Écran du Maître. */
+  if (jg) return SIMU ? ouvreJauge(jg, jg.dataset.jauge) : undefined;
   const pt = e.target.closest("[data-ptab]");
   if (pt) { persoTab = pt.dataset.ptab; return majPerso(); }
   const qs = e.target.closest("[data-qsel]");
@@ -12517,13 +12816,13 @@ wow.addEventListener("click", e => {
     if (FENETRES.includes(k)) return basculeFen(k);
     if (k === "qNouv" || k === "qFinie" || k === "qSuppr") return actionQuete(k);
     if (k === "cxNouv" || k === "cxSuppr" || k === "cxRevele") return actionCodex(k);
-    if (k === "talents") return setMode("play");
+    if (k === "talents") return basculeFen("talents");
     if (k === "tour") return tourSuivant();
     if (k === "subir") return ouvreDegats(act);
     if (k === "esquive") return jetEsquive();
     if (k === "fincombat") return finDuCombat();
     if (k === "pageBar") { $("#wBas").classList.toggle("page2"); return majBarres(); }
-    if (k === "metiers") return setMode("craft");
+    if (k === "metiers") return basculeFen("metiers");
     if (k === "jeter") return jeterTenu(e);
     if (k === "sac0") { if (tenu) return; perso.fen.sacs[0] = !perso.fen.sacs[0]; sauvePerso(); majSacs(); majBarres(); return; }
     if (k === "portrait" || k === "fond") { pickRetour = pickScope; pickScope = "toutes"; }
@@ -12643,8 +12942,8 @@ function toucheWow(e) {
   if (k === "KeyL") { basculeFen("quetes"); return true; }
   if (k === "KeyJ") { basculeFen("codex"); return true; }
   if (k === "KeyB") { basculeSacs(); return true; }
-  if (k === "KeyN") { setMode("play"); return true; }
-  if (k === "KeyK") { setMode("craft"); return true; }
+  if (k === "KeyN") { basculeFen("talents"); return true; }
+  if (k === "KeyK") { basculeFen("metiers"); return true; }
   if (k === "KeyT") { tourSuivant(); return true; }
   if (k === "Enter") { e.preventDefault(); const c = $("#wChatIn"); if (c) c.focus(); return true; }
   return false;
@@ -13025,6 +13324,7 @@ function fusionCrea(corr) {
   Object.assign(out.effets, corr.effets || {});
   Object.assign(out.points, corr.points || {});
   Object.assign(out.emetteurs, corr.emetteurs || {});
+  if (corr.niveauDepart != null) out.niveauDepart = corr.niveauDepart;
   return out;
 }
 async function chargeCreation() {
@@ -13035,7 +13335,7 @@ async function chargeCreation() {
   CREA = fusionCrea(corr);
 }
 async function sauveCreation() {
-  const txt = JSON.stringify({ races: CREA.races, classes: CREA.classes, combos: CREA.combos, cadrages: CREA.cadrages, effets: CREA.effets, points: CREA.points, emetteurs: CREA.emetteurs, savedAt: new Date().toISOString() });
+  const txt = JSON.stringify({ races: CREA.races, classes: CREA.classes, combos: CREA.combos, cadrages: CREA.cadrages, effets: CREA.effets, points: CREA.points, emetteurs: CREA.emetteurs, niveauDepart: niveauDepart(), savedAt: new Date().toISOString() });
   try { localStorage.setItem(LS_CREA, txt); } catch (e) {}
   if (!DISK) return toast("Corrections gardées dans ce navigateur seulement (pas de serveur).", 5000);
   try { await diskWrite(CREA_FICHIER(), txt); toast("Corrections enregistrées dans Sauvegardes\\creation.json.", 3500); }
@@ -13043,6 +13343,8 @@ async function sauveCreation() {
 }
 
 const raceCrea = id => CREA.races.find(r => r.id === id) || null;
+/* Le niveau où commence tout personnage neuf de la table (réglé par le MJ dans la création). */
+const niveauDepart = () => Math.max(1, Math.min(60, parseInt((CREA || {}).niveauDepart) || 1));
 /* Le dé de vie suit l'armure de la classe : tissu 1D4, cuir 1D6, mailles 1D8, plaques 1D10. */
 /* Celui de la classe ouverte, d'après sa fiche de création. */
 const deVieClasse = () => deDeVie(((CREA.classes || {})[CLASS_ID] || {}).armure);
@@ -13694,7 +13996,11 @@ function ouvrirCreation(opt) {
         '<button data-sexe="' + s + '"' + (st.sexe === s ? ' class="on"' : "") + ">" + s + "</button>").join("") + "</div>" +
       '<button class="crGo" data-act="voir"' + (st.classe ? "" : " disabled") + ">" +
         (st.classe ? "Voir les talents : " + h((CLASSES.find(c => c.id === st.classe) || {}).name || "") : "Choisis une classe") + "</button>";
-    return barreCadre() + '<div class="crSexe">' + ["Homme", "Femme"].map(s =>
+    const reglageNiveau = st.edit
+      ? '<label class="crNoms" title="Le niveau où commence tout personnage créé pour la table">Niveau de départ des personnages ' +
+        '<input type="number" min="1" max="60" data-f="niveauDepart" value="' + niveauDepart() + '" style="max-width:80px"></label>'
+      : "";
+    return reglageNiveau + barreCadre() + '<div class="crSexe">' + ["Homme", "Femme"].map(s =>
         '<button data-sexe="' + s + '"' + (st.sexe === s ? ' class="on"' : "") + ">" + s + "</button>").join("") + "</div>" +
       '<div class="crNoms"><input type="text" data-id="prenom" placeholder="Prénom" value="' + h(st.prenom) + '">' +
         '<input type="text" data-id="nom" placeholder="Nom" value="' + h(st.nom) + '"></div>' +
@@ -13912,7 +14218,9 @@ async function creerPourJoueur(r) {
   const nomDeja = p ? [p.prenom, p.nom].filter(Boolean).join(" ").trim() : "";
   if (nomDeja && !confirm(r.joueur + " a déjà un personnage (" + nomDeja + "). Le remplacer par " + (r.prenom || "le nouveau") + " ?")) return;
   if (S && tmpDirty) { persist(); persistPlay(); await flushTmp(); }
-  try { sessionStorage.setItem(SS_CREA_JOUEUR(j), JSON.stringify(Object.assign({}, r, { retour: location.href, remplace: !!deja }))); }
+  /* Un personnage neuf commence au niveau de départ de la table. */
+  const niveau = niveauDepart();
+  try { sessionStorage.setItem(SS_CREA_JOUEUR(j), JSON.stringify(Object.assign({}, r, { retour: location.href, remplace: !!deja, niveau: niveau }))); }
   catch (e) { toast("Impossible de préparer la fiche de " + r.joueur + ".", 6000); return; }
   const u = new URL(location.href);
   u.searchParams.set("joueur", j);
@@ -13930,6 +14238,7 @@ function creationDuMj() {
 }
 
 (async function boot() {
+  installeFondPlan();
   await fenetreUnique();
   const sel = $("#classSel");
   sel.innerHTML = CLASSES.map(c =>
@@ -13971,7 +14280,16 @@ function creationDuMj() {
   await chargerGaleries();   /* le vrai contenu de Application\Images\ */
   showDisk();
   await openClass(CLASSES.some(c => c.id === want) ? want : "paladin", true);
+  /* Un personnage neuf part d'une fiche neuve, au niveau de départ de la table :
+     ni le niveau, ni les talents, ni les sacs d'une autre fiche de la classe
+     (ou de l'ancien personnage du joueur). */
+  if (creaJoueur) {
+    setProgress({ level: Math.max(1, parseInt(creaJoueur.niveau) || niveauDepart()) });
+    if (typeof majTout === "function") majTout();
+  }
   if (creaJoueur) appliqueCreation(creaJoueur);
+  if (JOUEUR) courrierEnAttente();
+  if (FOND_PLAN) setMode("wow");          /* sur le plan, l'Aventure et rien d'autre */
   /* Une création du MJ : la fiche du joueur est écrite, on rend l'onglet au MJ. */
   if (creaJoueur && creaJoueur.retour) {
     tmpDirty = true;

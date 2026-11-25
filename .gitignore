@@ -1,6 +1,7 @@
 node_modules/
 out/
 dist/
+dist-local/
 *.log
 
 # Bases et médias écrits par l'application au fil du jeu.

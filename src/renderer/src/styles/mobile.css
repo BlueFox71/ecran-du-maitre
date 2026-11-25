@@ -3239,3 +3239,27 @@ button.m-regarde-img {
 .m-stats-pied .dit {
   flex-basis: 100%;
 }
+
+/* La vue « plan seul », posée sous l'Aventure d'un joueur WoW : tout l'écran. */
+.m-plan-seul { position: fixed; inset: 0; overflow: hidden; background: #000; }
+.m-plan-seul .m-vue-pion { position: absolute; inset: 0; display: block; padding: 0; margin: 0; overflow: hidden; }
+/* Rien que le plan : le titre du lieu, les aides et « Sous vos yeux » s'effacent. */
+.m-plan-seul .m-vue-pion > section:first-child,
+.m-plan-seul .m-note,
+.m-plan-seul .m-regardes { display: none; }
+/* Le plan couvre l'écran sans se déformer (les murs et les pions sont écrits
+   dans son repère) : il prend la plus grande des deux dimensions, centré. */
+.m-plan-seul .m-plan {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: max(100vw, calc(100vh * var(--ratio, 1.6)));
+  max-width: none;
+  margin: 0;
+  border: 0;
+  border-radius: 0;
+}
+/* Le disque pour marcher flotte à droite, là où l'Aventure n'a rien. */
+.m-plan-seul .m-pupitre { position: absolute; right: 18px; top: 50%; transform: translateY(-50%); z-index: 5; padding: 0; }
+.m-plan-seul .m-erreur { position: absolute; top: 10px; left: 50%; transform: translateX(-50%); z-index: 6; }

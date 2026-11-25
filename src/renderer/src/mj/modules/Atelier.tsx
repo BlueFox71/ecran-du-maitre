@@ -21,6 +21,8 @@ import { EtapeMurs } from '../atelier/etapes/Murs'
 import { EtapeOuvertures } from '../atelier/etapes/Ouvertures'
 import { EtapeDeco } from '../atelier/etapes/Deco'
 import { EtapeEclairage } from '../atelier/etapes/Eclairage'
+import { useFiltreWow } from '../atelier/Palette'
+import iconeWow from '../../assets/atelier/wow.png'
 
 /** L'atelier s'enregistre de lui-même à ce rythme, s'il y a des changements. */
 const AUTO_ENREGISTREMENT = 5 * 60 * 1000
@@ -73,6 +75,7 @@ export function Atelier(): JSX.Element {
 function Chantier({ place }: { place: Place }): JSX.Element {
   const s = useStore()
   const [assets, setAssets] = useState<AssetAtelier[]>([])
+  const [filtreWow, setFiltreWow] = useFiltreWow()
   const images = useMemo<ImagesAtelier>(() => new Map(), [])
   const [versionImages, setVersionImages] = useState(0)
   const parId = useMemo(() => new Map(assets.map((a) => [a.id, a])), [assets])
@@ -237,6 +240,15 @@ function Chantier({ place }: { place: Place }): JSX.Element {
         {/* Les étapes y posent leurs outils (l'objet choisi : plans, miroirs, alignements). */}
         <div className="at-barre-outils" ref={setBarreOutils} />
         <span className="spacer" />
+        <button
+          className="btn btn-sm at-filtre-wow"
+          aria-pressed={filtreWow}
+          title={filtreWow ? 'Montrer de nouveau tous les assets' : 'Ne montrer que les assets World of Warcraft'}
+          onClick={() => setFiltreWow(!filtreWow)}
+        >
+          <img src={iconeWow} alt="" />
+          WoW
+        </button>
         <button className="btn btn-sm" aria-pressed={grille} onClick={() => setGrille(!grille)}>
           ▦ Grille
         </button>

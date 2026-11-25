@@ -18,7 +18,7 @@ import * as carnet from '../carnet'
 import * as mobile from '../mobile'
 import * as wow from '../wow'
 import * as wowFiches from '../wowFiches'
-import type { EnvoiWow, Regles } from '@shared/wow'
+import type { EffetFicheWow, EnvoiWow, MajFicheWow, ObjetFicheWow, Regles } from '@shared/wow'
 import * as projet from '../project'
 import * as annexes from '../db/repos/annexes'
 import * as smEvenements from '../db/repos/smEvenements'
@@ -277,6 +277,26 @@ export function registerIpc(): void {
   on('wow:associer', (characterId: number, choix: { playerId?: number | null; nouveau?: string | null }) =>
     wowFiches.associer(characterId, choix)
   )
+  /* La fiche d'un personnage WoW : son joueur de l'Aventure, et les effets que le MJ y pose ou retire. */
+  on('wow:joueurDe', (characterId: number) => wowFiches.joueurDe(characterId))
+  on('wow:effetFiche', (characterId: number, effet: EffetFicheWow) => wow.effetFiche(characterId, effet))
+  /* Le niveau d'un personnage WoW : la fiche de l'Écran le décide, son Aventure suit. */
+  on('wow:niveau', (characterId: number, niveau: number) => {
+    const c = wowFiches.poserNiveau(characterId, niveau)
+    if (c?.data.niveauWow) wow.pousserFiche(characterId, { niveau: c.data.niveauWow })
+    return c
+  })
+  /* Armure, défense, initiative, résistances : réglées sur la fiche, l'Aventure suit. */
+  on('wow:combat', (characterId: number, totaux: Record<string, number>) => {
+    const propres = Object.fromEntries(
+      Object.entries(totaux ?? {}).filter(([p, v]) => /^total\.(resist\.\w+|armure|defense|initiative)$/.test(p) && Number.isFinite(Number(v)))
+    )
+    const c = wowFiches.poserCombat(characterId, propres)
+    if (c && Object.keys(propres).length) wow.pousserFiche(characterId, { totaux: propres })
+    return c
+  })
+  on('wow:chercherObjets', (texte: string) => wow.chercherObjets(String(texte ?? '')))
+  on('wow:objetFiche', (characterId: number, envoi: ObjetFicheWow) => wow.objetFiche(characterId, envoi))
   on('wow:ouvrirDonnees', async () => {
     await shell.openPath(wow.dossier())
     return true
@@ -1132,6 +1152,7 @@ export function registerIpc(): void {
     'mots:ecrire',
     (playerIds: number[], texte: string, beatId: number | null, envoyer: boolean, vibre: boolean) => {
       mots.ecrire(playerIds, texte, beatId, envoyer, vibre !== false)
+      if (envoyer && texte.trim()) wow.motsVersAventure(playerIds.map((playerId) => ({ playerId, texte: texte.trim() })))
       return motsEtPousse()
     }
   )
@@ -1141,7 +1162,13 @@ export function registerIpc(): void {
     return mots.listMots()
   })
   on('mots:envoyer', (lot: string) => {
+    /* Avant l'envoi : le lot gardé, ses destinataires et son texte, pour l'Aventure. */
+    const partants = mots
+      .listMots()
+      .filter((m) => m.lot === lot && !m.envoyeA)
+      .map((m) => ({ playerId: m.playerId, texte: m.texte }))
     mots.envoyer(lot)
+    wow.motsVersAventure(partants)
     return motsEtPousse()
   })
   on('mots:effacer', (lot: string) => {
@@ -1265,8 +1292,17 @@ export function registerIpc(): void {
   })
   on('characters:get', (id: number) => chars.getCharacter(id))
   on('characters:upsert', (input: any) => {
+    const avant = input?.id ? chars.getCharacter(input.id) : null
     const c = chars.upsertCharacter(input)
     display.refreshJoueurs()
+    /* Un personnage WoW : son identité part dans sa fiche de l'Aventure. */
+    if (avant) {
+      const maj: MajFicheWow = {}
+      if (c.sexe !== avant.sexe) maj.sexe = wowFiches.sexeAventure(c.sexe)
+      if (c.age !== avant.age) maj.age = c.age ?? ''
+      if (c.biographie !== avant.biographie) maj.histoire = c.biographie ?? ''
+      if (Object.keys(maj).length) wow.pousserFiche(c.id, maj)
+    }
     return c
   })
   /* Le butin ne bouge que chez le MJ : ni l'écran ni les téléphones n'en
@@ -1339,6 +1375,8 @@ export function registerIpc(): void {
   on('characters:bourse', (id: number, ecarts: Record<string, number>, reason?: string | null) => {
     const r = chars.bougerBourse(id, ecarts, monnaiesActives(lireCampagne(reglages.tous()).monnaies), reason)
     mobile.broadcast()
+    /* Un personnage WoW : ses pièces partent dans sa bourse de l'Aventure. */
+    if (['po', 'pa', 'pc'].some((k) => ecarts[k])) wow.pousserFiche(id, { argent: wowFiches.argentDe(r.character) })
     return r
   })
 

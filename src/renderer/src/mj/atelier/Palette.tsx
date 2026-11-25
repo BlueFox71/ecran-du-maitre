@@ -12,6 +12,7 @@
 import { useState, useSyncExternalStore, type ReactNode } from 'react'
 import {
   colonnesDuCatalogue,
+  estAzeroth,
   filtrerAssets,
   filtrerObjets,
   placeDansLeCatalogue,
@@ -52,6 +53,25 @@ function useRangement(cle: string): [Memoire, (patch: Partial<Memoire>) => void]
     for (const f of ecoutes) f()
   }
   return [m, changer]
+}
+
+/* Le filtre World of Warcraft : un seul bouton, dans la barre de l'atelier,
+   qui ne laisse que les assets d'Azeroth dans toutes les palettes. */
+let wow = false
+const ecoutesWow = new Set<() => void>()
+export function useFiltreWow(): [boolean, (v: boolean) => void] {
+  const v = useSyncExternalStore(
+    (f) => {
+      ecoutesWow.add(f)
+      return () => ecoutesWow.delete(f)
+    },
+    () => wow
+  )
+  const changer = (n: boolean): void => {
+    wow = n
+    for (const f of ecoutesWow) f()
+  }
+  return [v, changer]
 }
 
 /** Le nom de fichier de l'icône d'un rayon : « Toiles d'araignées » → `toiles-d-araignees`. */
@@ -137,12 +157,15 @@ export function Palette({
   partie?: 'tout' | 'filtres' | 'tuiles'
 }): JSX.Element {
   const [{ categorie, sous, recherche, chercher }, changer] = useRangement(cle)
+  const [filtreWow] = useFiltreWow()
   const setCategorie = (v: string | null): void => changer({ categorie: v, sous: null })
   const setSous = (v: string | null): void => changer({ sous: v })
   const setRecherche = (v: string): void => changer({ recherche: v })
   const setChercher = (v: boolean): void => changer({ chercher: v, ...(v ? {} : { recherche: '' }) })
 
   if (!assets.length) return <p className="at-vide">Aucun asset de ce type pour l’instant.</p>
+  if (filtreWow) assets = assets.filter(estAzeroth)
+  if (!assets.length) return partie === 'tuiles' ? <></> : <p className="at-vide">Aucun asset World of Warcraft ici.</p>
   const estChoisi = (a: AssetAtelier): boolean => (choisis ? choisis.includes(a.id) : choisi === a.id)
   if (!parCategorie) return <Tuiles liste={assets} estChoisi={estChoisi} onChoisir={onChoisir} />
 
@@ -283,7 +306,10 @@ export function CatalogueObjets({
   apres?: ReactNode
 }): JSX.Element {
   const [m, changer] = useRangement('catalogue-objets')
-  const theme = m.theme && THEMES.includes(m.theme) ? m.theme : null
+  const [filtreWow] = useFiltreWow()
+  if (filtreWow) assets = assets.filter(estAzeroth)
+  /* Le filtre WoW tient lieu de thème : la liste déroulante se fige sur Azeroth. */
+  const theme = filtreWow ? null : m.theme && THEMES.includes(m.theme) ? m.theme : null
   const colonnes = colonnesDuCatalogue(assets, theme)
   /* Une famille, un rayon retenus qui n'existent pas dans ce décor : on revient à tout. */
   const famille = colonnes.some((c) => c.famille === m.categorie) ? m.categorie : null
@@ -323,7 +349,13 @@ export function CatalogueObjets({
     <div className="at-catalogue">
       <label className="at-theme">
         <span className="eyebrow">Thème</span>
-        <select className="at-champ" value={theme ?? ''} onChange={(e) => changer({ theme: e.target.value || null })}>
+        <select
+          className="at-champ"
+          value={filtreWow ? 'Azeroth' : (theme ?? '')}
+          disabled={filtreWow}
+          title={filtreWow ? 'Filtre World of Warcraft actif (bouton WoW de la barre)' : undefined}
+          onChange={(e) => changer({ theme: e.target.value || null })}
+        >
           <option value="">Tous les thèmes</option>
           {THEMES.map((t) => (
             <option key={t} value={t}>

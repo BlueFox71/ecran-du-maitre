@@ -222,13 +222,29 @@ export function Azeroth(): JSX.Element {
           <Etats onEnvoyer={envoyer} />
           <Message onEnvoyer={envoyer} />
           <div className="az-bloc">
-            <button
-              className="btn"
-              onClick={() => void envoyer({ t: 'tour' }, 'Tour suivant')}
-              title="Chaque fiche visée passe au tour suivant : régénération, durées, incantations"
-            >
-              ⏳ Tour suivant
-            </button>
+            <div className="az-ligne">
+              <button
+                className="btn"
+                onClick={() => void envoyer({ t: 'combat', etat: 'debut' }, 'Début du combat')}
+                title="Les fiches visées entrent en combat"
+              >
+                ⚔ Début du combat
+              </button>
+              <button
+                className="btn"
+                onClick={() => void envoyer({ t: 'tour' }, 'Tour suivant')}
+                title="Chaque fiche visée passe au tour suivant : régénération, durées, incantations"
+              >
+                ⏳ Tour suivant
+              </button>
+              <button
+                className="btn"
+                onClick={() => void envoyer({ t: 'combat', etat: 'fin' }, 'Fin du combat')}
+                title="Le combat est terminé : les capacités « une fois par combat » reviennent"
+              >
+                🏳 Fin du combat
+              </button>
+            </div>
           </div>
           <JetDuMj />
         </aside>

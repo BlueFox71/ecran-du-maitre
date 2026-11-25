@@ -47,6 +47,9 @@ import { refusSac } from '@shared/sac'
 import { modificateur, naturel } from '@shared/jet'
 import * as reglagesCampagne from './db/repos/reglages'
 import * as display from './display'
+import * as wowFiches from './wowFiches'
+import { portActuel as portDuJeuWow } from './wowServeur'
+import { slugJoueurWow } from '@shared/wow'
 import * as prepa from './preparation'
 import { bonusParCarac, noterJet } from './jetDuPerso'
 import * as rolls from './db/repos/rolls'
@@ -619,6 +622,16 @@ function etatJoueur(playerId: number) {
   const nomsObjets = nomsDesObjets()
   return {
     campagne: nomCampagne(),
+    /* Une campagne WoW : le joueur joue dans son Aventure, posée sur le plan.
+       Son identifiant est celui de son personnage né dans l'Aventure, sinon
+       son prénom (l'Aventure le fera créer). */
+    wow: (() => {
+      if (!joueur || lireCampagne(reglagesCampagne.tous()).regles !== 'wow') return null
+      const port = portDuJeuWow()
+      if (!port) return null
+      const id = (perso ? wowFiches.joueurDe(perso.id) : null) ?? slugJoueurWow(joueur.name)
+      return id ? { joueur: id, port } : null
+    })(),
     joueur: joueur
       ? { id: joueur.id, nom: joueur.name, couleur: joueur.color }
       : null,

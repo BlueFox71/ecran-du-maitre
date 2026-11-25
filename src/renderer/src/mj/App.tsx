@@ -138,7 +138,8 @@ export function App(): JSX.Element {
      ouvrir leur Aventure sans que le MJ passe d'abord par Azeroth. */
   const regles = s.reglages.regles
   useEffect(() => {
-    if (s.ready && s.project && regles === 'wow') void window.jdr.wow.demarrer()
+    if (s.ready && s.project && regles === 'wow')
+      void window.jdr.wow.demarrer().then(() => s.refreshReglages())
   }, [s.ready, s.project, regles])
 
   // Raccourcis de table : voile noir, écran joueurs, navigation.

@@ -756,6 +756,25 @@ export interface CharacterData {
    * diffusé**. Absent, aucun.
    */
   effetsObjets?: EffetSurEntite[]
+  /**
+   * Un personnage WoW : les effets en cours dans son Aventure (buffs, malus),
+   * tenus en miroir par `main/wowFiches.ts`. Absent hors WoW.
+   */
+  aurasWow?: { nom: string; mal: boolean; tours: number; pile: number; lbl: string }[]
+  /** Un personnage WoW : son niveau, décidé sur la fiche de l'Écran et suivi par son Aventure. */
+  niveauWow?: number
+  /** Un personnage WoW : ses totaux de combat (armure, défense, initiative, résistances), tels que son Aventure les calcule. */
+  combatWow?: { armure: number; defense: number; initiative: number; resist: Record<string, number> }
+  /**
+   * Un personnage WoW : son équipement, ses sacs, ses talents et ses sorts,
+   * tels que son Aventure les montrait la dernière fois qu'elle était ouverte.
+   */
+  aventureWow?: {
+    equip: { c: string; nom: string; q: number }[]
+    sacs: { nom: string; q: number; qte: number }[]
+    talents: { nom: string; rang: number; max: number }[]
+    sorts: { nom: string; niveau: number }[]
+  }
 }
 
 /** Un objet de la campagne, et ce qu'il fait à ce personnage-là. */
