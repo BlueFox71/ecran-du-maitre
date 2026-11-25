@@ -23,6 +23,7 @@ import { listPions } from './db/repos/pions'
 import { listMurs } from './db/repos/murs'
 import { listOuvertures } from './db/repos/ouvertures'
 import { barrieres, seCroisent, type Barriere, type Pt } from '@shared/murs'
+import { pionSurPlan } from '@shared/chasse'
 import {
   MOTIFS_VIBRATION,
   type EtatZone,
@@ -255,11 +256,8 @@ const concerne = (z: ZoneSon, p: Pion): boolean => {
  * posé dans un cercle passait pour être à côté.
  */
 function surCarte(p: Pion, g: { w: number; h: number }): Pt {
-  const carte = g.w / g.h
-  const ecran = display.ratioEcran()
-  const x = ecran > carte ? (p.x - 0.5) * (ecran / carte) + 0.5 : p.x
-  const y = ecran < carte ? (p.y - 0.5) * (carte / ecran) + 0.5 : p.y
-  return { x: x * g.w, y: y * g.h }
+  const q = pionSurPlan(p, g.w / g.h, display.ratioEcran())
+  return { x: q.x * g.w, y: q.y * g.h }
 }
 
 /** La part du rayon qui reste entre le pion et le bord : 1 au centre, 0 au bord ou au-delà. */
