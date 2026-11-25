@@ -157,6 +157,8 @@ const TAILLE_MIN = 0.1
  * Tirer le coin `i` d'un objet (dans l'ordre de `contourDeLObjet`) jusqu'à
  * `p` : le coin opposé ne bouge pas. `garder` : les proportions restent
  * celles de l'image — c'est le cas par défaut, un meuble ne s'étire pas.
+ * Tiré au-delà du coin opposé, l'objet se retourne en miroir dans ce sens :
+ * `o` est donc l'objet tel qu'il était quand on a saisi le coin.
  */
 export function redimensionner(o: ObjetPose, i: number, p: PointCase, garder: boolean): ObjetPose {
   const sx = i === 1 || i === 2 ? 1 : -1
@@ -169,20 +171,33 @@ export function redimensionner(o: ObjetPose, i: number, p: PointCase, garder: bo
   const qy = o.y + (-sx * o.l * sin) / 2 + (-sy * o.h * cos) / 2
   const dx = p[0] - qx
   const dy = p[1] - qy
-  let l = Math.max(TAILLE_MIN, (dx * cos + dy * sin) * sx)
-  let h = Math.max(TAILLE_MIN, (-dx * sin + dy * cos) * sy)
+  /* Négatives : la souris a passé le coin opposé, l'objet se retourne. */
+  const lS = (dx * cos + dy * sin) * sx
+  const hS = (-dx * sin + dy * cos) * sy
+  const fx = lS < 0
+  const fy = hS < 0
+  let l = Math.max(TAILLE_MIN, Math.abs(lS))
+  let h = Math.max(TAILLE_MIN, Math.abs(hS))
   if (garder) {
     const k = Math.max(l / o.l, h / o.h)
     l = Math.max(TAILLE_MIN, o.l * k)
     h = Math.max(TAILLE_MIN, o.h * k)
   }
+  const ex = fx ? -sx : sx
+  const ey = fy ? -sy : sy
   return {
     ...o,
     l,
     h,
-    x: qx + (sx * l * cos) / 2 - (sy * h * sin) / 2,
-    y: qy + (sx * l * sin) / 2 + (sy * h * cos) / 2
+    x: qx + (ex * l * cos) / 2 - (ey * h * sin) / 2,
+    y: qy + (ex * l * sin) / 2 + (ey * h * cos) / 2,
+    ...miroirs(o, fx, fy)
   }
+}
+
+/** Retourner l'image d'un objet dans son propre repère (`fx` : gauche ↔ droite, `fy` : haut ↔ bas). */
+function miroirs(o: ObjetPose, fx: boolean, fy: boolean): Pick<ObjetPose, 'miroirX' | 'miroirY'> {
+  return { miroirX: !!o.miroirX !== fx || undefined, miroirY: !!o.miroirY !== fy || undefined }
 }
 
 /** Le milieu des quatre côtés d'un objet : haut, droite, bas, gauche (dans son repère, avant rotation). */
@@ -195,7 +210,8 @@ export function milieuxDesCotes(o: ObjetPose): PointCase[] {
  * Tirer le milieu d'un côté (0 haut, 1 droite, 2 bas, 3 gauche) jusqu'à `p` :
  * l'objet s'allonge ou rétrécit dans ce sens seulement, le côté opposé reste
  * en place. Seule la projection de `p` sur l'axe compte : tirer de biais ne
- * déplace pas l'objet de côté.
+ * déplace pas l'objet de côté. Tiré au-delà du côté opposé, il se retourne
+ * en miroir : `o` est l'objet tel qu'il était quand on a saisi le côté.
  */
 export function etirer(o: ObjetPose, cote: number, p: PointCase): ObjetPose {
   const a = (o.angle * Math.PI) / 180
@@ -204,12 +220,17 @@ export function etirer(o: ObjetPose, cote: number, p: PointCase): ObjetPose {
   const s = cote === 1 || cote === 2 ? 1 : -1
   const taille = enLargeur ? o.l : o.h
   const fixe: PointCase = [o.x - (s * axe[0] * taille) / 2, o.y - (s * axe[1] * taille) / 2]
-  const neuve = Math.max(TAILLE_MIN, s * ((p[0] - fixe[0]) * axe[0] + (p[1] - fixe[1]) * axe[1]))
+  const signee = s * ((p[0] - fixe[0]) * axe[0] + (p[1] - fixe[1]) * axe[1])
+  /* Tiré au-delà du côté opposé : l'objet se retourne en miroir dans ce sens. */
+  const retourne = signee < 0
+  const neuve = Math.max(TAILLE_MIN, Math.abs(signee))
+  const e = retourne ? -s : s
   return {
     ...o,
     ...(enLargeur ? { l: neuve } : { h: neuve }),
-    x: fixe[0] + (s * axe[0] * neuve) / 2,
-    y: fixe[1] + (s * axe[1] * neuve) / 2
+    x: fixe[0] + (e * axe[0] * neuve) / 2,
+    y: fixe[1] + (e * axe[1] * neuve) / 2,
+    ...miroirs(o, enLargeur && retourne, !enLargeur && retourne)
   }
 }
 
