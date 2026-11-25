@@ -6,7 +6,7 @@ import { listJoueurs, listTemplates } from './db/repos/characters'
 import { getItem } from './db/repos/library'
 import { getPlace } from './db/repos/places'
 import { getSon } from './db/repos/sons'
-import { planDe } from './db/repos/echelle'
+import { dansLeLieu, planDe } from './db/repos/echelle'
 import { mediaUrl } from './vault'
 import { COLLAGE_CELLS, ENCART_NEUF, jaugeSanite } from '@shared/types'
 import type {
@@ -684,7 +684,7 @@ function chasseDuLieu(): DisplayState['chasse'] {
   const ici = state.placeId
   if (ici == null) return []
   return appareils
-    .filter((a) => a.ou === 'lieu' && a.placeId != null && (a.placeId === ici || planDe(a.placeId) === ici))
+    .filter((a) => a.ou === 'lieu' && a.placeId != null && dansLeLieu(a.placeId, ici))
     .map((a) => ({ placementId: a.placementId, outil: a.outil, valeur: a.valeur, allume: a.allume }))
 }
 

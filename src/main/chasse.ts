@@ -22,8 +22,8 @@ import { donner, exemplairesOutils, situer } from './db/repos/objets'
 import { pionsPartout } from './db/repos/pions'
 import { listMurs } from './db/repos/murs'
 import { listOuvertures } from './db/repos/ouvertures'
-import { getConstruction } from './db/repos/construction'
-import { echelleDe, planDe } from './db/repos/echelle'
+import { getConstruction, largeurConstruiteM } from './db/repos/construction'
+import { dansLeLieu, echelleDe, planDe } from './db/repos/echelle'
 import { barrieres, RAYON_PION, seCroisent, type Barriere, type Pt } from '@shared/murs'
 import {
   LARGEUR_PLAN_DEFAUT_M,
@@ -60,32 +60,45 @@ export interface Plan {
   h: number
   /** Ce qui arrête le pas — et donc le son, en partie. En pixels du plan. */
   murs: Barriere[]
-  construction: Construction | null
-  /** La largeur du plan, en mètres. */
+  /** Lue au premier besoin : juger qui lit un appareil n'a pas à relire tout le terrain. */
+  readonly construction: Construction | null
+  /** La largeur du plan, en mètres : celle du terrain bâti, sinon l'échelle. */
   metres: number
 }
 
 function lirePlan(plan: number): Plan {
   const { w, h } = mobile.repereDuPlan(plan)
   const enPx = (q: PointMur): Pt => ({ x: q[0] * w, y: q[1] * h })
+  let construction: Construction | null | undefined
   return {
     w,
     h,
     murs: barrieres(listMurs(plan), 'pas', enPx, listOuvertures(plan)),
-    construction: getConstruction(plan),
-    metres: echelleDe(plan).metres ?? LARGEUR_PLAN_DEFAUT_M
+    get construction() {
+      if (construction === undefined) construction = getConstruction(plan)
+      return construction
+    },
+    metres: largeurConstruiteM(plan) ?? echelleDe(plan).metres ?? LARGEUR_PLAN_DEFAUT_M
   }
 }
 
-/** Les plans lus pendant un calcul : chacun une seule fois, quel que soit le nombre d'appareils. */
-function plans(): (placeId: number) => Plan {
-  const lus = new Map<number, Plan>()
-  return (placeId) => {
-    const plan = planDe(placeId)
-    let p = lus.get(plan)
-    if (!p) lus.set(plan, (p = lirePlan(plan)))
-    return p
-  }
+/**
+ * Les plans déjà lus, d'un calcul à l'autre : un pion qui marche ne change ni
+ * les murs ni le terrain. On les oublie dès que le MJ touche à un lieu (voir
+ * `plansChanges`).
+ */
+const plansLus = new Map<number, Plan>()
+
+/** Un mur, une porte, un terrain, une image ou une échelle ont pu changer : les plans seront relus. */
+export function plansChanges(): void {
+  plansLus.clear()
+}
+
+function planDuLieu(placeId: number): Plan {
+  const plan = planDe(placeId)
+  let p = plansLus.get(plan)
+  if (!p) plansLus.set(plan, (p = lirePlan(plan)))
+  return p
 }
 
 const borne = (v: number): number => Math.min(1, Math.max(0, v))
@@ -127,13 +140,17 @@ export interface ContexteChasse {
 }
 
 export function contexte(): ContexteChasse {
-  return { pions: pionsPartout(), plan: plans() }
+  return { pions: pionsPartout(), plan: planDuLieu }
 }
 
 interface Calcul {
   appareils: AppareilChasse[]
   /** Les exemplaires posés et trouvés : seuls ceux-là peuvent se montrer à la table. */
   trouves: Set<number>
+  /** Les pions lus pour ce calcul : les téléphones jugent avec eux qui lit quoi. */
+  pions: Pion[]
+  /** Les exemplaires posés dans un lieu, avec ou sans point sur le plan. */
+  poses: Set<number>
 }
 
 function calculer(): Calcul {
@@ -141,12 +158,13 @@ function calculer(): Calcul {
   /* Une séance sans outil ne coûte rien : ni pions, ni plans à lire. */
   if (exemplaires.length === 0) {
     controles.clear()
-    return (dernier = { appareils: [], trouves: new Set() })
+    return (dernier = { appareils: [], trouves: new Set(), pions: [], poses: new Set() })
   }
   const { pions, plan } = contexte()
   const affiche = display.getState().placeId
   const out: AppareilChasse[] = []
   const trouves = new Set<number>()
+  const poses = new Set<number>()
   for (const ex of exemplaires) {
     let ou: AppareilChasse['ou'] = 'ailleurs'
     let placeId: number | null = null
@@ -161,6 +179,7 @@ function calculer(): Calcul {
         pos = appareilEnMain(p, plan(p.placeId))
       }
     } else {
+      poses.add(ex.placementId)
       placeId = ex.placeId
       if (ex.pos && ex.placeId != null) {
         ou = 'lieu'
@@ -209,7 +228,7 @@ function calculer(): Calcul {
   /* Ce qui n'est plus un appareil — supprimé, plus un outil, jeté, rangé —
      perd le contrôle du MJ : il ne le retrouvera pas en revenant. */
   for (const id of controles.keys()) if (!out.some((a) => a.placementId === id)) controles.delete(id)
-  return (dernier = { appareils: out, trouves })
+  return (dernier = { appareils: out, trouves, pions, poses })
 }
 
 /** Tous les appareils, en main ou posés, avec ce qu'ils lisent en ce moment. */
@@ -254,13 +273,16 @@ export function recalculer(diffuser = true): void {
  * relit sa zone. La valeur est bornée à ce que l'appareil sait afficher.
  */
 export function controler(placementId: number, valeur: number | null): AppareilChasse[] {
-  const a = appareils().find((x) => x.placementId === placementId)
-  if (a && valeur !== null && Number.isFinite(valeur)) {
+  /* Le dernier calcul suffit pour savoir de quel outil il s'agit : un seul
+     calcul par geste, celui qui suit — le curseur en envoie beaucoup. */
+  const a = (dernier ?? calculer()).appareils.find((x) => x.placementId === placementId)
+  /* Seulement un appareil en main ou posé : celui d'un porteur sans pion ne lit rien. */
+  if (a && a.ou !== 'ailleurs' && valeur !== null && Number.isFinite(valeur)) {
     const [min, max] = a.outil === 'emf' ? [0, 5] : [TEMPERATURE_MIN, TEMPERATURE_MAX]
     controles.set(placementId, Math.min(max, Math.max(min, valeur)))
   } else if (valeur === null) controles.delete(placementId)
   recalculer()
-  return appareils()
+  return dernier!.appareils
 }
 
 /**
@@ -288,31 +310,33 @@ export function lisiblePar(
 /**
  * Ce que les téléphones affichent des appareils, pour une diffusion : à créer
  * **une fois** puis à appeler pour chaque téléphone. Sans outil dans la séance,
- * ça ne coûte qu'une requête ; sinon on reprend le dernier calcul du moteur et
- * on ne lit les pions et les plans que si un appareil posé est à juger.
+ * rien ne se relit ; sinon on reprend le dernier calcul du moteur — ses pions,
+ * et les plans qu'il garde — pour juger les appareils posés.
  */
 export function lecteurTelephones(): (
   characterId: number | null,
   placeId: number | null
 ) => { outils: OutilTelephone[]; appareilsPoses: AppareilPose[] } {
-  if (exemplairesOutils().length === 0) return () => ({ outils: [], appareilsPoses: [] })
-  const { appareils: tous, trouves } = dernier ?? calculer()
-  let ctx: ContexteChasse | null = null
+  const { appareils: tous, trouves, pions, poses } = dernier ?? calculer()
+  if (tous.length === 0) return () => ({ outils: [], appareilsPoses: [] })
+  const ctx: ContexteChasse = { pions, plan: planDuLieu }
   return (characterId, placeId) => {
     const outils: OutilTelephone[] = []
     if (characterId != null) {
       for (const a of tous) {
         /* En main, ou posé par lui (`characterId` vaut alors `posePar`). */
         if (a.characterId !== characterId) continue
-        /* Porté mais sans pion (le MJ ne l'a pas encore posé) : il a l'appareil, il ne lit rien. */
-        const ou = a.ou === 'lieu' ? 'lieu' : 'main'
+        /* Porté mais sans pion (le MJ ne l'a pas encore posé) : il a l'appareil, il
+           ne lit rien. Posé mais sans point sur le plan (le MJ l'a effacé) : posé
+           quand même — pas « en main » —, sans valeur. */
+        const pose = poses.has(a.placementId)
         let valeur: number | null = a.ou === 'ailleurs' ? null : a.valeur
-        if (a.ou === 'lieu') valeur = lisiblePar(a, characterId, (ctx ??= contexte())) ? a.valeur : null
+        if (a.ou === 'lieu') valeur = lisiblePar(a, characterId, ctx) ? a.valeur : null
         outils.push({
           placementId: a.placementId,
           nom: a.nom,
           outil: a.outil,
-          ou,
+          ou: pose ? 'lieu' : 'main',
           allume: a.allume,
           valeur
         })
@@ -327,7 +351,7 @@ export function lecteurTelephones(): (
                 a.ou === 'lieu' &&
                 a.placeId != null &&
                 trouves.has(a.placementId) &&
-                (a.placeId === placeId || planDe(a.placeId) === placeId)
+                dansLeLieu(a.placeId, placeId)
             )
             .map((a) => ({ placementId: a.placementId, outil: a.outil, valeur: a.valeur, allume: a.allume }))
     return { outils, appareilsPoses }
@@ -394,6 +418,7 @@ export function ramasserOutil(characterId: number, placementId: number): string 
 /** Une campagne qu'on ferme emporte ses contrôles : les numéros d'exemplaire ne valent que pour elle. */
 export function oublier(): void {
   controles.clear()
+  plansLus.clear()
   dernierMj = '[]'
   dernierVu = '[]'
   dernier = null

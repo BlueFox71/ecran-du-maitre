@@ -19,6 +19,11 @@ vi.mock('../repos/pions', async (importOriginal) => {
   const m = await importOriginal<typeof import('../repos/pions')>()
   return { ...m, pionsPartout: vi.fn(m.pionsPartout) }
 })
+/* La construction aussi : on compte combien de fois elle est relue. */
+vi.mock('../repos/construction', async (importOriginal) => {
+  const m = await importOriginal<typeof import('../repos/construction')>()
+  return { ...m, getConstruction: vi.fn(m.getConstruction) }
+})
 
 import * as display from '../../display'
 import * as mobile from '../../mobile'
@@ -27,7 +32,8 @@ import { getDb } from '../index'
 import * as objets from '../repos/objets'
 import { addPion, pionsPartout } from '../repos/pions'
 import { addMur } from '../repos/murs'
-import { setConstruction } from '../repos/construction'
+import { getConstruction, setConstruction } from '../repos/construction'
+import * as reglages from '../repos/reglages'
 import { gainSon, type AppareilChasse } from '@shared/chasse'
 import type { Construction } from '@shared/atelier'
 
@@ -121,6 +127,7 @@ it("un mur entre l'EMF et le pion atténue", () => {
   addPion({ placeId: salle, characterId: pj('Anna'), x: 0.6, y: 0.5 })
   const libre = de(pl)!.gain
   addMur({ placeId: salle, nature: 'mur', pts: [[0.55, 0], [0.55, 1]] })
+  chasse.plansChanges()
   expect(de(pl)!.gain).toBeCloseTo(libre * 0.35, 5)
 })
 
@@ -331,6 +338,7 @@ it('lisiblePar : le porteur, ou un pion proche sans mur', () => {
   addPion({ placeId: salle, characterId: bob, x: 0.65, y: 0.5 })
   expect(chasse.lisiblePar(a, bob)).toBe(true)
   addMur({ placeId: salle, nature: 'mur', pts: [[0.55, 0], [0.55, 1]] })
+  chasse.plansChanges()
   expect(chasse.lisiblePar(a, bob)).toBe(false)
   addPion({ placeId: salle, characterId: bob, x: 0.5, y: 0.8 })
   expect(chasse.lisiblePar(a, bob)).toBe(false)
@@ -401,6 +409,7 @@ it('ramasser trop loin est refusé', () => {
 it('ramasser à travers un mur est refusé', () => {
   const { bob, pl } = posee()
   addMur({ placeId: salle, nature: 'mur', pts: [[0.5025, 0], [0.5025, 1]] })
+  chasse.plansChanges()
   expect(chasse.ramasserOutil(bob, pl)).toMatch(/mur/)
   expect(exemplaire(pl)!.port).toBe('lieu')
 })
@@ -436,4 +445,84 @@ it("le téléphone garde l'outil qu'il porte même sans pion, sans valeur", () =
   expect(chasse.lecteurTelephones()(anna, salle).outils).toEqual([
     expect.objectContaining({ placementId: pl, ou: 'main', valeur: null })
   ])
+})
+
+/* ---------------- les plans gardés d'un calcul à l'autre ---------------- */
+
+it('la construction est relue une fois pour plusieurs pas de pion, et de nouveau après un changement de lieu', () => {
+  construire(salle)
+  const anna = pj('Anna')
+  const pion = addPion({ placeId: salle, characterId: anna, x: 0.5, y: 0.5 })
+  const pl = enMain(outil('EMF', 'emf'), anna)
+  const pas = pasDePion()
+  vi.mocked(getConstruction).mockClear()
+  for (const x of [0.5, 0.52, 0.54, 0.56]) {
+    getDb().prepare(`UPDATE pion SET x = ? WHERE id = ?`).run(x, pion.id)
+    pas(salle)
+  }
+  chasse.lecteurTelephones()(anna, salle)
+  expect(getConstruction).toHaveBeenCalledTimes(1)
+  /* L'atelier repeint la zone : sans l'oublier, le moteur lirait l'ancienne. */
+  construire(salle, { emf: [{ id: 't', valeur: 2, rayon: 4, pts: [[5, 5]] }] })
+  chasse.plansChanges()
+  pas(salle)
+  expect(getConstruction).toHaveBeenCalledTimes(2)
+  expect(de(pl)!.valeur).toBe(2)
+})
+
+it('juger qui lit un appareil posé ne relit pas la construction', () => {
+  construire(salle)
+  const { anna, pl } = posee()
+  const a = de(pl)!
+  chasse.plansChanges()
+  vi.mocked(getConstruction).mockClear()
+  expect(chasse.lisiblePar(a, anna)).toBe(true)
+  expect(getConstruction).not.toHaveBeenCalled()
+})
+
+it('un terrain bâti donne sa largeur en mètres : cases × mètres par case', () => {
+  /* 10 cases de 1 m : 0,1 de largeur = 1 m, quand l'échelle par défaut en dirait 3. */
+  construire(salle, { metresParCase: 1 })
+  const pl = pose(outil('EMF', 'emf'), salle, 0.5, 0.5)
+  addPion({ placeId: salle, characterId: pj('Anna'), x: 0.8, y: 0.5 })
+  expect(de(pl)!.gain).toBeCloseTo(gainSon(3, 0), 5)
+})
+
+it('un contrôle ne fait qu’un calcul, et se refuse à un appareil hors du plan', () => {
+  construire(salle)
+  const pl = pose(outil('EMF', 'emf'), salle, 0.1, 0.1)
+  const sansPion = enMain(outil('Thermo', 'thermometre'), pj('Anna'))
+  chasse.recalculer()
+  vi.mocked(pionsPartout).mockClear()
+  chasse.controler(pl, 3)
+  expect(pionsPartout).toHaveBeenCalledTimes(1)
+  const r = chasse.controler(sansPion, 30).find((a) => a.placementId === sansPion)!
+  expect(r).toMatchObject({ ou: 'ailleurs', controle: false })
+})
+
+it('un appareil posé dont le MJ a effacé le point reste « posé » sur le téléphone, sans valeur', () => {
+  const { anna, pl } = posee()
+  getDb().prepare(`UPDATE objet_placement SET pos_x = NULL, pos_y = NULL WHERE id = ?`).run(pl)
+  chasse.recalculer(false)
+  expect(de(pl)!.ou).toBe('ailleurs')
+  expect(chasse.lecteurTelephones()(anna, salle).outils).toEqual([
+    expect.objectContaining({ placementId: pl, ou: 'lieu', valeur: null })
+  ])
+})
+
+it('un appareil posé dans une pièce non découpée se montre sur le lieu parent, comme les objets', () => {
+  const piece = lieu('Placard', s)
+  getDb().prepare(`UPDATE place SET parent_id = ? WHERE id = ?`).run(salle, piece)
+  const pl = pose(outil('EMF', 'emf'), piece, 0.5, 0.5)
+  chasse.recalculer(false)
+  expect(objets.objetsVus(salle).map((o) => o.id)).toContain(pl)
+  expect(chasse.lecteurTelephones()(null, salle).appareilsPoses.map((a) => a.placementId)).toEqual([pl])
+})
+
+it('ramasser respecte la place du sac, avec le refus de « prendre »', () => {
+  const { bob, pl } = posee()
+  reglages.poser('sac.capacite', '1')
+  enMain(objet(s, 'Lampe'), bob)
+  expect(() => chasse.ramasserOutil(bob, pl)).toThrow(/sac de Bob est plein/)
+  expect(exemplaire(pl)!.port).toBe('lieu')
 })

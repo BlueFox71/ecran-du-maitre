@@ -7,7 +7,7 @@
 import { getDb } from '../index'
 import { listMurs } from './murs'
 import { listOuvertures } from './ouvertures'
-import { lireConstruction, type CalqueDerive, type Construction } from '@shared/atelier'
+import { constructionVide, lireConstruction, type CalqueDerive, type Construction } from '@shared/atelier'
 import { planDeSynchro } from '@shared/synchro'
 import type { PointMur } from '@shared/types'
 
@@ -16,6 +16,26 @@ export function getConstruction(placeId: number): Construction | null {
     | { data: string }
     | undefined
   return r ? lireConstruction(r.data) : null
+}
+
+/**
+ * La largeur d'un terrain bâti, en mètres — sans relire toute la
+ * construction : on n'en veut que deux nombres. `null` : le lieu n'est pas bâti.
+ * Mêmes replis que `lireConstruction` pour une valeur abîmée.
+ */
+export function largeurConstruiteM(placeId: number): number | null {
+  const r = getDb()
+    .prepare(
+      `SELECT json_extract(data, '$.largeur') AS largeur, json_extract(data, '$.metresParCase') AS mpc
+         FROM construction WHERE place_id = ? AND json_valid(data)`
+    )
+    .get(placeId) as { largeur: unknown; mpc: unknown } | undefined
+  if (!r) return null
+  const base = constructionVide()
+  const fini = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v)
+  const largeur = fini(r.largeur) && r.largeur >= 1 ? r.largeur : base.largeur
+  const mpc = fini(r.mpc) && r.mpc > 0 ? r.mpc : base.metresParCase
+  return largeur * mpc
 }
 
 export function setConstruction(placeId: number, c: Construction): void {

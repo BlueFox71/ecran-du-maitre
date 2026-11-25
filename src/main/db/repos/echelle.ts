@@ -30,6 +30,19 @@ export function planDe(placeId: number): number {
   return r?.zone && r.parentId != null ? r.parentId : placeId
 }
 
+/**
+ * L'appareil posé dans `placeId` se montre-t-il sur le lieu `ici` ? Dans le
+ * lieu même ou l'une de ses pièces directes, découpée ou non — la règle de
+ * `objetsVus`, qui dessine les objets posés.
+ */
+export function dansLeLieu(placeId: number, ici: number): boolean {
+  if (placeId === ici) return true
+  const r = getDb().prepare(`SELECT parent_id AS parentId FROM place WHERE id = ?`).get(placeId) as
+    | { parentId: number | null }
+    | undefined
+  return r?.parentId === ici
+}
+
 /** Les mètres que fait la largeur du plan, et d'où on le sait. */
 function largeurEnMetres(plan: number): { metres: number | null; source: EchellePlan['source']; portes: number } {
   const db = getDb()

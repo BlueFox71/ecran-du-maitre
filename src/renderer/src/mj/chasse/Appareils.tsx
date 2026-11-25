@@ -94,12 +94,16 @@ export function Appareils(): JSX.Element {
                 {a.allume ? '' : ' (éteint)'}
               </span>
               {a.controle && <Curseur a={a} />}
-              <button
-                className={`btn btn-sm${a.controle ? ' btn-brass' : ''}`}
-                onClick={() => void window.jdr.chasse.controler(a.placementId, a.controle ? null : a.valeur)}
-              >
-                {a.controle ? 'Lâcher le contrôle de cet objet' : 'Prendre le contrôle de cet objet'}
-              </button>
+              {/* Seulement en main ou posé : ailleurs, l'appareil ne lit rien. Un
+                  contrôle déjà pris se lâche toujours. */}
+              {a.ou !== 'ailleurs' || a.controle ? (
+                <button
+                  className={`btn btn-sm${a.controle ? ' btn-brass' : ''}`}
+                  onClick={() => void window.jdr.chasse.controler(a.placementId, a.controle ? null : a.valeur)}
+                >
+                  {a.controle ? 'Lâcher le contrôle de cet objet' : 'Prendre le contrôle de cet objet'}
+                </button>
+              ) : null}
             </li>
           ))}
         </ul>

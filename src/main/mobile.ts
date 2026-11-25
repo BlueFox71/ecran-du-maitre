@@ -547,6 +547,7 @@ export function repondrePorte(playerId: number, ouvrir: boolean): void {
   if (ouvrir) {
     ouvertures.updateOuverture(d.ouvertureId, { ouverte: true, verrouillee: false })
     demandesPorte.delete(playerId)
+    chasse.plansChanges()
     chasse.recalculer(false)
     display.calqueABouge()
     revoirDemandesPorte()
@@ -1469,6 +1470,8 @@ function poserRamasser(
   const joueur = players.getPlayer(ap.playerId)
   const perso = joueur?.characterId != null ? chars.getCharacter(joueur.characterId) : null
   if (!perso) return json(res, 409, { erreur: 'Aucun personnage ne t’est attribué.' })
+  /* Écran figé : le monde attend, comme pour un pas de pion. */
+  if (display.getState().frozen) return json(res, 409, { erreur: 'gele' })
   const placementId = Number(corps.placementId)
   if (!Number.isInteger(placementId)) return json(res, 400, { erreur: 'Objet inconnu.' })
   /* Poser : seulement ses affaires, comme ranger ou allumer. */

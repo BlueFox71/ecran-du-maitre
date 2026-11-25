@@ -106,7 +106,13 @@ export function registerIpc(): void {
   const on = <A extends unknown[], R>(channel: string, fn: (...args: A) => R): void => {
     /* Ce qu'un échange de préparation écrit en base devient un pas de Ctrl+Z. */
     ipcMain.handle(channel, (_e, ...args) => {
+      /* Ce qui touche un lieu — murs, portes, terrain, image, échelle, un pas
+         défait — fait relire leurs plans aux outils de chasse : avant le geste
+         (il recalcule souvent lui-même), et après. */
+      const lieuTouche = /^(atelier|murs|ouvertures|places|defaire|seance):/.test(channel)
+      if (lieuTouche) chasse.plansChanges()
       const r = defaire.envelopper(channel, () => fn(...(args as A)))
+      if (lieuTouche) chasse.plansChanges()
       /* Un lieu retouché (ou défait) : son fichier texte suit. */
       /* Les murs aussi : une coupe fait naître un lieu (voir recalerPieces). */
       if (/^(places|defaire|timeline|fiche|murs):/.test(channel)) lieuxTexte.synchroniserBientot()
@@ -932,6 +938,8 @@ export function registerIpc(): void {
     if (pochette.suivreInventaires()) display.versMj('pochette:changee', null)
     /* Un combat ne passe pas d'une séance à l'autre. */
     tours.fin()
+    /* Les outils de chasse de l'autre séance ne sont plus ceux-ci. */
+    chasse.recalculer(false)
     display.refreshJoueurs()
     mobile.broadcast()
     /* Le mode d'emploi pour qui écrit la séance en fichiers. */
