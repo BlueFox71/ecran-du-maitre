@@ -10,10 +10,25 @@ import imageEmf from '../assets/chasse/emf-eteint.png'
 import imageThermometre from '../assets/chasse/thermometre.png'
 import { LEDS_EMF, ledsAllumees } from '../mj/chasse/emf'
 import { froid } from '../mj/chasse/temperature'
+import { useNiveauVivant, useTemperatureVivante } from '../mj/chasse/vivant'
 
 /** L'URL de la photo d'un outil. */
 export function imageOutil(o: OutilChasse): string {
   return o === 'emf' ? imageEmf : imageThermometre
+}
+
+/**
+ * L'image d'un objet : la photo de son outil s'il en représente un, sinon
+ * l'item de la bibliothèque qu'on lui a choisi (affiche réduite d'abord).
+ */
+export function imageObjet(
+  o: { imageItemId: number | null; outil?: OutilChasse | null },
+  items: { id: number; url?: string | null; poster?: string | null }[]
+): string | null {
+  if (o.outil) return imageOutil(o.outil)
+  if (o.imageItemId == null) return null
+  const i = items.find((x) => x.id === o.imageItemId)
+  return i?.poster ?? i?.url ?? null
 }
 
 /** Le rapport hauteur / largeur des photos (EMF 348 × 908, thermomètre 499 × 1520). */
@@ -81,4 +96,28 @@ export function AppareilPose({
       />
     </div>
   )
+}
+
+function EmfVivant(p: { valeur: number; allume: boolean; taille: number }): JSX.Element {
+  return <AppareilPose outil="emf" valeur={useNiveauVivant(p.valeur, p.allume)} allume={p.allume} taille={p.taille} />
+}
+
+function ThermoVivant(p: { valeur: number; allume: boolean; taille: number }): JSX.Element {
+  return <AppareilPose outil="thermometre" valeur={useTemperatureVivante(p.valeur)} allume={p.allume} taille={p.taille} />
+}
+
+/**
+ * Un appareil posé sur un plan, avec une lueur qui vit (tremblement de
+ * l'EMF, bruit du thermomètre) au lieu de rester figée sur la valeur reçue.
+ */
+export function AppareilSurPlan({
+  outil,
+  ...reste
+}: {
+  outil: OutilChasse
+  valeur: number
+  allume: boolean
+  taille: number
+}): JSX.Element {
+  return outil === 'emf' ? <EmfVivant {...reste} /> : <ThermoVivant {...reste} />
 }

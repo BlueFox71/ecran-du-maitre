@@ -51,6 +51,7 @@ import { TIER_LABEL } from '@shared/types'
 import { formesDesMurs } from '@shared/pieces'
 import { useEchap } from '../echap'
 import { survolCarte, useDemandeFiche, viserCarte } from '../viseCarte'
+import { imageObjet } from '../../shared/outilsChasse'
 import { ETAT_OBJET_AIDE, ETAT_OBJET_DIT, etatSuivant } from '@shared/types'
 
 /** Un élément choisi sur la carte : toutes les rubriques de la fiche se déplient. */
@@ -1757,7 +1758,7 @@ function ChoixLiens({
                       <div className="fdl-choix-groupe">{g.titre}</div>
                       {liste.map((o) => {
                         const pris = b.objetIds.includes(o.id)
-                        const img = s.allItems.find((i) => i.id === o.imageItemId)
+                        const url = imageObjet(o, s.allItems)
                         return (
                           <button
                             key={o.id}
@@ -1765,7 +1766,7 @@ function ChoixLiens({
                             disabled={pris}
                             onClick={() => onChange({ objetIds: [...b.objetIds, o.id] })}
                           >
-                            {img?.url ? <img src={img.poster ?? img.url} alt="" /> : <span className="rond" />}
+                            {url ? <img src={url} alt="" /> : <span className="rond" />}
                             <span>
                               {o.nom}
                               {pris ? ' ✓' : ''}
@@ -1967,11 +1968,11 @@ function PanneauQuiQuoi({
               })}
               {reserve.length ? <div className="fdl-choix-groupe">Réserve d’objets</div> : null}
               {reserve.map((o) => {
-                const img = s.allItems.find((i) => i.id === o.imageItemId)
+                const url = imageObjet(o, s.allItems)
                 const ici = objetsIci.some((e) => e.o.id === o.id)
                 return (
                   <button key={o.id} className="fdl-choix-item" onClick={() => void poserObjet(o.id)}>
-                    {img?.url ? <img src={img.poster ?? img.url} alt="" /> : <span className="rond" />}
+                    {url ? <img src={url} alt="" /> : <span className="rond" />}
                     <span>{o.nom}</span>
                     <span className="ou">{ici ? 'déjà ici — un de plus' : o.placements.length ? 'posé ailleurs' : 'réserve'}</span>
                   </button>
@@ -2161,7 +2162,9 @@ function RangeeObjet({
   const differe = useDiffere()
   const cle = `objet-${o.id}`
   const ouvert = deplie === cle
-  const img = s.allItems.find((i) => i.id === o.imageItemId)
+  const url = imageObjet(o, s.allItems)
+  /* « Montrer à l'écran » : un item de la bibliothèque ; un outil n'en a pas. */
+  const img = o.outil ? null : s.allItems.find((i) => i.id === o.imageItemId)
   const f = s.objetFamilles.find((y) => y.id === o.familleId) ?? null
   const tenu = x.port === 'pnj'
   const [precision, setPrecision] = useState(x.precision ?? '')
@@ -2195,8 +2198,8 @@ function RangeeObjet({
           ev.dataTransfer.effectAllowed = 'move'
         }}
       >
-        {img?.url ? (
-          <img className="fdl-rvig" src={img.poster ?? img.url} alt="" />
+        {url ? (
+          <img className="fdl-rvig" src={url} alt="" />
         ) : (
           <span className={`fdl-rvig c-${f?.teinte ?? 'neutral'}`}>{glypheObjet(f?.glyphe ?? 'outils', 'glyphe')}</span>
         )}
@@ -2224,7 +2227,7 @@ function RangeeObjet({
       </div>
       {ouvert ? (
         <div className={`fdl-detail${enfant ? ' enfant' : ''}`}>
-          {img?.url ? <img className="fdl-detail-image" src={img.url} alt={o.nom} /> : null}
+          {url ? <img className="fdl-detail-image" src={o.outil ? url : (s.allItems.find((i) => i.id === o.imageItemId)?.url ?? url)} alt={o.nom} /> : null}
           <div className="fdl-ou">
             <span className="fdl-bascule petite">
               <button
@@ -2360,7 +2363,7 @@ function PuceObjet({
   retirer?: boolean
 }): JSX.Element {
   const s = useStore()
-  const img = s.allItems.find((i) => i.id === o.imageItemId)
+  const url = imageObjet(o, s.allItems)
   const f = s.objetFamilles.find((y) => y.id === o.familleId) ?? null
   return (
     <button
@@ -2368,8 +2371,8 @@ function PuceObjet({
       onClick={onClick}
       title={retirer ? 'Retirer le lien' : o.nom}
     >
-      {img?.url ? (
-        <img src={img.poster ?? img.url} alt="" />
+      {url ? (
+        <img src={url} alt="" />
       ) : (
         <span className="rond">{glypheObjet(f?.glyphe ?? 'outils', 'glyphe')}</span>
       )}
@@ -2757,7 +2760,8 @@ export function FicheCompacte({
           compte={caches ? `${caches} caché${caches > 1 ? 's' : ''}` : 'tout est trouvé'}
         >
           {objets.map(({ o, x }) => {
-            const img = s.allItems.find((i) => i.id === o.imageItemId)
+            const url = imageObjet(o, s.allItems)
+            const img = o.outil ? null : s.allItems.find((i) => i.id === o.imageItemId)
             const f = s.objetFamilles.find((y) => y.id === o.familleId) ?? null
             const porteur = x.port === 'pnj' ? pnjsIci.find((c) => c.id === x.characterId) : null
             /* Parti d'ici : on dit où il est maintenant. */
@@ -2778,6 +2782,10 @@ export function FicheCompacte({
                   >
                     <img src={img.poster ?? img.url} alt="" />
                   </button>
+                ) : url ? (
+                  <span className="fdc-vig">
+                    <img src={url} alt="" />
+                  </span>
                 ) : (
                   <span className={`fdc-vig vide c-${f?.teinte ?? 'neutral'}`}>
                     {glypheObjet(f?.glyphe ?? 'outils', 'glyphe')}

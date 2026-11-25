@@ -5,6 +5,8 @@ import { Pings, usePings } from '../shared/Pings'
 import { Brouillard, regardsDes, sousUnRegard } from '../shared/Brouillard'
 import { Visage } from '../shared/Visage'
 import { Piece } from '../shared/Piece'
+import { AppareilSurPlan, imageOutil } from '../shared/outilsChasse'
+import type { AppareilPose, OutilChasse } from '@shared/chasse'
 import { D20 } from '../shared/D20'
 import { barrieres, pasContraint, RAYON_PION, seCroisent, type Pt } from '@shared/murs'
 import { bordsOuverture } from '@shared/ouvertures'
@@ -145,6 +147,8 @@ interface ObjetTel {
   /** Son image, en adresse du serveur, et son cadrage carré. Absents d'un serveur plus ancien. */
   image?: string | null
   cadre?: CadreCarre | null
+  /** L'appareil de chasse qu'il est : sa photo prend la place de son image. */
+  outil?: OutilChasse | null
 }
 
 /** Un inventaire que le MJ a ouvert à la table : le camion, la malle. */
@@ -159,6 +163,7 @@ interface InventaireTel {
     teinte: string | null
     image?: string | null
     cadre?: CadreCarre | null
+    outil?: OutilChasse | null
   }[]
 }
 
@@ -197,6 +202,8 @@ interface Etat {
   mots?: MotTel[]
   /** Ses affaires à lui, et les endroits du corps où les mettre. */
   objets: ObjetTel[]
+  /** Les appareils de chasse posés dans le lieu affiché, que le plan dessine. */
+  appareilsPoses?: AppareilPose[]
   emplacements: { cle: string; nom: string }[]
   /** Les inventaires ouverts, où chacun pioche. Absent d'un serveur plus ancien. */
   inventaires?: InventaireTel[]
@@ -1612,14 +1619,16 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
    */
   const carte = (
     genre: 'porte' | 'sac' | 'inv',
-    o: { placementId: number; nom: string; qte: number; teinte: string | null; image?: string | null; cadre?: CadreCarre | null },
+    o: { placementId: number; nom: string; qte: number; teinte: string | null; image?: string | null; cadre?: CadreCarre | null; outil?: OutilChasse | null },
     sous: string | null,
     action: JSX.Element,
     ouvrir?: () => void
   ): JSX.Element => (
     <div key={o.placementId} className={`m-carte m-c-${genre}`} style={teinte(o.teinte)}>
       <button className="m-carte-img" onClick={ouvrir} disabled={!ouvrir} tabIndex={ouvrir ? 0 : -1}>
-        {o.image ? (
+        {o.outil ? (
+          <Visage url={imageOutil(o.outil)} cadre={null} alt={o.nom} />
+        ) : o.image ? (
           <Visage url={API + o.image} cadre={o.cadre} alt={o.nom} />
         ) : (
           <span className="m-carte-init">{initiales(o.nom)}</span>
@@ -3302,6 +3311,26 @@ function Plan({
           >
             {calque.objets.map((o) => {
               const r = Math.max(nat.w, nat.h) * 0.008
+              /* Un appareil de chasse : l'appareil vu de dessus, avec sa lueur ;
+                 éteint tant que le serveur ne dit rien de lui. */
+              if (o.outil) {
+                const a = etat.appareilsPoses?.find((x) => x.placementId === o.id)
+                return (
+                  <g key={o.id} transform={`translate(${o.x * nat.w} ${o.y * nat.h})`}>
+                    <foreignObject
+                      x={-r * 8}
+                      y={-r * 8}
+                      width={r * 16}
+                      height={r * 16}
+                      style={{ overflow: 'visible' }}
+                    >
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <AppareilSurPlan outil={o.outil} valeur={a?.valeur ?? 0} allume={a?.allume ?? false} taille={r * 6} />
+                      </div>
+                    </foreignObject>
+                  </g>
+                )
+              }
               return (
                 <g key={o.id} transform={`translate(${o.x * nat.w} ${o.y * nat.h})`}>
                   {/* Son image s'il en a une, comme à l'écran de la table ; sinon le losange. */}

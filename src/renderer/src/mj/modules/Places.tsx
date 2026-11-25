@@ -14,6 +14,7 @@
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { Valeur } from '../components/Valeur'
 import { urlPortraitMj } from '../../shared/avatarsMj'
+import { imageObjet } from '../../shared/outilsChasse'
 import { nomDuMj } from '@shared/reglages'
 import { createPortal } from 'react-dom'
 import { useStore } from '../store'
@@ -5399,7 +5400,7 @@ function CalqueObjets({
       {objets.map(({ o, x }) => {
         const enMain = tire?.id === x.id ? tire : null
         const pos = enMain ?? x.pos!
-        const img = s.allItems.find((i) => i.id === o.imageItemId)
+        const url = imageObjet(o, s.allItems)
         const f = s.objetFamilles.find((y) => y.id === o.familleId) ?? null
         return (
           <div
@@ -5438,8 +5439,8 @@ function CalqueObjets({
               void onSituer(x.id, { x: enMain.x, y: enMain.y }).finally(() => setTire(null))
             }}
           >
-            {img?.url ? (
-              <img src={img.poster ?? img.url} alt="" />
+            {url ? (
+              <img src={url} alt="" />
             ) : (
               <span className={`c-${f?.teinte ?? 'neutral'}`}>{glypheObjet(f?.glyphe ?? 'outils', 'glyphe')}</span>
             )}

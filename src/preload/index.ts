@@ -5,7 +5,7 @@ import type { Modif } from '@shared/modifs'
 import type { EvenementSm } from '@shared/santeMentale'
 import type { Cible, Plage } from '@shared/surlignage'
 import type { Cadre, Construction } from '@shared/atelier'
-import type { AppareilChasse } from '@shared/chasse'
+import type { AppareilChasse, OutilChasse } from '@shared/chasse'
 import type { AssetAtelier } from '@shared/atelierAssets'
 import type {
   JetSm,
@@ -662,6 +662,8 @@ const api = {
         chargeNom?: string | null
         chargeMax?: number | null
         effets?: EffetObjet[]
+        /** L'appareil de chasse qu'il représente ; `null`, un objet ordinaire. */
+        outil?: OutilChasse | null
       }
     ) => call<Objet | null>('objets:update', id, patch),
     /** Repartir d'un objet : la description suit, les exemplaires posés, non. */

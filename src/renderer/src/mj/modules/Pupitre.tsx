@@ -19,6 +19,7 @@ import { BoutonTours, Tours, pionEnJeu } from '../components/Tours'
 import { TrameEnJeu } from '../components/PlanTrame'
 import { Valeur } from '../components/Valeur'
 import { Visage } from '../../shared/Visage'
+import { imageObjet } from '../../shared/outilsChasse'
 import { Pings, usePings } from '../../shared/Pings'
 import { DesSurTable } from '../../shared/DesSurTable'
 import { duree } from '../../shared/mesures'
@@ -385,8 +386,8 @@ export function Pupitre(): JSX.Element {
           y: x.pos!.y,
           nom: x.qte > 1 ? `${o.nom} ×${x.qte}` : o.nom,
           etat: x.etat,
-          image: o.imageItemId != null ? (s.allItems.find((i) => i.id === o.imageItemId)?.url ?? null) : null,
-          cadre: o.imageCadre
+          image: o.outil ? imageObjet(o, s.allItems) : o.imageItemId != null ? (s.allItems.find((i) => i.id === o.imageItemId)?.url ?? null) : null,
+          cadre: o.outil ? null : o.imageCadre
         }))
     )
   }, [s.objets, s.places, s.allItems, editPlaceId])

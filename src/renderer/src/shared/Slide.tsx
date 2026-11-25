@@ -11,6 +11,7 @@ import type {
   CadreCarre,
   CalqueBrouillard,
   CollageCell,
+  DisplayState,
   Encart,
   EtatPion,
   FenetreImage,
@@ -23,6 +24,7 @@ import type {
   TextOverlay
 } from '@shared/types'
 import { urlPortraitMj } from './avatarsMj'
+import { AppareilSurPlan } from './outilsChasse'
 import { EcranStats } from './EcranStats'
 import { modificateur, signe } from '@shared/jet'
 
@@ -199,6 +201,8 @@ export interface SlideExtras {
    * les joueurs voient.
    */
   brouillard?: CalqueBrouillard | null
+  /** Les appareils de chasse posés sur ce lieu et ce qu'ils lisent (`DisplayState.chasse`). */
+  chasse?: DisplayState['chasse']
   /**
    * L'ombre se peint-elle ? Les murs servent même quand on ne la montre pas :
    * côté MJ, ils retiennent les pions alors que la carte reste entière.
@@ -331,6 +335,7 @@ export function Slide({
   slide,
   animate = true,
   brouillard,
+  chasse,
   ombre = true,
   surbrillance,
   pions: pionsRecus,
@@ -702,6 +707,7 @@ export function Slide({
             focus={focus}
             onDefocus={onDefocus}
             brouillard={brouillard}
+            chasse={chasse}
             yeux={yeux}
             ombre={ombre}
             surbrillance={surbrillance}
@@ -781,6 +787,7 @@ export function Slide({
                      comme ailleurs. À plusieurs cases, aucune ne peut prétendre
                      porter la scène — on ne pose rien. */
                   brouillard={cases.length === 1 ? brouillard : null}
+                  chasse={cases.length === 1 ? chasse : undefined}
                   yeux={cases.length === 1 ? yeux : undefined}
                   ombre={ombre}
                   surbrillance={cases.length === 1 ? surbrillance : undefined}
@@ -1361,6 +1368,7 @@ export function Framed({
   video,
   loop,
   brouillard,
+  chasse,
   yeux,
   ombre: montrerOmbre = true,
   surbrillance,
@@ -1392,6 +1400,7 @@ export function Framed({
   loop?: boolean
   /** Le calque d'ombre à poser sur cette image, s'il y en a un. */
   brouillard?: CalqueBrouillard | null
+  chasse?: DisplayState['chasse']
   /** Les pions des joueurs, en fractions de l'écran. */
   yeux?: { x: number; y: number; cap: number; characterId: number }[]
   /** L'ombre se peint-elle ? Les murs servent aussi quand on ne la montre pas. */
@@ -1728,7 +1737,21 @@ export function Framed({
     return (
       <div className="brouillard-cadre objets-vus" style={{ ...repere.cadre, transform: repere.transform }}>
         <svg className="brouillard" viewBox={`0 0 ${w} ${h}`} preserveAspectRatio="none">
-          {brouillard.objets.map((o) => (
+          {brouillard.objets.map((o) =>
+            o.outil ? (
+              /* Un appareil de chasse : vu de dessus, avec sa lueur ; éteint
+                 tant que la table ne sait rien de lui. */
+              <g key={o.id} className="objet-vu" transform={`translate(${o.x * w} ${o.y * h})`}>
+                <foreignObject x={-r * 8} y={-r * 8} width={r * 16} height={r * 16} style={{ overflow: 'visible' }}>
+                  <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                    {(() => {
+                      const a = chasse?.find((x) => x.placementId === o.id)
+                      return <AppareilSurPlan outil={o.outil} valeur={a?.valeur ?? 0} allume={a?.allume ?? false} taille={r * 6} />
+                    })()}
+                  </div>
+                </foreignObject>
+              </g>
+            ) : (
             <g key={o.id} className="objet-vu" transform={`translate(${o.x * w} ${o.y * h})`}>
               {o.image ? (
                 <ImageObjetCarte url={o.image} cadre={o.cadre ?? null} cote={r * 7} />
@@ -1745,7 +1768,8 @@ export function Framed({
                 {o.qte > 1 ? `${o.nom} ×${o.qte}` : o.nom}
               </text>
             </g>
-          ))}
+            )
+          )}
         </svg>
       </div>
     )

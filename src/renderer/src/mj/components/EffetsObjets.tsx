@@ -15,6 +15,7 @@ import { createPortal } from 'react-dom'
 import { useStore } from '../store'
 import { useEchap } from '../echap'
 import { Visage } from '../../shared/Visage'
+import { imageObjet } from '../../shared/outilsChasse'
 import { IconClose, IconCopier, IconEtincelles, IconPlus, IconSearch } from './Icons'
 import type { Character, EffetSurEntite, Objet } from '@shared/types'
 
@@ -25,9 +26,9 @@ function sansAccents(t: string): string {
 /** La vignette d'un objet : son image cadrée, ou ses initiales sur la teinte de sa famille. */
 function ImageObjet({ o }: { o: Objet }): JSX.Element {
   const s = useStore()
-  const img = o.imageItemId != null ? s.allItems.find((i) => i.id === o.imageItemId) : undefined
+  const url = imageObjet(o, s.allItems)
   const famille = s.objetFamilles.find((f) => f.id === o.familleId)
-  if (img?.url) return <Visage url={img.url} cadre={o.imageCadre} alt={o.nom} />
+  if (url) return <Visage url={url} cadre={o.outil ? null : o.imageCadre} alt={o.nom} />
   return (
     <span className={`eo-init c-${famille?.teinte ?? 'neutral'}`}>
       {o.nom

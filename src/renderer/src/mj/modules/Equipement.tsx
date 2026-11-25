@@ -24,6 +24,7 @@ import { Pop } from '../components/Pop'
 import { MenuDonner } from '../components/MenuDonner'
 import { ouvrirParametres } from '../components/parametres/registre'
 import { ditSac, etatSac, sacPlein } from '@shared/sac'
+import { imageObjet } from '../../shared/outilsChasse'
 
 /** Un objet posé sur le personnage : l'objet, et l'exemplaire qui est à lui. */
 interface SurLui {
@@ -204,8 +205,7 @@ function Case({
 }): JSX.Element {
   const s = useStore()
   const famille = x ? (s.objetFamilles.find((f) => f.id === x.o.familleId) ?? null) : null
-  const img = x?.o.imageItemId ? s.allItems.find((i) => i.id === x.o.imageItemId) : null
-  const url = img?.poster ?? img?.url ?? null
+  const url = x ? imageObjet(x.o, s.allItems) : null
 
   if (!x) {
     return (

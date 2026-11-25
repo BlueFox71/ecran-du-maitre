@@ -48,6 +48,8 @@ import { ModaleNouvelObjet } from '../components/NouvelObjet'
 import { ImporterDUneSeance } from '../components/ImporterDUneSeance'
 import { RognageCarre } from '../components/RognageCarre'
 import { Piece } from '../../shared/Piece'
+import { imageObjet } from '../../shared/outilsChasse'
+import { OUTILS_CHASSE, estOutil } from '@shared/chasse'
 import { ditMontant, monnaiesActives, type Monnaie } from '@shared/monnaies'
 import { ditPlaces, refusSac } from '@shared/sac'
 import {
@@ -422,8 +424,7 @@ export function Objets(): JSX.Element {
 function vignetteObjet(o: Objet, familles: ObjetFamille[]): JSX.Element {
   const s = useStore.getState()
   const f = familles.find((x) => x.id === o.familleId) ?? null
-  const img = itemById(s.allItems, o.imageItemId)
-  const url = img?.poster ?? img?.url ?? null
+  const url = imageObjet(o, s.allItems)
   if (url) return <img src={url} alt="" />
   return glypheObjet(f?.glyphe ?? 'outils', 'glyphe')
 }
@@ -452,8 +453,7 @@ function GrilleObjets({
       {objets.map((o) => {
         const f = familles.find((x) => x.id === o.familleId) ?? null
         const n = o.placements.reduce((t, p) => t + p.qte, 0)
-        const img = itemById(s.allItems, o.imageItemId)
-        const url = img?.poster ?? img?.url ?? null
+        const url = imageObjet(o, s.allItems)
         return (
           <button
             key={o.id}
@@ -1150,8 +1150,9 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
     frappe.current = setTimeout(() => void enregistre(patch), 400)
   }
 
-  const img = itemById(s.allItems, o.imageItemId)
-  const urlImage = img?.poster ?? img?.url ?? null
+  /* Un objet-outil montre la photo de son outil : pas d'image de la bibliothèque. */
+  const img = o.outil ? null : itemById(s.allItems, o.imageItemId)
+  const urlImage = imageObjet(o, s.allItems)
   const totalPose = o.placements.reduce((t, p) => t + p.qte, 0)
   /* Ce qu'on tape dans la quantité, recalé sur l'objet dès qu'il change. */
   const [qteTapee, setQteTapee] = useState(String(o.qte))
@@ -1219,16 +1220,18 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
                 zoomer
               </button>
             ) : null}
-            {urlImage ? (
+            {urlImage && !o.outil ? (
               <button className="changer" onClick={() => setRogner(true)} title="Choisir la partie de l’image que montre la fiche">
                 <IconCrop />
                 recadrer
               </button>
             ) : null}
-            <button className="changer" onClick={() => setImage(true)}>
-              <IconImage />
-              {urlImage ? 'changer l’image' : 'une image de la bibliothèque'}
-            </button>
+            {o.outil ? null : (
+              <button className="changer" onClick={() => setImage(true)}>
+                <IconImage />
+                {urlImage ? 'changer l’image' : 'une image de la bibliothèque'}
+              </button>
+            )}
           </span>
         </div>
 
@@ -1337,6 +1340,22 @@ function FicheObjet({ o }: { o: Objet }): JSX.Element {
                   if (Number.isFinite(n) && n >= 0) tape({ bonusSac: n })
                 }}
               />
+            </label>
+
+            {/* Un outil de chasse : l'objet en devient un appareil, avec sa photo. */}
+            <label className="champ" title="L’objet représente un appareil de chasse : posé ou porté, il mesure et s’affiche avec sa photo">
+              <span>Outil de chasse</span>
+              <select
+                value={o.outil ?? ''}
+                onChange={(e) => pose({ outil: estOutil(e.target.value) ? e.target.value : null })}
+              >
+                <option value="">Aucun</option>
+                {OUTILS_CHASSE.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.nom}
+                  </option>
+                ))}
+              </select>
             </label>
 
             {/* La valeur se dit dans les monnaies de la campagne, réglées une

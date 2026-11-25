@@ -113,6 +113,7 @@ export function Player(): JSX.Element {
                 /* Les pions et l'ombre du lieu ne vont que sur sa carte : une
                    lettre montrée par-dessus ne se couvre pas de ses jetons. */
                 brouillard={surCarte ? calque : null}
+                chasse={surCarte ? state.chasse : undefined}
                 /* Plein jour : la carte entière, sans ombre ; les murs retiennent
                    toujours le pas, ils sont seulement tus. */
                 ombre={state.vision !== 'jour'}

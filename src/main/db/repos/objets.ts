@@ -1092,12 +1092,13 @@ export function contenuInventaire(inventaireId: number): {
   teinte: string | null
   imageItemId: number | null
   imageCadre: CadreCarre | null
+  outil: OutilChasse | null
 }[] {
   return (
     getDb()
       .prepare(
         `SELECT p.id AS placementId, o.id AS objetId, o.nom, p.qte, f.teinte,
-                o.image_item_id AS imageItemId, o.image_cadre AS imageCadre
+                o.image_item_id AS imageItemId, o.image_cadre AS imageCadre, o.outil
            FROM objet_placement p
            JOIN objet o ON o.id = p.objet_id
            LEFT JOIN objet_famille f ON f.id = o.famille_id
@@ -1110,7 +1111,8 @@ export function contenuInventaire(inventaireId: number): {
     qte: r.qte ?? 1,
     teinte: r.teinte ?? null,
     imageItemId: r.imageItemId ?? null,
-    imageCadre: lisCadreCarre(r.imageCadre)
+    imageCadre: lisCadreCarre(r.imageCadre),
+    outil: estOutil(r.outil) ? r.outil : null
   }))
 }
 
