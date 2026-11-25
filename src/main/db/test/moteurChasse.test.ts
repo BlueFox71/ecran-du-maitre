@@ -428,3 +428,12 @@ it("le téléphone liste ses outils, et les appareils posés du lieu affiché", 
   chasse.recalculer(false)
   expect(chasse.lecteurTelephones()(anna, salle).outils[0].valeur).toBeNull()
 })
+
+it("le téléphone garde l'outil qu'il porte même sans pion, sans valeur", () => {
+  const anna = pj('Anna')
+  const pl = enMain(outil('EMF', 'emf'), anna)
+  chasse.recalculer(false)
+  expect(chasse.lecteurTelephones()(anna, salle).outils).toEqual([
+    expect.objectContaining({ placementId: pl, ou: 'main', valeur: null })
+  ])
+})

@@ -17,6 +17,7 @@
  */
 import * as display from './display'
 import * as mobile from './mobile'
+import { getDb } from './db'
 import { donner, exemplairesOutils, situer } from './db/repos/objets'
 import { pionsPartout } from './db/repos/pions'
 import { listMurs } from './db/repos/murs'
@@ -302,14 +303,16 @@ export function lecteurTelephones(): (
     if (characterId != null) {
       for (const a of tous) {
         /* En main, ou posé par lui (`characterId` vaut alors `posePar`). */
-        if (a.ou === 'ailleurs' || a.characterId !== characterId) continue
-        let valeur: number | null = a.valeur
+        if (a.characterId !== characterId) continue
+        /* Porté mais sans pion (le MJ ne l'a pas encore posé) : il a l'appareil, il ne lit rien. */
+        const ou = a.ou === 'lieu' ? 'lieu' : 'main'
+        let valeur: number | null = a.ou === 'ailleurs' ? null : a.valeur
         if (a.ou === 'lieu') valeur = lisiblePar(a, characterId, (ctx ??= contexte())) ? a.valeur : null
         outils.push({
           placementId: a.placementId,
           nom: a.nom,
           outil: a.outil,
-          ou: a.ou,
+          ou,
           allume: a.allume,
           valeur
         })
@@ -350,14 +353,17 @@ export function poserOutil(characterId: number, placementId: number): string | n
   if (!p) return 'Ton pion n’est sur aucun lieu.'
   const q = appareilEnMain(p, plan(p.placeId))
   const avant = new Set(exemplairesOutils().map((e) => e.placementId))
-  donner(placementId, { port: 'lieu', placeId: p.placeId }, 1, characterId)
-  /* Une pile se détache : la part posée est une nouvelle ligne. */
-  const pose = exemplairesOutils().find(
-    (e) => e.port === 'lieu' && e.posePar === characterId && (e.placementId === placementId || !avant.has(e.placementId))
-  )
-  if (!pose) return 'Impossible de poser cet appareil.'
-  /* Un geste de jeu, pas de préparation : le lieu d'origine du MJ ne bouge pas. */
-  situer(pose.placementId, q, undefined, true)
+  /* Tout ou rien : si la part posée est introuvable, l'appareil reste dans ses mains. */
+  getDb().transaction(() => {
+    donner(placementId, { port: 'lieu', placeId: p.placeId }, 1, characterId)
+    /* Une pile se détache : la part posée est une nouvelle ligne. */
+    const pose = exemplairesOutils().find(
+      (e) => e.port === 'lieu' && e.posePar === characterId && (e.placementId === placementId || !avant.has(e.placementId))
+    )
+    if (!pose) throw new Error('pose introuvable')
+    /* Un geste de jeu, pas de préparation : le lieu d'origine du MJ ne bouge pas. */
+    situer(pose.placementId, q, undefined, true)
+  })()
   return null
 }
 

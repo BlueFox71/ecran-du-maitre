@@ -993,7 +993,7 @@ function router(req: IncomingMessage, res: ServerResponse): void {
     if (chemin === '/api/pochette/lu') return void lireJson(req, res, (b) => pocheLu(res, url, b))
     if (chemin === '/api/mot/lu') return void lireJson(req, res, (b) => motLu(res, url, b))
     if (chemin === '/api/equiper') return void lireJson(req, res, (b) => equiper(res, url, b))
-    if (chemin === '/api/poser') return void lireJson(req, res, (b) => poserRamasser(res, url, b, chasse.poserOutil))
+    if (chemin === '/api/poser') return void lireJson(req, res, (b) => poserRamasser(res, url, b, chasse.poserOutil, true))
     if (chemin === '/api/ramasser') return void lireJson(req, res, (b) => poserRamasser(res, url, b, chasse.ramasserOutil))
     if (chemin === '/api/allumer') return void lireJson(req, res, (b) => allumer(res, url, b))
     if (chemin === '/api/prendre') return void lireJson(req, res, (b) => prendre(res, url, b))
@@ -1461,7 +1461,8 @@ function poserRamasser(
   res: ServerResponse,
   url: URL,
   corps: any,
-  geste: (characterId: number, placementId: number) => string | null
+  geste: (characterId: number, placementId: number) => string | null,
+  siensSeulement = false
 ): void {
   const ap = exige(res, url)
   if (!ap) return
@@ -1470,6 +1471,9 @@ function poserRamasser(
   if (!perso) return json(res, 409, { erreur: 'Aucun personnage ne t’est attribué.' })
   const placementId = Number(corps.placementId)
   if (!Number.isInteger(placementId)) return json(res, 400, { erreur: 'Objet inconnu.' })
+  /* Poser : seulement ses affaires, comme ranger ou allumer. */
+  if (siensSeulement && objets.porteurDe(placementId) !== perso.id)
+    return json(res, 403, { erreur: 'Cet objet n’est pas à toi.' })
   let refus: string | null
   try {
     refus = geste(perso.id, placementId)
