@@ -30,6 +30,15 @@ export function ledsAllumees(niveau: number): number {
 }
 
 /**
+ * Les LED qu'on voit sur l'appareil : aucune s'il est éteint ; allumé, au moins
+ * la première (verte) — même au niveau 0, l'appareil est en marche.
+ */
+export function ledsVisibles(niveau: number, allume: boolean): number {
+  if (!allume) return 0
+  return Math.max(1, ledsAllumees(niveau))
+}
+
+/**
  * La courbe du bouton « Approche » : le niveau monte en douceur, tient un
  * instant au sommet, puis redescend. `t` en secondes, `duree` le tout.
  */

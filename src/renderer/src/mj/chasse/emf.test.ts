@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { courbeApproche, ledsAllumees, reglageFichier } from './emf'
+import { courbeApproche, ledsAllumees, ledsVisibles, reglageFichier } from './emf'
 
 describe('EMF', () => {
   it('allume autant de LED que le niveau, bornées de 0 à 5', () => {
@@ -8,6 +8,13 @@ describe('EMF', () => {
     expect(ledsAllumees(2.6)).toBe(3)
     expect(ledsAllumees(9)).toBe(5)
     expect(ledsAllumees(-1)).toBe(0)
+  })
+
+  it('montre les LED : aucune éteint, la première seule allumé au niveau 0', () => {
+    expect(ledsVisibles(3, false)).toBe(0)
+    expect(ledsVisibles(0, true)).toBe(1)
+    expect(ledsVisibles(3, true)).toBe(3)
+    expect(ledsVisibles(5, true)).toBe(5)
   })
 
   it('joue le son tel quel à 3, en rafales dessous, plus vite dessus, rien à 0', () => {

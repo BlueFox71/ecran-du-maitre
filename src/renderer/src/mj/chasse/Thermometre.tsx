@@ -7,23 +7,10 @@
  * se rafraîchit toutes les demi-secondes, avec le petit bruit d'un vrai
  * appareil. Rien ne part vers l'écran ni les portables.
  */
-import { useEffect, useRef, useState } from 'react'
-import imageThermometre from '../../assets/chasse/thermometre.png'
-import {
-  TEMPERATURE_MAX,
-  TEMPERATURE_MIN,
-  bornerTemperature,
-  froid,
-  rapprocher,
-  texteTemperature
-} from './temperature'
-
-/** L'écran sur la photo, en pixels du recadrage (499 × 1520) : seules les proportions comptent. */
-const ECRAN = { x: 94, y: 228, l: 312, h: 278 }
-const PHOTO_L = 499
-const PHOTO_H = 1520
-/** Un vrai thermomètre infrarouge ne rafraîchit pas en continu. */
-const RAFRAICHISSEMENT_MS = 500
+import { useState } from 'react'
+import { EcranThermometre } from './EcranThermometre'
+import { TEMPERATURE_MAX, TEMPERATURE_MIN, texteTemperature } from './temperature'
+import { useTemperatureVivante } from './vivant'
 
 const PALIERS = [20, 15, 10, 5, 0, -5]
 
@@ -31,56 +18,12 @@ export function Thermometre(): JSX.Element {
   const [allume, setAllume] = useState(true)
   const [cible, setCible] = useState(18)
   const [vitesse, setVitesse] = useState(1.5)
-  const [mesure, setMesure] = useState(18)
-  /* La valeur « vraie », qui glisse vers la cible ; la mesure en est la lecture bruitée. */
-  const vraie = useRef(18)
-  const cibleRef = useRef(cible)
-  const vitesseRef = useRef(vitesse)
-  cibleRef.current = cible
-  vitesseRef.current = vitesse
-
-  useEffect(() => {
-    if (!allume) return
-    const t = setInterval(() => {
-      vraie.current = rapprocher(vraie.current, cibleRef.current, vitesseRef.current, RAFRAICHISSEMENT_MS / 1000)
-      const bruit = (Math.random() - 0.5) * 0.2
-      setMesure(bornerTemperature(vraie.current + bruit))
-    }, RAFRAICHISSEMENT_MS)
-    return () => clearInterval(t)
-  }, [allume])
-
-  const f = froid(mesure)
-  const pourcent = (v: number, total: number): string => `${(v / total) * 100}%`
+  const mesure = useTemperatureVivante(cible, vitesse)
 
   return (
     <div className="emf-case">
       <div className="emf-appareil">
-        <div className="thermo">
-          <img src={imageThermometre} alt="Thermomètre infrarouge" draggable={false} />
-          <div
-            className={`thermo-ecran${allume ? '' : ' eteint'}`}
-            style={{
-              left: pourcent(ECRAN.x, PHOTO_L),
-              top: pourcent(ECRAN.y, PHOTO_H),
-              width: pourcent(ECRAN.l, PHOTO_L),
-              height: pourcent(ECRAN.h, PHOTO_H),
-              ['--froid' as string]: f
-            }}
-          >
-            {allume ? (
-              <>
-                <span className="thermo-unite">°C</span>
-                <span className="thermo-chiffres">
-                  {/* Les segments éteints, en fantôme derrière, comme sur un vrai écran. */}
-                  <span className="thermo-fond" aria-hidden>
-                    {'-88.8'}
-                  </span>
-                  <span className="thermo-valeur">{texteTemperature(mesure)}</span>
-                </span>
-              </>
-            ) : null}
-          </div>
-        </div>
+        <EcranThermometre t={mesure} eteint={!allume} />
       </div>
 
       <div className="emf-commandes">
