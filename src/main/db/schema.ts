@@ -2092,5 +2092,15 @@ export const MIGRATIONS: Migration[] = [
     /* Répartir ce qui était commun : voir repartition.ts. */
     sql: ``,
     run: repartirParSeance
+  },
+  {
+    id: 97,
+    sql: `
+    /* Un objet peut être un outil de chasse (le détecteur EMF, le thermomètre) :
+       'emf' | 'thermometre', NULL pour un objet ordinaire. Un exemplaire posé
+       dans un lieu garde le personnage qui l'y a posé depuis son téléphone. */
+    ALTER TABLE objet ADD COLUMN outil TEXT;
+    ALTER TABLE objet_placement ADD COLUMN pose_par INTEGER REFERENCES character(id) ON DELETE SET NULL;
+    `
   }
 ]

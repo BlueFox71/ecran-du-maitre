@@ -16,6 +16,8 @@ import { copierLigne } from '../copie'
 import { mediaUrl } from '../../vault'
 import { UNITE_VALEUR_PAR_DEFAUT, eclaire, lisCadreCarre } from '@shared/types'
 import { lireCampagne } from '@shared/reglages'
+import { estOutil } from '@shared/chasse'
+import type { OutilChasse } from '@shared/chasse'
 import { EPSILON_SAC, REFUS_SAC, alourdi, ditPlaces, etatSac, sacPlein } from '@shared/sac'
 import type { EtatSac, LigneSac } from '@shared/sac'
 import * as reglages from './reglages'
@@ -135,7 +137,7 @@ export function removeFamille(id: number): void {
 const SELECT_OBJET = `
   SELECT id, nom, famille_id AS familleId, image_item_id AS imageItemId, image_cadre AS imageCadre,
          unique_piece AS uniquePiece, qte, poids, places, bonus_sac AS bonusSac, valeur, prix, vu, su,
-         equipable, emplacements, charge_nom AS chargeNom, charge_max AS chargeMax, effets
+         equipable, emplacements, charge_nom AS chargeNom, charge_max AS chargeMax, effets, outil
     FROM objet`
 
 /** Les endroits du corps notés sur l'objet ; une liste vide si rien n'est dit. */
@@ -202,6 +204,7 @@ function toObjet(r: any, ex: Exemplaires | undefined): Objet {
     chargeNom: r.chargeNom,
     chargeMax: r.chargeMax == null ? null : Number(r.chargeMax),
     effets: lireEffets(r.effets),
+    outil: estOutil(r.outil) ? r.outil : null,
     placements: ex?.placements ?? [],
     corbeille: ex?.corbeille ?? []
   }
@@ -253,7 +256,7 @@ function placementsOf(objetIds: number[]): Map<number, Exemplaires> {
       `SELECT p.id, p.objet_id AS objetId, p.port, p.place_id AS placeId,
               p.character_id AS characterId, p.inventaire_id AS inventaireId,
               p.detail, p.qte, p.etat, p.emplacement, p.origine_place_id AS origineLieuId,
-              p.eteinte, p.pos_x AS posX, p.pos_y AS posY,
+              p.eteinte, p.pos_x AS posX, p.pos_y AS posY, p.pose_par AS posePar,
               CASE WHEN p.port = 'corbeille' THEN 'Corbeille'
                    ELSE COALESCE(l.name, c.name, i.nom, '—') END AS cible,
               p.init_port AS initPort, p.init_place_id AS initPlaceId,
@@ -290,7 +293,8 @@ function placementsOf(objetIds: number[]): Map<number, Exemplaires> {
       initial: lireInitial(r),
       deplace: !!r.deplace,
       eteinte: !!r.eteinte,
-      pos: r.port === 'lieu' && r.posX != null && r.posY != null ? { x: r.posX, y: r.posY } : null
+      pos: r.port === 'lieu' && r.posX != null && r.posY != null ? { x: r.posX, y: r.posY } : null,
+      posePar: r.posePar ?? null
     }
     let ex = par.get(r.objetId)
     if (!ex) par.set(r.objetId, (ex = { placements: [], corbeille: [] }))
@@ -333,6 +337,7 @@ export interface ObjetPatch {
   chargeNom?: string | null
   chargeMax?: number | null
   effets?: EffetObjet[]
+  outil?: OutilChasse | null
 }
 
 /**
@@ -368,7 +373,7 @@ export function updateObjet(id: number, patch: ObjetPatch): Objet | null {
          unique_piece = @unique, qte = @qte, poids = @poids, places = @places,
          bonus_sac = @bonusSac, valeur = @valeur, prix = @prix,
          vu = @vu, su = @su, equipable = @equipable, emplacements = @emplacements,
-         charge_nom = @chargeNom, charge_max = @chargeMax, effets = @effets
+         charge_nom = @chargeNom, charge_max = @chargeMax, effets = @effets, outil = @outil
        WHERE id = @id`
     )
     .run({
@@ -405,7 +410,9 @@ export function updateObjet(id: number, patch: ObjetPatch): Objet | null {
       emplacements: JSON.stringify(v.emplacements),
       chargeNom: v.chargeNom,
       chargeMax: v.chargeMax,
-      effets: JSON.stringify(v.effets)
+      effets: JSON.stringify(v.effets),
+      /* Une valeur qui n'est pas un outil connu ne change rien. */
+      outil: patch.outil === null || estOutil(patch.outil) ? patch.outil : cur.outil
     })
   return getObjet(id)
 }
@@ -431,7 +438,8 @@ export function copyObjet(id: number): Objet | null {
     emplacements: [...src.emplacements],
     chargeNom: src.chargeNom,
     chargeMax: src.chargeMax,
-    effets: src.effets.map((e) => ({ ...e }))
+    effets: src.effets.map((e) => ({ ...e })),
+    outil: src.outil
   })
 }
 
@@ -601,13 +609,15 @@ export function objetsDe(characterId: number): {
   /** L'image de l'objet (un item de la bibliothèque) et son cadrage carré. */
   imageItemId: number | null
   imageCadre: CadreCarre | null
+  /** C'est un outil de chasse (détecteur EMF, thermomètre) ; `null`, un objet ordinaire. */
+  outil: OutilChasse | null
 }[] {
   return (
     getDb()
       .prepare(
         `SELECT p.id AS placementId, o.id AS objetId, o.nom, p.emplacement, o.emplacements,
                 p.qte, f.teinte, o.effets, p.eteinte, o.bonus_sac AS bonusSac,
-                o.image_item_id AS imageItemId, o.image_cadre AS imageCadre
+                o.image_item_id AS imageItemId, o.image_cadre AS imageCadre, o.outil
            FROM objet_placement p
            JOIN objet o ON o.id = p.objet_id
            LEFT JOIN objet_famille f ON f.id = o.famille_id
@@ -627,7 +637,8 @@ export function objetsDe(characterId: number): {
     allumee: !r.eteinte,
     bonusSac: Math.max(0, r.bonusSac ?? 0),
     imageItemId: r.imageItemId ?? null,
-    imageCadre: lisCadreCarre(r.imageCadre)
+    imageCadre: lisCadreCarre(r.imageCadre),
+    outil: estOutil(r.outil) ? r.outil : null
   }))
 }
 
@@ -690,7 +701,9 @@ function donnerLibre(
   placementId: number,
   cible: { port: PortObjet; placeId?: number | null; characterId?: number | null },
   /** Combien en donner ; absent, tout l'exemplaire part. */
-  qte?: number
+  qte?: number,
+  /** Posé dans un lieu depuis le téléphone de ce personnage ; toute autre cible l'efface. */
+  posePar?: number | null
 ): Objet | null {
   const db = getDb()
   const cur = db
@@ -701,7 +714,7 @@ function donnerLibre(
   db.prepare(
     `UPDATE objet_placement
         SET port = @port, place_id = @placeId, character_id = @characterId,
-            inventaire_id = NULL, emplacement = NULL, etat = @etat,
+            inventaire_id = NULL, emplacement = NULL, etat = @etat, pose_par = @posePar,
             /* Il quitte un lieu : le lieu s'en souvient (les valeurs lues ici
                sont celles d'avant la mise à jour). */
             origine_place_id = COALESCE(origine_place_id, CASE WHEN port = 'lieu' THEN place_id END)
@@ -712,7 +725,8 @@ function donnerLibre(
     placeId: cible.port === 'lieu' ? (cible.placeId ?? null) : null,
     /* À la corbeille, il n'est plus nulle part (comme `jeter`, mais d'une partie). */
     characterId: cible.port === 'lieu' || cible.port === 'corbeille' ? null : (cible.characterId ?? null),
-    etat: cible.port === 'lieu' ? 'trouve' : cible.port === 'corbeille' ? 'cache' : 'porte'
+    etat: cible.port === 'lieu' ? 'trouve' : cible.port === 'corbeille' ? 'cache' : 'porte',
+    posePar: cible.port === 'lieu' ? (posePar ?? null) : null
   })
   return getObjet(cur.objetId)
 }
@@ -829,7 +843,7 @@ export function objetsVus(placeId: number | null): ObjetVu[] {
   const rows = getDb()
     .prepare(
       `SELECT p.id, p.pos_x AS x, p.pos_y AS y, p.qte, o.nom,
-              i.rel_path AS image, o.image_cadre AS cadre
+              i.rel_path AS image, o.image_cadre AS cadre, o.outil
          FROM objet_placement p
          JOIN objet o ON o.id = p.objet_id
          JOIN place l ON l.id = p.place_id
@@ -848,6 +862,7 @@ export function objetsVus(placeId: number | null): ObjetVu[] {
     nom: string
     image: string | null
     cadre: string | null
+    outil: string | null
   }[]
   /* Son image aussi : sur la carte, on reconnaît une lampe à son dessin plus
      vite qu'à son nom. Elle ne dit rien de plus que ce que l'objet montre. */
@@ -858,7 +873,8 @@ export function objetsVus(placeId: number | null): ObjetVu[] {
     nom: r.nom,
     qte: r.qte ?? 1,
     image: mediaUrl(r.image),
-    cadre: lisCadreCarre(r.cadre)
+    cadre: lisCadreCarre(r.cadre),
+    ...(estOutil(r.outil) ? { outil: r.outil } : {})
   }))
 }
 

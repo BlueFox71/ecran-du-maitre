@@ -1,5 +1,6 @@
 /** Types partagés entre le processus principal, le préchargement et les interfaces. */
 import type { Modif } from './modifs'
+import type { OutilChasse } from './chasse'
 
 export type ItemKind = 'doc' | 'image' | 'video' | 'audio' | 'pdf' | 'other'
 
@@ -353,6 +354,8 @@ export interface ObjetVu {
   /** Son image, telle que l'interface la sert, et son cadrage carré ; null sans image. */
   image?: string | null
   cadre?: CadreCarre | null
+  /** Un outil de chasse posé là ; absent pour un objet ordinaire. */
+  outil?: OutilChasse
 }
 
 /**
@@ -932,6 +935,8 @@ export interface Objet {
   chargeNom: string | null
   chargeMax: number | null
   effets: EffetObjet[]
+  /** L'outil de chasse que cet objet est (détecteur EMF, thermomètre) ; `null`, un objet ordinaire. */
+  outil: OutilChasse | null
   /** Où ses exemplaires se trouvent, dans l'ordre où on les a posés. */
   placements: ObjetPlacement[]
   /**
@@ -1196,6 +1201,8 @@ export interface ObjetPlacement {
   eteinte: boolean
   /** Posé dans un lieu, son point sur le plan (fractions de l'image) ; `null` : nulle part de précis. */
   pos: { x: number; y: number } | null
+  /** Le personnage qui l'a posé là depuis son téléphone ; `null` si c'est le MJ ou si rien n'est dit. */
+  posePar: number | null
 }
 
 /**
