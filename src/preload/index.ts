@@ -5,6 +5,7 @@ import type { Modif } from '@shared/modifs'
 import type { EvenementSm } from '@shared/santeMentale'
 import type { Cible, Plage } from '@shared/surlignage'
 import type { Cadre, Construction } from '@shared/atelier'
+import type { AppareilChasse } from '@shared/chasse'
 import type { AssetAtelier } from '@shared/atelierAssets'
 import type {
   JetSm,
@@ -915,6 +916,19 @@ const api = {
       const h = (): void => cb()
       ipcRenderer.on('sons:silence', h)
       return (): void => void ipcRenderer.removeListener('sons:silence', h)
+    }
+  },
+
+  /** Les outils de chasse en jeu : tous les appareils, et la main du MJ sur l'un d'eux. */
+  chasse: {
+    etat: () => call<AppareilChasse[]>('chasse:etat'),
+    /** `null` rend l'appareil à sa zone. */
+    controler: (placementId: number, valeur: number | null) =>
+      call<AppareilChasse[]>('chasse:controler', placementId, valeur),
+    onState: (cb: (a: AppareilChasse[]) => void) => {
+      const h = (_e: unknown, a: AppareilChasse[]): void => cb(a)
+      ipcRenderer.on('chasse:state', h)
+      return (): void => void ipcRenderer.removeListener('chasse:state', h)
     }
   },
 

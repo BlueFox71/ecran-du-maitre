@@ -41,6 +41,7 @@ import * as tours from '../tours'
 import * as voix from '../voix'
 import * as prepa from '../preparation'
 import * as regieSon from '../sons'
+import * as chasse from '../chasse'
 import * as sons from '../db/repos/sons'
 import * as defaire from '../defaire'
 import * as fsLib from '../library'
@@ -623,6 +624,8 @@ export function registerIpc(): void {
     /* Un inventaire passé à la Pochette y montre ce qu'il tient : ce qui vient
        d'y entrer ou d'en sortir y entre ou en sort aussi. */
     if (pochette.suivreInventaires()) display.versMj('pochette:changee', null)
+    /* Un outil de chasse donné, posé, rangé, éteint : ce qu'il lit change. */
+    chasse.recalculer()
     mobile.broadcast()
     return v
   }
@@ -780,6 +783,8 @@ export function registerIpc(): void {
       if (r.ancienne) carteChangee(placeId, r.ancienne, r.neuve)
       else if (placeId === display.getState().placeId) display.refreshPions()
       piecesSuivent(placeId)
+      /* Les calques EMF et température ont pu être repeints, ailleurs qu'à l'écran aussi. */
+      chasse.recalculer()
       return r.place
     }
   )
@@ -877,6 +882,13 @@ export function registerIpc(): void {
   ipcMain.handle('regieSon:toutRearmer', () => regieSon.toutRearmer())
   ipcMain.handle('regieSon:vibrer', (_e, motif: any) => regieSon.vibrerTous(motif))
   regieSon.brancher()
+
+  /* Les outils de chasse : le MJ voit tous les appareils, et peut en prendre le contrôle. */
+  ipcMain.handle('chasse:etat', () => chasse.appareils())
+  ipcMain.handle('chasse:controler', (_e, placementId: number, valeur: number | null) =>
+    chasse.controler(Number(placementId), valeur == null ? null : Number(valeur))
+  )
+  chasse.brancher()
 
   /* ---------------- chronologie ---------------- */
 
@@ -1372,6 +1384,7 @@ export function registerIpc(): void {
     if (r.pions) display.refreshPions()
     /* La régie relit : demandes de feu vert et temps morts repartent aussi de zéro. */
     if (choix.sons) regieSon.toutRearmer()
+    chasse.recalculer()
     display.refreshJoueurs()
     display.versMj('characters:relus', null)
     if (pochette.suivreInventaires()) display.versMj('pochette:changee', null)

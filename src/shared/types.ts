@@ -2438,6 +2438,12 @@ export interface DisplayState {
    * compteur est le signal qu'il attend pour relire le calque.
    */
   calqueRev: number
+  /**
+   * Les outils de chasse **posés** sur le lieu à l'écran, et ce qu'ils lisent —
+   * de quoi dessiner leur lueur. Rien d'autre : ni ceux qu'on tient en main, ni
+   * les calques peints, que les joueurs ne doivent jamais deviner.
+   */
+  chasse?: { placementId: number; outil: OutilChasse; valeur: number; allume: boolean }[]
   pions: Pion[]
   /** Taille des pions du lieu, en pourcentage de la largeur de l'écran. */
   pionSize: number

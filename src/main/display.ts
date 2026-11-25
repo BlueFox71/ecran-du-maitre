@@ -27,6 +27,7 @@ import type {
   DeSurTable,
   AnnonceSm
 } from '@shared/types'
+import type { AppareilChasse } from '@shared/chasse'
 
 const BLACK: SlidePayload = { type: 'black' }
 
@@ -663,12 +664,34 @@ export function setFocusPion(id: number | null): DisplayState {
 
 /**
  * Qui veut savoir qu'un pion a bougé, ou que le lieu a changé : la régie du
- * son, qui fait partir les sons posés. Un rappel plutôt qu'un import — elle
- * dépend de l'écran, pas l'inverse.
+ * son, qui fait partir les sons posés, et les outils de chasse, qui suivent
+ * leur porteur. Des rappels plutôt que des imports — ils dépendent de
+ * l'écran, pas l'inverse.
  */
-let apresPions: ((placeId: number | null) => void) | null = null
+const apresPions: ((placeId: number | null) => void)[] = []
 export function ecouterPions(f: (placeId: number | null) => void): void {
-  apresPions = f
+  apresPions.push(f)
+}
+
+/**
+ * Les outils de chasse, tels que le moteur les a calculés la dernière fois.
+ * L'écran n'en garde que les appareils posés sur le lieu à l'écran — le
+ * filtre est refait à chaque changement de lieu, sans attendre le moteur.
+ */
+let appareils: AppareilChasse[] = []
+function chasseDuLieu(): DisplayState['chasse'] {
+  const ici = state.placeId
+  if (ici == null) return []
+  return appareils
+    .filter((a) => a.ou === 'lieu' && a.placeId != null && (a.placeId === ici || planDe(a.placeId) === ici))
+    .map((a) => ({ placementId: a.placementId, outil: a.outil, valeur: a.valeur, allume: a.allume }))
+}
+
+/** Le moteur des outils de chasse a recalculé : la table relit ce qu'affichent les appareils posés. */
+export function chasseABouge(a: AppareilChasse[]): void {
+  appareils = a
+  state.chasse = chasseDuLieu()
+  broadcast()
 }
 
 /** À rappeler après toute modification de pions : l'état vit ici, pas ailleurs. */
@@ -693,7 +716,8 @@ export function refreshPions(): DisplayState {
     const suivi = getPion(state.focusPionId)
     if (!suivi || suivi.placeId !== state.placeId) state.focusPionId = null
   }
-  apresPions?.(state.placeId)
+  for (const f of apresPions) f(state.placeId)
+  state.chasse = chasseDuLieu()
   broadcast()
   return state
 }

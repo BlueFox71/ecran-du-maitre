@@ -119,6 +119,15 @@ export function listPions(placeId: number | null): Pion[] {
 }
 
 /**
+ * Tous les pions, de tous les lieux, cachés compris — sans l'état des PNJ.
+ * Pour les outils de chasse, qui mesurent partout où il y a quelqu'un, pas
+ * seulement sur le lieu à l'écran.
+ */
+export function pionsPartout(): Pion[] {
+  return (getDb().prepare(`${SELECT} ORDER BY p.place_id, p.ord, p.id`).all() as Row[]).map(toPion)
+}
+
+/**
  * Ceux que les joueurs voient — et rien d'autre.
  *
  * C'est la seule porte par laquelle un pion rejoint l'écran des joueurs, leur

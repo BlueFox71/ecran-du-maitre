@@ -20,6 +20,7 @@ import * as display from './display'
 import * as tours from './tours'
 import * as prepa from './preparation'
 import * as regieSon from './sons'
+import * as chasse from './chasse'
 import * as fsLib from './library'
 import * as examen from './examen'
 import { listPlayers } from './db/repos/players'
@@ -139,6 +140,7 @@ export function switchTo(dir: string, avantRechargement?: () => void): ProjectIn
   prepa.oublier()
   /* Ses sons aussi : les nappes et les sons posés étaient les siens. */
   regieSon.oublier()
+  chasse.oublier()
   display.refreshJoueurs()
   /* Les fenêtres d'image montraient des images de l'autre campagne. */
   display.fermerFenetre()
@@ -258,6 +260,7 @@ export function closeProject(): void {
   tours.fin()
   prepa.oublier()
   regieSon.oublier()
+  chasse.oublier()
   closeDb()
   courant = null
   carnet.setLastProject(null)

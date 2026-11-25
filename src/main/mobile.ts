@@ -48,6 +48,7 @@ import { modificateur, naturel } from '@shared/jet'
 import * as reglagesCampagne from './db/repos/reglages'
 import * as display from './display'
 import * as prepa from './preparation'
+import * as chasse from './chasse'
 import { bonusParCarac, noterJet } from './jetDuPerso'
 import * as rolls from './db/repos/rolls'
 import { bonusDuPerso } from '@shared/modifs'
@@ -1409,6 +1410,8 @@ function equiper(res: ServerResponse, url: URL, corps: any): void {
   /* Le poste du MJ suit, et les téléphones aussi — celui du joueur, qui vient
      d'agir, et son second appareil s'il en a un. */
   versMj('objets:changes', null)
+  /* Un outil de chasse pris, rangé, allumé : ce qu'il lit et fait entendre suit. */
+  chasse.recalculer()
   broadcast()
   json(res, 200, { ok: true })
 }
@@ -1432,6 +1435,7 @@ function allumer(res: ServerResponse, url: URL, corps: any): void {
   objets.allumer(placementId, !!corps.allumee)
   display.calqueABouge()
   versMj('objets:changes', null)
+  chasse.recalculer()
   broadcast()
   json(res, 200, { ok: true })
 }
@@ -1468,6 +1472,7 @@ function prendre(res: ServerResponse, url: URL, corps: any): void {
   const texte = `${perso.name} a pris ${nom}`
   objets.noter(inv.id, texte)
   versMj('objets:changes', `${texte} dans ${inv.nom}`)
+  chasse.recalculer()
   broadcast()
   json(res, 200, { ok: true })
 }
@@ -1497,6 +1502,7 @@ function remettre(res: ServerResponse, url: URL, corps: any): void {
   const texte = `${perso.name} a remis ${nom}`
   objets.noter(inv.id, texte)
   versMj('objets:changes', `${texte} dans ${inv.nom}`)
+  chasse.recalculer()
   broadcast()
   json(res, 200, { ok: true })
 }
