@@ -544,6 +544,7 @@ export function repondrePorte(playerId: number, ouvrir: boolean): void {
   if (ouvrir) {
     ouvertures.updateOuverture(d.ouvertureId, { ouverte: true, verrouillee: false })
     demandesPorte.delete(playerId)
+    chasse.recalculer(false)
     display.calqueABouge()
     revoirDemandesPorte()
   } else d.refusee = true
@@ -1411,7 +1412,7 @@ function equiper(res: ServerResponse, url: URL, corps: any): void {
      d'agir, et son second appareil s'il en a un. */
   versMj('objets:changes', null)
   /* Un outil de chasse pris, rangé, allumé : ce qu'il lit et fait entendre suit. */
-  chasse.recalculer()
+  chasse.recalculer(false)
   broadcast()
   json(res, 200, { ok: true })
 }
@@ -1435,7 +1436,7 @@ function allumer(res: ServerResponse, url: URL, corps: any): void {
   objets.allumer(placementId, !!corps.allumee)
   display.calqueABouge()
   versMj('objets:changes', null)
-  chasse.recalculer()
+  chasse.recalculer(false)
   broadcast()
   json(res, 200, { ok: true })
 }
@@ -1472,7 +1473,7 @@ function prendre(res: ServerResponse, url: URL, corps: any): void {
   const texte = `${perso.name} a pris ${nom}`
   objets.noter(inv.id, texte)
   versMj('objets:changes', `${texte} dans ${inv.nom}`)
-  chasse.recalculer()
+  chasse.recalculer(false)
   broadcast()
   json(res, 200, { ok: true })
 }
@@ -1502,7 +1503,7 @@ function remettre(res: ServerResponse, url: URL, corps: any): void {
   const texte = `${perso.name} a remis ${nom}`
   objets.noter(inv.id, texte)
   versMj('objets:changes', `${texte} dans ${inv.nom}`)
-  chasse.recalculer()
+  chasse.recalculer(false)
   broadcast()
   json(res, 200, { ok: true })
 }

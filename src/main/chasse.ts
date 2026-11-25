@@ -17,7 +17,7 @@
  */
 import * as display from './display'
 import * as mobile from './mobile'
-import { listObjets } from './db/repos/objets'
+import { exemplairesOutils } from './db/repos/objets'
 import { pionsPartout } from './db/repos/pions'
 import { listMurs } from './db/repos/murs'
 import { listOuvertures } from './db/repos/ouvertures'
@@ -40,11 +40,17 @@ import type { Pion, PointMur } from '@shared/types'
 
 /** Les appareils dont le MJ a pris le contrôle, et la valeur qu'il leur impose. */
 const controles = new Map<number, number>()
-/** Ce qu'on a diffusé la dernière fois : on ne rediffuse que ce qui change. */
-let dernier: string | null = null
+/**
+ * Ce qu'on a envoyé la dernière fois : au MJ (tout, positions comprises), et
+ * ce que voient la table et les téléphones (valeur, où, allumé). On ne
+ * renvoie que ce qui change — un pion qui marche, EMF en main, au-dessus d'un
+ * même niveau ne doit rien rediffuser aux joueurs.
+ */
+let dernierMj = '[]'
+let dernierVu = '[]'
 
 /** Tout ce qu'il faut savoir d'un plan pour y situer, lire et entendre un appareil. */
-interface Plan {
+export interface Plan {
   w: number
   h: number
   /** Ce qui arrête le pas — et donc le son, en partie. En pixels du plan. */
@@ -79,12 +85,18 @@ function plans(): (placeId: number) => Plan {
 
 const borne = (v: number): number => Math.min(1, Math.max(0, v))
 
+/** Où est le pion, en fractions du plan — hors de [0, 1] s'il se tient dans une bande de l'écran. */
+function ouEstLePion(p: Pion, g: Plan): { x: number; y: number } {
+  return pionSurPlan(p, g.w / g.h, display.ratioEcran())
+}
+
 /**
- * Où est le pion, en fractions du plan. Un pion dans une bande de l'écran est
- * hors de la carte : on le ramène au bord, un appareil ne lit pas dans le vide.
+ * Où est l'appareil qu'il tient. Un pion dans une bande est hors de la carte :
+ * on ramène l'appareil au bord, il ne lit pas dans le vide. L'oreille, elle,
+ * reste où est le pion.
  */
-function surPlan(p: Pion, g: Plan): { x: number; y: number } {
-  const q = pionSurPlan(p, g.w / g.h, display.ratioEcran())
+function appareilEnMain(p: Pion, g: Plan): { x: number; y: number } {
+  const q = ouEstLePion(p, g)
   return { x: borne(q.x), y: borne(q.y) }
 }
 
@@ -99,97 +111,137 @@ function trajet(a: { x: number; y: number }, b: { x: number; y: number }, g: Pla
 
 const joueur = (p: Pion): boolean => p.characterId != null && !p.pnj
 
-function calculer(): AppareilChasse[] {
-  const plan = plans()
+/**
+ * Ce qu'il faut pour situer les pions et lire les plans, lu une fois et
+ * partagé : `lisiblePar`, appelé pour chaque téléphone et chaque appareil, ne
+ * doit pas relire la base à chaque appel.
+ */
+export interface ContexteChasse {
+  pions: Pion[]
+  plan: (placeId: number) => Plan
+}
+
+export function contexte(): ContexteChasse {
+  return { pions: pionsPartout(), plan: plans() }
+}
+
+interface Calcul {
+  appareils: AppareilChasse[]
+  /** Les exemplaires posés et trouvés : seuls ceux-là peuvent se montrer à la table. */
+  trouves: Set<number>
+}
+
+function calculer(): Calcul {
+  const exemplaires = exemplairesOutils()
+  /* Une séance sans outil ne coûte rien : ni pions, ni plans à lire. */
+  if (exemplaires.length === 0) {
+    controles.clear()
+    return { appareils: [], trouves: new Set() }
+  }
+  const { pions, plan } = contexte()
   const affiche = display.getState().placeId
-  const pions = pionsPartout()
   const out: AppareilChasse[] = []
-  for (const o of listObjets()) {
-    if (!o.outil) continue
-    for (const ex of o.placements) {
-      if (ex.port !== 'pj' && ex.port !== 'lieu') continue
-      let ou: AppareilChasse['ou'] = 'ailleurs'
-      let placeId: number | null = null
-      let pos: AppareilChasse['pos'] = null
-      if (ex.port === 'pj') {
-        /* En main : le pion de son porteur, celui du lieu à l'écran d'abord. */
-        const siens = pions.filter((p) => p.characterId === ex.characterId)
-        const p = siens.find((q) => q.placeId === affiche) ?? siens[0]
-        if (p) {
-          ou = 'main'
-          placeId = p.placeId
-          pos = surPlan(p, plan(p.placeId))
-        }
-      } else {
-        placeId = ex.placeId
-        if (ex.pos && ex.placeId != null) {
-          ou = 'lieu'
-          pos = ex.pos
-        }
+  const trouves = new Set<number>()
+  for (const ex of exemplaires) {
+    let ou: AppareilChasse['ou'] = 'ailleurs'
+    let placeId: number | null = null
+    let pos: AppareilChasse['pos'] = null
+    if (ex.port === 'pj') {
+      /* En main : le pion de son porteur, celui du lieu à l'écran d'abord. */
+      const siens = pions.filter((p) => p.characterId === ex.characterId)
+      const p = siens.find((q) => q.placeId === affiche) ?? siens[0]
+      if (p) {
+        ou = 'main'
+        placeId = p.placeId
+        pos = appareilEnMain(p, plan(p.placeId))
       }
-      const g = placeId != null ? plan(placeId) : null
-      const c = g?.construction ?? null
-      const sous: PointCase | null = c && pos ? [pos.x * c.largeur, pos.y * c.hauteur] : null
-      const controle = controles.get(ex.id)
-      const valeur =
-        controle ?? (o.outil === 'emf' ? niveauEmfSous(c, sous) : temperatureSous(c, sous))
-      const allume = !ex.eteinte
-
-      /* Le son : seul l'EMF en a, et seulement s'il marche et capte quelque chose. */
-      let gain = 0
-      if (o.outil === 'emf' && allume && valeur >= 0.5 && ou !== 'ailleurs') {
-        if (ou === 'main') gain = 1
-        else if (g && pos && placeId != null) {
-          const ici = planDe(placeId)
-          for (const p of pions) {
-            if (!joueur(p) || planDe(p.placeId) !== ici) continue
-            const t = trajet(pos, surPlan(p, g), g)
-            gain = Math.max(gain, gainSon(t.m, t.murs))
-          }
-        }
+    } else {
+      placeId = ex.placeId
+      if (ex.pos && ex.placeId != null) {
+        ou = 'lieu'
+        pos = ex.pos
+        if (ex.trouve) trouves.add(ex.placementId)
       }
-
-      out.push({
-        placementId: ex.id,
-        objetId: o.id,
-        nom: o.nom,
-        outil: o.outil,
-        ou,
-        placeId,
-        pos,
-        /* Posé : celui qui l'a posé depuis son téléphone — une trace qui ne
-           vaut que tant qu'il est dans le lieu. */
-        characterId: ex.port === 'pj' ? ex.characterId : ex.posePar,
-        allume,
-        valeur,
-        controle: controle !== undefined,
-        gain
-      })
     }
+    const g = placeId != null ? plan(placeId) : null
+    const c = g?.construction ?? null
+    const sous: PointCase | null = c && pos ? [pos.x * c.largeur, pos.y * c.hauteur] : null
+    const controle = controles.get(ex.placementId)
+    const valeur = controle ?? (ex.outil === 'emf' ? niveauEmfSous(c, sous) : temperatureSous(c, sous))
+    const allume = !ex.eteinte
+
+    /* Le son : seul l'EMF en a, et seulement s'il marche et capte quelque chose. */
+    let gain = 0
+    if (ex.outil === 'emf' && allume && valeur >= 0.5 && ou !== 'ailleurs') {
+      if (ou === 'main') gain = 1
+      else if (g && pos && placeId != null) {
+        const ici = planDe(placeId)
+        for (const p of pions) {
+          if (!joueur(p) || planDe(p.placeId) !== ici) continue
+          const t = trajet(pos, ouEstLePion(p, g), g)
+          gain = Math.max(gain, gainSon(t.m, t.murs))
+        }
+      }
+    }
+
+    out.push({
+      placementId: ex.placementId,
+      objetId: ex.objetId,
+      nom: ex.nom,
+      outil: ex.outil,
+      ou,
+      placeId,
+      pos,
+      /* Posé : celui qui l'a posé depuis son téléphone (le dépôt ne le rend
+         que pour un exemplaire dans un lieu). */
+      characterId: ex.port === 'pj' ? ex.characterId : ex.posePar,
+      allume,
+      valeur,
+      controle: controle !== undefined,
+      gain
+    })
   }
   /* Ce qui n'est plus un appareil — supprimé, plus un outil, jeté, rangé —
      perd le contrôle du MJ : il ne le retrouvera pas en revenant. */
   for (const id of controles.keys()) if (!out.some((a) => a.placementId === id)) controles.delete(id)
-  return out
+  return { appareils: out, trouves }
 }
 
 /** Tous les appareils, en main ou posés, avec ce qu'ils lisent en ce moment. */
 export function appareils(): AppareilChasse[] {
-  return calculer()
+  return calculer().appareils
 }
 
+/** Ce que les joueurs peuvent en percevoir : ni position, ni gain — ceux-là ne regardent que le MJ. */
+const vuDesJoueurs = (a: AppareilChasse[], trouves: Set<number>): string =>
+  JSON.stringify(
+    a.map((x) => [x.placementId, x.ou, x.placeId, x.characterId, x.valeur, x.allume, trouves.has(x.placementId)])
+  )
+
 /**
- * Recalculer, et prévenir qui doit l'être — mais seulement si quelque chose a
- * bougé : un pion qui glisse loin de tout appareil ne doit rien rediffuser.
+ * Recalculer, et prévenir qui doit l'être — seulement ce qui a changé.
+ *
+ * Le MJ reçoit `chasse:state` dès que quoi que ce soit bouge. La table et les
+ * téléphones ne sont rediffusés que si ce qu'ils voient a changé, et alors
+ * une seule fois : `display.broadcast` prévient aussi les téléphones.
+ * `diffuser = false` quand l'appelant diffuse juste après (un pas de pion,
+ * une porte, un objet donné) : l'état de la table est mis à jour sans partir.
  */
-export function recalculer(): void {
-  const a = calculer()
-  const json = JSON.stringify(a)
-  if (json === dernier) return
-  dernier = json
-  display.versMj('chasse:state', a)
-  mobile.broadcast()
-  display.chasseABouge(a)
+export function recalculer(diffuser = true): void {
+  const { appareils: a, trouves } = calculer()
+  const mj = JSON.stringify(a)
+  if (mj !== dernierMj) {
+    dernierMj = mj
+    display.versMj('chasse:state', a)
+  }
+  const vu = vuDesJoueurs(a, trouves)
+  if (vu === dernierVu) return
+  dernierVu = vu
+  /* La table ne reçoit, des appareils posés, que ceux qui sont trouvés (comme `objetsVus`). */
+  display.chasseABouge(
+    a.filter((x) => x.ou !== 'lieu' || trouves.has(x.placementId)),
+    diffuser
+  )
 }
 
 /**
@@ -197,7 +249,7 @@ export function recalculer(): void {
  * relit sa zone. La valeur est bornée à ce que l'appareil sait afficher.
  */
 export function controler(placementId: number, valeur: number | null): AppareilChasse[] {
-  const a = calculer().find((x) => x.placementId === placementId)
+  const a = appareils().find((x) => x.placementId === placementId)
   if (a && valeur !== null && Number.isFinite(valeur)) {
     const [min, max] = a.outil === 'emf' ? [0, 5] : [TEMPERATURE_MIN, TEMPERATURE_MAX]
     controles.set(placementId, Math.min(max, Math.max(min, valeur)))
@@ -209,17 +261,21 @@ export function controler(placementId: number, valeur: number | null): AppareilC
 /**
  * Le joueur peut-il lire cet appareil ? Le sien, en main, toujours ; un autre
  * seulement si son pion est sur le même plan, assez près, sans mur entre eux
- * — pas de lecture à distance dans le noir.
+ * — pas de lecture à distance dans le noir. Pour plusieurs appels de suite,
+ * passer un même `contexte()`.
  */
-export function lisiblePar(a: AppareilChasse, characterId: number): boolean {
+export function lisiblePar(
+  a: AppareilChasse,
+  characterId: number,
+  ctx: ContexteChasse = contexte()
+): boolean {
   if (a.ou === 'main' && a.characterId === characterId) return true
   if (a.ou === 'ailleurs' || a.placeId == null || !a.pos) return false
-  const plan = plans()
   const ici = planDe(a.placeId)
-  const g = plan(a.placeId)
-  return pionsPartout().some((p) => {
+  const g = ctx.plan(a.placeId)
+  return ctx.pions.some((p) => {
     if (p.characterId !== characterId || planDe(p.placeId) !== ici) return false
-    const t = trajet(a.pos!, surPlan(p, g), g)
+    const t = trajet(a.pos!, ouEstLePion(p, g), g)
     return t.m <= PORTEE_LECTURE_M && t.murs === 0
   })
 }
@@ -227,14 +283,16 @@ export function lisiblePar(a: AppareilChasse, characterId: number): boolean {
 /** Une campagne qu'on ferme emporte ses contrôles : les numéros d'exemplaire ne valent que pour elle. */
 export function oublier(): void {
   controles.clear()
-  dernier = null
+  dernierMj = '[]'
+  dernierVu = '[]'
 }
 
 export function brancher(): void {
-  /* Comme pour les sons : une erreur ici ne doit pas empêcher les pions de bouger. */
+  /* Comme pour les sons : une erreur ici ne doit pas empêcher les pions de
+     bouger. Pas de diffusion : `refreshPions` diffuse juste après. */
   display.ecouterPions(() => {
     try {
-      recalculer()
+      recalculer(false)
     } catch (e) {
       console.error('[chasse]', e)
     }

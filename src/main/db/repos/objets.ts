@@ -878,6 +878,58 @@ export function objetsVus(placeId: number | null): ObjetVu[] {
   }))
 }
 
+/** Un exemplaire d'outil de chasse, en main ou posé : ce que le moteur des appareils lit. */
+export interface ExemplaireOutil {
+  placementId: number
+  objetId: number
+  nom: string
+  outil: OutilChasse
+  port: 'pj' | 'lieu'
+  placeId: number | null
+  characterId: number | null
+  pos: { x: number; y: number } | null
+  posePar: number | null
+  eteinte: boolean
+  /** Posé et trouvé : seul celui-là peut se montrer à la table (comme `objetsVus`). */
+  trouve: boolean
+}
+
+/**
+ * Les exemplaires d'outils de chasse de la séance, en main ou posés — et
+ * rien d'autre. Une requête étroite : le moteur la relit à chaque pas de
+ * pion, il ne doit pas traîner toute la réserve avec lui.
+ */
+export function exemplairesOutils(): ExemplaireOutil[] {
+  const rows = getDb()
+    .prepare(
+      `SELECT p.id, p.objet_id AS objetId, o.nom, o.outil, p.port, p.place_id AS placeId,
+              p.character_id AS characterId, p.pos_x AS x, p.pos_y AS y,
+              p.pose_par AS posePar, p.eteinte, p.etat
+         FROM objet_placement p
+         JOIN objet o ON o.id = p.objet_id
+        WHERE o.outil IS NOT NULL AND p.port IN ('pj', 'lieu')
+          AND o.session_id = @session
+          AND (p.session_id = @session OR p.session_id IS NULL)
+        ORDER BY o.ord, o.id, p.ord, p.id`
+    )
+    .all({ session: activeSessionId() }) as any[]
+  return rows
+    .filter((r) => estOutil(r.outil))
+    .map((r) => ({
+      placementId: r.id,
+      objetId: r.objetId,
+      nom: r.nom,
+      outil: r.outil as OutilChasse,
+      port: r.port as 'pj' | 'lieu',
+      placeId: r.placeId,
+      characterId: r.characterId,
+      pos: r.port === 'lieu' && r.x != null && r.y != null ? { x: r.x, y: r.y } : null,
+      posePar: r.port === 'lieu' ? (r.posePar ?? null) : null,
+      eteinte: !!r.eteinte,
+      trouve: r.etat === 'trouve'
+    }))
+}
+
 function reprendreLibre(id: number): Objet | null {
   const db = getDb()
   const cur = db.prepare(`SELECT objet_id AS objetId FROM objet_placement WHERE id = ?`).get(id) as

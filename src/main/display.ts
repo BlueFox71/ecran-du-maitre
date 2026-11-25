@@ -674,8 +674,9 @@ export function ecouterPions(f: (placeId: number | null) => void): void {
 }
 
 /**
- * Les outils de chasse, tels que le moteur les a calculés la dernière fois.
- * L'écran n'en garde que les appareils posés sur le lieu à l'écran — le
+ * Les outils de chasse, tels que le moteur les a calculés la dernière fois —
+ * les appareils posés n'y sont que s'ils sont trouvés : le moteur fait ce
+ * tri, comme `objetsVus`. L'écran n'en garde que ceux du lieu à l'écran ; le
  * filtre est refait à chaque changement de lieu, sans attendre le moteur.
  */
 let appareils: AppareilChasse[] = []
@@ -687,11 +688,15 @@ function chasseDuLieu(): DisplayState['chasse'] {
     .map((a) => ({ placementId: a.placementId, outil: a.outil, valeur: a.valeur, allume: a.allume }))
 }
 
-/** Le moteur des outils de chasse a recalculé : la table relit ce qu'affichent les appareils posés. */
-export function chasseABouge(a: AppareilChasse[]): void {
+/**
+ * Le moteur des outils de chasse a recalculé : la table relit ce qu'affichent
+ * les appareils posés. `diffuser = false` quand une diffusion suit de toute
+ * façon (un pas de pion) : l'état change, il partira avec elle.
+ */
+export function chasseABouge(a: AppareilChasse[], diffuser = true): void {
   appareils = a
   state.chasse = chasseDuLieu()
-  broadcast()
+  if (diffuser) broadcast()
 }
 
 /** À rappeler après toute modification de pions : l'état vit ici, pas ailleurs. */

@@ -2,9 +2,9 @@ import { afterEach, beforeEach, expect, it, vi } from 'vitest'
 import { activer, fermerBaseEssai, lieu, objet, ouvrirBaseEssai, pj, pnj, placer, seance } from './base'
 
 /* L'écran et les téléphones : on n'en garde que ce que le moteur lit ou appelle. */
-const ecran = vi.hoisted(() => ({ placeId: null as number | null }))
+const ecran = vi.hoisted(() => ({ placeId: null as number | null, ratio: 1 }))
 vi.mock('../../display', () => ({
-  ratioEcran: () => 1,
+  ratioEcran: () => ecran.ratio,
   getState: () => ({ placeId: ecran.placeId }),
   versMj: vi.fn(),
   chasseABouge: vi.fn(),
@@ -14,12 +14,18 @@ vi.mock('../../mobile', () => ({
   repereDuPlan: () => ({ w: 1000, h: 1000 }),
   broadcast: vi.fn()
 }))
+/* Les pions, tels quels — on ne fait que compter qui les relit tous. */
+vi.mock('../repos/pions', async (importOriginal) => {
+  const m = await importOriginal<typeof import('../repos/pions')>()
+  return { ...m, pionsPartout: vi.fn(m.pionsPartout) }
+})
 
 import * as display from '../../display'
+import * as mobile from '../../mobile'
 import * as chasse from '../../chasse'
 import { getDb } from '../index'
 import * as objets from '../repos/objets'
-import { addPion } from '../repos/pions'
+import { addPion, pionsPartout } from '../repos/pions'
 import { addMur } from '../repos/murs'
 import { setConstruction } from '../repos/construction'
 import { gainSon, type AppareilChasse } from '@shared/chasse'
@@ -34,6 +40,7 @@ beforeEach(() => {
   activer(s)
   salle = lieu('Salle', s)
   ecran.placeId = salle
+  ecran.ratio = 1
   vi.clearAllMocks()
 })
 afterEach(() => {
@@ -228,6 +235,88 @@ it("recalculer n'envoie rien si rien n'a changé", () => {
   expect(display.versMj).toHaveBeenCalledTimes(1)
   expect(display.versMj).toHaveBeenCalledWith('chasse:state', expect.any(Array))
   expect(display.chasseABouge).toHaveBeenCalledTimes(1)
+  expect(mobile.broadcast).not.toHaveBeenCalled()
+})
+
+/** L'écouteur que le moteur inscrit auprès de l'écran : un pas de pion. */
+function pasDePion(): (placeId: number | null) => void {
+  chasse.brancher()
+  const f = vi.mocked(display.ecouterPions).mock.calls.at(-1)![0]
+  vi.clearAllMocks()
+  return f
+}
+
+it('un pas de pion, EMF en main sur un même niveau : rien ne part vers la table ni les téléphones', () => {
+  construire(salle, { emf: [{ id: 't', valeur: 3, rayon: 4, pts: [[5, 5]] }] })
+  const anna = pj('Anna')
+  const pion = addPion({ placeId: salle, characterId: anna, x: 0.5, y: 0.5 })
+  enMain(outil('EMF', 'emf'), anna)
+  const pas = pasDePion()
+  pas(salle)
+  /* Le premier calcul : le MJ l'apprend, l'état de la table change sans partir. */
+  expect(display.versMj).toHaveBeenCalledTimes(1)
+  expect(display.chasseABouge).toHaveBeenCalledWith(expect.any(Array), false)
+  vi.clearAllMocks()
+  for (const x of [0.52, 0.54]) {
+    getDb().prepare(`UPDATE pion SET x = ? WHERE id = ?`).run(x, pion.id)
+    pas(salle)
+  }
+  /* La position a changé : le MJ, une fois par pas ; la valeur non : personne d'autre. */
+  expect(display.versMj).toHaveBeenCalledTimes(2)
+  expect(display.chasseABouge).not.toHaveBeenCalled()
+  expect(mobile.broadcast).not.toHaveBeenCalled()
+})
+
+it('une valeur qui change sur un pas de pion met la table à jour sans diffuser', () => {
+  construire(salle)
+  const anna = pj('Anna')
+  const pion = addPion({ placeId: salle, characterId: anna, x: 0.1, y: 0.1 })
+  enMain(outil('EMF', 'emf'), anna)
+  const pas = pasDePion()
+  pas(salle)
+  vi.clearAllMocks()
+  getDb().prepare(`UPDATE pion SET x = 0.5, y = 0.5 WHERE id = ?`).run(pion.id)
+  pas(salle)
+  expect(display.chasseABouge).toHaveBeenCalledTimes(1)
+  expect(display.chasseABouge).toHaveBeenCalledWith(expect.any(Array), false)
+  expect(mobile.broadcast).not.toHaveBeenCalled()
+})
+
+it('une séance sans outil ne lit pas les pions et ne dit rien', () => {
+  addPion({ placeId: salle, characterId: pj('Anna'), x: 0.5, y: 0.5 })
+  objet(s, 'Clé')
+  const pas = pasDePion()
+  vi.mocked(pionsPartout).mockClear()
+  pas(salle)
+  chasse.recalculer()
+  expect(chasse.appareils()).toEqual([])
+  expect(pionsPartout).not.toHaveBeenCalled()
+  expect(display.versMj).not.toHaveBeenCalled()
+  expect(display.chasseABouge).not.toHaveBeenCalled()
+  expect(mobile.broadcast).not.toHaveBeenCalled()
+})
+
+it("la table ne reçoit pas un appareil posé qui n'est pas trouvé", () => {
+  const o = outil('EMF', 'emf')
+  const vu = pose(o, salle, 0.2, 0.2)
+  const cache = pose(o, salle, 0.8, 0.8)
+  getDb().prepare(`UPDATE objet_placement SET etat = 'cache' WHERE id = ?`).run(cache)
+  chasse.recalculer()
+  const envoyes = vi.mocked(display.chasseABouge).mock.calls[0][0].map((a) => a.placementId)
+  expect(envoyes).toContain(vu)
+  expect(envoyes).not.toContain(cache)
+  /* Le MJ, lui, les voit tous. */
+  expect(chasse.appareils().map((a) => a.placementId)).toEqual(expect.arrayContaining([vu, cache]))
+})
+
+it("un pion dans une bande de l'écran s'entend d'où il est, sans être ramené au bord", () => {
+  /* Écran deux fois plus large que le plan carré : x = 0,99 à l'écran tombe à 1,48 sur le plan. */
+  ecran.ratio = 2
+  construire(salle, { emf: [{ id: 't', valeur: 4, rayon: 1.5, pts: [[10, 5]] }] })
+  const pl = pose(outil('EMF', 'emf'), salle, 0.99, 0.5)
+  addPion({ placeId: salle, characterId: pj('Anna'), x: 0.99, y: 0.5 })
+  expect(de(pl)!.valeur).toBe(4)
+  expect(de(pl)!.gain).toBeCloseTo(gainSon(0.49 * 30, 0), 5)
 })
 
 it('lisiblePar : le porteur, ou un pion proche sans mur', () => {
@@ -237,7 +326,7 @@ it('lisiblePar : le porteur, ou un pion proche sans mur', () => {
   addPion({ placeId: salle, characterId: anna, x: 0.5, y: 0.5 })
   const pl = pose(outil('EMF', 'emf'), salle, 0.5, 0.5)
   const a = de(pl)!
-  expect(chasse.lisiblePar(a, anna)).toBe(true)
+  expect(chasse.lisiblePar(a, anna, chasse.contexte())).toBe(true)
   expect(chasse.lisiblePar(a, bob)).toBe(false)
   addPion({ placeId: salle, characterId: bob, x: 0.65, y: 0.5 })
   expect(chasse.lisiblePar(a, bob)).toBe(true)

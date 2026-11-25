@@ -620,12 +620,13 @@ export function registerIpc(): void {
 
   /* Ce que le MJ range ou donne, les téléphones le voient : un joueur qui
      reçoit un objet doit le trouver dans son sac sans rien toucher. */
-  const remue = <T>(v: T): T => {
+  const remue = <T>(v: T, chasseRelue = false): T => {
     /* Un inventaire passé à la Pochette y montre ce qu'il tient : ce qui vient
        d'y entrer ou d'en sortir y entre ou en sort aussi. */
     if (pochette.suivreInventaires()) display.versMj('pochette:changee', null)
-    /* Un outil de chasse donné, posé, rangé, éteint : ce qu'il lit change. */
-    chasse.recalculer()
+    /* Un outil de chasse donné, rangé, éteint : ce qu'il lit change. Sans
+       diffusion de plus — les téléphones sont prévenus juste après. */
+    if (!chasseRelue) chasse.recalculer(false)
     mobile.broadcast()
     return v
   }
@@ -634,8 +635,10 @@ export function registerIpc(): void {
      compteur ; le calque ne laisse passer, d'un objet, que le nom et la place
      des exemplaires trouvés (`objets.objetsVus`). */
   const eclaireAutrement = <T>(v: T): T => {
+    /* Les outils de chasse d'abord : un appareil posé part avec ce calque. */
+    chasse.recalculer(false)
     display.calqueABouge()
-    return remue(v)
+    return remue(v, true)
   }
 
   on('objets:list', () => ({
@@ -743,6 +746,8 @@ export function registerIpc(): void {
   on('murs:add', (input: any) => {
     const m = murs.addMur(input)
     piecesSuivent(m?.placeId)
+    /* Un mur étouffe l'EMF et cache sa lecture : le MJ entend la différence. */
+    chasse.recalculer(false)
     return m
   })
   /* Ce qui vient de l'atelier ne se retouche que dans l'atelier : sinon le
@@ -753,6 +758,7 @@ export function registerIpc(): void {
     if (cur && murVerrouille(cur)) throw new Error(VERROU)
     const m = murs.updateMur(id, patch)
     if (patch && ('pts' in patch || 'nature' in patch)) piecesSuivent(m?.placeId)
+    chasse.recalculer(false)
     /* Tirer ou ouvrir un rideau change ce que les joueurs voient : on le leur
        dit. Déplacer un trait, non — le tracé ne regarde que le MJ, et un
        calque rediffusé à chaque point d'une polyligne ferait clignoter la
@@ -766,6 +772,7 @@ export function registerIpc(): void {
     const placeId = cur?.placeId
     murs.removeMur(id)
     piecesSuivent(placeId)
+    chasse.recalculer(false)
   })
 
   /* ---------------- l'atelier des lieux ---------------- */
@@ -790,12 +797,18 @@ export function registerIpc(): void {
   )
 
   on('ouvertures:of', (placeId: number | null) => ouvertures.listOuvertures(placeId))
-  on('ouvertures:add', (input: any) => ouvertures.addOuverture(input))
+  on('ouvertures:add', (input: any) => {
+    const o = ouvertures.addOuverture(input)
+    chasse.recalculer(false)
+    return o
+  })
   on('ouvertures:update', (id: number, patch: any) => {
     const cur = ouvertures.getOuverture(id)
     if (cur && !modifOuvertureAutorisee(cur, patch ?? {}))
       throw new Error('Cette ouverture vient de l’atelier : on l’y déplace, ici on l’ouvre ou on la verrouille')
     const o = ouvertures.updateOuverture(id, patch)
+    /* Une porte ouverte laisse passer le son des EMF, et leur lecture. */
+    chasse.recalculer(false)
     /* Ouvrir une porte change ce que les joueurs voient : on le leur dit. */
     display.calqueABouge()
     mobile.revoirDemandesPorte()
@@ -805,10 +818,12 @@ export function registerIpc(): void {
     if (ouvertures.getOuverture(id)?.atelierId)
       throw new Error('Cette ouverture vient de l’atelier : elle s’efface dans l’atelier')
     ouvertures.removeOuverture(id)
+    chasse.recalculer(false)
     mobile.revoirDemandesPorte()
   })
   on('ouvertures:fermerPortes', (placeId: number) => {
     const n = ouvertures.fermerLesPortes(placeId)
+    chasse.recalculer(false)
     display.calqueABouge()
     mobile.revoirDemandesPorte()
     return n
@@ -1384,7 +1399,7 @@ export function registerIpc(): void {
     if (r.pions) display.refreshPions()
     /* La régie relit : demandes de feu vert et temps morts repartent aussi de zéro. */
     if (choix.sons) regieSon.toutRearmer()
-    chasse.recalculer()
+    chasse.recalculer(false)
     display.refreshJoueurs()
     display.versMj('characters:relus', null)
     if (pochette.suivreInventaires()) display.versMj('pochette:changee', null)
