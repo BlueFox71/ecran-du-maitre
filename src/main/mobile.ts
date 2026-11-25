@@ -249,8 +249,11 @@ function appareilDe(
 }
 
 /** L'état poussé à un appareil : celui du joueur suivi, et s'il ne fait que regarder. */
-function etatPour(ap: { playerId: number; spectateur: boolean }) {
-  return { ...etatJoueur(ap.playerId), spectateur: ap.spectateur }
+function etatPour(
+  ap: { playerId: number; spectateur: boolean },
+  appareils: ReturnType<typeof chasse.lecteurTelephones> = chasse.lecteurTelephones()
+) {
+  return { ...etatJoueur(ap.playerId, appareils), spectateur: ap.spectateur }
 }
 
 /**
@@ -592,10 +595,12 @@ export function poserJetsAttendus(liste: { characterId: number; titre: string; c
 /** Pousse l'état à tous les téléphones. Appelé quand le PC change quelque chose. */
 export function broadcast(): void {
   if (flux.size === 0 || !isDbOpen()) return
+  /* Les appareils de chasse se lisent une fois pour tous les téléphones. */
+  const appareils = chasse.lecteurTelephones()
   for (const [token, liste] of flux) {
     const ap = appareilDe(token)
     if (!ap) continue
-    const etat = etatPour(ap)
+    const etat = etatPour(ap, appareils)
     for (const { abonne } of liste) abonne.etat(etat)
   }
 }
@@ -605,7 +610,7 @@ export function broadcast(): void {
  * l'écran, les pions dessus. On ne lui envoie rien d'autre — ni la
  * préparation du MJ, ni ce que voient les autres.
  */
-function etatJoueur(playerId: number) {
+function etatJoueur(playerId: number, appareils: ReturnType<typeof chasse.lecteurTelephones>) {
   const joueur = players.getPlayer(playerId)
   const perso = joueur?.characterId != null ? chars.getCharacter(joueur.characterId) : null
   const fiche = chars.campaignSheet()
@@ -619,6 +624,7 @@ function etatJoueur(playerId: number) {
   const pions = placeId != null ? listPionsVus(placeId) : []
 
   const nomsObjets = nomsDesObjets()
+  const chasseDuJoueur = appareils(perso?.id ?? null, placeId)
   return {
     campagne: nomCampagne(),
     joueur: joueur
@@ -740,6 +746,9 @@ function etatJoueur(playerId: number) {
      * le sac du voisin.
      */
     objets: perso ? objets.objetsDe(perso.id).map(avecImage) : [],
+    /* Ses appareils de chasse, en main ou posés par lui, et ceux posés dans le lieu affiché. */
+    outils: chasseDuJoueur.outils,
+    appareilsPoses: chasseDuJoueur.appareilsPoses,
     /* Ce que tient son sac, pour qu'il sache avant de piocher s'il a la place. */
     sac: perso ? sacDe(perso.id) : null,
     /* Le jet de Volonté que le MJ attend de lui ; le spectateur, lui, ne l’affiche pas. */
@@ -984,6 +993,8 @@ function router(req: IncomingMessage, res: ServerResponse): void {
     if (chemin === '/api/pochette/lu') return void lireJson(req, res, (b) => pocheLu(res, url, b))
     if (chemin === '/api/mot/lu') return void lireJson(req, res, (b) => motLu(res, url, b))
     if (chemin === '/api/equiper') return void lireJson(req, res, (b) => equiper(res, url, b))
+    if (chemin === '/api/poser') return void lireJson(req, res, (b) => poserRamasser(res, url, b, chasse.poserOutil))
+    if (chemin === '/api/ramasser') return void lireJson(req, res, (b) => poserRamasser(res, url, b, chasse.ramasserOutil))
     if (chemin === '/api/allumer') return void lireJson(req, res, (b) => allumer(res, url, b))
     if (chemin === '/api/prendre') return void lireJson(req, res, (b) => prendre(res, url, b))
     if (chemin === '/api/remettre') return void lireJson(req, res, (b) => remettre(res, url, b))
@@ -1437,6 +1448,39 @@ function allumer(res: ServerResponse, url: URL, corps: any): void {
   display.calqueABouge()
   versMj('objets:changes', null)
   chasse.recalculer(false)
+  broadcast()
+  json(res, 200, { ok: true })
+}
+
+/**
+ * Poser un appareil sous son pion, ou ramasser celui qu'on a devant soi. Le
+ * moteur juge (porteur, distance, murs) et rend la raison d'un refus ; ici on
+ * ne garde que la garde commune et la diffusion.
+ */
+function poserRamasser(
+  res: ServerResponse,
+  url: URL,
+  corps: any,
+  geste: (characterId: number, placementId: number) => string | null
+): void {
+  const ap = exige(res, url)
+  if (!ap) return
+  const joueur = players.getPlayer(ap.playerId)
+  const perso = joueur?.characterId != null ? chars.getCharacter(joueur.characterId) : null
+  if (!perso) return json(res, 409, { erreur: 'Aucun personnage ne t’est attribué.' })
+  const placementId = Number(corps.placementId)
+  if (!Number.isInteger(placementId)) return json(res, 400, { erreur: 'Objet inconnu.' })
+  let refus: string | null
+  try {
+    refus = geste(perso.id, placementId)
+  } catch (e) {
+    return refuse(res, e)
+  }
+  if (refus) return json(res, 409, { erreur: refus })
+  /* L'appareil change de main : la table relit ses calques, le MJ son inventaire. */
+  chasse.recalculer(false)
+  display.calqueABouge()
+  versMj('objets:changes', null)
   broadcast()
   json(res, 200, { ok: true })
 }

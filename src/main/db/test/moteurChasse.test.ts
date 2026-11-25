@@ -335,3 +335,96 @@ it('lisiblePar : le porteur, ou un pion proche sans mur', () => {
   addPion({ placeId: salle, characterId: bob, x: 0.5, y: 0.8 })
   expect(chasse.lisiblePar(a, bob)).toBe(false)
 })
+
+/* ---------------- poser et ramasser depuis le téléphone ---------------- */
+
+const exemplaire = (id: number) => objets.exemplairesOutils().find((e) => e.placementId === id)
+
+it("poser met l'EMF sous le pion, trouvé, posé par lui", () => {
+  const anna = pj('Anna')
+  addPion({ placeId: salle, characterId: anna, x: 0.3, y: 0.4 })
+  const pl = enMain(outil('EMF', 'emf'), anna)
+  expect(chasse.poserOutil(anna, pl)).toBeNull()
+  expect(exemplaire(pl)).toMatchObject({ port: 'lieu', placeId: salle, posePar: anna, trouve: true, pos: { x: 0.3, y: 0.4 } })
+  expect(de(pl)).toMatchObject({ ou: 'lieu', characterId: anna })
+})
+
+it("poser d'une pile de deux n'en pose qu'un", () => {
+  const anna = pj('Anna')
+  addPion({ placeId: salle, characterId: anna, x: 0.3, y: 0.4 })
+  const o = outil('EMF', 'emf')
+  const pl = placer(o, s, { port: 'pj', characterId: anna, etat: 'porte', qte: 2 })
+  expect(chasse.poserOutil(anna, pl)).toBeNull()
+  const tous = objets.exemplairesOutils()
+  expect(tous.filter((e) => e.port === 'lieu')).toHaveLength(1)
+  expect(tous.filter((e) => e.port === 'pj')).toHaveLength(1)
+  expect(getDb().prepare(`SELECT qte FROM objet_placement WHERE id = ?`).get(pl)).toEqual({ qte: 1 })
+})
+
+it("on ne pose pas l'EMF d'un autre, ni sans pion", () => {
+  const anna = pj('Anna')
+  const bob = pj('Bob')
+  addPion({ placeId: salle, characterId: anna, x: 0.3, y: 0.4 })
+  const pl = enMain(outil('EMF', 'emf'), anna)
+  expect(chasse.poserOutil(bob, pl)).not.toBeNull()
+  expect(exemplaire(pl)!.port).toBe('pj')
+  const cleo = pj('Cléo')
+  const sien = enMain(outil('Thermo', 'thermometre'), cleo)
+  expect(chasse.poserOutil(cleo, sien)).toMatch(/pion/)
+})
+
+function posee(): { anna: number; bob: number; pl: number } {
+  const anna = pj('Anna')
+  const bob = pj('Bob')
+  addPion({ placeId: salle, characterId: anna, x: 0.5, y: 0.5 })
+  addPion({ placeId: salle, characterId: bob, x: 0.505, y: 0.5 })
+  const pl = enMain(outil('EMF', 'emf'), anna)
+  expect(chasse.poserOutil(anna, pl)).toBeNull()
+  chasse.recalculer(false)
+  return { anna, bob, pl }
+}
+
+it('ramasser à côté : il passe dans les mains de celui qui le ramasse', () => {
+  const { bob, pl } = posee()
+  expect(chasse.ramasserOutil(bob, pl)).toBeNull()
+  expect(exemplaire(pl)).toMatchObject({ port: 'pj', characterId: bob, posePar: null })
+})
+
+it('ramasser trop loin est refusé', () => {
+  const { pl } = posee()
+  const loin = pj('Loin')
+  addPion({ placeId: salle, characterId: loin, x: 0.7, y: 0.5 })
+  expect(chasse.ramasserOutil(loin, pl)).toMatch(/loin/)
+  expect(exemplaire(pl)!.port).toBe('lieu')
+})
+
+it('ramasser à travers un mur est refusé', () => {
+  const { bob, pl } = posee()
+  addMur({ placeId: salle, nature: 'mur', pts: [[0.5025, 0], [0.5025, 1]] })
+  expect(chasse.ramasserOutil(bob, pl)).toMatch(/mur/)
+  expect(exemplaire(pl)!.port).toBe('lieu')
+})
+
+it("deux ramassages : le second est refusé et l'EMF n'est pas dupliqué", () => {
+  const { anna, bob, pl } = posee()
+  expect(chasse.ramasserOutil(bob, pl)).toBeNull()
+  expect(chasse.ramasserOutil(anna, pl)).toBe('Quelqu’un l’a déjà ramassé.')
+  expect(objets.exemplairesOutils()).toHaveLength(1)
+  expect(exemplaire(pl)).toMatchObject({ port: 'pj', characterId: bob })
+})
+
+it("le téléphone liste ses outils, et les appareils posés du lieu affiché", () => {
+  const { anna, bob, pl } = posee()
+  const lire = chasse.lecteurTelephones()
+  const a = lire(anna, salle)
+  expect(a.outils).toEqual([expect.objectContaining({ placementId: pl, ou: 'lieu', nom: 'EMF' })])
+  expect(a.appareilsPoses).toEqual([expect.objectContaining({ placementId: pl, outil: 'emf' })])
+  /* Bob n'en a posé aucun, mais le voit sur le plan. */
+  expect(lire(bob, salle).outils).toEqual([])
+  expect(lire(bob, salle).appareilsPoses).toHaveLength(1)
+  expect(lire(bob, null).appareilsPoses).toEqual([])
+  /* Anna s'éloigne : son EMF posé ne se lit plus. */
+  getDb().prepare(`UPDATE pion SET x = 0.9 WHERE character_id = ?`).run(anna)
+  chasse.recalculer(false)
+  expect(chasse.lecteurTelephones()(anna, salle).outils[0].valeur).toBeNull()
+})

@@ -17,13 +17,13 @@
  */
 import * as display from './display'
 import * as mobile from './mobile'
-import { exemplairesOutils } from './db/repos/objets'
+import { donner, exemplairesOutils, situer } from './db/repos/objets'
 import { pionsPartout } from './db/repos/pions'
 import { listMurs } from './db/repos/murs'
 import { listOuvertures } from './db/repos/ouvertures'
 import { getConstruction } from './db/repos/construction'
 import { echelleDe, planDe } from './db/repos/echelle'
-import { barrieres, seCroisent, type Barriere, type Pt } from '@shared/murs'
+import { barrieres, RAYON_PION, seCroisent, type Barriere, type Pt } from '@shared/murs'
 import {
   LARGEUR_PLAN_DEFAUT_M,
   PORTEE_LECTURE_M,
@@ -33,7 +33,9 @@ import {
   niveauEmfSous,
   pionSurPlan,
   temperatureSous,
-  type AppareilChasse
+  type AppareilChasse,
+  type AppareilPose,
+  type OutilTelephone
 } from '@shared/chasse'
 import type { Construction, PointCase } from '@shared/atelier'
 import type { Pion, PointMur } from '@shared/types'
@@ -48,6 +50,8 @@ const controles = new Map<number, number>()
  */
 let dernierMj = '[]'
 let dernierVu = '[]'
+/** Le dernier calcul : les téléphones le relisent à chaque diffusion sans tout refaire. */
+let dernier: Calcul | null = null
 
 /** Tout ce qu'il faut savoir d'un plan pour y situer, lire et entendre un appareil. */
 export interface Plan {
@@ -136,7 +140,7 @@ function calculer(): Calcul {
   /* Une séance sans outil ne coûte rien : ni pions, ni plans à lire. */
   if (exemplaires.length === 0) {
     controles.clear()
-    return { appareils: [], trouves: new Set() }
+    return (dernier = { appareils: [], trouves: new Set() })
   }
   const { pions, plan } = contexte()
   const affiche = display.getState().placeId
@@ -204,7 +208,7 @@ function calculer(): Calcul {
   /* Ce qui n'est plus un appareil — supprimé, plus un outil, jeté, rangé —
      perd le contrôle du MJ : il ne le retrouvera pas en revenant. */
   for (const id of controles.keys()) if (!out.some((a) => a.placementId === id)) controles.delete(id)
-  return { appareils: out, trouves }
+  return (dernier = { appareils: out, trouves })
 }
 
 /** Tous les appareils, en main ou posés, avec ce qu'ils lisent en ce moment. */
@@ -280,11 +284,113 @@ export function lisiblePar(
   })
 }
 
+/**
+ * Ce que les téléphones affichent des appareils, pour une diffusion : à créer
+ * **une fois** puis à appeler pour chaque téléphone. Sans outil dans la séance,
+ * ça ne coûte qu'une requête ; sinon on reprend le dernier calcul du moteur et
+ * on ne lit les pions et les plans que si un appareil posé est à juger.
+ */
+export function lecteurTelephones(): (
+  characterId: number | null,
+  placeId: number | null
+) => { outils: OutilTelephone[]; appareilsPoses: AppareilPose[] } {
+  if (exemplairesOutils().length === 0) return () => ({ outils: [], appareilsPoses: [] })
+  const { appareils: tous, trouves } = dernier ?? calculer()
+  let ctx: ContexteChasse | null = null
+  return (characterId, placeId) => {
+    const outils: OutilTelephone[] = []
+    if (characterId != null) {
+      for (const a of tous) {
+        /* En main, ou posé par lui (`characterId` vaut alors `posePar`). */
+        if (a.ou === 'ailleurs' || a.characterId !== characterId) continue
+        let valeur: number | null = a.valeur
+        if (a.ou === 'lieu') valeur = lisiblePar(a, characterId, (ctx ??= contexte())) ? a.valeur : null
+        outils.push({
+          placementId: a.placementId,
+          nom: a.nom,
+          outil: a.outil,
+          ou: a.ou,
+          allume: a.allume,
+          valeur
+        })
+      }
+    }
+    const appareilsPoses: AppareilPose[] =
+      placeId == null
+        ? []
+        : tous
+            .filter(
+              (a) =>
+                a.ou === 'lieu' &&
+                a.placeId != null &&
+                trouves.has(a.placementId) &&
+                (a.placeId === placeId || planDe(a.placeId) === placeId)
+            )
+            .map((a) => ({ placementId: a.placementId, outil: a.outil, valeur: a.valeur, allume: a.allume }))
+    return { outils, appareilsPoses }
+  }
+}
+
+/** Le pion du personnage : celui du lieu à l'écran d'abord, comme pour l'appareil qu'il tient. */
+function pionDe(characterId: number, pions: Pion[]): Pion | undefined {
+  const siens = pions.filter((p) => p.characterId === characterId)
+  const affiche = display.getState().placeId
+  return siens.find((q) => q.placeId === affiche) ?? siens[0]
+}
+
+/**
+ * Le joueur pose un de ses appareils sous son pion. Un seul, même d'une pile.
+ * `null` : fait ; sinon la raison du refus, à lui montrer.
+ */
+export function poserOutil(characterId: number, placementId: number): string | null {
+  const ex = exemplairesOutils().find((e) => e.placementId === placementId)
+  if (!ex || ex.port !== 'pj' || ex.characterId !== characterId) return 'Cet appareil n’est pas à toi.'
+  const { pions, plan } = contexte()
+  const p = pionDe(characterId, pions)
+  if (!p) return 'Ton pion n’est sur aucun lieu.'
+  const q = appareilEnMain(p, plan(p.placeId))
+  const avant = new Set(exemplairesOutils().map((e) => e.placementId))
+  donner(placementId, { port: 'lieu', placeId: p.placeId }, 1, characterId)
+  /* Une pile se détache : la part posée est une nouvelle ligne. */
+  const pose = exemplairesOutils().find(
+    (e) => e.port === 'lieu' && e.posePar === characterId && (e.placementId === placementId || !avant.has(e.placementId))
+  )
+  if (!pose) return 'Impossible de poser cet appareil.'
+  /* Un geste de jeu, pas de préparation : le lieu d'origine du MJ ne bouge pas. */
+  situer(pose.placementId, q, undefined, true)
+  return null
+}
+
+/**
+ * Le joueur ramasse un appareil posé : son pion doit être sur le même plan,
+ * tout près, sans mur entre eux. Deux joueurs qui tendent la main en même
+ * temps : le premier l'a, le second apprend qu'il n'y est plus.
+ */
+export function ramasserOutil(characterId: number, placementId: number): string | null {
+  const ex = exemplairesOutils().find((e) => e.placementId === placementId)
+  if (!ex || ex.port !== 'lieu' || !ex.trouve) return 'Quelqu’un l’a déjà ramassé.'
+  if (ex.placeId == null || !ex.pos) return 'Quelqu’un l’a déjà ramassé.'
+  const { pions, plan } = contexte()
+  const ici = planDe(ex.placeId)
+  const p = pions.find((q) => q.characterId === characterId && planDe(q.placeId) === ici)
+  if (!p) return 'Ton pion n’est pas dans ce lieu.'
+  const g = plan(ex.placeId)
+  const pion = ouEstLePion(p, g)
+  const pa = { x: pion.x * g.w, y: pion.y * g.h }
+  const pb = { x: ex.pos.x * g.w, y: ex.pos.y * g.h }
+  if (Math.hypot(pb.x - pa.x, pb.y - pa.y) > 3 * RAYON_PION * Math.max(g.w, g.h))
+    return 'Tu es trop loin pour le ramasser.'
+  if (g.murs.some((m) => seCroisent(pa, pb, m.a, m.b))) return 'Un mur te sépare de cet appareil.'
+  donner(placementId, { port: 'pj', characterId })
+  return null
+}
+
 /** Une campagne qu'on ferme emporte ses contrôles : les numéros d'exemplaire ne valent que pour elle. */
 export function oublier(): void {
   controles.clear()
   dernierMj = '[]'
   dernierVu = '[]'
+  dernier = null
 }
 
 export function brancher(): void {

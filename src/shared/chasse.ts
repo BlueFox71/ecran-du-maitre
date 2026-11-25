@@ -51,6 +51,25 @@ export interface AppareilChasse {
   gain: number
 }
 
+/** Un appareil sur la fiche du téléphone : porté, ou posé par son joueur. */
+export interface OutilTelephone {
+  placementId: number
+  nom: string
+  outil: OutilChasse
+  ou: 'main' | 'lieu'
+  allume: boolean
+  /** `null` quand le joueur ne peut pas le lire (posé loin de son pion, ou derrière un mur). */
+  valeur: number | null
+}
+
+/** Un appareil posé dans le lieu affiché, que le plan du téléphone dessine sous l'ombre. */
+export interface AppareilPose {
+  placementId: number
+  outil: OutilChasse
+  valeur: number
+  allume: boolean
+}
+
 /** Bornes d'une température peinte, en °C. */
 export const TEMPERATURE_MIN = -20
 export const TEMPERATURE_MAX = 35
