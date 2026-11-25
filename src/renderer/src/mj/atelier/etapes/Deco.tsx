@@ -33,6 +33,7 @@ import type { PropsEtape } from '../../modules/Atelier'
 import { CatalogueObjets } from '../Palette'
 import { contour, poignee } from '../dessin'
 import { ImportAsset } from '../ImportAsset'
+import { EtapeMesures } from './Mesures'
 
 /** Où se tient la poignée de rotation : au-dessus de l'objet, en cases. */
 const ECART_ROTATION = 0.45
@@ -160,7 +161,7 @@ function CaseGroupe({
   )
 }
 
-export function EtapeDeco(props: PropsEtape): JSX.Element {
+function EtapeObjets(props: PropsEtape): JSX.Element {
   const { co, assets, setOutil, repeindre } = props
   const objets = assets.filter((a) => a.type === 'objet')
   const [arme, setArme] = useState<AssetAtelier | null>(null)
@@ -644,6 +645,31 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
         onChoisir={onChoisir}
         apres={<ImportAsset {...props} typeParDefaut="objet" />}
       />
+    </div>
+  )
+}
+
+type Mode = 'objets' | 'emf' | 'temperature'
+
+const MODES: { id: Mode; label: string }[] = [
+  { id: 'objets', label: 'Objets' },
+  { id: 'emf', label: 'EMF' },
+  { id: 'temperature', label: 'Température' }
+]
+
+/** L'étape Objets : poser la déco, ou peindre les zones d'EMF et de température que lisent les outils de chasse. */
+export function EtapeDeco(props: PropsEtape): JSX.Element {
+  const [mode, setMode] = useState<Mode>('objets')
+  return (
+    <div className="at-colonne">
+      <div className="at-outils">
+        {MODES.map((m) => (
+          <button key={m.id} className="btn btn-sm" aria-pressed={mode === m.id} onClick={() => setMode(m.id)}>
+            {m.label}
+          </button>
+        ))}
+      </div>
+      {mode === 'objets' ? <EtapeObjets {...props} /> : <EtapeMesures {...props} calque={mode} />}
     </div>
   )
 }
