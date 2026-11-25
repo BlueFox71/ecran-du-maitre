@@ -38,6 +38,7 @@ import * as rolls from '../db/repos/rolls'
 import * as pions from '../db/repos/pions'
 import * as display from '../display'
 import * as tours from '../tours'
+import * as voix from '../voix'
 import * as prepa from '../preparation'
 import * as regieSon from '../sons'
 import * as sons from '../db/repos/sons'
@@ -161,6 +162,13 @@ export function registerIpc(): void {
   /* Le panneau d'émojis du système (Windows + point) : il écrit dans le
      champ qui a la main, comme si on l'avait ouvert au clavier. */
   on('app:emojis', () => app.showEmojiPanel())
+
+  /* La Spirit Box : les voix de Windows, et le texte du MJ prononcé en WAV
+     (hors ligne). Pas de pas de Ctrl+Z : rien n'est écrit en base. */
+  ipcMain.handle('spirit:voix', () => voix.voixInstallees())
+  ipcMain.handle('spirit:parler', (_e, texte: string, nomVoix: string | null, debit: number) =>
+    voix.parler(texte, nomVoix, debit)
+  )
 
   /*
    * Le portrait du MJ, pris n'importe où sur le disque. Il suit le maître du
@@ -763,9 +771,6 @@ export function registerIpc(): void {
   on('atelier:ajouterNiveau', (placeId: number) => atelier.ajouterNiveau(placeId))
   on('atelier:de', (placeId: number) => atelier.de(placeId))
   on('atelier:assets', () => atelierAssets.tousLesAssets())
-  on('atelier:profils', () => atelierAssets.profils())
-  on('atelier:choisirProfil', (nom: string | null) => atelierAssets.choisirProfil(nom))
-  on('atelier:assetsPrives', (nom: string) => atelierAssets.assetsPrivesDe(nom))
   on('atelier:importer', (meta: any, png: Uint8Array) => atelierAssets.importer(meta, png))
   on('atelier:retirerAsset', (id: string) => atelierAssets.retirer(id))
   on(

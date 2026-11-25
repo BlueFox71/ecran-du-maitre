@@ -29,6 +29,13 @@ extraResources:
   # servi par l'Écran lui-même. Ses données restent dans leur dossier du disque.
   - from: resources/wow
     to: wow
+  # La police « Help Me » du livre d'écriture (licence SIL OFL 1.1) : la licence
+  # doit accompagner chaque copie distribuée.
+  - from: src/renderer/src/assets/chasse/polices/HelpMe-Licence-OFL.txt
+    to: licences/HelpMe-OFL.txt
+  # La police « DSEG7 » de l'écran du thermomètre (licence SIL OFL 1.1).
+  - from: src/renderer/src/assets/chasse/polices/DSEG-Licence-OFL.txt
+    to: licences/DSEG-OFL.txt
 win:
   target:
     - target: nsis

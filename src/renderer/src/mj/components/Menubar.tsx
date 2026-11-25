@@ -6,7 +6,6 @@ import { useEchap } from '../echap'
 import type { Rubrique } from './parametres/registre'
 import { MATIERES_RAIL } from '@shared/reglages'
 import { nouvelleCampagne } from './NouvelleCampagne'
-import { AssetsPrives } from './AssetsPrives'
 
 /**
  * La barre de menus, en haut à gauche — là où tous les logiciels la mettent.
@@ -68,16 +67,6 @@ export function Menubar({
   useEffect(() => {
     void window.jdr.app.modePortable().then(setPortable)
   }, [ouvert])
-  /* Les profils de l'atelier, pour « Voir les assets privés de … ». */
-  const [profils, setProfils] = useState<string[]>([])
-  const [voirPrives, setVoirPrives] = useState<string | null>(null)
-  useEffect(() => {
-    if (portable === null) return
-    window.jdr.atelier.profils().then(
-      (p) => setProfils(p.liste.map((x) => x.nom)),
-      () => setProfils([])
-    )
-  }, [ouvert, portable])
   const reference = s.sessions.find((x) => x.label.startsWith('Référence dev'))
   const recentes = s.recents.filter((r) => r.path !== s.project?.dir).slice(0, 6)
 
@@ -241,13 +230,8 @@ export function Menubar({
               }}
             />
           ) : null}
-          {profils.length ? <hr /> : null}
-          {profils.map((nom) => (
-            <Mi key={nom} label={`Voir les assets privés de ${nom}…`} on={() => setVoirPrives(nom)} />
-          ))}
         </Menu>
       ) : null}
-      {voirPrives ? <AssetsPrives nom={voirPrives} onClose={() => setVoirPrives(null)} /> : null}
 
       <Menu nom="Aide" id="aide" droite ouvert={ouvert} onOuvrir={setOuvert}>
         <Mi label="Raccourcis de table…" on={() => onParametres('touches')} />

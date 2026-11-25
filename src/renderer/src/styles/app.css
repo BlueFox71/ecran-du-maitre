@@ -412,121 +412,11 @@
   align-items: baseline;
   gap: 8px;
 }
-/* « Voir les assets privés de … » : une grille de vignettes, par rayon. */
-.modal.assets-prives.large {
-  width: min(980px, 100%);
-  height: min(820px, 100%);
-}
-.ap-groupe {
-  display: grid;
-  gap: 6px;
-}
-.ap-grille {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
-  gap: 8px;
-}
-.ap-asset {
-  display: grid;
-  gap: 4px;
-  margin: 0;
-  padding: 6px;
-  border-radius: 8px;
-  background: var(--sunk);
-}
-.ap-asset img {
-  width: 100%;
-  aspect-ratio: 1;
-  object-fit: contain;
-}
-.ap-asset figcaption {
-  font-size: 11px;
-  line-height: 1.25;
-  color: var(--text-dim);
-  text-align: center;
-}
-/* Le profil, à gauche de la version : il prend toute la largeur libre, et
-   sa liste s'ouvre vers le haut. */
 .session-version {
   display: flex;
   align-items: baseline;
   gap: 8px;
   flex: none;
-}
-.choix-profil {
-  position: relative;
-  flex: 1;
-  min-width: 0;
-}
-.choix-profil-bouton {
-  display: flex;
-  align-items: baseline;
-  gap: 6px;
-  width: 100%;
-  padding: 2px 6px;
-  margin-left: -6px;
-  border: 1px solid transparent;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  cursor: pointer;
-}
-.session-row .choix-profil-bouton b {
-  flex: 1;
-  text-align: left;
-}
-.choix-profil-bouton:hover,
-.choix-profil-bouton[aria-expanded='true'] {
-  border-color: var(--line);
-  background: var(--sunk);
-}
-.choix-profil-chevron {
-  font-size: 9px;
-  color: var(--text-faint);
-}
-.choix-profil-liste {
-  position: absolute;
-  bottom: calc(100% + 6px);
-  left: -6px;
-  right: 0;
-  z-index: 50;
-  min-width: 190px;
-  margin: 0;
-  padding: 4px;
-  list-style: none;
-  border: 1px solid var(--line);
-  border-radius: 8px;
-  background: var(--surface);
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
-}
-.choix-profil-liste button {
-  display: grid;
-  gap: 1px;
-  width: 100%;
-  padding: 6px 9px;
-  border: 0;
-  border-radius: 6px;
-  background: transparent;
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.choix-profil-liste button:hover {
-  background: var(--sunk);
-}
-.choix-profil-liste button[aria-selected='true'] {
-  background: var(--brass-wash);
-  color: var(--brass-ink);
-}
-.choix-profil-liste .nom {
-  font-weight: 600;
-  font-size: 13px;
-}
-.choix-profil-liste .quoi {
-  font-size: 11px;
-  color: var(--text-faint);
 }
 .session-row b {
   font-family: 'IBM Plex Mono', monospace;
@@ -26576,15 +26466,6 @@ body.surligneur-actif [data-cible] {
    L'atelier des lieux
    ============================================================ */
 
-.at-accueil-corps {
-  display: grid;
-  gap: 18px;
-  max-width: 720px;
-}
-.at-bloc {
-  display: grid;
-  gap: 8px;
-}
 .at-ligne {
   display: flex;
   gap: 8px;
@@ -26598,38 +26479,6 @@ body.surligneur-actif [data-cible] {
   background: var(--surface);
   color: var(--text);
   font: inherit;
-}
-.at-liste {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
-  gap: 6px;
-}
-.at-lieu {
-  width: 100%;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 9px 12px;
-  border: 1px solid var(--line);
-  border-radius: 6px;
-  background: var(--raised);
-  color: var(--text);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.at-lieu:hover {
-  border-color: var(--brass-line);
-  background: var(--brass-wash);
-}
-.at-lieu svg {
-  flex: none;
-  width: 16px;
-  height: 16px;
-  color: var(--brass);
 }
 .at-vide {
   margin: 0;
@@ -27282,49 +27131,6 @@ button.at-titre:hover {
 
 /* Un lieu construit dans la liste de l'atelier, et sa corbeille, posée
    dans la tuile, à droite. */
-.at-lieu-ligne {
-  position: relative;
-}
-.at-lieu-ligne .at-lieu {
-  padding-right: 40px;
-}
-.at-lieu-ligne .at-lieu span {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-.at-lieu-suppr {
-  position: absolute;
-  top: 50%;
-  right: 6px;
-  transform: translateY(-50%);
-  display: grid;
-  place-items: center;
-  width: 28px;
-  height: 28px;
-  padding: 0;
-  border: 0;
-  border-radius: 5px;
-  background: transparent;
-  color: var(--text-dim);
-  cursor: pointer;
-}
-.at-lieu-suppr svg {
-  width: 15px;
-  height: 15px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 1.5;
-}
-.at-lieu-suppr:hover:not(:disabled) {
-  background: rgba(0, 0, 0, 0.25);
-  color: var(--blood);
-}
-.at-lieu-suppr:disabled {
-  opacity: 0.3;
-  cursor: not-allowed;
-}
 
 /* Le voile de chargement du chantier : tant que la dernière image n'est pas là. */
 .at-chargement {
@@ -27498,4 +27304,886 @@ button.at-titre:hover {
 .imp-ligne .sub {
   font-size: 11px;
   color: var(--text-faint);
+}
+
+/* ============================================================
+   L'EMF — le détecteur du chasseur de fantômes (modules/Emf.tsx)
+   ============================================================ */
+/* ---- Simulation Objets : une case par objet ---- */
+.simu-vue {
+  overflow-y: auto;
+}
+/* Le menu des objets : un bouton par objet, sa photo et son nom. */
+.simu-menu {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.simu-menu-objet {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  width: 118px;
+  padding: 8px 8px 7px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: 10px;
+  cursor: pointer;
+}
+.simu-menu-objet:hover {
+  color: var(--text);
+  border-color: var(--line);
+}
+.simu-menu-objet.on {
+  color: var(--brass-ink);
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+}
+.simu-vignette {
+  width: 100%;
+  height: 72px;
+  object-fit: contain;
+  border-radius: 6px;
+  background: var(--sunk);
+  user-select: none;
+}
+/* Le thermomètre : sur sa photo haute, on cadre l'écran et la tête. */
+.simu-vignette.v-thermometre {
+  object-fit: cover;
+  object-position: 50% 14%;
+}
+.simu-vignette.v-spirit {
+  object-fit: cover;
+  object-position: 50% 42%;
+}
+.simu-vignette.v-planche {
+  object-fit: cover;
+}
+.simu-vignette.v-livre {
+  object-fit: cover;
+}
+.simu-case[hidden] {
+  display: none;
+}
+.simu-case {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+  padding: 14px;
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+}
+.simu-case header h3 {
+  margin: 0;
+  font-size: 15px;
+}
+.simu-case header p {
+  margin: 2px 0 0;
+  font-size: 12px;
+  color: var(--text-faint);
+}
+/* L'EMF dans sa case : l'appareil à gauche, ses commandes à droite. */
+.emf-case {
+  display: grid;
+  /* L'appareil à sa taille, les commandes à côté : rien ne s'étire. */
+  justify-content: start;
+  grid-template-columns: auto minmax(180px, 440px);
+  gap: 16px;
+  align-items: start;
+}
+.emf-appareil {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 12px;
+  background: radial-gradient(circle at 50% 40%, var(--raised), var(--sunk));
+  border: 1px solid var(--line-soft);
+  border-radius: 12px;
+}
+.emf-photo {
+  position: relative;
+  height: 420px;
+  aspect-ratio: 348 / 908;
+}
+.emf-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  filter: drop-shadow(0 10px 24px rgba(0, 0, 0, 0.6));
+}
+/* Une LED allumée : la photo allumée, découverte dans un cercle autour d'elle
+   (clip-path posé dans le composant), exactement sur la photo éteinte. */
+.emf-photo img.emf-allumee {
+  position: absolute;
+  inset: 0;
+  filter: none;
+}
+/* Et la lumière qui en déborde. */
+.emf-halo {
+  position: absolute;
+  aspect-ratio: 1;
+  translate: -50% -50%;
+  border-radius: 50%;
+  pointer-events: none;
+  background: radial-gradient(
+    circle,
+    color-mix(in oklab, var(--led) 55%, transparent) 0,
+    color-mix(in oklab, var(--led) 18%, transparent) 35%,
+    transparent 70%
+  );
+  mix-blend-mode: screen;
+}
+.emf-commandes {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.emf-champ {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.emf-champ input[type='range'] {
+  width: 100%;
+  accent-color: var(--brass);
+}
+.emf-paliers {
+  display: flex;
+  gap: 4px;
+}
+.emf-paliers .btn {
+  flex: 1;
+  justify-content: center;
+}
+.emf-ligne {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.emf-aide {
+  font-size: 12px;
+  color: var(--text-faint);
+}
+
+/* ============================================================
+   Le livre d'écriture fantôme (chasse/Livre.tsx)
+   ============================================================ */
+.livre-case {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+@media (max-width: 1100px) {
+  .livre-case {
+    flex-direction: column;
+  }
+}
+/* Tout se mesure en largeur du livre (cqw) : texte et crayon gardent leurs
+   proportions à toutes les tailles. */
+.livre {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  /* Tout le livre sous le menu des objets, sans faire défiler ; et jamais
+     démesuré sur un grand écran. */
+  max-width: min(1100px, calc((100vh - 380px) * 1.5));
+  container-type: inline-size;
+  aspect-ratio: 1536 / 1024;
+  border-radius: 8px;
+  overflow: hidden;
+  user-select: none;
+}
+.livre-fond {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+/* Les deux pages : deux colonnes, la gauche se remplit d'abord. Les bornes
+   sont celles du papier sur la photo (1536 × 1024). */
+.livre-texte {
+  position: absolute;
+  left: calc(100% * 165 / 1536);
+  top: calc(100% * 105 / 1024);
+  width: calc(100% * 1200 / 1536);
+  height: calc(100% * 800 / 1024);
+  columns: 2;
+  column-gap: calc(100cqw * 100 / 1536);
+  column-fill: auto;
+  /* On coupe au bord du papier, pas au cadre d'écriture : une boucle, une
+     lettre penchée, un texte incliné peuvent mordre sur la marge. */
+  overflow: clip;
+  overflow-clip-margin: 2.2cqw;
+  line-height: 1.3;
+  /* Le graphite : un gris sombre qui laisse voir le grain du papier. */
+  color: rgba(48, 44, 40, 0.88);
+  mix-blend-mode: multiply;
+  text-shadow: 0 0 0.04em rgba(40, 36, 32, 0.45);
+}
+/* Un passage est un bloc : il commence à la ligne, et pivote autour de son
+   début quand on l'incline. */
+.livre-passage {
+  display: block;
+  overflow-wrap: anywhere;
+}
+/* Droit, le passage est du texte ordinaire, qui passe d'une page à l'autre.
+   Incliné, il devient un bloc à sa largeur réelle, qui pivote autour de son début. */
+.livre-ligne {
+  display: inline;
+}
+.livre-ligne.inclinee {
+  display: inline-block;
+  max-width: 100%;
+  transform-origin: 0 50%;
+}
+/* Un passage à cheval sur les deux pages : il enjambe les deux colonnes,
+   par-dessus la pliure ; les passages d'une page reprennent en dessous. */
+.livre-passage.deux-pages {
+  column-span: all;
+}
+.livre-mot {
+  white-space: nowrap;
+}
+.livre-lettre {
+  display: inline-block;
+  visibility: hidden;
+}
+/* Une lettre se trace de gauche à droite, comme sous la mine. */
+.livre-lettre.vue {
+  visibility: visible;
+  animation: livre-trace 0.22s ease-out both;
+}
+@keyframes livre-trace {
+  from {
+    clip-path: inset(-20% 100% -20% -20%);
+    opacity: 0.4;
+  }
+  to {
+    clip-path: inset(-20% -20% -20% -20%);
+    opacity: 1;
+  }
+}
+/* La pointe du crayon est le coin bas gauche de son image. */
+.livre-crayon {
+  position: absolute;
+  width: 26cqw;
+  transform-origin: 0 100%;
+  pointer-events: none;
+  filter: drop-shadow(0.6cqw 1cqw 0.8cqw rgba(0, 0, 0, 0.45));
+  transition: left 0.12s linear, top 0.12s linear, transform 0.3s ease;
+}
+.livre-crayon.ecrit {
+  transition: left 0.08s linear, top 0.08s linear, transform 0.08s linear;
+}
+.livre-commandes {
+  flex: 0 0 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.livre-saisie {
+  width: 100%;
+  resize: vertical;
+  font: inherit;
+  padding: 8px 10px;
+  color: var(--text);
+  background: var(--sunk);
+  border: 1px solid var(--line);
+  border-radius: 8px;
+}
+.livre-ecritures {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+}
+.livre-ecritures .btn {
+  font-size: 15px;
+}
+.livre-reglages {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.livre-son {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--text-dim);
+}
+.livre-plein {
+  color: var(--orange);
+}
+/* L’aperçu de ce qui est dans le champ : en pâle, sans animation,
+   pas encore tracé. */
+.livre-lettre.livre-apercu {
+  visibility: visible;
+  opacity: 0.4;
+  color: rgba(70, 60, 50, 0.9);
+}
+/* « Help Me » — GGBotNet, licence SIL OFL 1.1 (voir assets/chasse/polices/HelpMe-Licence-OFL.txt).
+   Une écriture du livre d'écriture fantôme (chasse/ecriture.ts). */
+@font-face {
+  font-family: 'Help Me';
+  src: url('../assets/chasse/polices/HelpMe.ttf') format('truetype');
+  font-display: swap;
+}
+/* L'historique du livre : les derniers textes, un clic les remet dans le champ. */
+.livre-historique {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  max-height: 260px;
+  overflow-y: auto;
+}
+.livre-historique li {
+  display: flex;
+  align-items: flex-start;
+  gap: 2px;
+}
+.livre-historique-texte {
+  flex: 1;
+  min-width: 0;
+  /* Un long texte passe à la ligne : on le lit en entier. */
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  line-height: 1.35;
+  text-align: left;
+  padding: 4px 8px;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--text-dim);
+  background: var(--sunk);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.livre-historique-texte:hover {
+  color: var(--text);
+  border-color: var(--brass-line);
+}
+.livre-historique-ote {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  font-size: 15px;
+  line-height: 1;
+  color: var(--text-faint);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.livre-historique-ote:hover {
+  color: var(--blood);
+  background: var(--blood-wash);
+}
+/* Le dessin à main levée, par-dessus le texte : le même graphite. Il ne prend
+   la souris qu'en mode dessin, pour ne pas gêner le reste. */
+.livre-dessin {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  mix-blend-mode: multiply;
+}
+.livre-dessin.actif {
+  pointer-events: auto;
+  cursor: none;
+  touch-action: none;
+}
+.livre-dessin path {
+  fill: none;
+  stroke: rgba(48, 44, 40, 0.88);
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  filter: drop-shadow(0 0 0.6px rgba(40, 36, 32, 0.5));
+}
+/* En dessin, le crayon colle à la souris, sans retard. */
+.livre-crayon.dessine {
+  transition: none;
+}
+/* « DSEG7 Classic » — keshikan, licence SIL OFL 1.1 (voir assets/chasse/polices/DSEG-Licence-OFL.txt).
+   Les chiffres à segments de l'écran du thermomètre (chasse/Thermometre.tsx). */
+@font-face {
+  font-family: 'DSEG7 Classic';
+  src: url('../assets/chasse/polices/DSEG7Classic-Bold.woff2') format('woff2');
+  font-weight: 700;
+  font-display: swap;
+}
+
+/* ============================================================
+   Le thermomètre (chasse/Thermometre.tsx)
+   ============================================================ */
+/* La photo garde ses proportions ; tout l'écran se mesure en largeur de la photo (cqw). */
+.thermo {
+  position: relative;
+  height: 460px;
+  aspect-ratio: 499 / 1520;
+  container-type: inline-size;
+}
+.thermo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.55));
+}
+.thermo-ecran {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 0 4.5cqw;
+  border-radius: 1.2cqw;
+  color: #0c2a33;
+  /* Le rétroéclairage blanchit avec le froid (--froid de 0 à 1). */
+  background: color-mix(
+    in oklab,
+    rgba(255, 255, 255, 0.85) calc(var(--froid) * 55%),
+    transparent
+  );
+  transition: background 1.2s ease;
+}
+.thermo-ecran.eteint {
+  background: rgba(14, 32, 38, 0.92);
+}
+.thermo-unite {
+  font: 700 7cqw/1 'Archivo', sans-serif;
+  opacity: 0.8;
+}
+.thermo-chiffres {
+  position: relative;
+  font: 700 15.5cqw/1.1 'DSEG7 Classic', monospace;
+  letter-spacing: 0.02em;
+}
+/* Les segments éteints, à peine visibles derrière les chiffres. */
+.thermo-fond {
+  position: absolute;
+  right: 0;
+  opacity: 0.08;
+}
+.thermo-valeur {
+  position: relative;
+}
+
+/* ============================================================
+   La Spirit Box (chasse/SpiritBox.tsx) — la photo, et la fréquence dans
+   son écran ; tout se mesure en largeur de la photo (cqw).
+   ============================================================ */
+.spirit-photo {
+  position: relative;
+  height: 460px;
+  aspect-ratio: 629 / 1519;
+  container-type: inline-size;
+}
+.spirit-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  user-select: none;
+  filter: drop-shadow(0 10px 22px rgba(0, 0, 0, 0.55));
+}
+/* Éteinte, l'écran orange de la photo s'assombrit ; allumée, il est tel quel. */
+.spirit-ecran {
+  position: absolute;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: flex-end;
+  padding: 0 3.5cqw;
+  border-radius: 0.8cqw;
+  color: #3a1600;
+  background: rgba(28, 16, 6, 0.88);
+  transition: background 0.4s ease, filter 0.1s linear;
+}
+.spirit-photo.allume .spirit-ecran {
+  background: transparent;
+}
+/* Quand l'esprit parle, le rétroéclairage frémit. */
+.spirit-photo.parle .spirit-ecran {
+  animation: spirit-frisson 0.12s linear infinite alternate;
+}
+@keyframes spirit-frisson {
+  to {
+    background: rgba(255, 240, 200, 0.14);
+  }
+}
+.spirit-bande {
+  font: 700 3.4cqw/1 'Archivo', sans-serif;
+  opacity: 0.75;
+}
+.spirit-chiffres {
+  position: relative;
+  font: 700 9cqw/1.1 'DSEG7 Classic', monospace;
+}
+.spirit-fond {
+  position: absolute;
+  right: 0;
+  opacity: 0.09;
+}
+.spirit-valeur {
+  position: relative;
+}
+.spirit-reglages {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+/* Un objet sans photo dans le menu : son icône. */
+.simu-vignette-icone {
+  display: grid;
+  place-items: center;
+  width: 100%;
+  height: 72px;
+  border-radius: 6px;
+  background: var(--sunk);
+  color: var(--brass);
+}
+.simu-vignette-icone svg {
+  width: 34px;
+  height: 34px;
+}
+
+/* ============================================================
+   La planche de spiritisme (chasse/Planche.tsx)
+   ============================================================ */
+.planche-case {
+  display: flex;
+  gap: 16px;
+  align-items: flex-start;
+}
+@media (max-width: 1100px) {
+  .planche-case {
+    flex-direction: column;
+  }
+}
+/* Toute la planche sous le menu des objets, sans faire défiler. */
+.planche {
+  position: relative;
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  max-width: min(1050px, calc((100vh - 380px) * 1.5));
+  aspect-ratio: 1536 / 1024;
+  user-select: none;
+  /* La goutte chassée disparaît au bord de la planche. */
+  overflow: hidden;
+  border-radius: 10px;
+}
+.planche-fond {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+}
+/* La goutte : sa vitre est posée sur la case (translate et pivot réglés
+   dans le composant, autour du centre de la vitre). */
+.planche-goutte {
+  position: absolute;
+  width: 15%;
+  pointer-events: none;
+  filter: drop-shadow(0.5cqw 0.9cqw 0.7cqw rgba(0, 0, 0, 0.55))
+    drop-shadow(0 4px 10px rgba(0, 0, 0, 0.45));
+}
+.planche-commandes {
+  flex: 0 0 300px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.planche-touches {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 4px;
+}
+.planche-touches .btn {
+  justify-content: center;
+  padding-left: 0;
+  padding-right: 0;
+  font-weight: 600;
+}
+.planche-mots {
+  grid-template-columns: 1fr 1fr 2fr;
+}
+.planche-message {
+  min-height: 1.6em;
+  padding: 6px 8px;
+  font: 600 14px/1.4 'IBM Plex Mono', monospace;
+  color: var(--brass-ink);
+  background: var(--sunk);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  overflow-wrap: anywhere;
+}
+
+/* ============================================================
+   Le tarot de Marseille (chasse/Tarot.tsx)
+   ============================================================ */
+.tarot-case {
+  display: flex;
+  gap: 20px;
+  align-items: flex-start;
+}
+@media (max-width: 1100px) {
+  .tarot-case {
+    flex-direction: column;
+  }
+}
+.tarot-gauche {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+/* Le tapis : un feutre vert sombre, les cartes posées dessus. */
+.tarot-tapis {
+  min-height: 380px;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  align-items: flex-start;
+  gap: 22px;
+  padding: 20px 24px;
+  border-radius: 12px;
+  background: radial-gradient(ellipse at 50% 40%, #1f3b2c, #0d1c15 75%);
+  box-shadow: inset 0 0 40px rgba(0, 0, 0, 0.6);
+}
+.tarot-place {
+  margin: 0;
+  width: 190px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+.tarot-emplacement {
+  display: grid;
+  place-items: center;
+  align-self: center;
+  width: 150px;
+  aspect-ratio: 500 / 919;
+  padding: 12px;
+  text-align: center;
+  font-size: 12.5px;
+  color: #8fa58e;
+  border: 2px dashed rgba(185, 201, 184, 0.3);
+  border-radius: 8px;
+}
+.tarot-carte {
+  width: 150px;
+  aspect-ratio: 500 / 919;
+  padding: 0;
+  border: none;
+  background: none;
+  cursor: pointer;
+  perspective: 900px;
+  /* Le cadre du jeu hanté se mesure en largeur de carte. */
+  container-type: inline-size;
+}
+/* Posée depuis le jeu : elle glisse sur le tapis. */
+.tarot-carte.arrive {
+  animation: tarot-donne 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) both;
+}
+@keyframes tarot-donne {
+  from {
+    opacity: 0;
+    transform: translateY(60px) rotate(-5deg);
+  }
+}
+.tarot-interieur {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 100%;
+  transform-style: preserve-3d;
+  transition: transform 0.6s cubic-bezier(0.3, 0.7, 0.3, 1);
+}
+.tarot-carte.face .tarot-interieur {
+  transform: rotateY(180deg);
+}
+.tarot-dos,
+.tarot-recto {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  border-radius: 8px;
+  backface-visibility: hidden;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, 0.55);
+  user-select: none;
+}
+.tarot-recto {
+  transform: rotateY(180deg);
+}
+.tarot-carte:hover .tarot-dos {
+  box-shadow: 0 10px 22px rgba(0, 0, 0, 0.6), 0 0 0 2px var(--brass-line);
+}
+.tarot-retirer {
+  font-size: 11.5px;
+}
+/* Le texte de la carte : il apparaît quand elle est retournée. */
+.tarot-texte {
+  width: 100%;
+  min-height: 5em;
+  text-align: center;
+  opacity: 0;
+  transform: translateY(-4px);
+  transition: opacity 0.45s ease 0.35s, transform 0.45s ease 0.35s;
+}
+.tarot-texte.vu {
+  opacity: 1;
+  transform: none;
+}
+.tarot-texte strong {
+  display: block;
+  font-size: 13.5px;
+  color: var(--brass-ink);
+}
+.tarot-texte p {
+  margin: 4px 0 0;
+  font: italic 13px/1.45 'Fraunces Variable', serif;
+  color: #dfe6d8;
+}
+/* Le jeu : les 22 arcanes, à choisir. */
+.tarot-jeu {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, 66px);
+  justify-content: center;
+  gap: 6px;
+}
+.tarot-vignette {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3px;
+  padding: 4px 3px;
+  font: inherit;
+  font-size: 10.5px;
+  line-height: 1.15;
+  color: var(--text-dim);
+  background: var(--surface);
+  border: 1px solid var(--line-soft);
+  border-radius: 6px;
+  cursor: pointer;
+}
+.tarot-vignette img {
+  width: 100%;
+  aspect-ratio: 500 / 919;
+  object-fit: cover;
+  border-radius: 3px;
+  user-select: none;
+}
+.tarot-vignette:hover:not(:disabled) {
+  color: var(--text);
+  border-color: var(--brass-line);
+}
+.tarot-vignette:disabled {
+  cursor: default;
+  opacity: 0.35;
+}
+.tarot-vignette.posee {
+  opacity: 0.2;
+}
+.tarot-commandes {
+  flex: 0 0 280px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+/* Le cadre du jeu hanté : un carton jauni, un double filet, le chiffre
+   romain en haut, la photographie, le nom en bas. */
+.cadre-hante {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 3cqw;
+  padding: 7cqw 7cqw 6cqw;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 50% 45%, transparent 55%, rgba(70, 45, 15, 0.35) 100%),
+    linear-gradient(160deg, #eadcbc, #d8c49b 60%, #c9b07f);
+}
+/* Le double filet, à l'intérieur du bord. */
+.cadre-hante::before,
+.cadre-hante::after {
+  content: '';
+  position: absolute;
+  pointer-events: none;
+  border-radius: 1.5cqw;
+}
+.cadre-hante::before {
+  inset: 3cqw;
+  border: 0.9cqw solid #5a3d1c;
+}
+.cadre-hante::after {
+  inset: 4.8cqw;
+  border: 0.35cqw solid #8a6a3a;
+}
+.ch-numero,
+.ch-nom {
+  position: relative;
+  z-index: 1;
+  font-family: 'Fraunces Variable', Georgia, serif;
+  color: #3b2410;
+  text-align: center;
+  line-height: 1;
+}
+.ch-numero {
+  font-size: 10cqw;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+.ch-nom {
+  font-size: 8.4cqw;
+  font-weight: 600;
+  font-variant: small-caps;
+  letter-spacing: 0.03em;
+}
+.ch-photo {
+  position: relative;
+  z-index: 1;
+  flex: 1;
+  min-height: 0;
+  width: 100%;
+  border: 0.6cqw solid #3b2410;
+  box-shadow: 0 0 0 0.6cqw #c9b07f, 0 0 0 0.9cqw #5a3d1c;
+  overflow: hidden;
+  background: #2a1d10;
+}
+.ch-photo img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  user-select: none;
+}
+/* Le dos hanté : la photo occupe tout le cadre. */
+.dos-hante {
+  padding: 7cqw;
+}
+.simu-vignette.v-tarot {
+  object-fit: cover;
+  object-position: 50% 30%;
+}
+
+/* Le champ « Carte » d'un lieu sans plan : partir d'une image, ou le construire. */
+.choix-carte-deux {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
 }

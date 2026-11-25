@@ -347,66 +347,11 @@ export function filtrerObjets(
   })
 }
 
-/* ---------------- les assets privés d'un profil ---------------- */
-
-/**
- * Les profils de l'atelier et leurs assets privés (`prives.json`, à côté du
- * catalogue) : un asset privé ne se montre qu'à son profil — le restaurant de
- * la prochaine séance reste caché aux joueurs qui ouvrent l'application.
- */
-export interface PrivesAtelier {
-  profils: string[]
-  /** Par profil, les identifiants (sans `pack:`) de ses assets privés. */
-  assets: Record<string, string[]>
-}
-
-/** `prives.json` tel qu'il sort du disque ; abîmé, personne n'a rien de privé. */
-export function lirePrives(brut: unknown): PrivesAtelier {
-  let v: any = brut
-  if (typeof brut === 'string')
-    try {
-      v = JSON.parse(brut)
-    } catch {
-      return { profils: [], assets: {} }
-    }
-  const profils = Array.isArray(v?.profils) ? v.profils.filter(texte).map((p: string) => p.trim()) : []
-  const assets: Record<string, string[]> = {}
-  for (const p of profils) {
-    const l = v?.assets?.[p]
-    assets[p] = Array.isArray(l) ? l.filter(texte) : []
-  }
-  return { profils, assets }
-}
-
-/** Le profil à qui appartient un asset du pack, s'il est privé. */
-function proprietaire(a: AssetAtelier, prives: PrivesAtelier): string | null {
-  if (a.source !== 'pack') return null
-  const id = a.id.replace(/^pack:/, '')
-  return prives.profils.find((p) => prives.assets[p]?.includes(id)) ?? null
-}
-
-/** Ce que voit un profil : les assets publics, et ses assets privés à lui. */
-export function visiblesPour(assets: AssetAtelier[], prives: PrivesAtelier, profil: string | null): AssetAtelier[] {
-  return assets.filter((a) => {
-    const p = proprietaire(a, prives)
-    return !p || p === profil
-  })
-}
-
-/** Les profils et le nombre d'assets privés de chacun (ceux qui existent dans le pack). */
-export function comptesDesProfils(
-  assets: AssetAtelier[],
-  prives: PrivesAtelier
-): { nom: string; prives: number }[] {
-  return prives.profils.map((nom) => ({
-    nom,
-    prives: assets.filter((a) => proprietaire(a, prives) === nom).length
-  }))
-}
+/* ---------------- les assets manquants ---------------- */
 
 /**
  * Les assets dont une construction a besoin et qui manquent à ce catalogue
- * (privés d'un autre profil, ou retirés) : leurs identifiants, sans doublon.
+ * (retirés du pack ou des imports) : leurs identifiants, sans doublon.
  */
 export function assetsManquants(
   c: {

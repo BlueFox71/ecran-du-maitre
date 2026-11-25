@@ -14,7 +14,6 @@ import { Sonorisation } from './components/Sonorisation'
 import { Sonotheque } from './modules/Sonotheque'
 import { useSons } from './sons'
 import { Ident } from './components/Ident'
-import { ChoixProfil } from './components/ChoixProfil'
 import { CacheMJ } from './components/CacheMJ'
 import { Home } from './components/Home'
 import { Toasts } from './components/Toasts'
@@ -28,6 +27,7 @@ import { Editor } from './modules/Editor'
 import { Places, lesPlans } from './modules/Places'
 import { Atelier } from './modules/Atelier'
 import { Objets } from './modules/Objets'
+import { SimulationObjets } from './modules/SimulationObjets'
 import { Timeline } from './modules/Timeline'
 import { Annexes } from './modules/Annexes'
 import { cibleAnnexe } from './annexeGlisser'
@@ -45,8 +45,8 @@ import { demarrerSm } from './santeMentale/etat'
 import {
   IconChevron,
   IconCadrage,
-  IconMurs,
   IconCoffre,
+  IconEmf,
   IconNote,
   IconDoc,
   IconDie,
@@ -269,19 +269,22 @@ export function App(): JSX.Element {
             <NavItem id="places" label="Lieux" count={s.places.length} icon={<IconPlace />} />
             {/* Les seuls lieux qui ont un plan : on les feuillette d'un plan à l'autre. */}
             <div className="nav-sous">
+              {/* L'atelier n'a plus d'entrée : un plan se construit depuis le volet
+                  d'un lieu, ou se retouche depuis son plan. */}
               <NavItem id="plans" label="Plans" count={nbPlans} icon={<IconCadrage />} />
-              {/* L'atelier : un plan qu'on construit, mur par mur, plutôt qu'on ne le retrace. */}
-              <NavItem
-                id="atelier"
-                label="Atelier"
-                count={s.places.filter((p) => p.construit).length}
-                icon={<IconMurs />}
-              />
             </div>
             {/* La réserve : ce qui se trouve, se ramasse, se porte. Elle est
                 de la matière, comme les lieux — on la prépare avant la séance,
                 puis on la pose. */}
             <NavItem id="objets" label="Objets" count={s.objets.length} icon={<IconCoffre />} />
+            {/* Le matériel du chasseur de fantômes, essayé à part avant d'aller sur
+                la carte : seulement à une table de chasse aux fantômes (des règles
+                jamais choisies valent chasse aux fantômes). */}
+            {s.reglages.regles !== 'wow' ? (
+              <div className="nav-sous">
+                <NavItem id="emf" label="Simulation Objets" icon={<IconEmf />} />
+              </div>
+            ) : null}
             {/* La sonothèque : les sons de la campagne, rangés en planches,
                 qu'on pose ensuite sur les plans et qu'on joue au Paravent. */}
             {s.poste.railMasques.includes('sons') ? null : (
@@ -319,7 +322,6 @@ export function App(): JSX.Element {
 
         <div className="rail-foot">
           <div className="session-row">
-            <ChoixProfil />
             <span className="session-version">
               <span className="eyebrow">Version</span>
               <b>{s.version || '—'}</b>
@@ -385,6 +387,7 @@ export function App(): JSX.Element {
               {s.view === 'plans' && <Places plans />}
               {s.view === 'atelier' && <Atelier />}
               {s.view === 'objets' && <Objets />}
+              {s.view === 'emf' && s.reglages.regles !== 'wow' && <SimulationObjets />}
               {s.view === 'sons' && <Sonotheque />}
               {s.view === 'timeline' && <Timeline />}
               {s.view === 'trame' && <Trame />}
@@ -574,6 +577,8 @@ function subtitle(s: ReturnType<typeof useStore.getState>): string {
       const n = s.places.filter((p) => p.construit).length
       return `${n} lieu${n > 1 ? 'x' : ''} construit${n > 1 ? 's' : ''}`
     }
+    case 'emf':
+      return 'Le matériel du chasseur de fantômes : EMF, thermomètre, Spirit Box, planche, tarot, livre d’écriture'
     case 'objets': {
       const poses = s.objets.reduce((n, o) => n + o.placements.length, 0)
       return `${s.objets.length} objets · ${s.objetFamilles.length} catégories · ${poses} posés`

@@ -380,6 +380,20 @@ export function Places({
     }
   }
 
+  /* De retour de l'atelier : on retrouve le lieu qu'on construisait — sur son
+     plan s'il en a un désormais, sinon choisi dans l'arbre. */
+  const aRouvrir = useStore((st) => st.lieuARouvrir)
+  useEffect(() => {
+    if (aRouvrir == null) return
+    s.lieuRouvert()
+    const q = place(aRouvrir)
+    if (!q) return
+    for (const a of ascendants(s.places, q)) deplier(a.id)
+    if (q.mapItemId) allerAuPlan(q)
+    else setChoisi(q.id)
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [aRouvrir])
+
   const lieuOuvert = place(ouvert)
   const ficheOuverte = place(fiche)
   if (lieuOuvert) {
@@ -1430,6 +1444,21 @@ function Volet({
   const [choixCarte, setChoixCarte] = useState(false)
   const minuteur = useRef<number | null>(null)
 
+  /* Bâtir son plan à l'atelier : le lieu devient « construit », l'atelier
+     s'ouvre dessus et ramène ici en sortant. */
+  const construire = async (): Promise<void> => {
+    if (!f) return
+    try {
+      if (!f.construit) {
+        await window.jdr.atelier.construire(f.id)
+        await s.refreshPlaces()
+      }
+      s.ouvrirAtelier(f.id)
+    } catch (e) {
+      s.toast(e instanceof Error ? e.message : String(e), true)
+    }
+  }
+
   /* Le brouillon se recharge quand on change de lieu, jamais pendant qu'on
      écrit dedans : sinon la relecture qui suit l'enregistrement viendrait
      reposer le texte sous le curseur. */
@@ -1603,6 +1632,47 @@ function Volet({
               </span>
               <span className="btn btn-ghost btn-sm">Voir les murs</span>
             </button>
+          ) : f.construit ? (
+            /* Un plan bâti se retouche à l'atelier : son image et ses murs en
+               dérivent, une autre image les ferait diverger. */
+            <button className="choix-carte" onClick={() => void construire()}>
+              <span className="vue">
+                {carte?.url ? (
+                  <img src={carte.poster ?? carte.url} alt="" loading="lazy" decoding="async" draggable={false} />
+                ) : (
+                  <IconMurs />
+                )}
+              </span>
+              <span className="tx">
+                <b>{carte ? carte.title : 'Plan en construction'}</b>
+                <span className="ou">Construit à l’atelier : sol, murs, portes, objets, éclairage</span>
+              </span>
+              <span className="btn btn-ghost btn-sm">Modifier</span>
+            </button>
+          ) : !carte && f.tier !== 'espace' ? (
+            /* Deux façons de donner un plan : une image qu'on a déjà, où l'on
+               trace les murs à la main ; ou un plan qu'on bâtit avec les
+               assets, dont les murs et les portes viennent tout seuls. */
+            <div className="choix-carte-deux">
+              <button className="choix-carte" onClick={() => setChoixCarte(true)}>
+                <span className="vue">
+                  <IconImage />
+                </span>
+                <span className="tx">
+                  <b>Partir d’une image</b>
+                  <span className="ou">Une carte du dossier de la campagne ; les murs se tracent dessus</span>
+                </span>
+              </button>
+              <button className="choix-carte" onClick={() => void construire()}>
+                <span className="vue">
+                  <IconMurs />
+                </span>
+                <span className="tx">
+                  <b>Construire le plan</b>
+                  <span className="ou">Sol, murs, portes, objets, éclairage : les murs se posent d’eux-mêmes</span>
+                </span>
+              </button>
+            </div>
           ) : (
             <button className="choix-carte" onClick={() => setChoixCarte(true)}>
               <span className="vue">
@@ -2164,7 +2234,7 @@ function ListeDesPlans({ onOuvrir }: { onOuvrir: (p: Place) => void }): JSX.Elem
       ) : (
         <div className="empty">
           <b>Aucun plan</b>
-          Un lieu reçoit son plan depuis son volet, dans Lieux.
+          Un lieu reçoit son plan depuis son volet, dans Lieux : à partir d’une image, ou construit avec les assets.
         </div>
       )}
     </section>

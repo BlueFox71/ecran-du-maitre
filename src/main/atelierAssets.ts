@@ -10,12 +10,8 @@ import { existsSync, mkdirSync, readFileSync, unlinkSync, writeFileSync } from '
 import { join, normalize, sep } from 'node:path'
 import {
   appliquerRangement,
-  comptesDesProfils,
   lireCatalogue,
-  lirePrives,
-  visiblesPour,
   type AssetAtelier,
-  type PrivesAtelier,
   type SourceAsset
 } from '@shared/atelierAssets'
 
@@ -59,51 +55,9 @@ function lirePack(): AssetAtelier[] {
   }
 }
 
-/* ---------------- les profils ---------------- */
-
-/** Les profils du pack et leurs assets privés (`prives.json`). */
-function prives(): PrivesAtelier {
-  const f = join(dossierPack(), 'prives.json')
-  if (!existsSync(f)) return { profils: [], assets: {} }
-  try {
-    return lirePrives(readFileSync(f, 'utf8'))
-  } catch {
-    return { profils: [], assets: {} }
-  }
-}
-
-/** Le profil choisi sur cette machine : retenu dans le dossier de l'utilisateur, hors de toute campagne. */
-const fichierProfil = (): string => join(dossierMoi(), 'profil.json')
-
-export function profilCourant(): string | null {
-  try {
-    const v = JSON.parse(readFileSync(fichierProfil(), 'utf8'))
-    return typeof v?.profil === 'string' && prives().profils.includes(v.profil) ? v.profil : null
-  } catch {
-    return null
-  }
-}
-
-export function choisirProfil(nom: string | null): string | null {
-  const ok = nom && prives().profils.includes(nom) ? nom : null
-  writeFileSync(fichierProfil(), JSON.stringify({ profil: ok }))
-  return ok
-}
-
-/** Les profils, et combien d'assets privés chacun possède. */
-export function profils(): { courant: string | null; liste: { nom: string; prives: number }[] } {
-  return { courant: profilCourant(), liste: comptesDesProfils(lirePack(), prives()) }
-}
-
-/** Les assets privés d'un profil, quel que soit le profil choisi (mode développeur). */
-export function assetsPrivesDe(nom: string): AssetAtelier[] {
-  const ids = new Set(prives().assets[nom] ?? [])
-  return lirePack().filter((a) => ids.has(a.id.replace(/^pack:/, '')))
-}
-
-/** Ce que l'atelier montre : le pack (sans les assets privés des autres profils), puis les imports. */
+/** Ce que l'atelier montre : tout le pack, puis les imports. */
 export function tousLesAssets(): AssetAtelier[] {
-  return [...visiblesPour(lirePack(), prives(), profilCourant()), ...lire('moi')]
+  return [...lirePack(), ...lire('moi')]
 }
 
 /** Le chemin d'un fichier d'asset, ou `null` s'il sortirait de son dossier. */

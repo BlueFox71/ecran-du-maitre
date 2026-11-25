@@ -15,8 +15,7 @@ import { chargerImages, type ImagesAtelier } from '../atelier/images'
 import { useConstruction, type ConstructionOuverte } from '../atelier/useConstruction'
 import { Toile, type Outil } from '../atelier/Toile'
 import { useEssaiAtelier } from '../atelier/Essai'
-import { IconMurs, IconPlus, IconSoleil, IconTrash } from '../components/Icons'
-import { PROFIL_CHANGE } from '../components/ChoixProfil'
+import { IconSoleil } from '../components/Icons'
 import { EtapeSol } from '../atelier/etapes/Sol'
 import { EtapeMurs } from '../atelier/etapes/Murs'
 import { EtapeOuvertures } from '../atelier/etapes/Ouvertures'
@@ -59,167 +58,15 @@ export interface PropsEtape {
 export function Atelier(): JSX.Element {
   const lieuId = useStore((s) => s.atelierLieuId)
   const place = useStore((s) => s.places.find((p) => p.id === lieuId) ?? null)
-  return place?.construit ? <Chantier key={place.id} place={place} /> : <Accueil />
+  /* L'atelier n'a pas de page à lui : sans lieu bâti à ouvrir, on retourne
+     d'où l'on venait (Lieux ou Plans). */
+  const vide = !place?.construit
+  useEffect(() => {
+    if (vide) useStore.getState().ouvrirAtelier(null)
+  }, [vide])
+  return place?.construit ? <Chantier key={place.id} place={place} /> : <></>
 }
 
-/* ---------------- l'accueil : choisir ou commencer un lieu ---------------- */
-
-function Accueil(): JSX.Element {
-  const s = useStore()
-  const [nom, setNom] = useState('')
-  const construits = s.places.filter((p) => p.construit)
-  const sansCarte = s.places.filter((p) => !p.construit && !p.mapItemId && p.tier !== 'espace')
-
-  const creer = async (): Promise<void> => {
-    try {
-      const p = await window.jdr.atelier.creer(nom.trim() || 'Lieu construit', null)
-      await s.refreshPlaces()
-      setNom('')
-      s.ouvrirAtelier(p.id)
-    } catch (e) {
-      s.toast(e instanceof Error ? e.message : String(e), true)
-    }
-  }
-  /* Supprimer un lieu construit : seulement un brouillon de l'atelier, qu'on
-     n'a encore rangé nulle part. Un lieu rangé dans les Lieux sert à la
-     partie : on le supprime de là-bas, où l'on voit ce qu'il tient. */
-  const [aSupprimer, setASupprimer] = useState<Place | null>(null)
-  const officiel = (p: Place): boolean => p.parentId !== null && s.places.some((q) => q.id === p.parentId)
-  const supprimer = async (p: Place): Promise<void> => {
-    setASupprimer(null)
-    try {
-      await window.jdr.places.remove(p.id)
-      await s.refreshPlaces()
-      s.toast(`« ${p.name} » est supprimé.`)
-    } catch (e) {
-      s.toast(e instanceof Error ? e.message : String(e), true)
-    }
-  }
-
-  const construire = async (id: number): Promise<void> => {
-    try {
-      await window.jdr.atelier.construire(id)
-      await s.refreshPlaces()
-      s.ouvrirAtelier(id)
-    } catch (e) {
-      s.toast(e instanceof Error ? e.message : String(e), true)
-    }
-  }
-
-  return (
-    <section className="view at-accueil">
-      <div className="vhead">
-        <div>
-          <h2>Atelier</h2>
-          <p>
-            Construis un lieu de A à Z : le sol, les murs, les portes et les fenêtres, la déco,
-            l’éclairage. Ce que tu enregistres devient le plan du lieu, et ses murs arrêtent les pions
-            et les regards comme ceux que tu traces à la main.
-          </p>
-        </div>
-      </div>
-      <div className="at-accueil-corps">
-        <div className="at-bloc">
-          <span className="eyebrow">Nouveau lieu construit</span>
-          <form
-            className="at-ligne"
-            onSubmit={(e) => {
-              e.preventDefault()
-              void creer()
-            }}
-          >
-            <input
-              className="at-champ"
-              placeholder="Le manoir Halloway, rez-de-chaussée"
-              value={nom}
-              onChange={(e) => setNom(e.target.value)}
-            />
-            <button className="btn btn-brass" type="submit">
-              <IconPlus /> Commencer
-            </button>
-          </form>
-        </div>
-        <div className="at-bloc">
-          <span className="eyebrow">Lieux construits · {construits.length}</span>
-          {construits.length ? (
-            <ul className="at-liste">
-              {construits.map((p) => (
-                <li key={p.id} className="at-lieu-ligne">
-                  <button className="at-lieu" onClick={() => s.ouvrirAtelier(p.id)}>
-                    <IconMurs />
-                    <span>{p.name}</span>
-                  </button>
-                  <button
-                    className="at-lieu-suppr"
-                    disabled={officiel(p)}
-                    onClick={() => setASupprimer(p)}
-                    aria-label={`Supprimer « ${p.name} »`}
-                    title={
-                      officiel(p)
-                        ? 'Ce lieu est rangé dans les Lieux : il sert à la partie. Supprime-le depuis les Lieux.'
-                        : 'Supprimer ce lieu'
-                    }
-                  >
-                    <IconTrash />
-                  </button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <p className="at-vide">Aucun pour l’instant.</p>
-          )}
-        </div>
-        {sansCarte.length ? (
-          <div className="at-bloc">
-            <span className="eyebrow">Construire un lieu qui n’a pas encore de plan</span>
-            <ul className="at-liste">
-              {sansCarte.map((p) => (
-                <li key={p.id}>
-                  <button className="at-lieu" onClick={() => void construire(p.id)}>
-                    <IconPlus />
-                    <span>{p.name}</span>
-                  </button>
-                </li>
-              ))}
-            </ul>
-          </div>
-        ) : null}
-      </div>
-      {aSupprimer ? (
-        <div className="scrim" onClick={() => setASupprimer(null)}>
-          <div
-            className="modal"
-            role="alertdialog"
-            aria-labelledby="at-suppr-titre"
-            onClick={(e) => e.stopPropagation()}
-            onKeyDown={(e) => {
-              if (e.key === 'Escape') setASupprimer(null)
-            }}
-          >
-            <header>
-              <IconTrash />
-              <h3 id="at-suppr-titre">Supprimer « {aSupprimer.name} » ?</h3>
-            </header>
-            <div className="body">
-              <p>
-                Le lieu et toute sa construction disparaissent : sol, murs, portes, objets et lumières.
-                On ne peut pas revenir en arrière.
-              </p>
-            </div>
-            <footer>
-              <button className="btn" autoFocus onClick={() => setASupprimer(null)}>
-                Annuler
-              </button>
-              <button className="btn btn-danger" onClick={() => void supprimer(aSupprimer)}>
-                Supprimer
-              </button>
-            </footer>
-          </div>
-        </div>
-      ) : null}
-    </section>
-  )
-}
 
 /* ---------------- le chantier ---------------- */
 
@@ -262,13 +109,6 @@ function Chantier({ place }: { place: Place }): JSX.Element {
 
   useEffect(() => {
     void recharger()
-  }, [recharger])
-
-  /* Un autre profil : d'autres assets privés à montrer. */
-  useEffect(() => {
-    const k = (): void => void recharger()
-    window.addEventListener(PROFIL_CHANGE, k)
-    return () => window.removeEventListener(PROFIL_CHANGE, k)
   }, [recharger])
 
   /* Les raccourcis de l'atelier : annuler, rétablir, enregistrer. */
@@ -367,8 +207,12 @@ function Chantier({ place }: { place: Place }): JSX.Element {
   return (
     <section className="view at-chantier">
       <div className="at-barre">
-        <button className="btn btn-sm" onClick={sortir} title="Revenir à la liste des lieux construits">
-          ←
+        <button
+          className="btn btn-sm"
+          onClick={sortir}
+          title={`Revenir ${s.atelierRetour === 'places' ? 'aux Lieux' : 'aux Plans'}, sur ce lieu`}
+        >
+          ← {s.atelierRetour === 'places' ? 'Lieux' : 'Plans'}
         </button>
         <TitreDuLieu place={place} />
         <nav className="at-etapes" role="tablist" aria-label="Les étapes de la construction">

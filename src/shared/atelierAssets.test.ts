@@ -5,9 +5,6 @@ import {
   appliquerRangement,
   assetsManquants,
   boiteOpaque,
-  comptesDesProfils,
-  lirePrives,
-  visiblesPour,
   colonnesDuCatalogue,
   detourerMagenta,
   FAMILLES,
@@ -245,39 +242,7 @@ describe('le catalogue des objets : thème, famille, rayon', () => {
   })
 })
 
-describe('les assets privés d’un profil', () => {
-  const a = (id: string, source: 'pack' | 'moi' = 'pack'): AssetAtelier => ({
-    id: `${source}:${id}`,
-    source,
-    type: 'objet',
-    nom: id,
-    categorie: 'Divers',
-    fichier: id + '.png'
-  })
-  const assets = [a('objets/lanterne'), a('objets/chaise'), a('objets/dragon'), a('objets/lanterne', 'moi')]
-  const prives = lirePrives(
-    JSON.stringify({ profils: ['Jules', 'Alexis'], assets: { Jules: ['objets/lanterne', 'objets/dragon', 'objets/absent'] } })
-  )
-
-  it('chaque profil voit le public et ses privés ; sans profil, le public seul', () => {
-    const ids = (p: string | null): string[] => visiblesPour(assets, prives, p).map((x) => x.id)
-    expect(ids('Jules')).toEqual(['pack:objets/lanterne', 'pack:objets/chaise', 'pack:objets/dragon', 'moi:objets/lanterne'])
-    expect(ids('Alexis')).toEqual(['pack:objets/chaise', 'moi:objets/lanterne'])
-    expect(ids(null)).toEqual(['pack:objets/chaise', 'moi:objets/lanterne'])
-  })
-
-  it('le compte des privés ne retient que ce qui existe dans le pack', () => {
-    expect(comptesDesProfils(assets, prives)).toEqual([
-      { nom: 'Jules', prives: 2 },
-      { nom: 'Alexis', prives: 0 }
-    ])
-  })
-
-  it('un fichier abîmé : aucun profil, rien de privé', () => {
-    expect(lirePrives('{oups')).toEqual({ profils: [], assets: {} })
-    expect(visiblesPour(assets, lirePrives('{oups'), null)).toHaveLength(4)
-  })
-
+describe('les assets manquants', () => {
   it('les assets d’une construction qui manquent au catalogue', () => {
     const c = {
       base: 'pack:sols/herbe',
@@ -288,16 +253,5 @@ describe('les assets privés d’un profil', () => {
     }
     const connus = new Set(['pack:sols/herbe', 'pack:sols/dalles', 'pack:murs/pierre'])
     expect(assetsManquants(c, connus)).toEqual(['pack:murs/laque', 'pack:objets/dragon'])
-  })
-
-  it('le pack livré : les assets privés existent, et appartiennent à un seul profil', () => {
-    const racine = join(__dirname, '../../resources/atelier')
-    const pack = new Set(
-      lireCatalogue(readFileSync(join(racine, 'catalogue.json'), 'utf8'), 'pack').map((x) => x.id.replace(/^pack:/, ''))
-    )
-    const p = lirePrives(readFileSync(join(racine, 'prives.json'), 'utf8'))
-    const tous = p.profils.flatMap((n) => p.assets[n])
-    expect(tous.filter((id) => !pack.has(id))).toEqual([])
-    expect(new Set(tous).size).toBe(tous.length)
   })
 })

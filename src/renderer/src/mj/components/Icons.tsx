@@ -550,6 +550,18 @@ export const IconCoffre = (p: P = {}): JSX.Element =>
     p
   )
 
+/** L'EMF : un boîtier et sa rangée de LED, ce que tient le chasseur de fantômes. */
+export const IconEmf = (p: P = {}): JSX.Element =>
+  box(
+    <>
+      <rect x="7" y="2.5" width="10" height="19" rx="3" />
+      <path d="M9.5 8h5" />
+      <path d="M9.5 11h5" />
+      <circle cx="12" cy="16.5" r="1.5" />
+    </>,
+    p
+  )
+
 /** Donner : ce qui part d'une main vers quelqu'un. */
 export const IconDonner = (p: P = {}): JSX.Element =>
   box(

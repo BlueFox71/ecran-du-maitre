@@ -47,6 +47,8 @@ export type ViewId =
   | 'plans'
   | 'atelier'
   | 'objets'
+  /** L'EMF du chasseur de fantômes, sous les Objets. */
+  | 'emf'
   | 'sons'
   | 'timeline'
   | 'trame'
@@ -201,12 +203,18 @@ interface State {
 
   /** Document ouvert dans l'éditeur. */
   editingItemId: number | null
-  /** Le lieu ouvert dans l'atelier ; `null`, l'accueil de l'atelier. */
+  /** Le lieu ouvert dans l'atelier (toujours un lieu bâti). */
   atelierLieuId: number | null
+  /** La page d'où l'on est venu à l'atelier : on y revient en sortant. */
+  atelierRetour: 'places' | 'plans'
+  /** Le lieu à rouvrir en revenant de l'atelier ; Lieux ou Plans le prennent puis l'effacent. */
+  lieuARouvrir: number | null
 
   setView: (v: ViewId) => void
-  /** Ouvre l'atelier sur un lieu bâti (ou sur son accueil). */
+  /** Ouvre l'atelier sur un lieu bâti ; `null` en sort, vers la page d'où l'on venait. */
   ouvrirAtelier: (placeId: number | null) => void
+  /** Lieux ou Plans a repris le lieu à rouvrir. */
+  lieuRouvert: () => void
   setVisuel: (v: 0 | 1) => void
   setTransition: (t: Transition) => void
   /** Écrit un réglage de la campagne. `null` l'efface et rend son défaut. */
@@ -351,9 +359,23 @@ export const useStore = create<State>((set, get) => ({
 
   editingItemId: null,
   atelierLieuId: null,
+  atelierRetour: 'plans',
+  lieuARouvrir: null,
 
   setView: (v) => set({ view: v }),
-  ouvrirAtelier: (placeId) => set({ view: 'atelier', atelierLieuId: placeId }),
+  /* L'atelier n'a plus de page à lui : il s'ouvre sur un lieu depuis Lieux
+     ou Plans, et y ramène, sur ce même lieu. */
+  ouvrirAtelier: (placeId) =>
+    set((s) =>
+      placeId === null
+        ? { view: s.atelierRetour, atelierLieuId: null, lieuARouvrir: s.atelierLieuId }
+        : {
+            view: 'atelier',
+            atelierLieuId: placeId,
+            atelierRetour: s.view === 'places' ? 'places' : s.view === 'atelier' ? s.atelierRetour : 'plans'
+          }
+    ),
+  lieuRouvert: () => set({ lieuARouvrir: null }),
   setVisuel: (v) => set({ visuel: v }),
   /* Le geste est immédiat — on arme la bascule et on bascule — et l'écriture
      suit sans qu'on l'attende : une bascule ne se met pas en file d'attente

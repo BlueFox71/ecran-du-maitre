@@ -121,6 +121,12 @@ const call = <R>(channel: string, ...args: unknown[]): Promise<R> =>
   ipcRenderer.invoke(channel, ...args) as Promise<R>
 
 const api = {
+  /** La Spirit Box : les voix de Windows, et un texte prononcé (octets d'un WAV). */
+  spirit: {
+    voix: () => call<{ nom: string; langue: string; genre: string }[]>('spirit:voix'),
+    parler: (texte: string, voix: string | null, debit: number) =>
+      call<Uint8Array>('spirit:parler', texte, voix, debit)
+  },
   app: {
     /** Ouvre le panneau d'émojis du système ; il écrit dans le champ qui a la main. */
     emojis: () => call<void>('app:emojis'),
@@ -812,13 +818,6 @@ const api = {
       call<Place>('atelier:enregistrer', placeId, c, png, cadre ?? null),
     /** Le pack livré puis les imports du MJ. Image : `jdr://atelier/<source>/<fichier>`. */
     assets: () => call<AssetAtelier[]>('atelier:assets'),
-    /** Les profils de l'atelier, le nombre d'assets privés de chacun, et celui de cette machine. */
-    profils: () =>
-      call<{ courant: string | null; liste: { nom: string; prives: number }[] }>('atelier:profils'),
-    /** Choisir le profil de cette machine : ses assets privés apparaissent, ceux des autres non. */
-    choisirProfil: (nom: string | null) => call<string | null>('atelier:choisirProfil', nom),
-    /** Les assets privés d'un profil, quel que soit celui de cette machine (mode développeur). */
-    assetsPrives: (nom: string) => call<AssetAtelier[]>('atelier:assetsPrives', nom),
     /** L'image est déjà recadrée et raccordée par l'atelier. */
     importer: (meta: Omit<AssetAtelier, 'id' | 'source' | 'fichier'>, png: Uint8Array) =>
       call<AssetAtelier>('atelier:importer', meta, png),
