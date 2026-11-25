@@ -191,7 +191,9 @@ export function EtapeMesures(props: PropsEtape & { calque: Calque }): JSX.Elemen
         <p className="at-aide">
           {valeur === null
             ? 'Glisse pour effacer : la zone redevient sans mesure.'
-            : 'Glisse pour peindre le niveau choisi ; repeindre remplace.'}
+            : calque === 'emf'
+              ? 'Glisse pour peindre le niveau choisi ; repeindre remplace.'
+              : 'Glisse pour peindre la température choisie ; repeindre remplace.'}
         </p>
         <ul className="at-raccourcis">
           <li>Clic droit ou <kbd>Échap</kbd> : annuler le trait en cours</li>

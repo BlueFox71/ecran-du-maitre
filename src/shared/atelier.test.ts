@@ -171,6 +171,26 @@ describe('agrandir', () => {
     c.murs.push({ id: 'm', assetId: 'x', pts: [[3, 3], [6, 3]], epaisseur: 0.4 })
     expect(() => agrandir(c, { gauche: -3, haut: 0, droite: 0, bas: 0 })).toThrow()
   })
+  it('les zones EMF et température suivent le décalage ; un passage hors du terrain part', () => {
+    const c: Construction = {
+      ...terrain(10, 10),
+      emf: [
+        { id: 'e', valeur: 3, rayon: 1, pts: [[1, 1], [5, 5]] },
+        { id: 'dehors', valeur: 2, rayon: 1, pts: [[9, 9]] }
+      ],
+      temperature: [{ id: 't', valeur: -5, rayon: 2, pts: [[0, 0], [9.5, 2]] }]
+    }
+    const { construction } = agrandir(c, { gauche: 2, haut: 1, droite: -3, bas: -3 })
+    expect(construction.emf).toEqual([{ id: 'e', valeur: 3, rayon: 1, pts: [[3, 2], [7, 6]] }])
+    expect(construction.temperature).toEqual([{ id: 't', valeur: -5, rayon: 2, pts: [[2, 1]] }])
+    const vide = agrandir({ ...terrain(10, 10), emf: [{ id: 'd', valeur: 2, rayon: 1, pts: [[9, 9]] }] }, {
+      gauche: 0,
+      haut: 0,
+      droite: -5,
+      bas: 0
+    })
+    expect(vide.construction).not.toHaveProperty('emf')
+  })
   it('refuse un terrain de moins d’une case', () => {
     expect(() => agrandir(terrain(2, 2), { gauche: 0, haut: 0, droite: -2, bas: 0 })).toThrow()
   })
@@ -451,6 +471,11 @@ describe('lireConstruction — calques de mesure', () => {
     const relu = lireConstruction(brut)
     expect(relu.emf).toBeUndefined()
     expect(relu.temperature?.map((x) => x.id)).toEqual(['ok'])
+  })
+
+  it('borne l’ambiante à [-20, 35]', () => {
+    expect(lireConstruction({ ...constructionVide(), ambiante: 99 }).ambiante).toBe(35)
+    expect(lireConstruction({ ...constructionVide(), ambiante: -40 }).ambiante).toBe(-20)
   })
 
   it('ambiante absente ou non finie : absente ; une construction sans calques n’en gagne pas', () => {

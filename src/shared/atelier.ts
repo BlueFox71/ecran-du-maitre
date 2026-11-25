@@ -447,9 +447,11 @@ export function agrandir(c: Construction, bords: Bords): { construction: Constru
   const dec = (p: PointCase): PointCase => [p[0] + gauche, p[1] + haut]
   const largeur = c.largeur + gauche + droite
   const hauteur = c.hauteur + haut + bas
+  /* Les calques de mesure sont recalculés plus bas : un calque vidé disparaît. */
+  const { emf: _emf, temperature: _temperature, ...reste } = c
   return {
     construction: {
-      ...c,
+      ...reste,
       largeur,
       hauteur,
       /* Les sols se découpent au nouveau bord ; celui qui sort tout entier part.
@@ -467,7 +469,9 @@ export function agrandir(c: Construction, bords: Bords): { construction: Constru
       murs: c.murs.map((m) => ({ ...m, pts: m.pts.map(dec) })),
       ouvertures: c.ouvertures.map((o) => ({ ...o })),
       objets: c.objets.map((o) => ({ ...o, x: o.x + gauche, y: o.y + haut })),
-      ...(c.habillages ? { habillages: c.habillages.map((h) => ({ ...h, pt: dec(h.pt) })) } : {})
+      ...(c.habillages ? { habillages: c.habillages.map((h) => ({ ...h, pt: dec(h.pt) })) } : {}),
+      /* Les zones peintes suivent le terrain comme un sol à l'aérosol. */
+      ...calquesDecales(c, dec, largeur, hauteur)
     },
     cadre: {
       x: -gauche / c.largeur,
@@ -476,6 +480,25 @@ export function agrandir(c: Construction, bords: Bords): { construction: Constru
       h: hauteur / c.hauteur
     }
   }
+}
+
+/** Les calques de mesure décalés ; un passage tombé hors du terrain part, un trait vidé aussi. */
+function calquesDecales(
+  c: Construction,
+  dec: (p: PointCase) => PointCase,
+  largeur: number,
+  hauteur: number
+): Pick<Construction, 'emf' | 'temperature'> {
+  const decaler = (traits: TraitMesure[]): TraitMesure[] =>
+    traits.flatMap((t) => {
+      const pts = t.pts
+        .map(dec)
+        .filter(([x, y]) => x >= -EPS && y >= -EPS && x <= largeur + EPS && y <= hauteur + EPS)
+      return pts.length ? [{ ...t, pts }] : []
+    })
+  const emf = c.emf ? decaler(c.emf) : []
+  const temperature = c.temperature ? decaler(c.temperature) : []
+  return { ...(emf.length ? { emf } : {}), ...(temperature.length ? { temperature } : {}) }
 }
 
 /** Ce qui reste fixe quand le terrain change de taille : 0 le bord gauche (ou haut), 0,5 le milieu, 1 le bord droit (ou bas). */
@@ -617,7 +640,7 @@ export function lireConstruction(brut: unknown): Construction {
       habillages.push({ id: h.id, pt: pt[0], assetId: h.assetId, ...(couleurSure(h.teinte) ? { teinte: h.teinte } : {}) })
   }
   /* Un calque de mesure : une gomme (`valeur: null`) est gardée, une valeur est
-     * ramenée par `normaliser` ; un trait sans id, sans points ou sans pinceau part. */
+     ramenée par `normaliser` ; un trait sans id, sans points ou sans pinceau part. */
   const calque = (brut: unknown, normaliser: (n: number) => number | null): TraitMesure[] => {
     const traits: TraitMesure[] = []
     for (const t of liste(brut)) {
@@ -649,7 +672,7 @@ export function lireConstruction(brut: unknown): Construction {
     objets,
     ...(emf.length ? { emf } : {}),
     ...(temperature.length ? { temperature } : {}),
-    ...(fini(v.ambiante) ? { ambiante: v.ambiante } : {})
+    ...(fini(v.ambiante) ? { ambiante: Math.min(TEMPERATURE_MAX, Math.max(TEMPERATURE_MIN, v.ambiante)) } : {})
   }
 }
 
