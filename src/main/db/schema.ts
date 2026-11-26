@@ -2134,5 +2134,29 @@ export const MIGRATIONS: Migration[] = [
     );
     CREATE INDEX idx_tarot_texte ON tarot_texte(session_id, arcane, ord);
     `
+  },
+  {
+    id: 100,
+    sql: `
+    /* Le carnet des chasseurs : les lignes (indices, entités) appartiennent à
+       la campagne ; les marques — entouré, barré — à une séance, un
+       personnage et une ligne. Une séance neuve part d'un carnet vierge, et
+       retirer une ligne emporte ses marques. */
+    CREATE TABLE carnet_element (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL REFERENCES campaign(id) ON DELETE CASCADE,
+      genre       TEXT NOT NULL CHECK (genre IN ('indice', 'entite')),
+      nom         TEXT NOT NULL,
+      ord         INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX idx_carnet_element ON carnet_element(campaign_id, genre, ord);
+    CREATE TABLE carnet_marque (
+      session_id   INTEGER NOT NULL REFERENCES game_session(id) ON DELETE CASCADE,
+      character_id INTEGER NOT NULL REFERENCES character(id) ON DELETE CASCADE,
+      element_id   INTEGER NOT NULL REFERENCES carnet_element(id) ON DELETE CASCADE,
+      etat         TEXT NOT NULL CHECK (etat IN ('entoure', 'barre')),
+      PRIMARY KEY (session_id, character_id, element_id)
+    );
+    `
   }
 ]
