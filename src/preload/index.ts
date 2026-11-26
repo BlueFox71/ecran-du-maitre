@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { FenetreChasse, Passage, TextePrepare, TexteTarot } from '@shared/parole'
+import type { FenetreChasse, ParoleObjet, Passage, TextePrepare, TexteTarot } from '@shared/parole'
 import type { Brut } from '@shared/reglages'
 import type { EnvoiWow, JoueurWow, PersoAAssocier, QuetePreparee, Regles, ServeurWow } from '@shared/wow'
 import type { Modif } from '@shared/modifs'
@@ -687,6 +687,7 @@ const api = {
         effets?: EffetObjet[]
         /** L'appareil de chasse qu'il représente ; `null`, un objet ordinaire. */
         outil?: OutilChasse | null
+        parole?: ParoleObjet
       }
     ) => call<Objet | null>('objets:update', id, patch),
     /** Repartir d'un objet : la description suit, les exemplaires posés, non. */

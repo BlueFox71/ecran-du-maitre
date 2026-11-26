@@ -14,7 +14,7 @@ import { TEMPERATURE_MAX, TEMPERATURE_MIN, texteTemperature } from './temperatur
 /** Au plus dix envois par seconde pendant qu'on tire le curseur. */
 const PAS_ENVOI_MS = 100
 
-function Curseur({ a }: { a: AppareilChasse }): JSX.Element {
+export function Curseur({ a }: { a: AppareilChasse }): JSX.Element {
   const emf = a.outil === 'emf'
   const [valeur, setValeur] = useState(a.valeur)
   const dernier = useRef(0)

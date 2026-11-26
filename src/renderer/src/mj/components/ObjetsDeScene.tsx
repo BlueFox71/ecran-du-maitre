@@ -15,6 +15,7 @@ import { useState } from 'react'
 import { itemById, useStore } from '../store'
 import { IconCoffre, IconDonner, IconEtincelles, IconEye, glypheObjet } from './Icons'
 import { MenuDonner } from './MenuDonner'
+import { AppareilsDuParavent } from './AppareilsDuParavent'
 import { ListeEffetsPnj, effetsSurPnj } from './EffetsObjets'
 import { AlerteLieux, lieuxDe } from './ObjetsDuLieu'
 import type { Surbrillance } from './Tableau'
@@ -148,6 +149,9 @@ export function ObjetsDeScene({
           </span>
         ) : null}
       </header>
+
+      {/* Les outils de chasse en jeu, et le tarot : à un geste, quel que soit le lieu. */}
+      <AppareilsDuParavent />
 
       <div className="tb-salles">
         {placeId == null ? (
