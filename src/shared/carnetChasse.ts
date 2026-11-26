@@ -48,7 +48,8 @@ export interface CarnetVu {
  * Les indices de départ, tirés du livre des fantômes de la séance 5 et
  * choisis par Jules le 26/11/2026. « Apparition visible », « Chute rapide de
  * santé mentale », puis (27/11) « Détecteur de mouvement », « Voix et
- * murmures » et « Objets manipulés ou lancés » en ont été écartés exprès.
+ * murmures », « Objets manipulés ou lancés » et « Polaroïd / miroir » en ont
+ * été écartés exprès.
  */
 export const INDICES_DEPART: readonly string[] = [
   'EMF élevé',
@@ -58,8 +59,7 @@ export const INDICES_DEPART: readonly string[] = [
   'Traces dans le sel',
   'Orbes sur caméra',
   'Écriture automatique',
-  'Planche Ouija',
-  'Polaroïd / miroir'
+  'Planche Ouija'
 ]
 
 /** Les entités du livre, dans son ordre. */
