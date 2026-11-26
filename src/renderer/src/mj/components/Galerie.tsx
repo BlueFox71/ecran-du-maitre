@@ -6,8 +6,8 @@
  * dort dans « Cartes/Manoir ». Plusieurs mots se cumulent, sans accents ni
  * majuscules qui comptent.
  *
- * Un clic sur une image referme la galerie et rend la main au Paravent, qui
- * demande où l'envoyer — visuel libre, direct ou fenêtre — comme partout.
+ * Un clic sur une image referme la galerie et l'ouvre en fenêtre sur le
+ * direct, comme partout.
  */
 import { useMemo, useState } from 'react'
 import { createPortal } from 'react-dom'
@@ -83,7 +83,7 @@ export function Galerie({
                 key={i.id}
                 className="galerie-vig"
                 onClick={(e) => onChoisir(i, e.clientX, e.clientY)}
-                title={`${i.title}${dossier ? `\n${dossier}` : ''}\nClic : visuel libre, direct ou fenêtre`}
+                title={`${i.title}${dossier ? `\n${dossier}` : ''}\nClic : en fenêtre sur le direct`}
               >
                 <span className="galerie-img">
                   {i.poster || i.url ? (

@@ -96,19 +96,9 @@ interface State {
   chasse: AppareilChasse[]
   screens: ScreenInfo[]
   /**
-   * Le visuel qu'on arrange — Visuel 1 ou Visuel 2. Il vit ici, et non dans la
-   * Régie ou dans le Pupitre, pour deux raisons : on passe de l'un à
-   * l'autre en cours de partie et on doit retrouver l'écran qu'on était en
-   * train de composer, et quitter la page ne doit pas défaire ce choix. Il
-   * n'est posé qu'une fois, à l'ouverture de la campagne, sur le visuel libre.
-   */
-  visuel: 0 | 1
-
-  /**
-   * La manière de basculer — fondu, volet, par le noir. Elle vit ici, comme
-   * `visuel`, parce que la Régie et le Pupitre basculent tous les deux et
-   * doivent le faire de la même façon : c'est un réglage de la table de
-   * mixage, pas de la page qu'on regarde.
+   * La manière de passer en direct — fondu, volet, par le noir. Elle vit ici
+   * parce que c'est un réglage de la table de mixage, pas de la page qu'on
+   * regarde.
    *
    * Elle part de ce que les paramètres ont retenu, et y retourne dès qu'on en
    * change : la bascule qu'on préfère est la même d'une soirée à l'autre.
@@ -218,7 +208,6 @@ interface State {
   ouvrirAtelier: (placeId: number | null) => void
   /** Lieux ou Plans a repris le lieu à rouvrir. */
   lieuRouvert: () => void
-  setVisuel: (v: 0 | 1) => void
   setTransition: (t: Transition) => void
   /** Écrit un réglage de la campagne. `null` l'efface et rend son défaut. */
   poserReglage: (cle: string, valeur: boolean | number | string | null) => Promise<void>
@@ -308,7 +297,6 @@ export const useStore = create<State>((set, get) => ({
   tours: null,
   chasse: [],
   screens: [],
-  visuel: 1,
   transition: CAMPAGNE_DEFAUT.basculeMode,
 
   reglages: CAMPAGNE_DEFAUT,
@@ -380,7 +368,6 @@ export const useStore = create<State>((set, get) => ({
           }
     ),
   lieuRouvert: () => set({ lieuARouvrir: null }),
-  setVisuel: (v) => set({ visuel: v }),
   /* Le geste est immédiat — on arme la bascule et on bascule — et l'écriture
      suit sans qu'on l'attende : une bascule ne se met pas en file d'attente
      derrière un aller-retour vers la base. */
@@ -456,23 +443,13 @@ export const useStore = create<State>((set, get) => ({
     }
 
     const [display, screens] = await Promise.all([api.display.state(), api.display.screens()])
-    /* Le seul moment où l'on choisit à sa place : à l'ouverture, on se met sur
-       le visuel libre, celui qu'on peut arranger. Ensuite c'est à lui, et ni
-       une bascule ni un changement de page n'y touchent. */
-    set({ display, screens, visuel: display.liveSlot === 0 ? 1 : 0 })
+    set({ display, screens })
 
     api.display.onState((d) => set({ display: d }))
     set({ tours: await api.tours.etat() })
     api.tours.onState((t) => set({ tours: t }))
     set({ chasse: await api.chasse.etat() })
     api.chasse.onState((a) => set({ chasse: a }))
-    /* La main passe à un joueur : la Régie regarde son lieu — le direct s'il
-       y est, sinon le visuel libre où il vient d'être préparé. Sans changer
-       de page : le MJ le trouve là en revenant à la Régie. */
-    api.tours.onLieu((ou) => {
-      const live = (get().display?.liveSlot ?? 0) as 0 | 1
-      set({ visuel: ou === 'direct' ? live : live === 0 ? 1 : 0 })
-    })
     /* La pile de Ctrl+Z vit côté base : elle dit ici ce qu'elle tient. */
     set({ defaireEtat: await api.defaire.etat() })
     api.defaire.onEtat((e) => set({ defaireEtat: e }))

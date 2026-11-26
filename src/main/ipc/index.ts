@@ -59,7 +59,7 @@ import { monnaiesActives } from '@shared/monnaies'
 import { apresLeCombat, apresUnTour, type Modif } from '@shared/modifs'
 import { noterJet } from '../jetDuPerso'
 import { reinitialiser } from '../reinitialiser'
-import type { AnnonceSm, ChoixReinit, EffetSurEntite, ImportChoix } from '@shared/types'
+import type { AnnonceSm, ChoixReinit, DisplayState, EffetSurEntite, ImportChoix } from '@shared/types'
 import type { Cible, Plage } from '@shared/surlignage'
 import { estFenetreSuivie, zoomer } from '../zoom'
 import { basculerModePortable, modePortable } from '../modePortable'
@@ -1544,14 +1544,6 @@ export function registerIpc(): void {
     return null
   }
 
-  /* Le lieu de celui qui joue se prépare pour le MJ : sa carte dans le visuel
-     libre, rien d'autre — ni le son, ni l'écran de la table. */
-  tours.surPreparerCarte((placeId) => {
-    const p = places.getPlace(placeId)
-    const slide = p?.mapItemId ? slideOf(p.mapItemId) : null
-    if (slide) display.prepare(slide)
-  })
-
   const asAudio = (itemId: number, playing: boolean): boolean => {
     const it = lib.getItem(itemId)
     const url = mediaUrl(it?.relPath ?? null)
@@ -1561,20 +1553,31 @@ export function registerIpc(): void {
     return true
   }
 
+  /**
+   * Une image montrée aux joueurs s'ouvre **en fenêtre sur le direct**, d'où
+   * qu'on la montre : le plan reste dessous, et on la referme sans rien perdre.
+   * Il n'y a plus de choix « à la place du direct ». Une vidéo ou un texte,
+   * qui ne tiennent pas en fenêtre, prennent l'écran.
+   */
+  const montrerImage = (itemId: number): DisplayState | null =>
+    lib.getItem(itemId)?.kind === 'image' ? display.ouvrirFenetre(itemId) : null
+
   on('display:showItem', (itemId: number) => {
     if (asAudio(itemId, true)) return display.getState()
+    const fenetre = montrerImage(itemId)
+    if (fenetre) return fenetre
     const slide = slideOf(itemId)
     return slide ? display.show(slide) : display.getState()
   })
 
-  /** Charge l'emplacement en préparation : les joueurs ne voient rien bouger. */
-  on('display:prepareItem', (itemId: number) => {
-    if (asAudio(itemId, false)) return display.getState()
+  /** Le Paravent n'a qu'un visuel : ce qu'on montre part tout de suite, dans la manière choisie. */
+  on('display:directItem', (itemId: number, ms?: number, mode?: Transition) => {
+    if (asAudio(itemId, true)) return display.getState()
+    const fenetre = montrerImage(itemId)
+    if (fenetre) return fenetre
     const slide = slideOf(itemId)
-    return slide ? display.prepare(slide) : display.getState()
+    return slide ? display.passerEnDirect(slide, undefined, ms ?? 800, mode ?? 'fondu') : display.getState()
   })
-
-  on('display:swap', (ms?: number, mode?: Transition) => display.swap(ms ?? 800, mode ?? 'fondu'))
 
   /* ---- collages : plusieurs images sur le même écran ---- */
 
@@ -1586,8 +1589,7 @@ export function registerIpc(): void {
   on('display:cellText', (index: number, texte: string, color?: string) =>
     display.ecrireCase(index, { texte, color })
   )
-  on('display:frame', (slot: 'prep' | 'live', cell: number | null, frame: Frame) =>
-    display.frameImage(slot, cell, frame)
+  on('display:frame', (cell: number | null, frame: Frame) => display.frameImage(cell, frame)
   )
   on('display:prepareCell', (index: number, itemId: number | null) => {
     if (itemId == null) return display.prepareCell(index, null)
@@ -1596,9 +1598,7 @@ export function registerIpc(): void {
     if (!it || it.kind !== 'image' || !url) return display.getState()
     return display.prepareCell(index, { kind: 'image', itemId: it.id, url, title: it.title })
   })
-  on('display:texts', (slot: 'prep' | 'live', texts: TextOverlay[]) =>
-    display.setTexts(slot, texts)
-  )
+  on('display:texts', (texts: TextOverlay[]) => display.setTexts(texts))
   on('display:blackout', () => display.blackout())
   on('display:arreterPresentation', () => display.arreterPresentation())
   on('display:freeze', (on2: boolean) => display.setFrozen(on2))
@@ -1626,21 +1626,18 @@ export function registerIpc(): void {
   /* ---------------- lieu en scène, pions, pointeur ---------------- */
 
   /**
-   * Préparer un lieu : sa carte va dans l'emplacement libre, son ambiance est
-   * chargée **en pause** — on la lance quand la scène commence, pas avant —
-   * et le lieu lui-même ne prend effet qu'à la bascule, pour que les pions ne
-   * se posent jamais sur la carte du lieu précédent.
+   * Afficher un lieu en direct : sa carte part aux joueurs dans la manière
+   * choisie, ses pions avec elle — jamais sur la carte du lieu précédent. Son
+   * ambiance est chargée **en pause** : on la lance quand la scène commence.
+   * Un lieu sans plan prend la scène sans toucher à l'image.
    */
-  on('display:preparePlace', (placeId: number | null) => {
-    display.preparePlace(placeId)
-    if (placeId != null) {
-      const p = places.getPlace(placeId)
-      if (p?.mapItemId) {
-        const slide = slideOf(p.mapItemId)
-        if (slide) display.prepare(slide)
-      }
-      if (p?.ambienceItemId) asAudio(p.ambienceItemId, false)
-    }
+  on('display:directPlace', (placeId: number, ms?: number, mode?: Transition) => {
+    const p = places.getPlace(placeId)
+    if (!p) return display.getState()
+    const slide = p.mapItemId ? slideOf(p.mapItemId) : null
+    if (slide) display.passerEnDirect(slide, placeId, ms ?? 800, mode ?? 'fondu')
+    else display.setPlace(placeId)
+    if (p.ambienceItemId) asAudio(p.ambienceItemId, false)
     return display.getState()
   })
 

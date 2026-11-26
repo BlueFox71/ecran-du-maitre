@@ -1131,17 +1131,9 @@ input[type='range']::-webkit-slider-thumb {
   grid-template-rows: 1fr 1fr;
 }
 
-/* L'écran de préparation se distingue de celui qui part aux joueurs. */
+/* La scène du Paravent est le direct : son liseré rouge le rappelle. */
 .big-frame.live {
   box-shadow: 0 0 0 1px var(--blood);
-}
-.live-pill.prep {
-  color: var(--brass-ink);
-  border-color: var(--brass-line);
-  background: var(--brass-wash);
-}
-.live-pill.prep .dot {
-  background: var(--brass);
 }
 
 /* ---- réserve de pions, sous la scène ---- */
@@ -6864,6 +6856,25 @@ input[type='range']::-webkit-slider-thumb {
   max-height: 100%;
   object-fit: contain;
 }
+.visionneuse .vis-zoom {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  place-items: center;
+  overflow: hidden;
+  cursor: zoom-in;
+  touch-action: none;
+}
+.visionneuse .vis-zoom.agrandi {
+  cursor: grab;
+}
+.visionneuse .vis-zoom.agrandi:active {
+  cursor: grabbing;
+}
+.visionneuse .vis-zoom img {
+  transform-origin: center;
+  user-select: none;
+}
 .visionneuse .vis-corps iframe {
   width: 100%;
   height: 100%;
@@ -10749,11 +10760,6 @@ input[type='range']::-webkit-slider-thumb {
 .pupitre .pu-avec-tableau .tb-ligne .tb-nom em {
   display: block;
 }
-.pupitre .pu-avec-tableau .tb-ligne .tb-oter {
-  position: absolute;
-  top: 3px;
-  right: 3px;
-}
 .pupitre .pu-avec-tableau .tb-ligne .btn:disabled {
   display: none;
 }
@@ -10842,16 +10848,6 @@ input[type='range']::-webkit-slider-thumb {
 }
 .pu-chrono.plein .pu-cote-tete > * {
   width: calc(var(--pu-fil) - 18px);
-}
-
-/* Le point rouge du visuel à l'antenne : la Régie le porte sous sa propre
-   classe, on le redit ici plutôt que d'élargir la sienne. */
-.pupitre .seg .point {
-  width: 6px;
-  height: 6px;
-  border-radius: 99px;
-  background: var(--blood);
-  flex: none;
 }
 
 /* ============================================================
@@ -12453,29 +12449,6 @@ input[type='range']::-webkit-slider-thumb {
   stroke-width: 1.6;
 }
 /* Retirer une lampe : discret, il ne s'allume qu'au survol de sa ligne. */
-.tb-oter {
-  flex: none;
-  display: grid;
-  place-items: center;
-  width: 18px;
-  height: 18px;
-  border-radius: 3px;
-  color: transparent;
-}
-.tb-ligne:hover .tb-oter {
-  color: var(--text-faint);
-}
-.tb-oter:hover {
-  color: var(--blood) !important;
-  background: var(--sunk);
-}
-.tb-oter svg {
-  width: 10px;
-  height: 10px;
-  stroke: currentColor;
-  fill: none;
-  stroke-width: 2.2;
-}
 .tb-ligne .btn {
   padding: 2px 7px;
   font-size: 10.5px;
@@ -17487,8 +17460,7 @@ ul[data-type='taskList'] li[data-checked='true'] > div {
   padding-left: calc(8px + var(--prof, 0) * 14px);
   align-items: center;
 }
-/* Chaque lieu porte ce que montrait la source de droite : qui s'y trouve, et
-   de quoi le mettre dans le visuel libre. */
+/* Chaque lieu dit qui s'y trouve. On le met à l'écran depuis les plans, plus bas. */
 .pu-lieu-ligne {
   display: flex;
   align-items: center;
@@ -17586,29 +17558,155 @@ ul[data-type='taskList'] li[data-checked='true'] > div {
   font-size: 10.5px;
   color: var(--text-faint);
 }
-.pu-lieu-visuel {
+/* ---- les plans, sous la liste des lieux ----
+   Un seul visuel, le direct : chaque plan s'y envoie d'un bouton. Celui à
+   l'écran passe en tête, bordé de rouge ; sous chacun, qui s'y tient. */
+.pu-plans {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-top: 14px;
+}
+.pu-plan {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 8px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--surface);
+}
+.pu-plan.direct {
+  border-color: var(--blood);
+  box-shadow: inset 3px 0 0 var(--blood);
+}
+.pu-plan-tete {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  min-width: 0;
+}
+.pu-plan-vig {
+  position: relative;
   flex: none;
+  width: 84px;
+  aspect-ratio: 16 / 10;
+  padding: 0;
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  overflow: hidden;
+  background: var(--sunk);
+  cursor: zoom-in;
+}
+/* La loupe dit que la vignette s'ouvre en grand : discrète au repos, nette au survol. */
+.pu-plan-loupe {
+  position: absolute;
+  right: 4px;
+  bottom: 4px;
   display: grid;
   place-items: center;
-  width: 24px;
-  height: 24px;
-  border-radius: 4px;
-  color: var(--text-faint);
+  width: 20px;
+  height: 20px;
+  border-radius: 99px;
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  opacity: 0.7;
+  transition: opacity 0.15s, transform 0.15s;
 }
-.pu-lieu-visuel:hover {
-  background: var(--tint);
+.pu-plan-loupe svg {
+  width: 11px;
+  height: 11px;
+}
+.pu-plan-vig:hover {
+  border-color: var(--line);
+}
+.pu-plan-vig:hover .pu-plan-loupe,
+.pu-plan-vig:focus-visible .pu-plan-loupe {
+  opacity: 1;
+  transform: scale(1.1);
+}
+.pu-plan-vig img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+.pu-plan-titre {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+/* Le nom entier, sur plusieurs lignes s'il le faut : deux plans d'un même
+   bâtiment ne se distinguent souvent que par leur fin (« … — sous-sol »). */
+.pu-plan-nom {
+  font-size: 13px;
+  font-weight: 500;
+  line-height: 1.3;
   color: var(--text);
+  overflow-wrap: anywhere;
 }
-.pu-lieu-visuel svg {
-  width: 14px;
-  height: 14px;
-}
-/* Prêt dans le visuel libre, ou déjà à l'antenne : le bouton le dit. */
-.pu-lieu-ligne.pret .pu-lieu-visuel {
-  color: var(--brass);
-}
-.pu-lieu-ligne.direct .pu-lieu-visuel {
+.pu-plan-direct {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  font-size: 11px;
   color: var(--blood);
+}
+/* Le point bat comme celui du direct, et une onde s'en échappe : on le voit
+   du coin de l'œil, sans avoir à lire. */
+.pu-plan-direct .point {
+  width: 6px;
+  height: 6px;
+  border-radius: 99px;
+  background: var(--blood);
+  animation:
+    pulse 1.9s ease-in-out infinite,
+    pu-plan-onde 1.9s ease-out infinite;
+}
+@keyframes pu-plan-onde {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--blood) 70%, transparent);
+  }
+  100% {
+    box-shadow: 0 0 0 6px color-mix(in srgb, var(--blood) 0%, transparent);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pu-plan-direct .point {
+    animation: none;
+  }
+}
+.pu-plan-pions .seats.ici {
+  flex-wrap: wrap;
+  row-gap: 2px;
+}
+.pu-plan-pions .seats.ici .jeton {
+  overflow: hidden;
+  box-shadow: 0 0 0 1.5px var(--surface);
+}
+.pu-plan-pions .seats.ici .jeton.photo {
+  background: var(--sunk);
+}
+.pu-plan-pions .seats.ici .jeton img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: cover;
+  display: block;
+}
+.pu-plan-pions {
+  display: flex;
+  align-items: center;
+  margin-top: 2px;
+}
+.pu-plan-pions .seats.ici {
+  margin: 0;
+}
+/* L'action principale : toute la largeur, à la même place d'une carte à l'autre. */
+.pu-plan-direct-btn {
+  width: 100%;
+  justify-content: center;
 }
 .pu-lieu-lecture .read-body p {
   white-space: pre-line;
@@ -24709,105 +24807,14 @@ button.fdc-vig:hover {
   width: 80px;
   flex: none;
 }
-.cd-suite {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  /* Le texte peut s'abréger, la vignette non : sans ce plancher, elle
-     débordait sur la liste des transitions. */
-  min-width: 84px;
-}
-.cd-suite-txt {
-  display: grid;
-  text-align: right;
-  min-width: 0;
-  line-height: 1.25;
-}
-.cd-suite-nom {
-  font-size: 11.5px;
-  color: var(--text-dim);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 220px;
-}
-.cd-vig {
-  position: relative;
-  flex: none;
-  height: 42px;
-  aspect-ratio: 16 / 9;
-  border: 1px solid var(--line);
-  border-radius: 4px;
-  overflow: hidden;
-  background: var(--ground);
-}
-.cd-modes {
-  display: inline-flex;
-  flex: none;
-  gap: 2px;
-  padding: 2px;
-  background: var(--ground);
-  border: 1px solid var(--line);
-  border-radius: 6px;
-}
-.cd-mode {
-  border: 0;
-  background: none;
-  color: var(--text-dim);
-  font: inherit;
-  font-size: 11.5px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  cursor: pointer;
-  white-space: nowrap;
-}
-.cd-mode.on {
-  background: var(--raised);
-  color: var(--text);
-}
-.cd-modes-liste {
-  display: none;
-  flex: none;
-}
-.cd .cd-bascule {
-  flex: none;
-  padding: 7px 16px;
-}
-/* Portable : les transitions passent en liste, « À suivre » perd ses mots.
-   Au Paravent d'un écran de 1920 (bureau à distance), la console ne fait que
-   935 px : en pleine largeur, le volume de l'ambiance chevauchait « À suivre »
-   et le nom de l'ambiance tombait à rien. Le seuil est donc au-dessus. */
-@container cd (max-width: 1000px) {
-  .cd-modes {
-    display: none;
-  }
-  .cd-modes-liste {
-    display: block;
-  }
-  .cd-suite-txt {
-    display: none;
-  }
-}
-/* Étroit (colonne de scène d'un portable) : deux lignes. En haut les gestes
-   d'urgence et l'ambiance, en bas « À suivre » et la bascule, calée à droite.
-   L'écarteur prend toute la ligne et force le passage. */
+/* Étroit (colonne de scène d'un portable) : le voile et l'ambiance se
+   serrent, sans séparateur. */
 @container cd (max-width: 760px) {
-  .cd-in {
-    flex-wrap: wrap;
-    row-gap: 7px;
-  }
-  .cd-in > .spacer {
-    flex: 0 0 100%;
-    height: 0;
-  }
   .cd-sep {
     display: none;
   }
   .cd-amb {
     flex: 1 1 auto;
-  }
-  .cd-suite {
-    margin-left: auto;
   }
 }
 /* Très étroit : l'ambiance ne garde que son curseur. */

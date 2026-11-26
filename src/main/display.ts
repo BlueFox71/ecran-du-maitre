@@ -38,7 +38,6 @@ const state: DisplayState = {
   slots: [BLACK, BLACK],
   liveSlot: 0,
   transition: null,
-  pendingPlaceId: null,
   previous: null,
   frozen: false,
   frozenView: null,
@@ -242,13 +241,9 @@ function habiller(slide: SlidePayload, placeId: number | null): SlidePayload {
   return carte ? { ...nue, url: carte } : nue
 }
 
-/** Le lieu de chaque emplacement : celui en scène au direct, celui qu'on prépare à côté. */
-const lieuDe = (slot: 0 | 1): number | null =>
-  slot === state.liveSlot ? state.placeId : (state.pendingPlaceId ?? state.placeId)
-
 /** Une apparence choisie, retirée, renommée : les deux emplacements la suivent. */
 export function rehabiller(): DisplayState {
-  for (const i of [0, 1] as const) state.slots[i] = habiller(state.slots[i], lieuDe(i))
+  for (const i of [0, 1] as const) state.slots[i] = habiller(state.slots[i], state.placeId)
   if (!state.frozen) sync()
   broadcast()
   return state
@@ -287,18 +282,11 @@ export function arreterPresentation(): DisplayState {
   return state
 }
 
-/** Charge l'emplacement en préparation : rien ne bouge pour les joueurs. */
-export function prepare(slide: SlidePayload): DisplayState {
-  state.slots[idle()] = garderTextes(habiller(slide, lieuDe(idle())), state.slots[idle()])
-  broadcast()
-  return state
-}
-
-/** Pose une image dans une case du collage en préparation, ou la vide. */
+/** Pose une image dans une case du collage à l'écran, ou la vide. Le Paravent n'a plus qu'un visuel : le direct. */
 export function prepareCell(index: number, cell: CollageCell | null): DisplayState {
-  const cur = state.slots[idle()]
+  const cur = state.slots[state.liveSlot]
   if (cur.type !== 'collage') {
-    state.slots[idle()] = garderTextes(
+    state.slots[state.liveSlot] = garderTextes(
       !cell
         ? { type: 'black' }
         : cell.kind === 'image'
@@ -312,14 +300,15 @@ export function prepareCell(index: number, cell: CollageCell | null): DisplaySta
     if (!Number.isInteger(index) || index < 0 || index >= n) return state
     const cells = Array.from({ length: n }, (_, i) => cur.cells[i] ?? null)
     cells[index] = cell
-    state.slots[idle()] = { ...cur, cells }
+    state.slots[state.liveSlot] = { ...cur, cells }
   }
+  sync()
   broadcast()
   return state
 }
 
 /**
- * Écrire dans une case du collage en préparation : la légende sous une image,
+ * Écrire dans une case du collage à l'écran : la légende sous une image,
  * ou le texte d'une case qui n'en porte pas.
  *
  * Les deux passent par la même porte parce qu'ils posent le même problème :
@@ -331,7 +320,7 @@ export function ecrireCase(
   index: number,
   quoi: { caption?: string } | { texte: string; color?: string }
 ): DisplayState {
-  const cur = state.slots[idle()]
+  const cur = state.slots[state.liveSlot]
   if (cur.type !== 'collage') return state
   const n = COLLAGE_CELLS[cur.layout]
   if (!Number.isInteger(index) || index < 0 || index >= n) return state
@@ -351,22 +340,15 @@ export function ecrireCase(
     cells[index] = { ...c, caption: quoi.caption }
   }
 
-  state.slots[idle()] = { ...cur, cells }
+  state.slots[state.liveSlot] = { ...cur, cells }
+  sync()
   broadcast()
   return state
 }
 
-/**
- * Recadre une image : celle d'une case du collage, ou l'image plein écran.
- * S'applique à l'emplacement qu'on est en train de regarder — on corrige un
- * cadrage aussi bien en préparant qu'en direct.
- */
-export function frameImage(
-  slot: 'prep' | 'live',
-  cell: number | null,
-  frame: Frame
-): DisplayState {
-  const which = slot === 'live' ? state.liveSlot : idle()
+/** Recadre une image à l'écran : celle d'une case du collage, ou l'image plein écran. */
+export function frameImage(cell: number | null, frame: Frame): DisplayState {
+  const which = state.liveSlot
   const cur = state.slots[which]
 
   if (cur.type === 'collage' && cell != null) {
@@ -389,12 +371,12 @@ export function frameImage(
 }
 
 /**
- * Remplace les textes de l'emplacement qu'on regarde. La régie envoie toujours
- * la liste entière : ajouter, modifier, déplacer et supprimer passent par le
- * même appel, et l'ordre d'empilement est celui de la liste.
+ * Remplace les textes de l'écran. Le Paravent envoie toujours la liste
+ * entière : ajouter, modifier, déplacer et supprimer passent par le même
+ * appel, et l'ordre d'empilement est celui de la liste.
  */
-export function setTexts(slot: 'prep' | 'live', texts: TextOverlay[]): DisplayState {
-  const which = slot === 'live' ? state.liveSlot : idle()
+export function setTexts(texts: TextOverlay[]): DisplayState {
+  const which = state.liveSlot
   const cur = state.slots[which]
 
   if (texts.length) {
@@ -413,23 +395,34 @@ export function setTexts(slot: 'prep' | 'live', texts: TextOverlay[]): DisplaySt
 let transitionSeq = 1
 
 /**
- * Bascule d'un emplacement à l'autre.
+ * Le Paravent n'a plus qu'un visuel : le direct. Montrer une image ou un lieu,
+ * c'est l'envoyer tout de suite aux joueurs, dans la manière choisie.
  *
- * `ms` à 0 coupe net — c'est le bouton « Couper », et le mode n'a alors rien à
- * dire. Sinon la fenêtre joueurs enchaîne de la manière demandée : elle seule
- * sait le faire, parce qu'elle seule tient les deux images en même temps.
+ * Les deux emplacements restent, mais pour la fenêtre joueurs seulement : il
+ * lui faut l'image d'avant et celle d'après pour enchaîner en fondu. On pose la
+ * nouvelle dans l'emplacement libre — **nue**, sans les textes que cet
+ * emplacement portait deux bascules plus tôt — puis on bascule.
+ *
+ * `placeId` : le lieu qui prend la scène avec cette image (ses pions arrivent
+ * en même temps qu'elle) ; `undefined` laisse le lieu en scène où il est.
+ *
+ * Le gel n'arrête rien ici : il tient au seuil de `broadcast`. On réarrange
+ * figé, et les joueurs découvrent le tout au dégel.
  */
-export function swap(ms = 800, mode: Transition = 'fondu'): DisplayState {
-  if (state.frozen) return state
-  state.previous = state.slide
+export function passerEnDirect(
+  slide: SlidePayload,
+  placeId: number | null | undefined,
+  ms: number,
+  mode: Transition
+): DisplayState {
+  const lieu = placeId === undefined ? state.placeId : placeId
+  if (!ECRANS_A_PART.has(state.slide.type)) state.previous = state.slide
+  state.slots[idle()] = habiller(slide, lieu)
   state.liveSlot = idle()
   state.transition = { id: transitionSeq++, ms, mode }
   sync()
-  // Le lieu préparé prend effet en même temps que son image : les pions ne
-  // se posent jamais sur la carte du lieu précédent.
-  if (state.pendingPlaceId != null) {
-    state.placeId = state.pendingPlaceId
-    state.pendingPlaceId = null
+  if (placeId !== undefined && placeId !== state.placeId) {
+    state.placeId = placeId
     refreshPions()
     return state
   }
@@ -628,7 +621,6 @@ export function setAudio(patch: Partial<AudioState>): DisplayState {
 /** Le lieu porte les pions : en changer, c'est changer de plateau. */
 export function setPlace(placeId: number | null): DisplayState {
   state.placeId = placeId
-  state.pendingPlaceId = null
   refreshPions()
   return state
 }
@@ -641,7 +633,7 @@ export function setPlace(placeId: number | null): DisplayState {
  * et, la carte n'étant plus la même, ils ne s'y poseraient plus du tout.
  */
 export function carteRemplacee(placeId: number, ancienne: number, neuve: SlidePayload): void {
-  if (state.placeId !== placeId && state.pendingPlaceId !== placeId) return
+  if (state.placeId !== placeId) return
   for (const i of [0, 1] as const) {
     const s = state.slots[i]
     if ((s.type === 'image' || s.type === 'video') && s.itemId === ancienne)
@@ -649,13 +641,6 @@ export function carteRemplacee(placeId: number, ancienne: number, neuve: SlidePa
   }
   if (!state.frozen) sync()
   refreshPions()
-}
-
-/** Prépare un lieu : il ne prendra effet qu'à la bascule. */
-export function preparePlace(placeId: number | null): DisplayState {
-  state.pendingPlaceId = placeId
-  broadcast()
-  return state
 }
 
 /**

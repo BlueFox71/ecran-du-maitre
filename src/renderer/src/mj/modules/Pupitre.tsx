@@ -8,7 +8,6 @@ import { AllurePions } from '../components/AllurePions'
 import { DetailPion } from '../components/DetailPion'
 import { VueSm } from '../santeMentale/VueSm'
 import { BoutonAffichage, useTraitsMj } from '../components/Affichage'
-import { MenuImage, type CibleImage } from '../components/MenuImage'
 import { ARTICLES_SITUES, FicheCompacte } from '../components/FicheDuLieu'
 import { BoutonSurligneur, EffacerSurlignage, Surlignable, Surligneur } from '../surligneur'
 import { cible, type Cible } from '@shared/surlignage'
@@ -16,7 +15,6 @@ import { montrerDansFiche, useViseCarte } from '../viseCarte'
 import type { ArticleSurCarte } from '../../shared/Slide'
 import { Slide } from '../../shared/Slide'
 import { BoutonTours, Tours, pionEnJeu } from '../components/Tours'
-import { TrameEnJeu } from '../components/PlanTrame'
 import { Valeur } from '../components/Valeur'
 import { Visage } from '../../shared/Visage'
 import { imageObjet } from '../../shared/outilsChasse'
@@ -27,7 +25,6 @@ import { accepteSi, estPiece, profondeur, useMontrerPieces } from './Places'
 import { initials } from './Sheets'
 import { dansForme } from '@shared/pieces'
 import { MenuPoserIci } from '../components/MenuPoserIci'
-import { Annotations, CadreAnnote } from '../components/Annotations'
 import { TableauDeScene, type Surbrillance } from '../components/Tableau'
 import { BoutonObjets, ObjetsDeScene, usePanneauScene } from '../components/ObjetsDeScene'
 import { IconPhone, Portables } from '../components/Portables'
@@ -37,16 +34,12 @@ import { ConsoleDirect } from '../components/ConsoleDirect'
 import { BoutonAttente } from '../components/Attente'
 import { Galerie } from '../components/Galerie'
 import {
-  BoutonPoserLumiere,
   BoutonTextes,
   SensEncart,
-  VoletAnnoter,
   VoletCase,
   VoletTextes,
   caseDuCollage,
-  useAnnotationsScene,
   useCalqueDuLieu,
-  usePoseLumiere,
   useTextesEcran
 } from '../components/OutilsDeScene'
 import { COLLAGE_CELLS, FRAME_NEUTRE, LUM_MAX, LUM_MIN } from '@shared/types'
@@ -74,19 +67,18 @@ import {
   IconScreen,
   IconEye,
   IconCercle,
-  IconPen,
   IconRetour,
   IconRotate,
   IconSearch,
   IconNote,
   IconTimeline,
-  IconTrame,
   IconTrash,
   kindIcon
 } from '../components/Icons'
 import { useEchap } from '../echap'
 import { ChoixDansArbre } from '../components/ChoixDansArbre'
-import { SelecteurApparence, porteurDe } from '../components/Apparences'
+import { SelecteurApparence, imageMontree, porteurDe } from '../components/Apparences'
+import { Visionneuse } from '../components/Visionneuse'
 import { estPresente, presenterLeJoueur } from '../presentation'
 import { montreLaCarte } from '@shared/scene'
 import { PanneauSons, useSonsSurCarte, useTouchesSon } from '../components/PanneauSons'
@@ -94,9 +86,9 @@ import { colorFor, etatSuivant } from '@shared/types'
 
 /* ============================================================
    Pupitre : le fil de la séance à gauche, l'écran des
-   joueurs à droite. Ce que le moment a sous la main se pose
-   directement dans le visuel libre — on n'a pas à changer de page
-   pour envoyer ce qu'on vient de lire.
+   joueurs à droite. Ce que le moment a sous la main part
+   directement en direct — un seul visuel, plus de bascule : on
+   n'a pas à changer de page pour envoyer ce qu'on vient de lire.
 
    Seule page de diffusion depuis le retrait de la Régie : on y suit
    la partie, on compose l'écran des joueurs et on diffuse.
@@ -131,10 +123,6 @@ export function Pupitre(): JSX.Element {
      pour ne pas perdre sa place en passant d'un module à l'autre. */
   const beat = s.beats.find((b) => b.id === s.activeBeatId) ?? s.beats[0] ?? null
 
-  /* Le visuel qu'on arrange vient du magasin : il survit au changement de
-     page, et la Régie regarde le même. */
-  const visuel = s.visuel
-  const setVisuel = s.setVisuel
   const [activeCell, setActiveCell] = useState(0)
   const [edit, setEdit] = useState<{ pions: Pion[]; size: number }>({ pions: [], size: 6 })
   const [choix, setChoix] = useState(false)
@@ -147,12 +135,12 @@ export function Pupitre(): JSX.Element {
      deux derniers prennent toute la colonne : ils n'ont rien à lire à côté. */
   const [cote, setCote] = useRetenu<'chrono' | 'lieux' | 'annexes' | 'portables' | 'sons'>(
     'cote',
-    'chrono'
+    'lieux'
   )
   const plein = cote === 'portables' || cote === 'sons'
-  /* Un onglet retenu qui n'existe plus (l'ancien « Dossier ») : retour au fil. */
+  /* Un onglet retenu qui n'existe plus (l'ancien « Dossier ») : retour aux lieux, le premier. */
   useEffect(() => {
-    if (!COTES.some((c) => c.id === cote)) setCote('chrono')
+    if (!COTES.some((c) => c.id === cote)) setCote('lieux')
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [cote])
   /* Les chiffres jouent les bruitages et le point fait silence, quel que soit l'onglet. */
@@ -163,6 +151,8 @@ export function Pupitre(): JSX.Element {
      ne fait rien — tout est côte à côte. */
   const [vue, setVue] = useRetenu<'lire' | 'scene'>('vue', 'lire')
   const [lieuVu, setLieuVu] = useRetenu<number | null>('lieu', null)
+  /* Le plan qu'on regarde en grand, pour soi seul. */
+  const [planVu, setPlanVu] = useState<number | null>(null)
   /* Ce que la scène du MJ montre de son calque : murs, portes, fenêtres… */
   const [traits] = useTraitsMj()
   /* Le menu de l'encart, ouvert d'un clic sur lui dans la scène. */
@@ -181,15 +171,7 @@ export function Pupitre(): JSX.Element {
   }, [choisi])
   /* Le lieu survolé dans le fil, et où poser sa bulle : à gauche de la ligne. */
   const [bulleLieu, setBulleLieu] = useState<{ id: number; x: number; y: number } | null>(null)
-  /* Le choix qu'ouvre un clic sur une image : visuel libre, ou fenêtre sur le direct. */
-  const [cibleImage, setCibleImage] = useState<CibleImage | null>(null)
   const [galerie, setGalerie] = useState(false)
-  /*
-   * Les annotations du lieu qu'on arrange, comme en Régie : on les voit, on les
-   * pose et on les écrit d'ici. De l'état local — la fenêtre joueurs ne peut
-   * pas les recevoir. Voir `useAnnotationsScene`.
-   */
-  const [voirAnnots, setVoirAnnots] = useState(false)
   /* L'ombre exacte de l'écran des joueurs, posée sur la scène à la demande. */
   const [leurOeil, setLeurOeil] = useState(false)
   /* Ce que le MJ survole dans son tableau de scène : un halo chez lui seul. */
@@ -200,8 +182,6 @@ export function Pupitre(): JSX.Element {
   const [panneau, basculerPanneau] = usePanneauScene('paravent.tiroir', () => null)
   const voirScene = panneau === 'scene'
   useEchap(() => panneau && basculerPanneau(panneau), panneau != null)
-  /* L'arborescence de la séance, par-dessus tout : on y coche ce qui est fait. */
-  const [trameOuverte, setTrameOuverte] = useState(false)
   const basculerScene = (): void => basculerPanneau('scene')
 
 
@@ -219,21 +199,8 @@ export function Pupitre(): JSX.Element {
   const poserOnde = ondes.ajouter
   useEffect(() => window.jdr.display.onPing(poserOnde), [poserOnde])
 
-  const liveSlot = (display?.liveSlot ?? 0) as 0 | 1
-  const idleSlot: 0 | 1 = liveSlot === 0 ? 1 : 0
-  const onLive = visuel === liveSlot
-
-  /* En arrivant sur la page, on regarde ce que voient les joueurs : le direct,
-     toujours. Une fois seulement, dès que l'état de l'écran est connu — ensuite
-     on passe d'un visuel à l'autre comme on veut. */
-  const arrive = useRef(false)
-  useEffect(() => {
-    if (arrive.current || !display) return
-    arrive.current = true
-    setVisuel(display.liveSlot)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [display])
-  const slide = display?.slots?.[visuel] ?? { type: 'black' as const }
+  /* Un seul visuel : le direct. Ce qu'on y fait part aussitôt aux joueurs. */
+  const slide = display?.slots?.[display.liveSlot] ?? { type: 'black' as const }
   /*
    * « Bloquer le zoom MJ » : sur le direct, la molette et le glisser ne
    * recadrent plus que la scène du MJ. Les joueurs gardent leur cadrage ; le
@@ -243,11 +210,10 @@ export function Pupitre(): JSX.Element {
   const [zoomMj, setZoomMj] = useState(false)
   const [cadreMj, setCadreMj] = useState<Frame | null>(null)
   const imageVue = 'itemId' in slide ? slide.itemId : null
-  useEffect(() => setCadreMj(null), [imageVue, visuel, zoomMj])
+  useEffect(() => setCadreMj(null), [imageVue, zoomMj])
   const slideVu =
     zoomMj && cadreMj && (slide.type === 'image' || slide.type === 'video') ? { ...slide, frame: cadreMj } : slide
-  const prepSlide = display?.slots?.[idleSlot] ?? { type: 'black' as const }
-  const layout: CollageLayout = prepSlide.type === 'collage' ? prepSlide.layout : '1'
+  const layout: CollageLayout = slide.type === 'collage' ? slide.layout : '1'
 
   /*
    * La scène prend la forme de l'écran des joueurs, pas un 16/9 de principe :
@@ -266,17 +232,11 @@ export function Pupitre(): JSX.Element {
   const frozen = display?.frozen ?? false
   const dark = (display?.slide ?? { type: 'black' }).type === 'black'
   const pillClass = frozen ? 'frozen' : dark ? 'off' : 'on'
-  const pillText = frozen ? 'Figé — rien ne part' : dark ? 'Voile noir' : 'Direct : chaque geste part aussitôt'
+  const pillText = frozen ? 'Figé — rien ne part' : dark ? 'Voile noir' : 'Direct'
 
-  /** Le lieu qu'on arrange : celui de l'écran qu'on regarde. */
-  const editPlaceId =
-    !onLive && display?.pendingPlaceId != null
-      ? display.pendingPlaceId
-      : /* Le lieu en scène ne s'arrange que sur sa carte : une autre image
-           regardée ici, libre ou au direct, ne porte ni ses pions ni ses murs. */
-        montreLaCarte(slide, display?.carteDuLieu ?? null)
-        ? (display?.placeId ?? null)
-        : null
+  /** Le lieu qu'on arrange : celui en scène — sur sa carte seulement. Une
+      autre image à l'écran ne porte ni ses pions ni ses murs. */
+  const editPlaceId = montreLaCarte(slide, display?.carteDuLieu ?? null) ? (display?.placeId ?? null) : null
 
   const refreshEdit = async (): Promise<void> => setEdit(await window.jdr.pions.of(editPlaceId))
   const refreshPresence = async (): Promise<void> => setPresence(await window.jdr.pions.presence())
@@ -290,16 +250,11 @@ export function Pupitre(): JSX.Element {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [display?.pions])
 
-  /* Les annotations suivent le lieu qu'on arrange, et ne se lisent que si on
-     les demande — inutile d'interroger la base pour un calque qu'on cache. */
-  const annot = useAnnotationsScene(editPlaceId, voirAnnots)
   /* Le calque du lieu : il retient les pions, nourrit le tableau de scène et
      l'œil des joueurs. Il se relit dès qu'un pion ou une porte bouge. */
   const calque = useCalqueDuLieu(editPlaceId, edit.pions, display?.pions, display?.calqueRev)
-  /* Les textes posés sur le visuel qu'on regarde, et la case visée d'un collage. */
-  const textes = useTextesEcran(slide, onLive)
-  /* Une bougie qu'on allume, une lanterne qu'on pose : un clic dans la pièce. */
-  const lampe = usePoseLumiere(editPlaceId, calque)
+  /* Les textes posés sur l'écran, et la case visée d'un collage. */
+  const textes = useTextesEcran(slide)
   /* Un joueur pose l'un de ses objets dans le lieu : armé depuis le détail du
      pion, il attend un clic sur le plan. Changer de lieu le désarme. */
   const [objetAPoser, setObjetAPoser] = useState<number | null>(null)
@@ -419,10 +374,6 @@ export function Pupitre(): JSX.Element {
   )
   const iCase = caseDuCollage(slide, activeCell)
 
-  /** Le lieu mis en scène, et sa carte — c'est elle qui porte les repères. */
-  const placeArrangee = s.places.find((p) => p.id === editPlaceId) ?? null
-  const carteScene = s.allItems.find((i) => i.id === placeArrangee?.mapItemId) ?? null
-
   /* ---------------- pointeur ---------------- */
 
   const sendPointer = (p: Pointer | null): void => {
@@ -472,34 +423,33 @@ export function Pupitre(): JSX.Element {
   /* ---------------- diffusion ---------------- */
 
   /**
-   * Un clic prépare : rien ne bouge pour les joueurs tant qu'on n'a pas
-   * basculé. Un son, lui, part tout de suite — il ne se prépare pas, il se
-   * joue, et on l'arrête d'un bouton.
+   * Un clic montre : l'image part tout de suite aux joueurs, dans la manière
+   * choisie — il n'y a plus de visuel en préparation. Une image s'ouvre en
+   * fenêtre sur le direct, le plan reste dessous ; une vidéo prend l'écran.
+   * Un son se joue, et on l'arrête d'un bouton.
    */
   const poser = async (it: UiItem): Promise<void> => {
     if (it.kind === 'audio') {
       await window.jdr.display.showItem(it.id)
       return
     }
-    const cells = COLLAGE_CELLS[layout]
-    if (cells > 1 && it.kind === 'image') {
-      const c = activeCell % cells
-      await window.jdr.display.prepareCell(c, it.id)
-      setActiveCell((c + 1) % cells)
+    if (it.kind === 'image') {
+      await window.jdr.display.fenetre(it.id)
       return
     }
-    await window.jdr.display.prepareItem(it.id)
+    await window.jdr.display.directItem(it.id, s.reglages.basculeMs, s.transition)
   }
 
-  const preparePlace = async (id: number): Promise<void> => {
-    await window.jdr.display.preparePlace(id)
+  /** Afficher un lieu en direct : son plan part dans la manière choisie, ses pions avec. */
+  const afficherLieu = async (id: number): Promise<void> => {
+    await window.jdr.display.directPlace(id, s.reglages.basculeMs, s.transition)
   }
 
   /* ---------------- l'image visée : pivot et lumière ---------------- */
 
   /**
-   * Sur quoi portent le pivot et la lumière : l'image plein écran du visuel
-   * qu'on regarde, ou la case visée s'il s'agit d'un collage.
+   * Sur quoi portent le pivot et la lumière : l'image plein écran, ou la case
+   * visée s'il s'agit d'un collage.
    */
   const cadreVise = (): { cell: number | null; frame: Frame } | null => {
     // Une vidéo se recadre comme une image, donc elle se pivote et s'éclaircit.
@@ -518,11 +468,8 @@ export function Pupitre(): JSX.Element {
   const pivotable = vise !== null
   const lum = Math.round((vise?.frame.lum ?? 1) * 100)
 
-  /* La carte à l'écran a-t-elle d'autres apparences ? Le lieu de ce visuel :
-     celui en scène au direct, celui qu'on prépare à côté. */
-  const lieuDuVisuel = onLive
-    ? (display?.placeId ?? null)
-    : (display?.pendingPlaceId ?? display?.placeId ?? null)
+  /* La carte à l'écran a-t-elle d'autres apparences ? */
+  const lieuDuVisuel = display?.placeId ?? null
   const lieuDuVisuelVu = s.places.find((p) => p.id === lieuDuVisuel)
   const porteurVu = lieuDuVisuelVu ? porteurDe(lieuDuVisuelVu, s.places) : null
   const avecApparences =
@@ -539,7 +486,7 @@ export function Pupitre(): JSX.Element {
   const pivoter = (): void => {
     if (!vise) return
     const rot = (((vise.frame.rot ?? 0) + 90) % 360) as 0 | 90 | 180 | 270
-    void window.jdr.display.frame(onLive ? 'live' : 'prep', vise.cell, {
+    void window.jdr.display.frame(vise.cell, {
       zoom: vise.frame.zoom,
       ox: 0,
       oy: 0,
@@ -551,7 +498,7 @@ export function Pupitre(): JSX.Element {
   /** Corrige la luminosité de l'image visée, sans toucher à son cadrage. */
   const poseLum = (pct: number): void => {
     if (!vise) return
-    void window.jdr.display.frame(onLive ? 'live' : 'prep', vise.cell, {
+    void window.jdr.display.frame(vise.cell, {
       ...vise.frame,
       lum: pct / 100
     })
@@ -572,12 +519,9 @@ export function Pupitre(): JSX.Element {
     const charId = e.dataTransfer.getData('text/pion-char')
     const lieuId = e.dataTransfer.getData('text/lieu')
 
-    /* Un lieu lâché sur l'écran à l'antenne y va tout de suite ; sur l'autre,
-       il attend la bascule. */
+    /* Un lieu lâché sur l'écran y va tout de suite. */
     if (lieuId) {
-      await (onLive
-        ? window.jdr.display.setPlace(Number(lieuId))
-        : preparePlace(Number(lieuId)))
+      await afficherLieu(Number(lieuId))
       return
     }
     if (pionId) {
@@ -586,8 +530,8 @@ export function Pupitre(): JSX.Element {
       return
     }
     /* Une image lâchée dans une case du collage y prend place ; ailleurs, elle
-       devient un pion. On ne compose jamais l'écran que les joueurs regardent. */
-    const visee = onLive ? null : cell
+       devient un pion. */
+    const visee = cell
     if (itemId && visee != null && visee < COLLAGE_CELLS[layout]) {
       await window.jdr.display.prepareCell(visee, Number(itemId))
       setActiveCell((visee + 1) % COLLAGE_CELLS[layout])
@@ -613,7 +557,14 @@ export function Pupitre(): JSX.Element {
       await window.jdr.pions.add({ placeId: editPlaceId, itemId: Number(itemId), x, y })
     }
     await refreshPresence()
-    await refreshEdit()
+    /* Le pion posé ouvre aussitôt sa fiche : on le pose pour s'en occuper.
+       L'ajout ne rend pas le pion, on le retrouve — le plus récent des siens. */
+    const frais = await window.jdr.pions.of(editPlaceId)
+    setEdit(frais)
+    const neuf = frais.pions
+      .filter((p) => (charId ? p.characterId === Number(charId) : p.itemId === Number(itemId)))
+      .sort((a, b) => b.id - a.id)[0]
+    if (neuf) setChoisi({ pionId: neuf.id, characterId: neuf.characterId })
   }
 
   const removePion = async (id: number): Promise<void> => {
@@ -714,7 +665,8 @@ export function Pupitre(): JSX.Element {
   const visuels = useMemo(() => matiere.filter((i) => A_L_ECRAN.has(i.kind)), [matiere])
 
   /* Une image ou une vidéo de l'étagère, celle du moment comme celle du lieu :
-     un clic la prépare, ou l'ouvre en fenêtre ; glissée sur la scène, un pion. */
+     un clic l'ouvre en fenêtre sur le direct (une vidéo prend l'écran) ;
+     glissée sur la scène, un pion. */
   const vignetteVisuel = (it: UiItem): JSX.Element => (
     <button
       key={it.id}
@@ -725,15 +677,11 @@ export function Pupitre(): JSX.Element {
         e.dataTransfer.setData('text/pion-item', String(it.id))
         e.dataTransfer.effectAllowed = 'copy'
       }}
-      onClick={(e) =>
-        it.kind === 'image'
-          ? setCibleImage({ item: it, titre: it.title, x: e.clientX, y: e.clientY })
-          : void poser(it)
-      }
+      onClick={() => void poser(it)}
       title={
         it.kind === 'image'
-          ? `${it.title} — clic : visuel libre ou fenêtre sur le direct ; glisser sur la scène : un pion`
-          : `Préparer ${it.title} — ou le glisser sur la scène pour en faire un pion`
+          ? `${it.title} — clic : en fenêtre sur le direct ; glisser sur la scène : un pion`
+          : `Montrer ${it.title} en direct — ou le glisser sur la scène pour en faire un pion`
       }
     >
       {it.poster || (it.kind === 'image' && it.url) ? (
@@ -806,13 +754,7 @@ export function Pupitre(): JSX.Element {
   /* Taire les pièces ; celle qu'on lit reste, sa ligne allumée dit où l'on est. */
   const [montrerPieces, basculerPieces] = useMontrerPieces('paravent.montrerPieces')
   const sansPieces = !montrerPieces
-  /* Seulement ceux qu'on peut montrer : un lieu sans plan n'a rien à mettre
-     à l'écran. Celui qu'on lit reste, comme pour les pièces. */
-  const [avecPlan, basculerAvecPlan] = useMontrerPieces('paravent.avecPlan')
-  const lieuxLus = lieuxEnArbre.filter(
-    ({ p }) =>
-      p.id === lieuLu?.id || ((!sansPieces || !estPiece(p)) && (!avecPlan || p.mapItemId != null))
-  )
+  const lieuxLus = lieuxEnArbre.filter(({ p }) => p.id === lieuLu?.id || !sansPieces || !estPiece(p))
   const filiationLu = useMemo(() => {
     const noms: string[] = []
     for (
@@ -844,6 +786,39 @@ export function Pupitre(): JSX.Element {
     const pnj = new Set((ici?.pnjs ?? []).map((x) => x.characterId))
     return (ici?.joueurs ?? []).filter((j) => !pnj.has(j.characterId))
   }
+  /* Les visages de ceux qui se tiennent là : pas un décompte. */
+  const visages = (ici: PionsDuLieu['joueurs']): JSX.Element | null =>
+    ici.length ? (
+      <span className="seats ici">
+        {ici.map((j) => (
+          <span key={j.characterId} className={`jeton c-${j.color}${j.url ? ' photo' : ''}`} title={j.name}>
+            {j.url ? <Visage url={j.url} cadre={j.cadre} /> : j.initials}
+          </span>
+        ))}
+      </span>
+    ) : null
+  /*
+   * Les plans : les lieux qui en portent un. Une pièce n'en a pas à elle,
+   * elle est dessinée sur celui de son étage — ses joueurs s'y rangent donc.
+   * Celui à l'écran passe en tête, les autres gardent l'ordre de l'arbre.
+   */
+  const planEnDirect = montreLaCarte(slide, display?.carteDuLieu ?? null) ? (display?.placeId ?? null) : null
+  const plans = lieuxEnArbre
+    .map(({ p }) => p)
+    .filter((p) => p.mapItemId != null && porteurDe(p, s.places) === p)
+    .map((p) => {
+      const vus = new Set<number>()
+      const ici = [p, ...s.places.filter((q) => q !== p && porteurDe(q, s.places) === p)]
+        .flatMap((q) => joueursIci(q.id))
+        .filter((j) => {
+          if (vus.has(j.characterId)) return false
+          vus.add(j.characterId)
+          return true
+        })
+      return { p, image: imageMontree(p, s.allItems), ici, direct: p.id === planEnDirect }
+    })
+    .sort((a, b) => Number(b.direct) - Number(a.direct))
+  const planOuvert = plans.find((x) => x.p.id === planVu) ?? null
   /* La bulle d'un lieu survolé : qui s'y trouve, joueurs puis PNJ. */
   const BulleLieu = ({ id, x, y }: { id: number; x: number; y: number }): JSX.Element | null => {
     const lieuSurvole = s.places.find((p) => p.id === id)
@@ -989,22 +964,12 @@ export function Pupitre(): JSX.Element {
                     />
                     Montrer les pièces
                   </label>
-                  <label className="lieux-filtre pu-filtre">
-                    <input
-                      type="checkbox"
-                      checked={avecPlan}
-                      onChange={(e) => basculerAvecPlan(e.target.checked)}
-                    />
-                    Seulement les lieux ayant un plan
-                  </label>
                   {lieuxLus.map(({ p, prof }) => {
                     const ici = joueursIci(p.id)
                     return (
                       <div
                         key={p.id}
-                        className={`pu-lieu-ligne${display?.placeId === p.id ? ' direct' : ''}${
-                          display?.pendingPlaceId === p.id ? ' pret' : ''
-                        }`}
+                        className={`pu-lieu-ligne${display?.placeId === p.id ? ' direct' : ''}`}
                         onMouseEnter={(e) => {
                           const r = e.currentTarget.getBoundingClientRect()
                           setBulleLieu({ id: p.id, x: r.left, y: r.top + r.height / 2 })
@@ -1025,33 +990,67 @@ export function Pupitre(): JSX.Element {
                             <span className="ttl">{p.name}</span>
                             {/* Qui se trouve là : les visages, pas un décompte —
                                 sous le nom, qui garde ainsi toute sa largeur. */}
-                            {ici.length ? (
-                              <span className="seats ici">
-                                {ici.map((j) => (
-                                  <span
-                                    key={j.characterId}
-                                    className={`jeton c-${j.color}${j.url ? ' photo' : ''}`}
-                                    title={j.name}
-                                  >
-                                    {j.url ? <Visage url={j.url} cadre={j.cadre} /> : j.initials}
-                                  </span>
-                                ))}
-                              </span>
-                            ) : null}
+                            {visages(ici)}
                           </span>
-                        </button>
-                        <button
-                          className="pu-lieu-visuel"
-                          onClick={() => void preparePlace(p.id)}
-                          title="Afficher dans le visuel libre"
-                          aria-label={`Afficher ${p.name} dans le visuel`}
-                        >
-                          <IconScreen />
                         </button>
                       </div>
                     )
                   })}
                   {lieuxEnArbre.length === 0 ? <p className="vide">Aucun lieu.</p> : null}
+
+                  {/* Les plans : ce qu'on peut mettre à l'écran. Celui en direct
+                      en tête ; sous chacun, les joueurs qui s'y tiennent. */}
+                  <div className="pu-plans">
+                    <div className="pu-sect">
+                      <span className="eyebrow">Plans</span>
+                      <span className="pu-line" />
+                    </div>
+                    {plans.map(({ p, image, ici, direct }) => (
+                      <div key={p.id} className={`pu-plan${direct ? ' direct' : ''}`}>
+                        <div className="pu-plan-tete">
+                          {/* La vignette est le « Voir le plan » : la colonne est trop
+                              étroite pour deux boutons côte à côte. */}
+                          <button
+                            className="pu-plan-vig"
+                            onClick={() => setPlanVu(p.id)}
+                            title={`Voir le plan de ${p.name} en grand — pour toi seul, rien ne part aux joueurs`}
+                            aria-label={`Voir le plan de ${p.name}`}
+                          >
+                            {image?.url ? (
+                              <img src={image.poster ?? image.url} alt="" />
+                            ) : (
+                              <span className="pu-rien" />
+                            )}
+                            <span className="pu-plan-loupe" aria-hidden>
+                              <IconSearch />
+                            </span>
+                          </button>
+                          <div className="pu-plan-titre">
+                            <span className="pu-plan-nom">{p.name}</span>
+                            {direct ? (
+                              <span className="pu-plan-direct">
+                                <span className="point" />
+                                En direct
+                              </span>
+                            ) : null}
+                            {/* Qui s'y tient : sous le nom, à côté de l'image. */}
+                            {ici.length ? <div className="pu-plan-pions">{visages(ici)}</div> : null}
+                          </div>
+                        </div>
+                        {direct ? null : (
+                          <button
+                            className="btn btn-sm btn-brass pu-plan-direct-btn"
+                            onClick={() => void afficherLieu(p.id)}
+                            title={`Afficher ${p.name} aux joueurs tout de suite, dans la manière choisie — ses pions avec lui`}
+                          >
+                            <IconScreen />
+                            L’afficher en direct
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                    {plans.length === 0 ? <p className="vide">Aucun lieu n’a de plan.</p> : null}
+                  </div>
                 </div>
               ) : cote === 'annexes' ? (
                 <div className="fil">
@@ -1114,12 +1113,14 @@ export function Pupitre(): JSX.Element {
                     <EffacerSurlignage conteneur={ficheLue} />
                     <BoutonSurligneur />
                     <button
-                      className={`btn btn-sm${display?.pendingPlaceId === lieuLu.id ? ' btn-on' : ''}`}
-                      onClick={() => void preparePlace(lieuLu.id)}
-                      title="Préparer ce lieu dans le visuel libre"
+                      className={`btn btn-sm${display?.placeId === lieuLu.id ? ' btn-on' : ''}`}
+                      onClick={() =>
+                        void afficherLieu(lieuLu.mapItemId ? lieuLu.id : porteurDe(lieuLu, s.places).id)
+                      }
+                      title="Afficher ce lieu aux joueurs tout de suite, dans la manière choisie"
                     >
                       <IconScreen />
-                      Afficher dans le visuel
+                      L’afficher en direct
                     </button>
                   </header>
                   {/* Ses images à montrer — et celles de son étage, pour une pièce. */}
@@ -1139,7 +1140,7 @@ export function Pupitre(): JSX.Element {
                       key={lieuLu.id}
                       p={lieuLu}
                       onChanger={setLieuVu}
-                      onMontrer={(item, titre, x, y) => setCibleImage({ item, titre, x, y })}
+                      onMontrer={(item) => void poser(item)}
                       avant={
                         <article className="read pu-lieu-lecture">
                           <h4>Ce que voient les joueurs</h4>
@@ -1250,8 +1251,8 @@ export function Pupitre(): JSX.Element {
                     {lieu ? (
                       <button
                         className="pu-vig pu-lieu"
-                        onClick={() => void preparePlace(lieu.id)}
-                        title={`Préparer ${lieu.name} — ses pions reviennent avec lui`}
+                        onClick={() => void afficherLieu(lieu.id)}
+                        title={`Afficher ${lieu.name} en direct — ses pions reviennent avec lui`}
                       >
                         {carte?.url ? <img src={carte.poster ?? carte.url} alt="" /> : <span className="pu-rien" />}
                         <span className="pu-kind">lieu</span>
@@ -1272,20 +1273,10 @@ export function Pupitre(): JSX.Element {
                             e.dataTransfer.setData('text/pion-char', String(c.id))
                             e.dataTransfer.effectAllowed = 'copy'
                           }}
-                          onClick={(e) =>
-                            photo
-                              ? setCibleImage({
-                                  item: photo,
-                                  titre: c.name,
-                                  x: e.clientX,
-                                  y: e.clientY,
-                                  pnj: true
-                                })
-                              : undefined
-                          }
+                          onClick={() => (photo ? void poser(photo) : undefined)}
                           title={
                             photo
-                              ? `${c.name} — clic : son portrait sur le visuel libre ou en fenêtre sur le direct ; glisser sur la scène : son pion`
+                              ? `${c.name} — clic : son portrait en fenêtre sur le direct ; glisser sur la scène : son pion`
                               : `${c.name} n’a pas de portrait — glisse-le sur la scène pour poser son pion`
                           }
                         >
@@ -1403,28 +1394,6 @@ export function Pupitre(): JSX.Element {
         <section className="pane pu-regie">
           {/* ---- la barre de la régie ---- */}
           <div className="pu-bar stage-bar">
-            {/* Le visuel qu'on arrange. Le direct porte son point rouge ; ce
-                qu'il montre se lit au moniteur du rail, et « À suivre » dans
-                la console. */}
-            <div className="seg pu-visuels">
-              {([0, 1] as const).map((n) => (
-                <button
-                  key={n}
-                  className={visuel === n ? 'on' : ''}
-                  aria-pressed={visuel === n}
-                  onClick={() => setVisuel(n)}
-                  title={
-                    n === liveSlot
-                      ? `Visuel ${n + 1} — ce que les joueurs ont sous les yeux : chaque geste part aussitôt`
-                      : `Visuel ${n + 1} — libre : rien ne part avant la bascule`
-                  }
-                >
-                  {n === liveSlot ? <span className="point" /> : null}
-                  Visuel {n + 1}
-                </button>
-              ))}
-            </div>
-
             <button
               className={`btn btn-sm${voirScene ? ' btn-on' : ''}`}
               onClick={basculerScene}
@@ -1461,15 +1430,6 @@ export function Pupitre(): JSX.Element {
               Sons
             </button>
             <BoutonTours />
-            <button
-              className={`btn btn-sm${trameOuverte ? ' btn-on' : ''}`}
-              aria-pressed={trameOuverte}
-              onClick={() => setTrameOuverte(true)}
-              title="L’arborescence de la séance : cocher ce qui est fait, voir ce qui est à portée — pour toi seul"
-            >
-              <IconTrame />
-              Arborescence
-            </button>
             <span className="sep" />
             {/* Sans libellé, comme les dispositions voisines : la barre passait
                 à la ligne dès qu'on lui ajoutait un mot. */}
@@ -1553,7 +1513,6 @@ export function Pupitre(): JSX.Element {
 
           {/* ---- les tours : à qui de jouer ---- */}
           <Tours />
-          {trameOuverte ? <TrameEnJeu onClose={() => setTrameOuverte(false)} /> : null}
 
           {/* ---- la grande scène : celle qu'on arrange ---- */}
           {/* Le tableau de scène, les objets ou les sons, en volet à gauche de
@@ -1572,7 +1531,7 @@ export function Pupitre(): JSX.Element {
               <ObjetsDeScene
                 placeId={editPlaceId}
                 onSurvol={setSurvol}
-                onMontrer={(item, titre, x, y) => setCibleImage({ item, titre, x, y })}
+                onMontrer={(item) => void poser(item)}
               />
             ) : null}
             {panneau === 'sons' ? (
@@ -1581,7 +1540,7 @@ export function Pupitre(): JSX.Element {
               </aside>
             ) : null}
           <div
-            className={`big-frame${onLive ? ' live' : ''}`}
+            className="big-frame live"
             style={{ ['--ecran' as string]: ecran }}
           >
             <div className="big-inner">
@@ -1590,19 +1549,15 @@ export function Pupitre(): JSX.Element {
                 onMouseMove={onStageMove}
                 onMouseLeave={() => sendPointer(null)}
               >
-                {/* Les ondes ne se voient que sur l'écran qu'on regarde vraiment :
-                    sur la préparation, elles désigneraient une autre image. */}
-                {onLive ? <Pings pings={ondes.pings} /> : null}
+                <Pings pings={ondes.pings} />
                 {/* Les d20 des joueurs tombent ici comme sur l'écran de la table ;
                     « Vu » sur le dé les retire de partout. */}
-                {onLive ? (
-                  <DesSurTable
-                    des={display?.des ?? []}
-                    onVu={(id) => void window.jdr.display.retirerDe(id)}
-                    annonces={display?.annoncesSm ?? []}
-                    onVuAnnonce={(id) => void window.jdr.display.retirerAnnonceSm(id)}
-                  />
-                ) : null}
+                <DesSurTable
+                  des={display?.des ?? []}
+                  onVu={(id) => void window.jdr.display.retirerDe(id)}
+                  annonces={display?.annoncesSm ?? []}
+                  onVuAnnonce={(id) => void window.jdr.display.retirerAnnonceSm(id)}
+                />
                 <Slide
                   slide={slideVu}
                   /* Le calque est toujours donné : les murs retiennent les pions.
@@ -1613,11 +1568,9 @@ export function Pupitre(): JSX.Element {
                   surbrillance={survol}
                   pions={edit.pions}
                   pionSize={edit.size}
-                  /* Comme en Régie : la caméra ne suit que la scène à
-                     l'antenne, jamais celle qu'on prépare. */
-                  focusPionId={onLive ? (display?.focusPionId ?? null) : null}
+                  focusPionId={display?.focusPionId ?? null}
                   /* Le halo de celui qui joue, comme chez les joueurs. */
-                  pionEnJeuId={onLive ? pionEnJeu(s.tours, edit.pions) : null}
+                  pionEnJeuId={pionEnJeu(s.tours, edit.pions)}
                   onDefocus={() => void window.jdr.pions.focus(null)}
                   pionLabels={display?.pionLabels ?? true}
                   pionPv={display?.pionPv ?? false}
@@ -1628,7 +1581,7 @@ export function Pupitre(): JSX.Element {
                   onSizeEncart={(largeur, hauteur) =>
                     void window.jdr.display.encart({ largeur, hauteur })
                   }
-                  fenetres={onLive ? display?.fenetres : null}
+                  fenetres={display?.fenetres}
                   onFenetre={(id, patch) => void window.jdr.display.reglerFenetre(id, patch)}
                   onFermerFenetre={(id) => void window.jdr.display.fermerFenetre(id)}
                   pointer={pointer}
@@ -1642,19 +1595,17 @@ export function Pupitre(): JSX.Element {
                     )
                   }
                   pionChoisiId={choisi?.pionId ?? null}
-                  activeCell={onLive ? undefined : activeCell}
-                  onPickCell={onLive ? undefined : setActiveCell}
+                  activeCell={slide.type === 'collage' ? activeCell : undefined}
+                  onPickCell={slide.type === 'collage' ? setActiveCell : undefined}
                   /* La molette agrandit, le glisser recadre ; les textes se
                      déplacent et se choisissent sur l'image — comme en Régie. */
                   onFrame={(cell, f) =>
-                    zoomMj && onLive && cell == null
-                      ? setCadreMj(f)
-                      : void window.jdr.display.frame(onLive ? 'live' : 'prep', cell, f)
+                    zoomMj && cell == null ? setCadreMj(f) : void window.jdr.display.frame(cell, f)
                   }
                   onMoveText={textes.bouge}
                   activeText={textes.over?.id ?? null}
                   onPickText={textes.choisit}
-                  onPoserSurCarte={lampe.poser ?? poserObjet}
+                  onPoserSurCarte={poserObjet}
                   onMenuCarte={
                     editPlaceId != null
                       ? (x, y, ex, ey) => setMenuPoser({ x, y, ex, ey })
@@ -1676,33 +1627,11 @@ export function Pupitre(): JSX.Element {
                   onChoisirArticle={choisirArticle}
                   articlesMj={articlesScene}
                 />
-                {/* Par-dessus la scène, jamais dedans : le calque du MJ ne fait
-                    pas partie de la diapositive, donc il ne part nulle part.
-                    Même cadrage que l'image diffusée, pour que les repères la
-                    suivent au zoom. */}
-                {voirAnnots && carteScene?.url ? (
-                  <CadreAnnote
-                    url={carteScene.url}
-                    className={`sur-scene${annot.outil ? ' arme' : ''}`}
-                    frame={'frame' in slideVu ? (slideVu.frame ?? FRAME_NEUTRE) : FRAME_NEUTRE}
-                  >
-                    <Annotations
-                      annotations={annot.annots}
-                      mode="edition"
-                      outil={annot.outil}
-                      choisi={annot.choisie}
-                      onChoisir={annot.setChoisie}
-                      onPoser={(k, x, y) => void annot.poser(k, x, y)}
-                      onDeplacer={(id, x, y) => void annot.deplacer(id, x, y)}
-                      onEffacer={(id) => void annot.effacer(id)}
-                    />
-                  </CadreAnnote>
-                ) : null}
               </div>
             </div>
-            <span className={`big-badge live-pill ${onLive ? pillClass : 'prep'}`}>
+            <span className={`big-badge live-pill ${pillClass}`}>
               <span className="dot" />
-              Visuel {visuel + 1} — {onLive ? pillText : 'libre, invisible des joueurs'}
+              {pillText}
             </span>
           </div>
             {/* Les outils de la carte : ils changent ce que fait la souris sur la
@@ -1744,20 +1673,6 @@ export function Pupitre(): JSX.Element {
               </button>
               <span className="pu-outils-sep" />
               <button
-                className={`btn btn-sm${voirAnnots ? ' btn-on' : ''}`}
-                aria-pressed={voirAnnots}
-                onClick={() => setVoirAnnots((v) => !v)}
-                disabled={editPlaceId == null}
-                title={
-                  editPlaceId == null
-                    ? 'Prépare d’abord le lieu où se tient la scène'
-                    : 'Tes repères et tes textes sur la carte — chez toi seulement, jamais chez les joueurs'
-                }
-              >
-                <IconPen />
-                Annoter
-              </button>
-              <button
                 className={`btn btn-sm${galerie ? ' btn-on' : ''}`}
                 aria-pressed={galerie}
                 onClick={() => setGalerie(true)}
@@ -1767,7 +1682,6 @@ export function Pupitre(): JSX.Element {
                 Images
               </button>
               <BoutonTextes t={textes} petit />
-              <BoutonPoserLumiere p={lampe} petit court />
               <span className="pu-outils-sep" />
               {/* Regarder de près sans que la table suive. */}
               <button
@@ -1790,9 +1704,8 @@ export function Pupitre(): JSX.Element {
           </div>
 
           {/* ---- les volets, sous la scène, quand on les demande ---- */}
-          <VoletCase slide={slide} iCase={iCase} onLive={onLive} />
-          {textes.ouvert ? <VoletTextes t={textes} onLive={onLive} /> : null}
-          {voirAnnots ? <VoletAnnoter a={annot} /> : null}
+          <VoletCase slide={slide} iCase={iCase} />
+          {textes.ouvert ? <VoletTextes t={textes} /> : null}
 
           {/* ---- la réserve de pions ---- */}
           {choixPnj ? (
@@ -1955,7 +1868,7 @@ export function Pupitre(): JSX.Element {
             </div>
           ) : null}
 
-          <ConsoleDirect apres={setVisuel} />
+          <ConsoleDirect />
         </section>
       </div>
 
@@ -1978,35 +1891,21 @@ export function Pupitre(): JSX.Element {
       {galerie ? (
         <Galerie
           onClose={() => setGalerie(false)}
-          onChoisir={(item, x, y) => {
+          onChoisir={(item) => {
             setGalerie(false)
-            setCibleImage({ item, titre: item.title, x, y })
+            void poser(item)
           }}
         />
       ) : null}
-      <MenuImage
-        cible={cibleImage}
-        onFerme={() => setCibleImage(null)}
-        onPreparer={poser}
-        libre={idleSlot + 1}
-        direct={liveSlot + 1}
-        /* Sur le direct, tout de suite, à la place de ce qu'il montre — et on
-           l'a sous les yeux. */
-        onDirect={async (it) => {
-          if (frozen) {
-            s.toast('Image figée — dégèle d’abord pour changer l’écran joueurs', true)
-            return
-          }
-          await window.jdr.display.showItem(it.id)
-          setVisuel(liveSlot)
-        }}
-        /* La fenêtre s'ouvre sur le direct : c'est lui qu'on veut avoir sous
-           les yeux pour la placer, pas le visuel libre. */
-        onFenetre={async (it) => {
-          await window.jdr.display.fenetre(it.id)
-          setVisuel(liveSlot)
-        }}
-      />
+      {planOuvert ? (
+        <Visionneuse
+          titre={planOuvert.p.name}
+          kind="image"
+          url={planOuvert.image?.url ?? null}
+          zoom
+          onClose={() => setPlanVu(null)}
+        />
+      ) : null}
       {bulleLieu ? <BulleLieu {...bulleLieu} /> : null}
       {menuEncart ? <MenuEncart {...menuEncart} onFerme={() => setMenuEncart(null)} /> : null}
       {menuPoser ? (
@@ -2068,8 +1967,8 @@ function MenuEncart({ x, y, onFerme }: { x: number; y: number; onFerme: () => vo
 /* Les onglets du fil, à gauche du Paravent. Les portables se règlent sans
    quitter la scène, comme en Régie. */
 const COTES = [
+  { id: 'lieux', nom: 'Lieux', aide: 'ce que voient les joueurs, qui est où, et les plans à afficher', Icone: IconPlace },
   { id: 'chrono', nom: 'Chronologie', aide: 'le fil de la séance', Icone: IconTimeline },
-  { id: 'lieux', nom: 'Lieux', aide: 'ce que voient les joueurs, qui est où, et le visuel', Icone: IconPlace },
   { id: 'annexes', nom: 'Annexes', aide: 'les documents gardés sous la main', Icone: IconDoc },
   { id: 'portables', nom: 'Portables', aide: 'fiches, jets et pions depuis le téléphone', Icone: IconPhone },
   { id: 'sons', nom: 'Sons', aide: 'ambiance, nappes, bruitages et sons posés sur le plan', Icone: IconNote }

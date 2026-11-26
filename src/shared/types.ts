@@ -2375,15 +2375,14 @@ export interface DisplayState {
   /** Ce qui est à l'écran : toujours `slots[liveSlot]`. */
   slide: SlidePayload
   /**
-   * Deux emplacements, comme une table de mixage : l'un est à l'antenne,
-   * l'autre se prépare. La bascule se fait en fondu, quand on le décide.
+   * Deux emplacements, pour la seule fenêtre joueurs : l'image d'avant et
+   * celle d'après, le temps d'un fondu. Le MJ n'a qu'un visuel, le direct —
+   * l'emplacement libre ne se prépare plus.
    */
   slots: [SlidePayload, SlidePayload]
   liveSlot: 0 | 1
   /** Change à chaque bascule : la fenêtre joueurs sait qu'il faut enchaîner. */
   transition: { id: number; ms: number; mode: Transition } | null
-  /** Lieu chargé dans l'emplacement en préparation, pris à la bascule. */
-  pendingPlaceId: number | null
   /** Diapositive avant le voile noir, pour pouvoir rétablir. */
   previous: SlidePayload | null
   /**

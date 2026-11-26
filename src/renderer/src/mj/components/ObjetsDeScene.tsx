@@ -6,8 +6,8 @@
  * à la place du tableau de scène — l'un ou l'autre, jamais les deux : la
  * colonne n'a pas la largeur de deux listes.
  *
- * Trois gestes, ceux de la table : la **montrer** (son image, sur un visuel ou
- * en fenêtre sur le direct), dire que les joueurs l'ont **trouvée**, la
+ * Trois gestes, ceux de la table : la **montrer** (son image, en fenêtre sur
+ * le direct), dire que les joueurs l'ont **trouvée**, la
  * **donner** à quelqu'un. On y lit le lieu affiché et ses pièces — un étage
  * découpé range ses objets dans les pièces, pas sur le palier.
  */

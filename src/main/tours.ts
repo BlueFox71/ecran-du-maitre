@@ -7,7 +7,6 @@
  * à chaque diffusion — les participants cachés n'y entrent pas.
  */
 import * as display from './display'
-import { getDb } from './db'
 import * as chars from './db/repos/characters'
 import { colorFor, getPion, initialsOf, listPions } from './db/repos/pions'
 import { getItem } from './db/repos/library'
@@ -321,26 +320,18 @@ function publier(): ToursMj | null {
   return tours
 }
 
-/* ---------------- le lieu de celui qui joue ---------------- */
+/* ---------------- celui qui joue ---------------- */
 
 /**
- * Quand la main passe à un joueur, la Régie du MJ se met sur le lieu où se
- * tient son personnage — pour le MJ seul : l'écran de la table ne bouge pas.
- *
- *  — Il est dans le lieu à l'écran : la Régie revient au direct.
- *  — Il est ailleurs : son lieu se prépare dans le visuel libre, et la Régie
- *    s'y met. Sa carte seulement ; pas son ambiance, qui couperait celle que
- *    la table entend.
+ * Quand la main passe à un joueur, la caméra peut le suivre (voir plus bas).
+ * Le lieu, lui, ne bouge pas : le Paravent n'a plus qu'un visuel, le direct,
+ * et changer de lieu dans le dos de la table serait le lui imposer. Le MJ voit
+ * dans le volet Lieux, sous chaque plan, qui s'y tient.
  *
  * Seulement quand la main **change** de personne : republier les tours pour un
  * nom relu ou un jeton déplacé ne doit pas arracher le MJ à ce qu'il regarde.
  */
 let enMain: string | null = null
-let preparerCarte: ((placeId: number) => void) | null = null
-/** Branché par l'IPC, qui sait faire une diapositive d'une carte. */
-export function surPreparerCarte(f: (placeId: number) => void): void {
-  preparerCarte = f
-}
 
 function suivreLeLieuDuTour(): void {
   const e = tours?.demarre && tours.phase === 'combat' ? tours.entrants[tours.actif] : undefined
@@ -348,21 +339,6 @@ function suivreLeLieuDuTour(): void {
   if (cle === enMain) return
   enMain = cle
   suivreCeluiQuiJoue(e)
-  if (!e || e.kind === 'pnj' || e.characterId == null) return
-
-  const ecran = display.getState()
-  const ici = listPions(ecran.placeId).some((p) => p.characterId === e.characterId)
-  if (ici) {
-    display.versMj('tours:lieu', 'direct')
-    return
-  }
-  const lieu = lieuDuPerso(e.characterId)
-  if (lieu == null) return
-  if (ecran.pendingPlaceId !== lieu) {
-    display.preparePlace(lieu)
-    preparerCarte?.(lieu)
-  }
-  display.versMj('tours:lieu', 'libre')
 }
 
 /**
@@ -379,14 +355,6 @@ function suivreCeluiQuiJoue(e: EntrantTour | undefined): void {
   if (!e || !e.montre || ecran.focusPionId == null) return
   const pion = pionDe(e, ecran.pions)
   if (pion && pion.id !== ecran.focusPionId) display.setFocusPion(pion.id)
-}
-
-/** Le lieu d'un personnage : là où se tient son pion (le plus récent s'il en a plusieurs). */
-function lieuDuPerso(characterId: number): number | null {
-  const r = getDb()
-    .prepare(`SELECT place_id AS id FROM pion WHERE character_id = ? ORDER BY id DESC LIMIT 1`)
-    .get(characterId) as { id: number } | undefined
-  return r?.id ?? null
 }
 
 display.onCalculTour(vu)

@@ -451,12 +451,6 @@ const api = {
       const h = (_e: unknown, t: ToursMj | null): void => cb(t)
       ipcRenderer.on('tours:state', h)
       return (): void => void ipcRenderer.removeListener('tours:state', h)
-    },
-    /** La main passe à un joueur : la Régie se met sur son lieu, au direct ou au visuel libre. */
-    onLieu: (cb: (ou: 'direct' | 'libre') => void) => {
-      const h = (_e: unknown, ou: 'direct' | 'libre'): void => cb(ou)
-      ipcRenderer.on('tours:lieu', h)
-      return (): void => void ipcRenderer.removeListener('tours:lieu', h)
     }
   },
 
@@ -1338,13 +1332,10 @@ const api = {
     screens: () => call<ScreenInfo[]>('display:screens'),
     show: (slide: SlidePayload) => call<DisplayState>('display:show', slide),
     showItem: (itemId: number) => call<DisplayState>('display:showItem', itemId),
-    /** Charge l'emplacement en préparation : rien ne bouge pour les joueurs. */
-    prepareItem: (itemId: number) => call<DisplayState>('display:prepareItem', itemId),
-    /** Bascule les deux emplacements. `ms` à 0 coupe net. */
-    swap: (ms?: number, mode?: Transition) => call<DisplayState>('display:swap', ms, mode),
+    /** Montre une image tout de suite aux joueurs, dans la manière choisie (`ms` à 0 : d'un coup). */
+    directItem: (itemId: number, ms?: number, mode?: Transition) =>
+      call<DisplayState>('display:directItem', itemId, ms, mode),
 
-    /** Disposition du collage en préparation. */
-    /** Le temps qu'il fait sur la scène. Le même deux fois l'éteint. */
     /** Pose une image dans une case du collage, ou la vide avec `null`. */
     prepareCell: (index: number, itemId: number | null) =>
       call<DisplayState>('display:prepareCell', index, itemId),
@@ -1355,11 +1346,9 @@ const api = {
     cellText: (index: number, texte: string, color?: string) =>
       call<DisplayState>('display:cellText', index, texte, color),
     /** Recadre une image : agrandissement et décalage. */
-    frame: (slot: 'prep' | 'live', cell: number | null, frame: Frame) =>
-      call<DisplayState>('display:frame', slot, cell, frame),
-    /** Remplace les textes posés sur l'emplacement regardé. */
-    texts: (slot: 'prep' | 'live', texts: TextOverlay[]) =>
-      call<DisplayState>('display:texts', slot, texts),
+    frame: (cell: number | null, frame: Frame) => call<DisplayState>('display:frame', cell, frame),
+    /** Remplace les textes posés sur l'écran. */
+    texts: (texts: TextOverlay[]) => call<DisplayState>('display:texts', texts),
     blackout: () => call<DisplayState>('display:blackout'),
     /** Retire la présentation d'un joueur et rend l'écran d'avant. */
     arreterPresentation: () => call<DisplayState>('display:arreterPresentation'),
@@ -1396,8 +1385,9 @@ const api = {
 
     /** Met un lieu en scène : sa carte part à l'écran, ses pions reviennent. */
     setPlace: (placeId: number | null) => call<DisplayState>('display:setPlace', placeId),
-    preparePlace: (placeId: number | null) =>
-      call<DisplayState>('display:preparePlace', placeId),
+    /** Affiche un lieu en direct : son plan part dans la manière choisie, ses pions avec lui. */
+    directPlace: (placeId: number, ms?: number, mode?: Transition) =>
+      call<DisplayState>('display:directPlace', placeId, ms, mode),
 
     /** Le pointeur va vite : canal léger, sans réponse. */
     pointer: (p: Pointer | null) => ipcRenderer.send('display:pointer', p),

@@ -30,7 +30,6 @@ import {
   type Place
 } from '@shared/types'
 import {
-  IconClose,
   IconPorte,
   IconRideau,
   IconSoleil,
@@ -514,19 +513,6 @@ export function TableauDeScene({
                     {l.nom ?? 'Lampe'}
                     <em>{l.allumee ? 'allumée' : 'éteinte'}</em>
                   </span>
-                  {/* La lanterne qu'un joueur emporte s'en va de la pièce. */}
-                  <button
-                    className="tb-oter"
-                    title="Retirer cette lampe"
-                    aria-label="Retirer cette lampe"
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      void window.jdr.lumieres.remove(l.id)
-                    }}
-                    onKeyDown={(e) => e.stopPropagation()}
-                  >
-                    <IconClose />
-                  </button>
                 </div>
               ))}
 

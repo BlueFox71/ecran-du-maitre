@@ -68,10 +68,10 @@ export interface TextesEcran {
 }
 
 /**
- * Les textes du visuel qu'on regarde. On envoie toujours la liste entière,
+ * Les textes de l'écran. On envoie toujours la liste entière,
  * et jamais une lettre à la fois : les joueurs verraient le texte s'écrire.
  */
-export function useTextesEcran(slide: SlidePayload, onLive: boolean): TextesEcran {
+export function useTextesEcran(slide: SlidePayload): TextesEcran {
   const textes = slide.texts ?? []
   const [sel, setSel] = useState<number | null>(null)
   const [ouvert, setOuvert] = useState(false)
@@ -81,8 +81,7 @@ export function useTextesEcran(slide: SlidePayload, onLive: boolean): TextesEcra
   const enAttente = useRef<{ id: number | null; v: string } | null>(null)
   const over = textes.find((t) => t.id === sel) ?? textes[textes.length - 1] ?? null
 
-  const envoie = (liste: TextOverlay[]): void =>
-    void window.jdr.display.texts(onLive ? 'live' : 'prep', liste)
+  const envoie = (liste: TextOverlay[]): void => void window.jdr.display.texts(liste)
 
   const pose = (patch: Partial<TextOverlay>): void => {
     if (!over) {
@@ -103,11 +102,11 @@ export function useTextesEcran(slide: SlidePayload, onLive: boolean): TextesEcra
     else envoie(textes.map((t) => (t.id === p.id ? { ...t, text: p.v } : t)))
   }
 
-  // On change de texte, ou de visuel : le champ suit — sauf pendant la frappe.
+  // On change de texte : le champ suit — sauf pendant la frappe.
   useEffect(() => {
     if (!ecrit.current) setChamp(over?.text ?? '')
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [onLive, over?.id, over?.text])
+  }, [over?.id, over?.text])
 
   return {
     textes,
@@ -164,7 +163,7 @@ export function useTextesEcran(slide: SlidePayload, onLive: boolean): TextesEcra
   }
 }
 
-export function VoletTextes({ t, onLive }: { t: TextesEcran; onLive: boolean }): JSX.Element {
+export function VoletTextes({ t }: { t: TextesEcran }): JSX.Element {
   return (
     <div className="tray tray-texte">
       <span className="eyebrow">Textes</span>
@@ -188,9 +187,7 @@ export function VoletTextes({ t, onLive }: { t: TextesEcran; onLive: boolean }):
       <input
         className="texte-champ"
         value={t.champ}
-        placeholder={
-          onLive ? 'Écrire sur l’écran des joueurs…' : 'Écrire sur l’écran en préparation…'
-        }
+        placeholder="Écrire sur l’écran des joueurs…"
         onChange={(e) => t.tape(e.target.value)}
         onBlur={t.finFrappe}
       />
@@ -277,18 +274,10 @@ export function BoutonTextes({ t, petit }: { t: TextesEcran; petit?: boolean }):
 /* ---------------- la case visée d'un collage ---------------- */
 
 /**
- * Sa légende si elle porte une image, son texte si elle n'en porte pas. On ne
- * compose que l'écran en préparation : sur le direct, le champ se fige.
+ * Sa légende si elle porte une image, son texte si elle n'en porte pas. Le
+ * Paravent n'a qu'un visuel : on compose le direct, sous les yeux des joueurs.
  */
-export function VoletCase({
-  slide,
-  iCase,
-  onLive
-}: {
-  slide: SlidePayload
-  iCase: number
-  onLive: boolean
-}): JSX.Element | null {
+export function VoletCase({ slide, iCase }: { slide: SlidePayload; iCase: number }): JSX.Element | null {
   const caseVisee = slide.type === 'collage' ? (slide.cells[iCase] ?? null) : null
   const contenu =
     caseVisee?.kind === 'texte'
@@ -322,13 +311,10 @@ export function VoletCase({
       <input
         className="texte-champ"
         value={champ}
-        disabled={onLive}
         placeholder={
-          onLive
-            ? 'On ne compose que l’écran en préparation'
-            : caseVisee?.kind === 'image'
-              ? 'Légender cette case — le carton sous le tableau…'
-              : 'Écrire dans cette case, ou y poser une image d’un clic…'
+          caseVisee?.kind === 'image'
+            ? 'Légender cette case — le carton sous le tableau…'
+            : 'Écrire dans cette case, ou y poser une image d’un clic…'
         }
         onChange={(e) => tape(e.target.value)}
         onBlur={() => {
@@ -355,7 +341,7 @@ export function VoletCase({
       <div className="spacer" />
       <button
         className="btn btn-sm btn-danger"
-        disabled={onLive || !caseVisee}
+        disabled={!caseVisee}
         onClick={() => {
           window.clearTimeout(frappe.current)
           ecrit.current = false
