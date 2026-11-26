@@ -8,7 +8,7 @@ import { useEffect, useState } from 'react'
 import type { CarnetVu, ElementCarnet, GenreCarnet } from '@shared/carnetChasse'
 import type { Reglage } from '../registre'
 
-/** Les lignes du carnet, relues à chaque changement — d'ici ou d'un Ctrl+Z. */
+/** Les lignes du carnet, relues à chaque changement — d'ici, d'un téléphone ou d'un Ctrl+Z (le serveur prévient). */
 function useCarnet(): [CarnetVu | null, (c: CarnetVu) => void] {
   const [carnet, setCarnet] = useState<CarnetVu | null>(null)
   useEffect(() => {

@@ -2,6 +2,7 @@ import { afterEach, beforeEach, expect, it } from 'vitest'
 import { activer, fermerBaseEssai, ouvrirBaseEssai, pj, seance } from './base'
 import * as carnet from '../repos/carnetChasse'
 import * as reglages from '../repos/reglages'
+import * as chars from '../repos/characters'
 import { ENTITES_DEPART, INDICES_DEPART } from '@shared/carnetChasse'
 
 beforeEach(() => ouvrirBaseEssai())
@@ -83,4 +84,20 @@ it('refuse un élément qui n’est pas de la campagne', () => {
   const c = pj('Anna')
   expect(carnet.marquer(c, 999999, 'entoure')).toBe(false)
   expect(carnet.marquesDeLaSeance()).toEqual([])
+})
+
+it('le carnet vu ne montre que les présents, et un absent ne marque pas', () => {
+  const anna = pj('Anna')
+  const bob = pj('Bob')
+  const e = carnet.ajouterElement('indice', 'Spirit Box')!.id
+  expect(carnet.marquer(anna, e, 'entoure')).toBe(true)
+  expect(carnet.marquer(bob, e, 'barre')).toBe(true)
+  chars.setPresent(bob, false)
+  expect(carnet.estPresent(bob)).toBe(false)
+  expect(carnet.estPresent(anna)).toBe(true)
+  const vu = carnet.vu()
+  expect(vu.marques).toEqual([{ characterId: anna, elementId: e, etat: 'entoure' }])
+  expect(vu.joueurs.map((j) => j.nom)).toEqual(['Anna'])
+  expect(vu.joueurs[0].initiales).toBe('A')
+  expect(vu.joueurs[0].color).toBeTruthy()
 })

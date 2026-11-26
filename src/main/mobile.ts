@@ -29,7 +29,7 @@ import { copieReduite, vignettesDir } from './vault'
 import { plageDemandee } from './plage'
 import * as chars from './db/repos/characters'
 import * as players from './db/repos/players'
-import { initialsOf, listPionsVus, movePion, tournerPion } from './db/repos/pions'
+import { listPionsVus, movePion, tournerPion } from './db/repos/pions'
 import { calqueDe } from './db/repos/murs'
 import { echelleDe, planDe } from './db/repos/echelle'
 import { barrieres, cheminContraint, distanceAuSegment, RAYON_PION, type Pt } from '@shared/murs'
@@ -55,7 +55,7 @@ import * as parole from './parole'
 import { bonusParCarac, noterJet } from './jetDuPerso'
 import * as rolls from './db/repos/rolls'
 import { bonusDuPerso } from '@shared/modifs'
-import { EMPLACEMENTS_OBJET, PION_COULEURS, colorFor, etatDeVie } from '@shared/types'
+import { EMPLACEMENTS_OBJET, PION_COULEURS, etatDeVie } from '@shared/types'
 import { AbonneSse } from './fluxSse'
 import type { CadreCarre, MobileInfo, MobileDevice, MobileNudge, MobilePing, StatsEcran } from '@shared/types'
 
@@ -254,9 +254,10 @@ function appareilDe(
 /** L'état poussé à un appareil : celui du joueur suivi, et s'il ne fait que regarder. */
 function etatPour(
   ap: { playerId: number; spectateur: boolean },
-  appareils: ReturnType<typeof chasse.lecteurTelephones> = chasse.lecteurTelephones()
+  appareils: ReturnType<typeof chasse.lecteurTelephones> = chasse.lecteurTelephones(),
+  carnetVu: CarnetVu = carnetChasse.vu()
 ) {
-  return { ...etatJoueur(ap.playerId, appareils), spectateur: ap.spectateur }
+  return { ...etatJoueur(ap.playerId, appareils, carnetVu), spectateur: ap.spectateur }
 }
 
 /**
@@ -596,42 +597,35 @@ export function poserJetsAttendus(liste: { characterId: number; titre: string; c
   broadcast()
 }
 
-/**
- * Le carnet des chasseurs tel que les téléphones et le MJ le voient : les
- * lignes de la campagne, et les marques de la séance des seuls personnages
- * présents — un absent ne vient pas brouiller le carnet des autres. C'est la
- * seule fabrique de `CarnetVu`.
- */
-export function carnetVu(): CarnetVu {
-  const presents = chars.listJoueurs()
-  const ici = new Set(presents.map((c) => c.id))
-  return {
-    elements: carnetChasse.elements(),
-    marques: carnetChasse.marquesDeLaSeance().filter((m) => ici.has(m.characterId)),
-    joueurs: presents.map((c) => ({
-      characterId: c.id,
-      nom: c.name,
-      color: c.color ?? colorFor(c.id),
-      initiales: initialsOf(c.name)
-    }))
-  }
-}
-
-/** Une marque posée, une ligne changée : les téléphones et le poste du MJ relisent. */
+/** Une marque posée, une ligne changée : les téléphones et le poste du MJ relisent (voir `broadcast`). */
 export function carnetChange(): void {
   broadcast()
-  versMj('carnetChasse:change', null)
 }
+
+/**
+ * Le dernier carnet signalé au poste du MJ. Tout ce qui le change — une marque,
+ * un Ctrl+Z, une autre séance, un absent, une couleur — passe par `broadcast` :
+ * c'est donc ici qu'on prévient le MJ, une fois, et seulement s'il a changé.
+ */
+let carnetDuMj = ''
 
 /** Pousse l'état à tous les téléphones. Appelé quand le PC change quelque chose. */
 export function broadcast(): void {
-  if (flux.size === 0 || !isDbOpen()) return
+  if (!isDbOpen()) return
+  /* Le carnet se lit une fois pour tous — et pour le MJ, même sans téléphone. */
+  const carnetVu = carnetChasse.vu()
+  const cle = JSON.stringify(carnetVu)
+  if (cle !== carnetDuMj) {
+    carnetDuMj = cle
+    versMj('carnetChasse:change', null)
+  }
+  if (flux.size === 0) return
   /* Les appareils de chasse se lisent une fois pour tous les téléphones. */
   const appareils = chasse.lecteurTelephones()
   for (const [token, liste] of flux) {
     const ap = appareilDe(token)
     if (!ap) continue
-    const etat = etatPour(ap, appareils)
+    const etat = etatPour(ap, appareils, carnetVu)
     for (const { abonne } of liste) abonne.etat(etat)
   }
 }
@@ -641,7 +635,11 @@ export function broadcast(): void {
  * l'écran, les pions dessus. On ne lui envoie rien d'autre — ni la
  * préparation du MJ, ni ce que voient les autres.
  */
-function etatJoueur(playerId: number, appareils: ReturnType<typeof chasse.lecteurTelephones>) {
+function etatJoueur(
+  playerId: number,
+  appareils: ReturnType<typeof chasse.lecteurTelephones>,
+  carnetVu: CarnetVu
+) {
   const joueur = players.getPlayer(playerId)
   const perso = joueur?.characterId != null ? chars.getCharacter(joueur.characterId) : null
   const fiche = chars.campaignSheet()
@@ -759,12 +757,16 @@ function etatJoueur(playerId: number, appareils: ReturnType<typeof chasse.lecteu
     /*
      * Son carnet des chasseurs : les lignes, ses marques et celles des autres
      * présents. Rien du tout si la campagne n'a aucune ligne — pas d'onglet.
-     * `moi` : son personnage, pour reconnaître ses propres marques.
+     * `moi` : son personnage, pour reconnaître ses propres marques ; null s'il
+     * n'en a pas ou s'il n'est pas noté à la séance — le téléphone masque
+     * alors l'onglet, plutôt que de laisser marquer dans le vide.
      */
-    carnet: (() => {
-      const c = carnetVu()
-      return c.elements.length ? { ...c, moi: perso?.id ?? null } : null
-    })(),
+    carnet: carnetVu.elements.length
+      ? {
+          ...carnetVu,
+          moi: perso && carnetVu.joueurs.some((j) => j.characterId === perso.id) ? perso.id : null
+        }
+      : null,
     /*
      * Les mots que le MJ lui a glissés — à lui seul, et seulement ceux qui sont
      * partis : `motsDe` ne laisse passer ni le mot du voisin, ni celui que le
@@ -1394,6 +1396,8 @@ function marquerCarnet(res: ServerResponse, url: URL, corps: any): void {
   if (!ap) return
   const characterId = players.getPlayer(ap.playerId)?.characterId ?? null
   if (characterId == null) return json(res, 403, { erreur: 'Aucun personnage ne t’est attribué.' })
+  if (!carnetChasse.estPresent(characterId))
+    return json(res, 403, { erreur: 'Ton personnage n’est pas noté à la séance.' })
   const elementId = Number(corps.elementId)
   const etat = corps.etat === 'entoure' || corps.etat === 'barre' ? corps.etat : corps.etat == null ? null : undefined
   if (!Number.isFinite(elementId) || etat === undefined || !carnetChasse.marquer(characterId, elementId, etat))

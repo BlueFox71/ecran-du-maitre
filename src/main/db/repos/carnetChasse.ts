@@ -8,10 +8,14 @@
  */
 import { activeCampaignId, activeSessionId, getDb } from '../index'
 import * as reglages from './reglages'
+import { listJoueurs } from './characters'
+import { initialsOf } from './pions'
+import { colorFor } from '@shared/types'
 import { lireCampagne } from '@shared/reglages'
 import {
   ENTITES_DEPART,
   INDICES_DEPART,
+  type CarnetVu,
   type ElementCarnet,
   type EtatMarque,
   type GenreCarnet,
@@ -126,4 +130,29 @@ export function marquer(characterId: number, elementId: number, etat: EtatMarque
     ).run(sid, characterId, elementId, etat)
   } else return false
   return true
+}
+
+/** À la séance : un personnage joueur noté présent et encore en jeu. */
+export function estPresent(characterId: number): boolean {
+  return listJoueurs().some((c) => c.id === characterId)
+}
+
+/**
+ * Le carnet tel que les téléphones et le MJ le voient : les lignes, et les
+ * marques de la séance des seuls présents — un absent ne vient pas brouiller
+ * le carnet des autres. C'est la seule fabrique de `CarnetVu`.
+ */
+export function vu(): CarnetVu {
+  const presents = listJoueurs()
+  const ici = new Set(presents.map((c) => c.id))
+  return {
+    elements: elements(),
+    marques: marquesDeLaSeance().filter((m) => ici.has(m.characterId)),
+    joueurs: presents.map((c) => ({
+      characterId: c.id,
+      nom: c.name,
+      color: c.color ?? colorFor(c.id),
+      initiales: initialsOf(c.name)
+    }))
+  }
 }

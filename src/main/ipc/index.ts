@@ -685,9 +685,9 @@ export function registerIpc(): void {
      arrivent des téléphones (voir mobile.ts). */
   const carnetApres = (): CarnetVu => {
     mobile.carnetChange()
-    return mobile.carnetVu()
+    return carnetChasse.vu()
   }
-  on('carnetChasse:etat', () => mobile.carnetVu())
+  on('carnetChasse:etat', () => carnetChasse.vu())
   on('carnetChasse:ajouter', (genre: GenreCarnet, nom: string) => {
     carnetChasse.ajouterElement(genre, nom)
     return carnetApres()
