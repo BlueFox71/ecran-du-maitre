@@ -84,7 +84,10 @@ export function AppareilPose({
   couleur?: string
 }): JSX.Element {
   const l = lueur(outil, valeur, allume)
-  const boite: CSSProperties = { position: 'relative', width: taille / RAPPORT[outil], height: taille, flex: 'none' }
+  const largeur = taille / RAPPORT[outil]
+  const boite: CSSProperties = { position: 'relative', width: largeur, height: taille, flex: 'none' }
+  /* Le disque couvre le plus grand côté : derrière un livre ou une planche couchés, il dépasse aussi. */
+  const disque = largeur > taille ? largeur * 1.15 : taille * 0.95
   return (
     <div style={boite}>
       {couleur ? (
@@ -96,8 +99,8 @@ export function AppareilPose({
             position: 'absolute',
             left: '50%',
             top: '50%',
-            width: taille * 0.95,
-            height: taille * 0.95,
+            width: disque,
+            height: disque,
             transform: 'translate(-50%, -50%)',
             borderRadius: '50%',
             background: 'color-mix(in srgb, var(--pion-ring, #d8a94a) 45%, transparent)',
