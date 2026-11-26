@@ -13,6 +13,7 @@ import type { UiFolder, UiItem } from '../../../preload/index'
 import { dansLApp } from '@shared/dossierDeLApp'
 import { refusSac } from '@shared/sac'
 import type { AppareilChasse } from '@shared/chasse'
+import type { FenetreChasse } from '@shared/parole'
 import type {
   Beat,
   CampaignPlayer,
@@ -94,6 +95,9 @@ interface State {
   tours: ToursMj | null
   /** Les appareils de chasse en jeu (portés ou posés), tels que le moteur les calcule. */
   chasse: AppareilChasse[]
+  /** Un texte du livre vu en avance, sur le visuel du Paravent : pour le MJ seul. */
+  apercuChasse: FenetreChasse | null
+  setApercuChasse: (f: FenetreChasse | null) => void
   screens: ScreenInfo[]
   /**
    * La manière de passer en direct — fondu, volet, par le noir. Elle vit ici
@@ -296,6 +300,8 @@ export const useStore = create<State>((set, get) => ({
   display: null,
   tours: null,
   chasse: [],
+  apercuChasse: null,
+  setApercuChasse: (f) => set({ apercuChasse: f }),
   screens: [],
   transition: CAMPAGNE_DEFAUT.basculeMode,
 

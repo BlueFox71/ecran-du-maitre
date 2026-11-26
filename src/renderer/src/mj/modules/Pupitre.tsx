@@ -1631,7 +1631,12 @@ export function Pupitre(): JSX.Element {
                 {/* Le livre, la planche ou le tarot montrés à la table : la même
                     fenêtre qu'eux, par-dessus la carte. Elle ne prend pas la
                     souris : le MJ garde la main sur la carte dessous. */}
-                {display?.fenetreChasse ? (
+                {s.apercuChasse ? (
+                  <div className="pu-fenetre-chasse apercu">
+                    <span className="pu-apercu-badge">Aperçu — les joueurs ne le voient pas</span>
+                    <FenetreChasseVue f={s.apercuChasse} />
+                  </div>
+                ) : display?.fenetreChasse ? (
                   <div className="pu-fenetre-chasse">
                     <FenetreChasseVue f={display.fenetreChasse} />
                   </div>

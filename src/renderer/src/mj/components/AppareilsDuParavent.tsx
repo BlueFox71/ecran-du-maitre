@@ -12,7 +12,7 @@ import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { Curseur } from '../chasse/Appareils'
 import { lancerEcriture, lancerVoix } from '../chasse/SonsChasse'
-import { ECRITURES, ecritureParId } from '../chasse/ecriture'
+import { ECRITURES } from '../chasse/ecriture'
 import { ARCANES } from '../chasse/arcanes'
 import {
   CASES_CHIFFRES,
@@ -28,7 +28,14 @@ import { imageOutil } from '../../shared/outilsChasse'
 import { VuePlanche, plancheBouge } from '../../shared/chasse/Vues'
 import { useMaintenant } from '../../shared/chasse/temps'
 import { estMesureur, seRegleAllume, type AppareilChasse } from '@shared/chasse'
-import { REGLAGES_VOIX, type Goutte, type ParoleObjet, type TextePrepare, type TexteTarot } from '@shared/parole'
+import {
+  REGLAGES_VOIX,
+  type Goutte,
+  type ParoleObjet,
+  type Passage,
+  type TextePrepare,
+  type TexteTarot
+} from '@shared/parole'
 import type { Objet } from '@shared/types'
 
 const nouvelId = (): string => Math.random().toString(36).slice(2, 10)
@@ -58,26 +65,29 @@ function Textes({
   o,
   verbe,
   onLancer,
-  reglages,
+  onVoir,
+  vu = null,
   bloque = null
 }: {
   o: Objet
   /** Le bouton qui lance : « Dire », « Écrire ». */
   verbe: string
   onLancer: (t: TextePrepare) => Promise<string | null>
+  /** Le livre : voir le texte en avance, avant de l'envoyer. */
+  onVoir?: (t: TextePrepare) => void
+  /** Le texte qu'on regarde en avance. */
+  vu?: string | null
   /** Pourquoi on ne peut rien lancer maintenant ; `null` : on peut. */
   bloque?: string | null
-  /** Ce qu'on règle sur un texte neuf (le livre : son écriture). */
-  reglages?: (t: TextePrepare, maj: (t: TextePrepare) => void) => JSX.Element
 }): JSX.Element {
   const [saisie, setSaisie] = useState('')
-  const [modele, setModele] = useState<TextePrepare>({ id: '', texte: '' })
   const [refus, setRefus] = useState<string | null>(null)
   const [enCours, setEnCours] = useState<string | null>(null)
+  /* On n'enregistre que le texte : l'écriture se choisit au moment d'écrire. */
   const ajouter = (): void => {
     const t = saisie.trim()
     if (!t) return
-    void enregistrer(o, { ...o.parole, textes: [...o.parole.textes, { ...modele, id: nouvelId(), texte: t }] })
+    void enregistrer(o, { ...o.parole, textes: [...o.parole.textes, { id: nouvelId(), texte: t }] })
     setSaisie('')
   }
   return (
@@ -99,9 +109,16 @@ function Textes({
             >
               {enCours === t.id ? '…' : verbe}
             </button>
-            <span className="ap-texte" style={t.ecriture ? { fontFamily: ecritureParId(t.ecriture).police } : undefined}>
-              {t.texte}
-            </span>
+            <span className="ap-texte">{t.texte}</span>
+            {onVoir ? (
+              <button
+                className={`btn btn-sm${vu === t.id ? ' btn-on' : ''}`}
+                title="Voir en avance, sur le visuel du Paravent : les joueurs ne le voient pas"
+                onClick={() => onVoir(t)}
+              >
+                Voir
+              </button>
+            ) : null}
             <button
               className="ap-ote"
               aria-label="Retirer ce texte"
@@ -127,7 +144,6 @@ function Textes({
             }
           }}
         />
-        {reglages ? reglages(modele, setModele) : null}
         <button className="btn btn-sm" disabled={!saisie.trim()} onClick={ajouter}>
           Ajouter
         </button>
@@ -248,6 +264,108 @@ function Planche({ o, bloque }: { o: Objet; bloque: string | null }): JSX.Elemen
   )
 }
 
+/** Ce que la main écrira au prochain passage : son écriture, sa taille, son inclinaison. */
+interface Main {
+  ecriture: string
+  taille: number
+  angle: number
+}
+
+/**
+ * Le livre : ses textes préparés, et la main qui les écrira. L'écriture, la
+ * taille et l'inclinaison se choisissent au moment d'écrire — rien n'est
+ * enregistré avec le texte. « Voir » montre le passage en avance sur le
+ * visuel du Paravent, à la suite de ce qui est déjà écrit, pour le MJ seul.
+ */
+function Livre({ o, bloque }: { o: Objet; bloque: string | null }): JSX.Element {
+  const [main, setMain] = useState<Main>({ ecriture: ECRITURES[0].id, taille: 1, angle: 0 })
+  const [vu, setVu] = useState<TextePrepare | null>(null)
+  const [pages, setPages] = useState<Passage[]>([])
+  const setApercu = useStore((s) => s.setApercuChasse)
+
+  /* L'aperçu suit les réglages ; il disparaît quand on ferme, ou quand le panneau part. */
+  useEffect(() => {
+    if (!vu) return setApercu(null)
+    setApercu({
+      sorte: 'livre',
+      objetId: o.id,
+      nom: o.nom,
+      /* Tout au début du temps : l'aperçu montre le texte déjà écrit, en entier. */
+      pages: [...pages.map((p) => ({ ...p, debut: 0 })), { id: -1, texte: vu.texte, ...main, debut: 0 }]
+    })
+  }, [vu, main, pages])
+  useEffect(() => () => setApercu(null), [])
+
+  const voir = async (t: TextePrepare): Promise<void> => {
+    if (vu?.id === t.id) return setVu(null)
+    setPages(await window.jdr.parole.pages(o.id))
+    setVu(t)
+  }
+  const ecrire = async (t: TextePrepare): Promise<string | null> => {
+    const r = await lancerEcriture(o.id, { ...t, ...main })
+    if (!r) setVu(null)
+    return r
+  }
+
+  return (
+    <div className="ap-corps">
+      <Montrer sorte="livre" objetId={o.id} />
+      <div className="ap-main">
+        <span className="ap-reglage">La main qui écrit</span>
+        <span className="ap-ecritures">
+          {ECRITURES.map((e) => (
+            <button
+              key={e.id}
+              className={`btn btn-sm${main.ecriture === e.id ? ' btn-on' : ''}`}
+              style={{ fontFamily: e.police }}
+              onClick={() => setMain({ ...main, ecriture: e.id })}
+            >
+              {e.nom}
+            </button>
+          ))}
+        </span>
+        <label className="ap-reglage">
+          <span>Inclinaison {main.angle}°</span>
+          <input
+            type="range"
+            min={-45}
+            max={45}
+            step={1}
+            value={main.angle}
+            onChange={(e) => setMain({ ...main, angle: Number(e.target.value) })}
+            onDoubleClick={() => setMain({ ...main, angle: 0 })}
+            title="Double-clic : à plat"
+          />
+        </label>
+        <label className="ap-reglage">
+          <span>Taille {Math.round(main.taille * 100)} %</span>
+          <input
+            type="range"
+            min={0.6}
+            max={1.8}
+            step={0.05}
+            value={main.taille}
+            onChange={(e) => setMain({ ...main, taille: Number(e.target.value) })}
+          />
+        </label>
+      </div>
+      <Textes
+        o={o}
+        verbe="Écrire"
+        bloque={bloque}
+        onLancer={ecrire}
+        onVoir={(t) => void voir(t)}
+        vu={vu?.id ?? null}
+      />
+      {vu ? (
+        <p className="ap-aide">
+          Aperçu sur le visuel du Paravent : règle la main, puis « Écrire ». « Voir » à nouveau pour le fermer.
+        </p>
+      ) : null}
+    </div>
+  )
+}
+
 /** Une carte d'appareil en jeu. */
 function Appareil({ a, o, ou }: { a: AppareilChasse; o: Objet | undefined; ou: string }): JSX.Element {
   return (
@@ -285,51 +403,7 @@ function Appareil({ a, o, ou }: { a: AppareilChasse; o: Objet | undefined; ou: s
           <Textes o={o} verbe="Dire" bloque={horsJeu(a)} onLancer={(t) => lancerVoix(o.id, t.texte, o.parole)} />
         </div>
       ) : o && a.outil === 'livre' ? (
-        <div className="ap-corps">
-          <Montrer sorte="livre" objetId={o.id} />
-          <Textes
-            o={o}
-            verbe="Écrire"
-            bloque={horsJeu(a)}
-            onLancer={(t) => lancerEcriture(o.id, t)}
-            reglages={(t, maj) => (
-              <span className="ap-ecritures">
-                {ECRITURES.map((e) => (
-                  <button
-                    key={e.id}
-                    className={`btn btn-sm${(t.ecriture ?? ECRITURES[0].id) === e.id ? ' btn-on' : ''}`}
-                    style={{ fontFamily: e.police }}
-                    onClick={() => maj({ ...t, ecriture: e.id })}
-                  >
-                    {e.nom}
-                  </button>
-                ))}
-                <label className="ap-reglage">
-                  <span>Inclinaison {t.angle ?? 0}°</span>
-                  <input
-                    type="range"
-                    min={-45}
-                    max={45}
-                    step={1}
-                    value={t.angle ?? 0}
-                    onChange={(e) => maj({ ...t, angle: Number(e.target.value) })}
-                  />
-                </label>
-                <label className="ap-reglage">
-                  <span>Taille {Math.round((t.taille ?? 1) * 100)} %</span>
-                  <input
-                    type="range"
-                    min={0.6}
-                    max={1.8}
-                    step={0.05}
-                    value={t.taille ?? 1}
-                    onChange={(e) => maj({ ...t, taille: Number(e.target.value) })}
-                  />
-                </label>
-              </span>
-            )}
-          />
-        </div>
+        <Livre o={o} bloque={horsJeu(a)} />
       ) : o && a.outil === 'planche' ? (
         <div className="ap-corps">
           <Montrer sorte="planche" objetId={o.id} />
