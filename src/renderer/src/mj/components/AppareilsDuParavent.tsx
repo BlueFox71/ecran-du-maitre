@@ -25,6 +25,20 @@ import type { Objet } from '@shared/types'
 
 const nouvelId = (): string => Math.random().toString(36).slice(2, 10)
 
+/**
+ * Pourquoi rien ne peut partir de cet outil en ce moment — personne ne le
+ * tient, il dort dans un sac, la spirit box est éteinte — ou `null` s'il est
+ * en jeu. Les mêmes refus que le poste (`parole.ts`), dits avant le clic : la
+ * voix met une seconde ou deux à se préparer, on ne la prépare pas pour rien.
+ */
+function horsJeu(a: AppareilChasse): string | null {
+  const elle = a.outil !== 'livre'
+  if (a.dansLeSac) return `${elle ? 'Elle' : 'Il'} est dans un sac.`
+  if (a.ou === 'ailleurs') return `Personne ne ${elle ? 'la' : 'le'} tient.`
+  if (a.outil === 'spiritbox' && !a.allume) return 'Elle est éteinte.'
+  return null
+}
+
 /** Écrire la parole d'une fiche, puis relire les objets. */
 async function enregistrer(o: Objet, parole: ParoleObjet): Promise<void> {
   await window.jdr.objets.update(o.id, { parole })
@@ -36,12 +50,15 @@ function Textes({
   o,
   verbe,
   onLancer,
-  reglages
+  reglages,
+  bloque = null
 }: {
   o: Objet
   /** Le bouton qui lance : « Dire », « Écrire ». */
   verbe: string
   onLancer: (t: TextePrepare) => Promise<string | null>
+  /** Pourquoi on ne peut rien lancer maintenant ; `null` : on peut. */
+  bloque?: string | null
   /** Ce qu'on règle sur un texte neuf (le livre : son écriture). */
   reglages?: (t: TextePrepare, maj: (t: TextePrepare) => void) => JSX.Element
 }): JSX.Element {
@@ -63,7 +80,8 @@ function Textes({
           <li key={t.id}>
             <button
               className="btn btn-sm btn-brass"
-              disabled={enCours !== null}
+              disabled={enCours !== null || !!bloque}
+              title={bloque ?? undefined}
               onClick={async () => {
                 setRefus(null)
                 setEnCours(t.id)
@@ -87,7 +105,7 @@ function Textes({
           </li>
         ))}
       </ul>
-      {refus ? <p className="ap-refus">{refus}</p> : null}
+      {bloque ? <p className="ap-aide">{bloque}</p> : refus ? <p className="ap-refus">{refus}</p> : null}
       <div className="ap-ajout">
         <textarea
           rows={2}
@@ -167,14 +185,14 @@ function Montrer({ sorte, objetId }: { sorte: 'livre' | 'planche'; objetId: numb
 }
 
 /** La planche : la goutte, case par case — au clic, ou au clavier quand la souris est dessus. */
-function Planche({ o }: { o: Objet }): JSX.Element {
+function Planche({ o, bloque }: { o: Objet; bloque: string | null }): JSX.Element {
   const [goutte, setGoutte] = useState<Goutte | null>(null)
   const [refus, setRefus] = useState<string | null>(null)
   const [survol, setSurvol] = useState(false)
   const maintenant = useMaintenant(plancheBouge(goutte, Date.now()))
   const bouge = plancheBouge(goutte, maintenant)
   const viser = async (id: string): Promise<void> => {
-    if (bouge) return
+    if (bouge || bloque) return
     const r = await window.jdr.parole.viser(o.id, id)
     setRefus(r)
     if (!r) setGoutte((g) => ({ de: g?.vers ?? '', vers: id, debut: Date.now() }))
@@ -197,12 +215,12 @@ function Planche({ o }: { o: Objet }): JSX.Element {
       <VuePlanche goutte={goutte} maintenant={maintenant} />
       <div className="ap-cases">
         {[...CASES_MOTS, ...CASES_LETTRES, ...CASES_CHIFFRES].map((c) => (
-          <button key={c.id} className="btn btn-sm" disabled={bouge} onClick={() => void viser(c.id)}>
+          <button key={c.id} className="btn btn-sm" disabled={bouge || !!bloque} onClick={() => void viser(c.id)}>
             {c.id}
           </button>
         ))}
       </div>
-      <p className="ap-aide">Souris sur la planche : les touches du clavier la font glisser.</p>
+      <p className="ap-aide">{bloque ?? 'Souris sur la planche : les touches du clavier la font glisser.'}</p>
       {refus ? <p className="ap-refus">{refus}</p> : null}
     </div>
   )
@@ -242,7 +260,7 @@ function Appareil({ a, o, ou }: { a: AppareilChasse; o: Objet | undefined; ou: s
       ) : o && a.outil === 'spiritbox' ? (
         <div className="ap-corps">
           <Voix o={o} />
-          <Textes o={o} verbe="Dire" onLancer={(t) => lancerVoix(o.id, t.texte, o.parole)} />
+          <Textes o={o} verbe="Dire" bloque={horsJeu(a)} onLancer={(t) => lancerVoix(o.id, t.texte, o.parole)} />
         </div>
       ) : o && a.outil === 'livre' ? (
         <div className="ap-corps">
@@ -250,6 +268,7 @@ function Appareil({ a, o, ou }: { a: AppareilChasse; o: Objet | undefined; ou: s
           <Textes
             o={o}
             verbe="Écrire"
+            bloque={horsJeu(a)}
             onLancer={(t) => lancerEcriture(o.id, t)}
             reglages={(t, maj) => (
               <span className="ap-ecritures">
@@ -292,7 +311,7 @@ function Appareil({ a, o, ou }: { a: AppareilChasse; o: Objet | undefined; ou: s
       ) : o && a.outil === 'planche' ? (
         <div className="ap-corps">
           <Montrer sorte="planche" objetId={o.id} />
-          <Planche o={o} />
+          <Planche o={o} bloque={horsJeu(a)} />
         </div>
       ) : null}
     </article>
@@ -395,7 +414,9 @@ export function AppareilsDuParavent(): JSX.Element {
   const characters = useStore((s) => s.characters)
   const places = useStore((s) => s.places)
   const ou = (a: AppareilChasse): string => {
-    if (a.ou === 'main') return `en main de ${characters.find((c) => c.id === a.characterId)?.name ?? '?'}`
+    const qui = characters.find((c) => c.id === a.characterId)?.name ?? '?'
+    if (a.dansLeSac) return `dans le sac de ${qui}`
+    if (a.ou === 'main') return `en main de ${qui}`
     if (a.ou === 'lieu') return `posé — ${places.find((p) => p.id === a.placeId)?.name ?? '?'}`
     return a.characterId != null ? 'rangé' : 'hors du plan'
   }

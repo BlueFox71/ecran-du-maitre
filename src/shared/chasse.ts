@@ -74,6 +74,8 @@ export interface AppareilChasse {
   valeur: number
   controle: boolean
   gain: number
+  /** À un personnage, mais rangé dans son sac (aucun emplacement) : hors jeu, muet. */
+  dansLeSac: boolean
 }
 
 /** Un appareil sur la fiche du téléphone : porté, ou posé par son joueur. */

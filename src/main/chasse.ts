@@ -232,7 +232,7 @@ function calculer(): Calcul {
        grésille toujours. Le livre et la planche sont muets ici. */
     const sonne = ex.outil === 'emf' ? valeur >= 0.5 : ex.outil === 'spiritbox'
     let gain = 0
-    if (sonne && allume && ou !== 'ailleurs') {
+    if (sonne && allume && ou !== 'ailleurs' && !ex.dansLeSac) {
       if (ou === 'main') gain = 1
       else if (g && pos && placeId != null) {
         const ici = planDe(placeId)
@@ -258,7 +258,8 @@ function calculer(): Calcul {
       allume,
       valeur,
       controle: controle !== undefined,
-      gain
+      gain,
+      dansLeSac: ex.dansLeSac
     })
   }
   /* Ce qui n'est plus un appareil — supprimé, plus un outil, jeté, rangé —
@@ -325,9 +326,14 @@ export function controler(placementId: number, valeur: number | null): AppareilC
  * Le dernier calcul, pour les outils qui parlent (`parole.ts`) : les appareils,
  * ceux qu'on a rangés dans un sac, et de quoi juger qui les voit.
  */
-export function etatDesAppareils(): { appareils: AppareilChasse[]; sacs: Set<number>; ctx: ContexteChasse } {
+export function etatDesAppareils(): {
+  appareils: AppareilChasse[]
+  sacs: Set<number>
+  trouves: Set<number>
+  ctx: ContexteChasse
+} {
   const d = dernier ?? calculer()
-  return { appareils: d.appareils, sacs: d.sacs, ctx: { pions: d.pions, plan: planDuLieu } }
+  return { appareils: d.appareils, sacs: d.sacs, trouves: d.trouves, ctx: { pions: d.pions, plan: planDuLieu } }
 }
 
 /**

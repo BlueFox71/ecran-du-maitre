@@ -11,7 +11,41 @@
  * « Ramasser ». Sa valeur ne s'affiche que si le joueur a de quoi la lire
  * d'où il est.
  */
-import { useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
+
+/** Tous les combien on redemande l'heure du poste (les horloges dérivent un peu). */
+const HEURE_MS = 5 * 60 * 1000
+
+/**
+ * Ce qu'il faut ajouter à l'horloge de ce téléphone pour lire celle du poste,
+ * mesuré au milieu de l'aller-retour. Demandé seulement quand un outil qui
+ * parle est en vue, puis toutes les cinq minutes.
+ */
+function useDecalagePoste(api: string, utile: boolean): number {
+  const [decalage, setDecalage] = useState(0)
+  useEffect(() => {
+    if (!utile) return
+    let vivant = true
+    const mesurer = async (): Promise<void> => {
+      try {
+        const avant = Date.now()
+        const r = await fetch(`${api}/api/heure`)
+        const { t } = (await r.json()) as { t: number }
+        const apres = Date.now()
+        if (vivant && Number.isFinite(t)) setDecalage(t - (avant + apres) / 2)
+      } catch {
+        /* le poste ne répond pas : on garde le dernier décalage connu */
+      }
+    }
+    void mesurer()
+    const minuterie = setInterval(() => void mesurer(), HEURE_MS)
+    return () => {
+      vivant = false
+      clearInterval(minuterie)
+    }
+  }, [api, utile])
+  return decalage
+}
 import { seRegleAllume, type OutilChasse, type OutilTelephone } from '@shared/chasse'
 import type { ParoleTelephone } from '@shared/parole'
 import { VueLivre, VuePlanche, VueSpirit, dureeVoix, livreEcrit, plancheBouge } from '../shared/chasse/Vues'
@@ -156,8 +190,7 @@ export function ObjetsDuPion({
   api,
   aPortee = [],
   onRamasser,
-  paroles = [],
-  horloge
+  paroles = []
 }: {
   outils: OutilTelephone[]
   jeton: string
@@ -166,14 +199,12 @@ export function ObjetsDuPion({
   onRamasser?: (placementId: number) => void
   /** Ce que disent la spirit box, le livre, la planche qu'il tient ou qui sont posés près de lui. */
   paroles?: ParoleTelephone[]
-  /** L'heure du poste quand cet état est parti : les animations s'y accordent. */
-  horloge?: number
 }): JSX.Element | null {
   const [ouvert, setOuvert] = useState<number | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
   const [envoi, setEnvoi] = useState(false)
   /* Ce qu'il faut ajouter à l'horloge de cet appareil pour lire celle du poste. */
-  const decalage = useMemo(() => (horloge ? horloge - Date.now() : 0), [horloge])
+  const decalage = useDecalagePoste(api, paroles.length > 0)
   const parole = (placementId: number): ParoleTelephone | undefined => paroles.find((p) => p.placementId === placementId)
   /* Un outil qui parle, posé près de lui par quelqu'un d'autre : il le lit sans l'avoir. */
   const proches = paroles.filter((p) => !outils.some((o) => o.placementId === p.placementId))

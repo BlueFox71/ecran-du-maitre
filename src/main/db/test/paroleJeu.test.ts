@@ -140,3 +140,32 @@ it('montrer le livre à la table, puis le retirer ; le tarot s’ajoute carte ap
   parole.retirerTarot()
   expect(parole.fenetreDeLaTable()).toBeNull()
 })
+
+/* ---------------- relecture finale ---------------- */
+
+it('une spirit box allumée rangée dans un sac se tait, et le moteur le dit', () => {
+  const bob = joueurEn('Bob', 0.5)
+  const sb = outil('Spirit box', 'spiritbox')
+  const pl = placer(sb, s, { port: 'pj', characterId: bob, etat: 'porte' })
+  chasse.recalculer(false)
+  const a = chasse.appareils().find((x) => x.placementId === pl)!
+  expect(a.dansLeSac).toBe(true)
+  expect(a.gain).toBe(0)
+})
+
+it('un livre caché (pas encore trouvé) ne se montre à personne, même tout près', () => {
+  const pres = joueurEn('Près', 0.51)
+  const livre = outil('Journal', 'livre')
+  const pl = placer(livre, s, { port: 'lieu', placeId: salle, etat: 'cache' })
+  getDb().prepare(`UPDATE objet_placement SET pos_x = 0.5, pos_y = 0.5 WHERE id = ?`).run(pl)
+  chasse.recalculer(false)
+  expect(parole.paroleDe(pres)).toEqual([])
+})
+
+it('changer de campagne retire aussi la fenêtre de la table', async () => {
+  const display = await import('../../display')
+  parole.tirerTarot('16-la-maison-dieu', 'Tout tombe.')
+  vi.mocked(display.setFenetreChasse).mockClear()
+  parole.oublier()
+  expect(display.setFenetreChasse).toHaveBeenCalledWith(null)
+})

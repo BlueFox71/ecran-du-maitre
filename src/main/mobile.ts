@@ -753,8 +753,6 @@ function etatJoueur(playerId: number, appareils: ReturnType<typeof chasse.lecteu
     appareilsPoses: chasseDuJoueur.appareilsPoses,
     /* Ce que disent la spirit box, le livre, la planche qu'il tient ou qui sont posés près de lui. */
     paroles: parole.paroleDe(perso?.id ?? null),
-    /* L'heure du poste : les animations (livre, goutte) partent de ses instants à lui. */
-    horloge: Date.now(),
     /* Ce que tient son sac, pour qu'il sache avant de piocher s'il a la place. */
     sac: perso ? sacDe(perso.id) : null,
     /* Le jet de Volonté que le MJ attend de lui ; le spectateur, lui, ne l’affiche pas. */
@@ -1010,6 +1008,10 @@ function router(req: IncomingMessage, res: ServerResponse): void {
     if (chemin === '/api/roll/supprimer') return void lireJson(req, res, (b) => supprimerJet(res, url, b))
     if (chemin === '/api/preparation') return void lireJson(req, res, (b) => preparer(res, url, b))
     if (chemin === '/api/calque') return calque(res, url)
+    /* L'heure du poste, demandée à part : les animations du livre et de la
+       planche partent de ses instants à lui. Dans l'état, elle ferait de chaque
+       diffusion un envoi neuf vers chaque téléphone. */
+    if (chemin === '/api/heure') return json(res, 200, { t: Date.now() })
     if (chemin === '/api/pion') return void lireJson(req, res, (b) => pion(res, url, b))
     if (chemin === '/api/ping') return void lireJson(req, res, (b) => ping(res, url, b))
     if (chemin === '/api/couleur') return void lireJson(req, res, (b) => couleur(res, url, b))

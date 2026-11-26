@@ -47,6 +47,7 @@ export function oublier(): void {
   gouttes.clear()
   montre = null
   tarot = []
+  display.setFenetreChasse(null)
 }
 
 /* Les mots du refus, accordés à l'outil : la spirit box, le livre, la planche. */
@@ -152,12 +153,14 @@ export function fenetreDeLaTable(): FenetreChasse | null {
 /** Les outils qui parlent que ce personnage voit : ceux qu'il tient, ceux posés près de lui. */
 export function paroleDe(characterId: number | null): ParoleTelephone[] {
   if (characterId == null) return []
-  const { appareils, sacs, ctx } = etatDesAppareils()
+  const { appareils, sacs, trouves, ctx } = etatDesAppareils()
   const out: ParoleTelephone[] = []
   for (const a of appareils) {
     if (!parle(a.outil) || a.ou === 'ailleurs' || sacs.has(a.placementId)) continue
-    /* En main : seulement celui qui le tient. Posé : tout joueur assez près. */
-    if (a.ou === 'main' ? a.characterId !== characterId : !lisiblePar(a, characterId, ctx)) continue
+    /* En main : seulement celui qui le tient. Posé : tout joueur assez près —
+       et seulement s'il a été trouvé : un outil que le MJ a caché ne se trahit pas. */
+    if (a.ou === 'main' ? a.characterId !== characterId : !trouves.has(a.placementId) || !lisiblePar(a, characterId, ctx))
+      continue
     out.push({
       placementId: a.placementId,
       objetId: a.objetId,

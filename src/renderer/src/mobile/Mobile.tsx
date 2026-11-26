@@ -221,8 +221,6 @@ interface Etat {
   outils?: OutilTelephone[]
   /** Ce que disent les outils qui parlent qu'il voit. Absent d'un serveur plus ancien. */
   paroles?: ParoleTelephone[]
-  /** L'heure du poste à l'envoi de cet état. */
-  horloge?: number
   emplacements: { cle: string; nom: string }[]
   /** Les inventaires ouverts, où chacun pioche. Absent d'un serveur plus ancien. */
   inventaires?: InventaireTel[]
@@ -3723,7 +3721,6 @@ function Plan({
         aPortee={aPortee}
         onRamasser={(id) => void ramasserAppareil(id)}
         paroles={etat.paroles ?? []}
-        horloge={etat.horloge}
       />
 
       {etat.spectateur ? (
