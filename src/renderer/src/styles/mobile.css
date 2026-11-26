@@ -3648,9 +3648,9 @@ button.m-regarde-img {
   display: flex;
   flex-direction: column;
   gap: 14px;
-  /* Un peu d'air sous l'en-tête, avant « Indices ». */
-  padding-top: 10px;
-  padding-bottom: 12px;
+  /* Un peu d'air sous l'en-tête, avant « Indices », et sur les côtés : les
+     lignes ne collent pas aux bords de l'écran. */
+  padding: 10px 12px 12px;
 }
 .m-cn-titre {
   margin: 0 0 6px;
