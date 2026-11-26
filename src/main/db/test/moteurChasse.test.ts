@@ -648,3 +648,19 @@ it('on ne prend pas le contrôle d’un outil qui ne mesure rien', () => {
   chasse.controler(livre, 3)
   expect(de(livre)?.controle).toBe(false)
 })
+
+it('un outil rangé dans les poches s’éteint ; repris en main, il reste éteint', () => {
+  const bob = pj('Bob')
+  addPion({ placeId: salle, characterId: bob, x: 0.5, y: 0.5 })
+  const emf = dansLeSac(outil('EMF', 'emf'), bob)
+  const tenu = enMain(outil('Thermo', 'thermometre'), bob)
+  chasse.recalculer(false)
+  const eteinte = (pl: number): number =>
+    (getDb().prepare(`SELECT eteinte FROM objet_placement WHERE id = ?`).get(pl) as { eteinte: number }).eteinte
+  expect(eteinte(emf)).toBe(1)
+  expect(de(emf)?.allume).toBe(false)
+  expect(eteinte(tenu)).toBe(0)
+  getDb().prepare(`UPDATE objet_placement SET emplacement = 'main-g' WHERE id = ?`).run(emf)
+  chasse.recalculer(false)
+  expect(de(emf)?.allume).toBe(false)
+})

@@ -18,7 +18,7 @@
 import * as display from './display'
 import * as mobile from './mobile'
 import { getDb } from './db'
-import { donner, exemplairesOutils, mainLibre, porter, situer } from './db/repos/objets'
+import { donner, eteindreLesOutilsEnPoche, exemplairesOutils, mainLibre, porter, situer } from './db/repos/objets'
 import { pionsPartout } from './db/repos/pions'
 import { listMurs } from './db/repos/murs'
 import { listOuvertures } from './db/repos/ouvertures'
@@ -183,6 +183,8 @@ interface Calcul {
 }
 
 function calculer(): Calcul {
+  /* Ce qui vient d'être rangé dans des poches s'éteint, avant de lire. */
+  eteindreLesOutilsEnPoche()
   const exemplaires = exemplairesOutils()
   /* Une séance sans outil ne coûte rien : ni pions, ni plans à lire. */
   if (exemplaires.length === 0) {

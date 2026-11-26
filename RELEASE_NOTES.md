@@ -9,5 +9,6 @@
 - **Tout se pilote depuis le panneau Objets du Paravent** : les appareils en jeu, quel que soit le lieu à l'écran — EMF et thermomètre avec leur mesure et la prise de contrôle, spirit box, livre, planche — et le tarot.
 
 ### Améliorations
+- **Un outil de chasse rangé dans les poches s'éteint.** Repris en main, il reste éteint jusqu'à ce que le joueur l'allume.
 - Un outil qui parle posé dans un lieu se lit sur le téléphone de chaque joueur proche, sans mur entre eux ; rangé dans un sac, il se tait.
 - Dupliquer une séance ou préparer la suivante emporte les textes préparés des outils et du tarot.
