@@ -135,7 +135,7 @@ function Textes({
         <textarea
           rows={2}
           value={saisie}
-          placeholder="Un texte à préparer… (Ctrl+Entrée pour l’ajouter)"
+          placeholder="Un texte à préparer… (Ctrl+Entrée pour l’enregistrer)"
           onChange={(e) => setSaisie(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
@@ -145,7 +145,7 @@ function Textes({
           }}
         />
         <button className="btn btn-sm" disabled={!saisie.trim()} onClick={ajouter}>
-          Ajouter
+          Enregistrer le texte
         </button>
       </div>
     </div>
@@ -493,7 +493,7 @@ function Tarot(): JSX.Element {
                 await relire()
               }}
             >
-              Ajouter
+              Enregistrer le texte
             </button>
           </div>
         </div>
