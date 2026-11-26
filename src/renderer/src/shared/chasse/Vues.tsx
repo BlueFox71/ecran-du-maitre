@@ -54,6 +54,19 @@ export function VueLivre({ pages, maintenant }: { pages: Passage[]; maintenant: 
     setPointe({ x: ((r.right - rl.left) / rl.width) * 100, y: ((r.bottom - r.height * 0.3 - rl.top) / rl.height) * 100 })
   }, [total])
 
+  /* Un passage incliné monte (ou descend) d'autant que sa largeur fois le
+     sinus de l'angle : on lui réserve cette place au-dessus (ou en dessous),
+     pour qu'il ne mange pas le passage voisin — comme dans la simulation. */
+  useLayoutEffect(() => {
+    livre.current?.querySelectorAll<HTMLElement>('.vl-passage').forEach((p) => {
+      const a = Number(p.dataset.angle) || 0
+      const ligne = p.querySelector<HTMLElement>('.vl-ligne')
+      const hausse = ligne ? ligne.offsetWidth * Math.sin((Math.abs(a) * Math.PI) / 180) : 0
+      p.style.paddingTop = a < 0 ? `${hausse}px` : ''
+      p.style.paddingBottom = a > 0 ? `${hausse}px` : ''
+    })
+  })
+
   let k = 0
   let dejaVues = 0
   const rendu = c.map(({ p }, i) => {
@@ -61,7 +74,12 @@ export function VueLivre({ pages, maintenant }: { pages: Passage[]; maintenant: 
     const limite = dejaVues + vues[i]
     dejaVues += Array.from(p.texte).length
     return (
-      <span key={p.id} className="vl-passage" style={{ fontFamily: e.police, fontSize: `${e.taille * p.taille}cqw` }}>
+      <span
+        key={p.id}
+        className="vl-passage"
+        data-angle={p.angle}
+        style={{ fontFamily: e.police, fontSize: `${e.taille * p.taille}cqw` }}
+      >
         <span
           className={`vl-ligne${p.angle ? ' inclinee' : ''}`}
           style={{ transform: p.angle ? `rotate(${p.angle}deg)` : undefined }}

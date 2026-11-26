@@ -4,6 +4,13 @@
    largeur qu'on lui donne et s'y mesure (unités cqw). Feuille à part : le
    téléphone et la table ne chargent pas celle de l'application.
    ============================================================ */
+/* « Help Me » — GGBotNet, licence SIL OFL 1.1 (assets/chasse/polices/HelpMe-Licence-OFL.txt).
+   Déclarée ici aussi : la table et les téléphones ne chargent pas app.css. */
+@font-face {
+  font-family: 'Help Me';
+  src: url('../../assets/chasse/polices/HelpMe.ttf') format('truetype');
+  font-display: swap;
+}
 @font-face {
   font-family: 'DSEG7 Classic';
   src: url('../../assets/chasse/polices/DSEG7Classic-Bold.woff2') format('woff2');
