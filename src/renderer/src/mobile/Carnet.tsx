@@ -86,13 +86,13 @@ export function Carnet({
     <div className="m-carnet">
       {erreur ? <p className="m-erreur">{erreur}</p> : null}
       {indices.length ? (
-        <section>
+        <section className="m-cn-indices">
           <h3 className="m-cn-titre">Indices</h3>
           <ul className="m-cn-liste">{indices.map(ligne)}</ul>
         </section>
       ) : null}
       {entites.length ? (
-        <section>
+        <section className="m-cn-entites">
           <h3 className="m-cn-titre">Entités</h3>
           <ul className="m-cn-liste">{entites.map(ligne)}</ul>
         </section>

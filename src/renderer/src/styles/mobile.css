@@ -3764,6 +3764,25 @@ button.m-regarde-img {
   color: var(--text-faint);
   text-align: center;
 }
+/* Deux teintes pour ne pas confondre les listes : l'azur des indices, le
+   prune des entités. Ni l'or ni le rouge, qui sont ceux des marques. */
+.m-cn-indices {
+  --liste: var(--azur);
+  --liste-wash: var(--azur-wash);
+}
+.m-cn-entites {
+  --liste: var(--prune);
+  --liste-wash: var(--prune-wash);
+}
+.m-cn-indices .m-cn-titre,
+.m-cn-entites .m-cn-titre {
+  color: var(--liste);
+}
+.m-cn-indices .m-cn-ligne,
+.m-cn-entites .m-cn-ligne {
+  border-left: 3px solid var(--liste);
+  background: linear-gradient(90deg, var(--liste-wash), var(--surface) 60%);
+}
 /* Sur une tablette, une ligne sur toute la largeur se lit mal : chaque liste
    passe en deux colonnes, remplies dans l'ordre de lecture, ligne à ligne. */
 @media (min-width: 700px) {
