@@ -11,8 +11,11 @@
  * « Ramasser ». Sa valeur ne s'affiche que si le joueur a de quoi la lire
  * d'où il est.
  */
-import { useState } from 'react'
-import type { OutilChasse, OutilTelephone } from '@shared/chasse'
+import { useMemo, useState } from 'react'
+import { seRegleAllume, type OutilChasse, type OutilTelephone } from '@shared/chasse'
+import type { ParoleTelephone } from '@shared/parole'
+import { VueLivre, VuePlanche, VueSpirit, dureeVoix, livreEcrit, plancheBouge } from '../shared/chasse/Vues'
+import { useMaintenant } from '../shared/chasse/temps'
 import { PhotoEmf } from '../mj/chasse/PhotoEmf'
 import { EcranThermometre } from '../mj/chasse/EcranThermometre'
 import { useNiveauVivant, useTemperatureVivante } from '../mj/chasse/vivant'
@@ -43,22 +46,61 @@ async function envoyer(
   }
 }
 
-/** L'appareil en grand, vivant : le niveau tremble, la température glisse. */
-function Appareil({ o }: { o: OutilTelephone }): JSX.Element {
+/** L'appareil en grand, vivant : le niveau tremble, la température glisse, le livre s'écrit… */
+function Appareil({
+  o,
+  p,
+  decalage
+}: {
+  o: { outil: OutilChasse; allume: boolean; valeur: number | null }
+  p?: ParoleTelephone
+  decalage: number
+}): JSX.Element {
+  if (o.outil === 'emf' || o.outil === 'thermometre')
+    return (
+      <div className="m-appareil">
+        {o.outil === 'emf' ? <EmfVivant o={o} /> : <ThermometreVivant o={o} />}
+      </div>
+    )
   return (
-    <div className="m-appareil">
-      {o.outil === 'emf' ? <EmfVivant o={o} /> : <ThermometreVivant o={o} />}
+    <div className={`m-parle m-parle-${o.outil}`}>
+      <Parle outil={o.outil} allume={o.allume} p={p} decalage={decalage} />
     </div>
   )
 }
 
+/** Un outil qui parle, réglé sur l'horloge du poste : il ne s'anime que quand il se passe quelque chose. */
+function Parle({
+  outil,
+  allume,
+  p,
+  decalage
+}: {
+  outil: 'spiritbox' | 'livre' | 'planche'
+  allume: boolean
+  p?: ParoleTelephone
+  decalage: number
+}): JSX.Element {
+  const maintenant = Date.now() + decalage
+  const actif =
+    outil === 'livre'
+      ? livreEcrit(p?.pages ?? [], maintenant)
+      : outil === 'planche'
+        ? plancheBouge(p?.goutte ?? null, maintenant)
+        : !!p?.dit && maintenant < p.dit.a + dureeVoix(p.dit.texte)
+  const t = useMaintenant(actif, decalage)
+  if (outil === 'spiritbox') return <VueSpirit allume={allume} dit={p?.dit} maintenant={t} />
+  if (outil === 'livre') return <VueLivre pages={p?.pages ?? []} maintenant={t} />
+  return <VuePlanche goutte={p?.goutte ?? null} maintenant={t} />
+}
+
 /* Un composant par outil : chacun ne fait tourner que son animation. */
-function EmfVivant({ o }: { o: OutilTelephone }): JSX.Element {
+function EmfVivant({ o }: { o: { valeur: number | null; allume: boolean } }): JSX.Element {
   const niveau = useNiveauVivant(o.valeur ?? 0, o.allume)
   return <PhotoEmf n={niveau} eteint={!o.allume} />
 }
 
-function ThermometreVivant({ o }: { o: OutilTelephone }): JSX.Element {
+function ThermometreVivant({ o }: { o: { valeur: number | null; allume: boolean } }): JSX.Element {
   const temperature = useTemperatureVivante(o.valeur ?? 0)
   return <EcranThermometre t={temperature} eteint={!o.allume} />
 }
@@ -92,6 +134,9 @@ function LectureThermometre({ o }: { o: OutilTelephone }): JSX.Element {
 
 /** Ce que lit l'appareil, s'il y a de quoi le lire d'ici. */
 function Lecture({ o }: { o: OutilTelephone }): JSX.Element {
+  /* Les outils qui parlent ne mesurent rien : on dit s'ils sont en marche, ou comment les lire. */
+  if (o.outil === 'spiritbox') return <span className="m-op-lu">{o.allume ? 'allumée' : 'éteinte'}</span>
+  if (o.outil === 'livre' || o.outil === 'planche') return <small>touche pour {o.outil === 'livre' ? 'le' : 'la'} lire</small>
   /* Rien à lire d'ici : l'EMF garde ses LED éteintes et le thermomètre un tiret,
      pour que la carte ne change pas de taille. */
   if (o.valeur == null && o.outil !== 'emf') return <span className="m-op-lu">{o.allume ? '—' : 'éteint'}</span>
@@ -110,28 +155,46 @@ export function ObjetsDuPion({
   jeton,
   api,
   aPortee = [],
-  onRamasser
+  onRamasser,
+  paroles = [],
+  horloge
 }: {
   outils: OutilTelephone[]
   jeton: string
   api: string
   aPortee?: AppareilAPortee[]
   onRamasser?: (placementId: number) => void
+  /** Ce que disent la spirit box, le livre, la planche qu'il tient ou qui sont posés près de lui. */
+  paroles?: ParoleTelephone[]
+  /** L'heure du poste quand cet état est parti : les animations s'y accordent. */
+  horloge?: number
 }): JSX.Element | null {
   const [ouvert, setOuvert] = useState<number | null>(null)
   const [erreur, setErreur] = useState<string | null>(null)
   const [envoi, setEnvoi] = useState(false)
-  /* L'appareil en grand n'existe que pour un outil encore en main : posé, il se referme. */
+  /* Ce qu'il faut ajouter à l'horloge de cet appareil pour lire celle du poste. */
+  const decalage = useMemo(() => (horloge ? horloge - Date.now() : 0), [horloge])
+  const parole = (placementId: number): ParoleTelephone | undefined => paroles.find((p) => p.placementId === placementId)
+  /* Un outil qui parle, posé près de lui par quelqu'un d'autre : il le lit sans l'avoir. */
+  const proches = paroles.filter((p) => !outils.some((o) => o.placementId === p.placementId))
+  /* L'appareil en grand : un outil en main, ou un outil qui parle qu'il voit. */
   const grand = outils.find((o) => o.placementId === ouvert && o.ou === 'main') ?? null
-  useRetourFerme(!!grand, () => setOuvert(null))
+  const grandProche = !grand
+    ? (paroles.find((p) => p.placementId === ouvert) ?? null)
+    : null
+  useRetourFerme(!!grand || !!grandProche, () => setOuvert(null))
 
   /* Ceux qu'un autre a posés : ils ne sont pas dans ma liste, mais je peux les prendre. */
-  const autres = aPortee.filter((a) => !outils.some((o) => o.placementId === a.id))
+  const autres = aPortee.filter(
+    (a) => !outils.some((o) => o.placementId === a.id) && !proches.some((p) => p.placementId === a.id)
+  )
   const peutRamasser = (id: number): boolean => !!onRamasser && aPortee.some((a) => a.id === id)
   /* Seulement ce qu'on porte ; un appareil posé ne revient que quand on est
      assez près pour le ramasser. */
-  const visibles = outils.filter((o) => o.ou === 'main' || peutRamasser(o.placementId))
-  if (!visibles.length && !autres.length) return null
+  const visibles = outils.filter(
+    (o) => o.ou === 'main' || peutRamasser(o.placementId) || (o.ou === 'lieu' && !!parole(o.placementId))
+  )
+  if (!visibles.length && !autres.length && !proches.length) return null
 
   const geste = async (route: 'allumer' | 'poser', o: OutilTelephone): Promise<void> => {
     setErreur(null)
@@ -172,16 +235,18 @@ export function ObjetsDuPion({
                 </span>
               </button>
               <span className="m-op-actions">
-                <button
-                  className={`m-op-btn m-op-marche${o.allume ? ' on' : ''}`}
-                  disabled={envoi}
-                  aria-pressed={o.allume}
-                  aria-label={o.allume ? `Éteindre ${o.nom}` : `Allumer ${o.nom}`}
-                  onClick={() => void geste('allumer', o)}
-                >
-                  <IconMarche />
-                  {o.allume ? 'Éteindre' : 'Allumer'}
-                </button>
+                {seRegleAllume(o.outil) ? (
+                  <button
+                    className={`m-op-btn m-op-marche${o.allume ? ' on' : ''}`}
+                    disabled={envoi}
+                    aria-pressed={o.allume}
+                    aria-label={o.allume ? `Éteindre ${o.nom}` : `Allumer ${o.nom}`}
+                    onClick={() => void geste('allumer', o)}
+                  >
+                    <IconMarche />
+                    {o.allume ? 'Éteindre' : 'Allumer'}
+                  </button>
+                ) : null}
                 <button className="m-op-btn" disabled={envoi} onClick={() => void geste('poser', o)}>
                   Poser<span className="m-op-dit"> ici</span>
                 </button>
@@ -189,14 +254,21 @@ export function ObjetsDuPion({
             </div>
           ) : (
             <div key={o.placementId} className={`m-op-carte pose${peutRamasser(o.placementId) ? ' proche' : ''}`}>
-              <span className="m-op-img">
-                <Visage url={imageOutil(o.outil)} cadre={null} alt="" />
-              </span>
-              <span className="m-op-texte">
-                <b>{o.nom}</b>
-                <small>posé, à portée de main</small>
-                <Lecture o={o} />
-              </span>
+              <button
+                className="m-op-ouvrir"
+                disabled={!parole(o.placementId)}
+                aria-label={`Lire ${o.nom}`}
+                onClick={() => setOuvert(o.placementId)}
+              >
+                <span className="m-op-img">
+                  <Visage url={imageOutil(o.outil)} cadre={null} alt="" />
+                </span>
+                <span className="m-op-texte">
+                  <b>{o.nom}</b>
+                  <small>{peutRamasser(o.placementId) ? 'posé, à portée de main' : 'posé près de toi'}</small>
+                  <Lecture o={o} />
+                </span>
+              </button>
               {peutRamasser(o.placementId) ? (
                 <button className="m-op-btn m-op-ramasser" onClick={() => onRamasser!(o.placementId)}>
                   Ramasser
@@ -205,6 +277,24 @@ export function ObjetsDuPion({
             </div>
           )
         )}
+        {proches.map((p) => (
+          <div key={p.placementId} className={`m-op-carte pose${peutRamasser(p.placementId) ? ' proche' : ''}`}>
+            <button className="m-op-ouvrir" aria-label={`Lire ${p.nom}`} onClick={() => setOuvert(p.placementId)}>
+              <span className="m-op-img">
+                <Visage url={imageOutil(p.outil)} cadre={null} alt="" />
+              </span>
+              <span className="m-op-texte">
+                <b>{p.nom}</b>
+                <small>posé près de toi</small>
+              </span>
+            </button>
+            {peutRamasser(p.placementId) ? (
+              <button className="m-op-btn m-op-ramasser" onClick={() => onRamasser!(p.placementId)}>
+                Ramasser
+              </button>
+            ) : null}
+          </div>
+        ))}
         {autres.map((a) => (
           <div key={a.id} className="m-op-carte pose proche">
             <span className="m-op-img">
@@ -229,16 +319,31 @@ export function ObjetsDuPion({
             ‹ Plan
           </button>
           <h2 className="m-outil-titre">{grand.nom}</h2>
-          <Appareil o={grand} />
+          <Appareil o={grand} p={parole(grand.placementId)} decalage={decalage} />
           {erreur ? <p className="m-erreur">{erreur}</p> : null}
           <div className="m-outil-actions">
-            <button className="m-outil-btn" disabled={envoi} onClick={() => void geste('allumer', grand)}>
-              {grand.allume ? 'Éteindre' : 'Allumer'}
-            </button>
+            {seRegleAllume(grand.outil) ? (
+              <button className="m-outil-btn" disabled={envoi} onClick={() => void geste('allumer', grand)}>
+                {grand.allume ? 'Éteindre' : 'Allumer'}
+              </button>
+            ) : null}
             <button className="m-outil-btn" disabled={envoi} onClick={() => void geste('poser', grand)}>
               Poser ici
             </button>
           </div>
+        </div>
+      ) : grandProche ? (
+        <div className="m-op-grand" role="dialog" aria-label={grandProche.nom}>
+          <button className="m-outil-retour" onClick={() => history.back()}>
+            ‹ Plan
+          </button>
+          <h2 className="m-outil-titre">{grandProche.nom}</h2>
+          {/* Posé, il ne s'allume pas d'ici : une spirit box qu'on entend est allumée. */}
+          <Appareil
+            o={{ outil: grandProche.outil, allume: !!grandProche.dit || grandProche.outil !== 'spiritbox', valeur: null }}
+            p={grandProche}
+            decalage={decalage}
+          />
         </div>
       ) : null}
     </section>

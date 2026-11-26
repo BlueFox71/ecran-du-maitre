@@ -18,6 +18,7 @@ import { Visage } from '../shared/Visage'
 import { Piece } from '../shared/Piece'
 import { AppareilSurPlan, imageOutil } from '../shared/outilsChasse'
 import { PORTEE_RAMASSER_M, type AppareilPose, type OutilChasse, type OutilTelephone } from '@shared/chasse'
+import type { ParoleTelephone } from '@shared/parole'
 import { ObjetsDuPion, type AppareilAPortee } from './Outils'
 import { D20 } from '../shared/D20'
 import { barrieres, pasContraint, RAYON_PION, seCroisent, type Pt } from '@shared/murs'
@@ -218,6 +219,10 @@ interface Etat {
   appareilsPoses?: AppareilPose[]
   /** Les outils de chasse qu'il porte ou qu'il a posés. Absent d'un serveur plus ancien. */
   outils?: OutilTelephone[]
+  /** Ce que disent les outils qui parlent qu'il voit. Absent d'un serveur plus ancien. */
+  paroles?: ParoleTelephone[]
+  /** L'heure du poste à l'envoi de cet état. */
+  horloge?: number
   emplacements: { cle: string; nom: string }[]
   /** Les inventaires ouverts, où chacun pioche. Absent d'un serveur plus ancien. */
   inventaires?: InventaireTel[]
@@ -3717,6 +3722,8 @@ function Plan({
         api={API}
         aPortee={aPortee}
         onRamasser={(id) => void ramasserAppareil(id)}
+        paroles={etat.paroles ?? []}
+        horloge={etat.horloge}
       />
 
       {etat.spectateur ? (

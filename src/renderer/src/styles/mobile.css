@@ -3629,3 +3629,13 @@ button.m-regarde-img {
 .thermo-valeur {
   position: relative;
 }
+
+/* Les outils qui parlent, en grand : le livre et la planche prennent la largeur. */
+.m-parle {
+  width: 100%;
+  max-width: 900px;
+}
+.m-parle-spiritbox {
+  display: flex;
+  justify-content: center;
+}

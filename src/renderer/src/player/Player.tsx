@@ -4,6 +4,7 @@ import { Pings, usePings } from '../shared/Pings'
 import { BandeauTour } from '../shared/BandeauTour'
 import { DesSurTable } from '../shared/DesSurTable'
 import { montreLaCarte } from '@shared/scene'
+import { FenetreChasseVue } from '../shared/chasse/FenetreChasse'
 import type {
   CalqueBrouillard,
   DisplayState,
@@ -130,6 +131,9 @@ export function Player(): JSX.Element {
                 pointer={pointer}
               />
             </div>
+
+            {/* Le livre, la planche ou le tarot que le MJ montre : une fenêtre par-dessus le plan. */}
+            {state.fenetreChasse ? <FenetreChasseVue f={state.fenetreChasse} /> : null}
 
             {state.tour ? <BandeauTour tour={state.tour} /> : null}
 

@@ -161,6 +161,7 @@ export function paroleDe(characterId: number | null): ParoleTelephone[] {
     out.push({
       placementId: a.placementId,
       objetId: a.objetId,
+      nom: a.nom,
       outil: a.outil,
       ...(a.outil === 'spiritbox' && dits.has(a.objetId) ? { dit: dits.get(a.objetId) } : {}),
       ...(a.outil === 'livre' ? { pages: pages.get(a.objetId) ?? [] } : {}),

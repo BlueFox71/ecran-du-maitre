@@ -107,6 +107,7 @@ export interface Goutte {
 export interface ParoleTelephone {
   placementId: number
   objetId: number
+  nom: string
   outil: 'spiritbox' | 'livre' | 'planche'
   /** Spirit box : le dernier texte dit, et quand la voix a commencé. */
   dit?: { texte: string; a: number }
