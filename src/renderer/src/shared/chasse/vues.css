@@ -165,22 +165,25 @@
 }
 
 /* --- le tarot --- */
+/* Tout le tapis se mesure en largeur de tapis (cqw) : la table, le Paravent et
+   le petit moniteur montrent la même composition, à leur échelle. */
 .vt {
+  container-type: inline-size;
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   align-items: flex-start;
-  gap: 18px;
-  padding: 14px;
+  gap: 1.6cqw;
+  padding: 1.4cqw;
   border-radius: 12px;
   background: radial-gradient(ellipse at 50% 40%, #1f3b2c, #0d1c15 75%);
 }
 .vt-place {
   margin: 0;
-  width: min(190px, 40%);
+  width: 12cqw;
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 0.7cqw;
 }
 .vt-carte {
   position: relative;
@@ -255,7 +258,7 @@
 .vt-texte {
   margin: 0;
   color: #f3e7c9;
-  font: italic 15px/1.35 Georgia, serif;
+  font: italic 0.95cqw/1.35 Georgia, serif;
   text-align: center;
 }
 
