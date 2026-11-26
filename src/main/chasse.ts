@@ -31,6 +31,7 @@ import {
   PORTEE_RAMASSER_M,
   TEMPERATURE_MAX,
   TEMPERATURE_MIN,
+  estMesureur,
   gainSon,
   niveauEmfSous,
   pionSurPlan,
@@ -221,12 +222,17 @@ function calculer(): Calcul {
     const c = g?.construction ?? null
     const sous: PointCase | null = c && pos ? [pos.x * c.largeur, pos.y * c.hauteur] : null
     const controle = controles.get(ex.placementId)
-    const valeur = controle ?? (ex.outil === 'emf' ? niveauEmfSous(c, sous) : temperatureSous(c, sous))
+    /* Seuls les mesureurs lisent le lieu ; les outils qui parlent valent 0. */
+    const valeur =
+      controle ??
+      (ex.outil === 'emf' ? niveauEmfSous(c, sous) : ex.outil === 'thermometre' ? temperatureSous(c, sous) : 0)
     const allume = !ex.eteinte
 
-    /* Le son : seul l'EMF en a, et seulement s'il marche et capte quelque chose. */
+    /* Le son : l'EMF quand il capte quelque chose ; la spirit box, allumée,
+       grésille toujours. Le livre et la planche sont muets ici. */
+    const sonne = ex.outil === 'emf' ? valeur >= 0.5 : ex.outil === 'spiritbox'
     let gain = 0
-    if (ex.outil === 'emf' && allume && valeur >= 0.5 && ou !== 'ailleurs') {
+    if (sonne && allume && ou !== 'ailleurs') {
       if (ou === 'main') gain = 1
       else if (g && pos && placeId != null) {
         const ici = planDe(placeId)
@@ -307,7 +313,7 @@ export function controler(placementId: number, valeur: number | null): AppareilC
      calcul par geste, celui qui suit — le curseur en envoie beaucoup. */
   const a = (dernier ?? calculer()).appareils.find((x) => x.placementId === placementId)
   /* Seulement un appareil en main ou posé : celui d'un porteur sans pion ne lit rien. */
-  if (a && a.ou !== 'ailleurs' && valeur !== null && Number.isFinite(valeur)) {
+  if (a && a.ou !== 'ailleurs' && estMesureur(a.outil) && valeur !== null && Number.isFinite(valeur)) {
     const [min, max] = a.outil === 'emf' ? [0, 5] : [TEMPERATURE_MIN, TEMPERATURE_MAX]
     controles.set(placementId, Math.min(max, Math.max(min, valeur)))
   } else if (valeur === null) controles.delete(placementId)

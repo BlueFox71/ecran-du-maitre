@@ -5,7 +5,7 @@
  * faire grésiller l'EMF ou plonger le thermomètre au bon moment.
  */
 import { useEffect, useRef, useState } from 'react'
-import type { AppareilChasse } from '@shared/chasse'
+import { estMesureur, seRegleAllume, type AppareilChasse } from '@shared/chasse'
 import { imageOutil } from '../../shared/outilsChasse'
 import { useStore } from '../store'
 import { NIVEAU_MAX } from './emf'
@@ -72,8 +72,15 @@ export function Appareils(): JSX.Element {
     return a.characterId != null ? 'rangé' : 'hors du plan'
   }
 
+  /* Les outils qui parlent ne mesurent rien : on dit seulement s'ils sont en marche. */
   const mesure = (a: AppareilChasse): string =>
-    a.outil === 'emf' ? `Niveau ${a.valeur.toFixed(1)}` : `${texteTemperature(a.valeur)} °C`
+    a.outil === 'emf'
+      ? `Niveau ${a.valeur.toFixed(1)}`
+      : a.outil === 'thermometre'
+        ? `${texteTemperature(a.valeur)} °C`
+        : a.outil === 'spiritbox'
+          ? 'Spirit box'
+          : ''
 
   return (
     <section className="chasse-appareils" aria-label="Appareils en jeu">
@@ -91,12 +98,12 @@ export function Appareils(): JSX.Element {
               </div>
               <span className={`chasse-valeur${a.allume ? '' : ' eteint'}`}>
                 {mesure(a)}
-                {a.allume ? '' : ' (éteint)'}
+                {a.allume || !seRegleAllume(a.outil) ? '' : ' (éteint)'}
               </span>
               {a.controle && <Curseur a={a} />}
               {/* Seulement en main ou posé : ailleurs, l'appareil ne lit rien. Un
                   contrôle déjà pris se lâche toujours. */}
-              {a.ou !== 'ailleurs' || a.controle ? (
+              {estMesureur(a.outil) && (a.ou !== 'ailleurs' || a.controle) ? (
                 <button
                   className={`btn btn-sm${a.controle ? ' btn-brass' : ''}`}
                   onClick={() => void window.jdr.chasse.controler(a.placementId, a.controle ? null : a.valeur)}

@@ -8,13 +8,16 @@ import type { CSSProperties } from 'react'
 import type { OutilChasse } from '@shared/chasse'
 import imageEmf from '../assets/chasse/emf-eteint.png'
 import imageThermometre from '../assets/chasse/thermometre.png'
+import imageSpirit from '../assets/chasse/spirit-box.png'
+import imageLivre from '../assets/chasse/livre.jpg'
+import imagePlanche from '../assets/chasse/planche.jpg'
 import { LEDS_EMF, ledsAllumees } from '../mj/chasse/emf'
 import { froid } from '../mj/chasse/temperature'
 import { useNiveauVivant, useTemperatureVivante } from '../mj/chasse/vivant'
 
 /** L'URL de la photo d'un outil. */
 export function imageOutil(o: OutilChasse): string {
-  return o === 'emf' ? imageEmf : imageThermometre
+  return { emf: imageEmf, thermometre: imageThermometre, spiritbox: imageSpirit, livre: imageLivre, planche: imagePlanche }[o]
 }
 
 /**
@@ -32,11 +35,20 @@ export function imageObjet(
 }
 
 /** Le rapport hauteur / largeur des photos (EMF 348 × 908, thermomètre 499 × 1520). */
-const RAPPORT: Record<OutilChasse, number> = { emf: 908 / 348, thermometre: 1520 / 499 }
+const RAPPORT: Record<OutilChasse, number> = {
+  emf: 908 / 348,
+  thermometre: 1520 / 499,
+  spiritbox: 1519 / 629,
+  livre: 1024 / 1536,
+  planche: 1024 / 1536
+}
 
 /** La lueur d'un appareil : sa couleur et son rayon (en fraction de la taille), ou rien. */
 function lueur(outil: OutilChasse, valeur: number, allume: boolean): { couleur: string; rayon: number } | null {
   if (!allume) return null
+  /* Les outils qui parlent : la spirit box allumée luit à peine ; le livre et la planche, jamais. */
+  if (outil === 'livre' || outil === 'planche') return null
+  if (outil === 'spiritbox') return { couleur: 'rgba(230, 230, 230, 0.3)', rayon: 0.6 }
   if (outil === 'emf') {
     const n = ledsAllumees(valeur)
     if (n === 0) return null
@@ -152,5 +164,7 @@ export function AppareilSurPlan({
   taille: number
   couleur?: string
 }): JSX.Element {
-  return outil === 'emf' ? <EmfVivant {...reste} /> : <ThermoVivant {...reste} />
+  if (outil === 'emf') return <EmfVivant {...reste} />
+  if (outil === 'thermometre') return <ThermoVivant {...reste} />
+  return <AppareilPose outil={outil} {...reste} />
 }

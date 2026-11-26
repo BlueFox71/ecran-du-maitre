@@ -34,7 +34,7 @@ import { addPion, pionsPartout } from '../repos/pions'
 import { addMur } from '../repos/murs'
 import { getConstruction, setConstruction } from '../repos/construction'
 import * as reglages from '../repos/reglages'
-import { gainSon, type AppareilChasse } from '@shared/chasse'
+import { gainSon, type AppareilChasse, type OutilChasse } from '@shared/chasse'
 import type { Construction } from '@shared/atelier'
 
 let s: number
@@ -70,7 +70,7 @@ function construire(placeId: number, extra: Partial<Construction> = {}): void {
   })
 }
 
-function outil(nom: string, quoi: 'emf' | 'thermometre'): number {
+function outil(nom: string, quoi: OutilChasse): number {
   const o = objet(s, nom)
   objets.updateObjet(o, { outil: quoi })
   return o
@@ -614,4 +614,37 @@ it('ramasser, les deux mains prises : il va dans le sac', () => {
   expect(chasse.ramasserOutil(bob, pl)).toBeNull()
   const r = getDb().prepare(`SELECT emplacement FROM objet_placement WHERE id = ?`).get(pl) as { emplacement: string | null }
   expect(r.emplacement).toBeNull()
+})
+
+/* ---------------- les outils qui parlent (chantier 2) ---------------- */
+
+it('une spirit box allumée en main grésille à plein, sans rien mesurer ; éteinte, elle se tait', () => {
+  construire(salle)
+  const bob = pj('Bob')
+  addPion({ placeId: salle, characterId: bob, x: 0.5, y: 0.5 })
+  const sb = enMain(outil('Spirit box', 'spiritbox'), bob)
+  chasse.recalculer(false)
+  expect(de(sb)).toMatchObject({ ou: 'main', valeur: 0, gain: 1 })
+  getDb().prepare(`UPDATE objet_placement SET eteinte = 1 WHERE id = ?`).run(sb)
+  chasse.recalculer(false)
+  expect(de(sb)?.gain).toBe(0)
+})
+
+it('le livre et la planche ne mesurent rien et ne font aucun bruit', () => {
+  construire(salle)
+  const bob = pj('Bob')
+  addPion({ placeId: salle, characterId: bob, x: 0.5, y: 0.5 })
+  const livre = enMain(outil('Livre', 'livre'), bob)
+  const planche = enMain(outil('Planche', 'planche'), bob)
+  chasse.recalculer(false)
+  expect(de(livre)).toMatchObject({ valeur: 0, gain: 0 })
+  expect(de(planche)).toMatchObject({ valeur: 0, gain: 0 })
+})
+
+it('on ne prend pas le contrôle d’un outil qui ne mesure rien', () => {
+  const bob = pj('Bob')
+  addPion({ placeId: salle, characterId: bob, x: 0.5, y: 0.5 })
+  const livre = enMain(outil('Livre', 'livre'), bob)
+  chasse.controler(livre, 3)
+  expect(de(livre)?.controle).toBe(false)
 })

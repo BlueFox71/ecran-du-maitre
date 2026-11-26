@@ -5,14 +5,27 @@
  */
 import type { Construction, PointCase } from './atelier'
 
-export type OutilChasse = 'emf' | 'thermometre'
+/**
+ * Les outils de chasse. Les deux premiers **mesurent** (le lieu leur donne une
+ * valeur) ; les trois autres **parlent** — le MJ leur fait dire quelque chose.
+ */
+export type OutilChasse = 'emf' | 'thermometre' | 'spiritbox' | 'livre' | 'planche'
 
 export const OUTILS_CHASSE: { id: OutilChasse; nom: string }[] = [
   { id: 'emf', nom: 'EMF' },
-  { id: 'thermometre', nom: 'Thermomètre' }
+  { id: 'thermometre', nom: 'Thermomètre' },
+  { id: 'spiritbox', nom: 'Spirit box' },
+  { id: 'livre', nom: 'Livre d’écriture' },
+  { id: 'planche', nom: 'Planche de spiritisme' }
 ]
 
 export const estOutil = (v: unknown): v is OutilChasse => OUTILS_CHASSE.some((o) => o.id === v)
+
+/** Un outil qui lit le lieu (une valeur, un contrôle du MJ) : l'EMF et le thermomètre. */
+export const estMesureur = (o: OutilChasse): boolean => o === 'emf' || o === 'thermometre'
+
+/** Un outil qui s'allume et s'éteint : les mesureurs, et la spirit box. */
+export const seRegleAllume = (o: OutilChasse): boolean => estMesureur(o) || o === 'spiritbox'
 
 /**
  * Un coup de pinceau sur un calque ; `valeur: null` = coup de gomme. Avec
