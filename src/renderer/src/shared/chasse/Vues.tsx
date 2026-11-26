@@ -197,7 +197,8 @@ export function VueSpirit({
           ) : null}
         </div>
       </div>
-      {dit && maintenant >= dit.a ? <p className="vs-dit">« {dit.texte} »</p> : null}
+      {/* Ce que dit la voix ne s'écrit pas sur le téléphone : on l'entend au PC,
+          l'écran ne fait que frémir pendant qu'elle parle. */}
     </div>
   )
 }

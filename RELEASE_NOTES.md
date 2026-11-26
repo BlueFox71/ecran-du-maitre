@@ -1,7 +1,7 @@
 <!-- version: 1.14.0 -->
 ### Nouveautés
 - **La spirit box, le livre d'écriture et la planche de spiritisme passent dans la main des joueurs.** Dans la fiche d'un objet, choisis son outil : comme l'EMF, on le porte, on le pose, on le ramasse depuis la page Pion du téléphone.
-- **La spirit box parle.** Allumée, elle grésille sur le PC. Prépare tes textes pour la séance et sa voix (la voix de Windows, grave, hachage, écho, clarté) ; en jeu, un clic sur « Dire » et elle le prononce à travers la radio — le texte s'affiche sur le téléphone de celui qui l'a en main au moment où la voix commence.
+- **La spirit box parle.** Allumée, elle grésille sur le PC. Prépare tes textes pour la séance et sa voix (la voix de Windows, grave, hachage, écho, clarté) ; en jeu, un clic sur « Dire » et elle le prononce à travers la radio — sur le téléphone de celui qui l'a en main, l'écran de la spirit box frémit pendant qu'elle parle.
 - **Le livre s'écrit tout seul.** Prépare tes textes avec leur écriture, leur taille et leur inclinaison ; « Écrire », et une main invisible les trace lettre par lettre sur le téléphone, pendant que le PC fait gratter le crayon. Les pages restent écrites : celui qui ramasse le livre les lit.
 - **La goutte de la planche glisse en direct.** Clique sur une lettre, un chiffre, Oui, Non ou Au revoir — ou tape la touche au clavier, la souris sur la planche — et la goutte y va, sur le téléphone du joueur.
 - **Montre le livre ou la planche à la table**, dans une fenêtre par-dessus le plan : l'écriture et la goutte s'y animent en même temps que sur le téléphone.

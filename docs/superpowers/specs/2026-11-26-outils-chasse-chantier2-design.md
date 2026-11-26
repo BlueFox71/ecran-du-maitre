@@ -39,7 +39,7 @@ Tout se pilote depuis le **panneau Objets du Paravent** (`ObjetsDeScene`, `src/r
 - **Allumée, elle grésille** (décision : « simple si c'est allumé ça fait du grésillement ») : le balayage radio de la simulation (`SonSpirit`, `src/renderer/src/mj/chasse/spirit.ts`), **joué sur le PC** comme le son de l'EMF. Éteinte : rien. Atténuation à la distance comme l'EMF (choix de Claude ; en main = plein volume).
 - **Côté MJ** : pour chaque spirit box, sa **liste de textes** et ses **réglages de voix** (décision : « configuration de voix prédéfinie aussi ») — la voix Windows et les réglages grave / hachage / écho / clarté de la simulation (`ReglagesVoix`). Réglages par spirit box pour la séance (choix de Claude ; un réglage par texte est laissé au constructeur s'il ne complique rien). Un bouton par texte : **Lancer** → le PC prononce le texte (TTS Windows, `src/main/voix.ts`) à travers le grésillement.
 - On ne lance qu'une spirit box **allumée et en jeu** (en main ou posée) ; sinon le bouton est grisé avec la raison (choix de Claude).
-- **Sur le téléphone** (voir § Qui voit quoi) : l'appareil avec sa fréquence qui défile (rendu de la simulation). Le texte dit s'affiche **quand la voix commence** — pas au clic, la voix met une seconde ou deux à se préparer — et reste jusqu'au texte suivant (choix de Claude).
+- **Sur le téléphone** (voir § Qui voit quoi) : l'appareil avec sa fréquence qui défile (rendu de la simulation). Le texte dit **ne s'affiche pas** : on l'entend au PC, l'écran de l'appareil frémit seulement pendant que la voix parle (décision de l'utilisateur, 27/11).
 
 ## Livre d'écriture
 
