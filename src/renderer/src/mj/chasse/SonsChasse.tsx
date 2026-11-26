@@ -10,6 +10,20 @@ import { REGLAGES_VOIX, type ParoleObjet, type TextePrepare } from '@shared/paro
 
 /** La radio de chaque spirit box qui grésille, par fiche d'objet : la voix passe par elle. */
 const radios = new Map<number, SonSpirit>()
+/** Le volume que le moteur donne à chaque radio (distance, murs) × le volume général. */
+const bases = new Map<number, number>()
+/** Le volume réglé par le MJ pour chaque spirit box, le temps qu'il tient le curseur. */
+const volumesEnCours = new Map<number, number>()
+
+/**
+ * Régler à l'oreille le volume d'une spirit box : il s'entend tout de suite.
+ * `null` : le réglage est enregistré, on revient à celui de la fiche.
+ */
+export function reglerVolumeSpirit(objetId: number, v: number | null): void {
+  if (v === null) return void volumesEnCours.delete(objetId)
+  volumesEnCours.set(objetId, v)
+  radios.get(objetId)?.setVolume((bases.get(objetId) ?? 0) * v)
+}
 
 /** Le débit de la voix de Windows, celui de la simulation par défaut. */
 const DEBIT = -2
@@ -88,6 +102,7 @@ interface Voix {
  */
 export function SonsChasse(): null {
   const chasse = useStore((s) => s.chasse)
+  const objets = useStore((s) => s.objets)
   const general = useSons((s) => s.regie)?.general ?? 0.8
   const voix = useRef(new Map<number, Voix>())
   /* L'état du moteur au moment du « Silence » : tant qu'il n'a pas changé, on se tait. */
@@ -146,14 +161,18 @@ export function SonsChasse(): null {
         r.setVolume(0)
         r.demarrer()
       }
-      r.setVolume(a.gain * general)
+      const base = a.gain * general
+      bases.set(a.objetId, base)
+      const o = objets.find((x) => x.id === a.objetId)
+      r.setVolume(base * (volumesEnCours.get(a.objetId) ?? o?.parole.volume ?? 1))
     }
     for (const [id, r] of [...radios]) {
       if (allumees.has(id)) continue
       r.arreter()
       radios.delete(id)
+      bases.delete(id)
     }
-  }, [chasse, general])
+  }, [chasse, general, objets])
 
   useEffect(() => {
     const toutCouper = (): void => {

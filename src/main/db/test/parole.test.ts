@@ -49,3 +49,9 @@ it('dupliquer une séance emporte les textes des outils et ceux du tarot', () =>
   expect(copie.parole.textes.map((t) => t.texte)).toEqual(['Elle est là'])
   expect(tarot.textesTarot().map((t) => t.texte)).toEqual(['Une fin.'])
 })
+
+it('lireParole : le volume de la spirit box est gardé, borné entre 0 et 1', () => {
+  expect(lireParole({ textes: [], volume: 0.4 }).volume).toBe(0.4)
+  expect(lireParole({ textes: [], volume: 3 }).volume).toBe(1)
+  expect(lireParole({ textes: [], volume: 'fort' }).volume).toBeUndefined()
+})

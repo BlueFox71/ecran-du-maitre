@@ -11,7 +11,7 @@
 import { useEffect, useState } from 'react'
 import { useStore } from '../store'
 import { Curseur } from '../chasse/Appareils'
-import { lancerEcriture, lancerVoix } from '../chasse/SonsChasse'
+import { lancerEcriture, lancerVoix, reglerVolumeSpirit } from '../chasse/SonsChasse'
 import { ECRITURES } from '../chasse/ecriture'
 import { ARCANES } from '../chasse/arcanes'
 import {
@@ -207,6 +207,33 @@ function Voix({ o }: { o: Objet }): JSX.Element {
       {curseur('echo', 'Écho', 0, 1)}
       {curseur('clarte', 'Clarté', 0, 1)}
     </details>
+  )
+}
+
+/** Le volume de la spirit box au PC : il s'entend en glissant, s'enregistre au lâcher. */
+function VolumeSpirit({ o }: { o: Objet }): JSX.Element {
+  const [v, setV] = useState(o.parole.volume ?? 1)
+  useEffect(() => setV(o.parole.volume ?? 1), [o.parole.volume])
+  const garder = (): void =>
+    void enregistrer(o, { ...o.parole, volume: v }).then(() => reglerVolumeSpirit(o.id, null))
+  return (
+    <label className="ap-reglage">
+      <span>Volume {Math.round(v * 100)} %</span>
+      <input
+        type="range"
+        min={0}
+        max={1}
+        step={0.05}
+        value={v}
+        onChange={(e) => {
+          const n = Number(e.target.value)
+          setV(n)
+          reglerVolumeSpirit(o.id, n)
+        }}
+        onPointerUp={garder}
+        onKeyUp={garder}
+      />
+    </label>
   )
 }
 
@@ -461,6 +488,7 @@ function Appareil({
         </div>
       ) : o && a.outil === 'spiritbox' ? (
         <div className="ap-corps">
+          <VolumeSpirit o={o} />
           <Voix o={o} />
           <Textes o={o} verbe="Dire" bloque={horsJeu(a)} onLancer={(t) => lancerVoix(o.id, t.texte, o.parole)} />
         </div>

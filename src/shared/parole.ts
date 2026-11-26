@@ -38,6 +38,8 @@ export interface ParoleObjet {
   textes: TextePrepare[]
   /** Spirit box : la voix Windows (`null` : celle par défaut) et ses réglages. */
   voix?: { nom: string | null; reglages: ReglagesVoix }
+  /** Spirit box : son volume au PC, de 0 à 1 (grésillement et voix). Absent : 1. */
+  volume?: number
 }
 
 /** Un texte du tarot, préparé pour une carte et pour la séance. `arcane` : `Arcane.fichier`. */
@@ -79,7 +81,8 @@ export function lireParole(brut: unknown): ParoleObjet {
           reglages: { grave: r.grave, hachage: r.hachage, echo: r.echo, clarte: r.clarte }
         }
       : undefined
-  return { textes, ...(voix ? { voix } : {}) }
+  const volume = fini(v.volume) ? Math.max(0, Math.min(1, v.volume)) : undefined
+  return { textes, ...(voix ? { voix } : {}), ...(volume !== undefined ? { volume } : {}) }
 }
 
 /* ============================================================
