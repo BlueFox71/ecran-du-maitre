@@ -42,6 +42,21 @@ import type { Objet } from '@shared/types'
 
 const nouvelId = (): string => Math.random().toString(36).slice(2, 10)
 
+/** Les outils dépliés (par exemplaire ; `'tarot'` pour le tarot), le temps de la soirée. */
+const deplies = new Set<number | 'tarot'>()
+
+/** Replié ou déplié : un clic sur l'en-tête bascule ; on s'en souvient d'une page à l'autre. */
+function useDeplie(cle: number | 'tarot'): [boolean, () => void] {
+  const [ouvert, setOuvert] = useState(() => deplies.has(cle))
+  const basculer = (): void =>
+    setOuvert((o) => {
+      if (o) deplies.delete(cle)
+      else deplies.add(cle)
+      return !o
+    })
+  return [ouvert, basculer]
+}
+
 /**
  * Pourquoi rien ne peut partir de cet outil en ce moment — personne ne le
  * tient, il dort dans un sac, la spirit box est éteinte — ou `null` s'il est
@@ -399,11 +414,27 @@ function Appareil({
   ou: string
   apercuIci: boolean
 }): JSX.Element {
+  const [ouvert, basculer] = useDeplie(a.placementId)
   return (
-    <article className={`ap-carte${a.controle ? ' controle' : ''}`}>
-      <header>
+    <article className={`ap-carte${a.controle ? ' controle' : ''}${ouvert ? ' ouvert' : ''}`}>
+      <header
+        role="button"
+        tabIndex={0}
+        aria-expanded={ouvert}
+        title={ouvert ? 'Replier' : 'Déplier ses commandes'}
+        onClick={basculer}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter' || e.key === ' ') {
+            e.preventDefault()
+            basculer()
+          }
+        }}
+      >
+        <span className="ap-chevron" aria-hidden="true">
+          {ouvert ? '▾' : '▸'}
+        </span>
         <img src={imageOutil(a.outil)} alt="" draggable={false} />
-        <span>
+        <span className="ap-nom">
           <b>{a.nom}</b>
           <small>
             {ou}
@@ -416,7 +447,7 @@ function Appareil({
           </span>
         ) : null}
       </header>
-      {estMesureur(a.outil) ? (
+      {!ouvert ? null : estMesureur(a.outil) ? (
         <div className="ap-corps">
           {a.controle ? <Curseur a={a} /> : null}
           {a.ou !== 'ailleurs' || a.controle ? (
@@ -457,16 +488,24 @@ function Tarot(): JSX.Element {
   }, [])
   const a = ARCANES.find((x) => x.fichier === carte)
   const siens = textes.filter((t) => t.arcane === carte)
+  const [ouvert, basculer] = useDeplie('tarot')
   return (
-    <section className="ap-tarot">
+    <section className={`ap-tarot${ouvert ? ' ouvert' : ''}`}>
       <header className="ap-tete">
-        <span className="eyebrow">Tarot</span>
+        <button className="ap-deplier" aria-expanded={ouvert} onClick={basculer}>
+          <span className="ap-chevron" aria-hidden="true">
+            {ouvert ? '▾' : '▸'}
+          </span>
+          <span className="eyebrow">Tarot</span>
+        </button>
         {f?.sorte === 'tarot' ? (
           <button className="btn btn-sm" onClick={() => void window.jdr.parole.retirerTarot()}>
             Retirer le tapis ({f.cartes.length})
           </button>
         ) : null}
       </header>
+      {ouvert ? (
+      <>
       <div className="ap-arcanes">
         {ARCANES.map((x) => (
           <button
@@ -531,6 +570,8 @@ function Tarot(): JSX.Element {
       ) : (
         <p className="ap-aide">Choisis la carte que le joueur a tirée.</p>
       )}
+      </>
+      ) : null}
     </section>
   )
 }

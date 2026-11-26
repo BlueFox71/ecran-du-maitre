@@ -28356,7 +28356,7 @@ button.at-titre:hover {
   object-fit: contain;
   flex: none;
 }
-.ap-carte > header > span {
+.ap-carte > header > .ap-nom {
   flex: 1;
   min-width: 0;
   display: grid;
@@ -28366,6 +28366,8 @@ button.at-titre:hover {
   font-size: 11.5px;
 }
 .ap-mesure {
+  flex: none;
+  white-space: nowrap;
   font-variant-numeric: tabular-nums;
   font-weight: 600;
 }
@@ -28513,4 +28515,28 @@ button.at-titre:hover {
 .ap-apercu-ici.apercu .fc-fenetre {
   outline: 2px dashed var(--brass, #d8a94a);
   outline-offset: 3px;
+}
+/* Les outils du panneau, repliés : un clic sur l'en-tête les déplie. */
+.ap-carte > header {
+  cursor: pointer;
+  border-radius: 6px;
+}
+.ap-carte > header:hover {
+  background: color-mix(in srgb, var(--text) 6%, transparent);
+}
+.ap-chevron {
+  flex: none;
+  width: 12px;
+  color: var(--text-faint);
+  font-size: 11px;
+}
+.ap-deplier {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: inherit;
+  cursor: pointer;
 }
