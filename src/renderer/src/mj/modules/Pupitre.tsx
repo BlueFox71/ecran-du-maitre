@@ -30,6 +30,7 @@ import { BoutonObjets, ObjetsDeScene, usePanneauScene } from '../components/Obje
 import { IconPhone, Portables } from '../components/Portables'
 import { TexteCourt } from '../components/TexteCourt'
 import { MotsSecrets } from '../components/MotsSecrets'
+import { CarnetsJoueurs } from '../components/CarnetsJoueurs'
 import { ConsoleDirect } from '../components/ConsoleDirect'
 import { BoutonAttente } from '../components/Attente'
 import { Galerie } from '../components/Galerie'
@@ -949,6 +950,8 @@ export function Pupitre(): JSX.Element {
               {cote === 'portables' ? (
                 <>
                   <Portables />
+                  {/* Ce que la table entoure et barre dans ses carnets. */}
+                  <CarnetsJoueurs />
                   {/* Les mots partent vers les téléphones : on les écrit aussi
                       d'ici, rattachés au moment en cours. */}
                   <MotsSecrets key={beat?.id ?? 0} beatId={beat?.id ?? null} />

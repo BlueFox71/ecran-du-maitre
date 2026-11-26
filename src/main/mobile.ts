@@ -41,6 +41,8 @@ import * as poche from './db/repos/pochette'
 import * as motsRepo from './db/repos/mots'
 import * as objets from './db/repos/objets'
 import * as carnet from './carnet'
+import * as carnetChasse from './db/repos/carnetChasse'
+import type { CarnetVu } from '@shared/carnetChasse'
 import { lireCampagne, lirePoste, type ReglagesPoste } from '@shared/reglages'
 import { monnaiesActives } from '@shared/monnaies'
 import { refusSac } from '@shared/sac'
@@ -252,9 +254,10 @@ function appareilDe(
 /** L'état poussé à un appareil : celui du joueur suivi, et s'il ne fait que regarder. */
 function etatPour(
   ap: { playerId: number; spectateur: boolean },
-  appareils: ReturnType<typeof chasse.lecteurTelephones> = chasse.lecteurTelephones()
+  appareils: ReturnType<typeof chasse.lecteurTelephones> = chasse.lecteurTelephones(),
+  carnetVu: CarnetVu = carnetChasse.vu()
 ) {
-  return { ...etatJoueur(ap.playerId, appareils), spectateur: ap.spectateur }
+  return { ...etatJoueur(ap.playerId, appareils, carnetVu), spectateur: ap.spectateur }
 }
 
 /**
@@ -594,15 +597,35 @@ export function poserJetsAttendus(liste: { characterId: number; titre: string; c
   broadcast()
 }
 
+/** Une marque posée, une ligne changée : les téléphones et le poste du MJ relisent (voir `broadcast`). */
+export function carnetChange(): void {
+  broadcast()
+}
+
+/**
+ * Le dernier carnet signalé au poste du MJ. Tout ce qui le change — une marque,
+ * un Ctrl+Z, une autre séance, un absent, une couleur — passe par `broadcast` :
+ * c'est donc ici qu'on prévient le MJ, une fois, et seulement s'il a changé.
+ */
+let carnetDuMj = ''
+
 /** Pousse l'état à tous les téléphones. Appelé quand le PC change quelque chose. */
 export function broadcast(): void {
-  if (flux.size === 0 || !isDbOpen()) return
+  if (!isDbOpen()) return
+  /* Le carnet se lit une fois pour tous — et pour le MJ, même sans téléphone. */
+  const carnetVu = carnetChasse.vu()
+  const cle = JSON.stringify(carnetVu)
+  if (cle !== carnetDuMj) {
+    carnetDuMj = cle
+    versMj('carnetChasse:change', null)
+  }
+  if (flux.size === 0) return
   /* Les appareils de chasse se lisent une fois pour tous les téléphones. */
   const appareils = chasse.lecteurTelephones()
   for (const [token, liste] of flux) {
     const ap = appareilDe(token)
     if (!ap) continue
-    const etat = etatPour(ap, appareils)
+    const etat = etatPour(ap, appareils, carnetVu)
     for (const { abonne } of liste) abonne.etat(etat)
   }
 }
@@ -612,7 +635,11 @@ export function broadcast(): void {
  * l'écran, les pions dessus. On ne lui envoie rien d'autre — ni la
  * préparation du MJ, ni ce que voient les autres.
  */
-function etatJoueur(playerId: number, appareils: ReturnType<typeof chasse.lecteurTelephones>) {
+function etatJoueur(
+  playerId: number,
+  appareils: ReturnType<typeof chasse.lecteurTelephones>,
+  carnetVu: CarnetVu
+) {
   const joueur = players.getPlayer(playerId)
   const perso = joueur?.characterId != null ? chars.getCharacter(joueur.characterId) : null
   const fiche = chars.campaignSheet()
@@ -727,6 +754,19 @@ function etatJoueur(playerId: number, appareils: ReturnType<typeof chasse.lecteu
         lu: x.luPar.includes(playerId)
       }))
     },
+    /*
+     * Son carnet des chasseurs : les lignes, ses marques et celles des autres
+     * présents. Rien du tout si la campagne n'a aucune ligne — pas d'onglet.
+     * `moi` : son personnage, pour reconnaître ses propres marques ; null s'il
+     * n'en a pas ou s'il n'est pas noté à la séance — le téléphone masque
+     * alors l'onglet, plutôt que de laisser marquer dans le vide.
+     */
+    carnet: carnetVu.elements.length
+      ? {
+          ...carnetVu,
+          moi: perso && carnetVu.joueurs.some((j) => j.characterId === perso.id) ? perso.id : null
+        }
+      : null,
     /*
      * Les mots que le MJ lui a glissés — à lui seul, et seulement ceux qui sont
      * partis : `motsDe` ne laisse passer ni le mot du voisin, ni celui que le
@@ -1017,6 +1057,7 @@ function router(req: IncomingMessage, res: ServerResponse): void {
     if (chemin === '/api/couleur') return void lireJson(req, res, (b) => couleur(res, url, b))
     if (chemin === '/api/pochette/lu') return void lireJson(req, res, (b) => pocheLu(res, url, b))
     if (chemin === '/api/mot/lu') return void lireJson(req, res, (b) => motLu(res, url, b))
+    if (chemin === '/api/carnet') return void lireJson(req, res, (b) => marquerCarnet(res, url, b))
     if (chemin === '/api/equiper') return void lireJson(req, res, (b) => equiper(res, url, b))
     if (chemin === '/api/poser') return void lireJson(req, res, (b) => poserRamasser(res, url, b, chasse.poserOutil, true))
     if (chemin === '/api/ramasser') return void lireJson(req, res, (b) => poserRamasser(res, url, b, chasse.ramasserOutil))
@@ -1343,6 +1384,26 @@ function motLu(res: ServerResponse, url: URL, corps: any): void {
     broadcast()
   }
   json(res, 200, { lu: true })
+}
+
+/**
+ * Une marque du carnet : le téléphone envoie l'état voulu (entouré, barré, ou
+ * rien), jamais « au suivant » — un envoi répété ne fait pas tourner deux fois.
+ * La marque est celle de son personnage ; sans personnage, pas de carnet.
+ */
+function marquerCarnet(res: ServerResponse, url: URL, corps: any): void {
+  const ap = exige(res, url)
+  if (!ap) return
+  const characterId = players.getPlayer(ap.playerId)?.characterId ?? null
+  if (characterId == null) return json(res, 403, { erreur: 'Aucun personnage ne t’est attribué.' })
+  if (!carnetChasse.estPresent(characterId))
+    return json(res, 403, { erreur: 'Ton personnage n’est pas noté à la séance.' })
+  const elementId = Number(corps.elementId)
+  const etat = corps.etat === 'entoure' || corps.etat === 'barre' ? corps.etat : corps.etat == null ? null : undefined
+  if (!Number.isFinite(elementId) || etat === undefined || !carnetChasse.marquer(characterId, elementId, etat))
+    return json(res, 400, { erreur: 'Indice inconnu.' })
+  carnetChange()
+  json(res, 200, { ok: true })
 }
 
 /**

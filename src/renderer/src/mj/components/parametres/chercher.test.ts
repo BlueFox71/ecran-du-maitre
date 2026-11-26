@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { chercher, normaliser } from './chercher'
-import { AILLEURS, REGLAGES, RUBRIQUES } from './registre'
+import { AILLEURS, REGLAGES, RUBRIQUES, cheminDe } from './registre'
 
 const sac = { nom: 'Capacité du sac', aide: 'Les places de chaque personnage', mots: ['inventaire', 'encombrement', 'charge', 'porter', 'emplacements'], chemin: 'La campagne › Règles du jeu' }
 const bascule = { nom: 'Manière de basculer, par défaut', mots: ['transition', 'fondu', 'volet'], chemin: 'La campagne › Écran des joueurs' }
@@ -61,5 +61,13 @@ describe('le registre', () => {
       expect(a.mots.length).toBeGreaterThan(0)
     }
     expect(new Set(AILLEURS.map((a) => a.id)).size).toBe(AILLEURS.length)
+  })
+  it('« phasmo » trouve les listes du carnet des chasseurs', () => {
+    const trouves = chercher(
+      REGLAGES.map((r) => ({ ...r, chemin: cheminDe(r) })),
+      'phasmo'
+    )
+    expect(trouves.map((r) => r.nom)).toContain('Indices')
+    expect(trouves.find((r) => r.nom === 'Indices')?.chemin).toBe('La campagne › Carnet des chasseurs')
   })
 })

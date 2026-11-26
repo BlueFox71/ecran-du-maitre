@@ -3639,3 +3639,126 @@ button.m-regarde-img {
   display: flex;
   justify-content: center;
 }
+
+/* ============================================================
+   Le carnet des chasseurs — entourer ou barrer, au stylo
+   ============================================================ */
+
+.m-carnet {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding-bottom: 12px;
+}
+.m-cn-titre {
+  margin: 0 0 6px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--text-dim);
+}
+.m-cn-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.m-cn-ligne {
+  width: 100%;
+  min-height: 46px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 8px 12px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 15px;
+  text-align: left;
+  -webkit-tap-highlight-color: transparent;
+}
+.m-cn-ligne:disabled {
+  opacity: 1;
+}
+/* Le mot porte la marque : un cercle doré tracé un peu de travers, ou un
+   trait rouge en travers. On doit le lire à bout de bras, dans le noir. */
+.m-cn-nom {
+  position: relative;
+  padding: 2px 8px;
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.m-cn-nom.entoure::before {
+  content: '';
+  position: absolute;
+  inset: -5px -4px;
+  border: 2.5px solid var(--brass);
+  border-radius: 50%;
+  transform: rotate(-3deg);
+  pointer-events: none;
+}
+.m-cn-nom.barre {
+  color: var(--text-faint);
+}
+.m-cn-nom.barre::after {
+  content: '';
+  position: absolute;
+  left: -2px;
+  right: -2px;
+  top: 52%;
+  height: 2.5px;
+  border-radius: 2px;
+  background: var(--blood);
+  transform: rotate(-4deg);
+  pointer-events: none;
+}
+/* Les marques des autres, à droite : une pastille par joueur, à la couleur
+   de son pion, pâle — elles renseignent sans se mêler aux siennes. */
+.m-cn-autres {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  max-width: 45%;
+}
+.m-cn-pastille {
+  position: relative;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 9.5px;
+  font-weight: 700;
+  color: var(--pion-ring);
+  opacity: 0.45;
+}
+.m-cn-pastille.entoure {
+  border: 2px solid var(--pion-ring);
+}
+.m-cn-pastille.barre {
+  background: var(--pion-fill);
+}
+.m-cn-pastille.barre::after {
+  content: '';
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: 9px;
+  height: 2px;
+  background: var(--pion-ring);
+  transform: rotate(-30deg);
+}
+.m-cn-aide {
+  margin: 0;
+  font-size: 12px;
+  color: var(--text-faint);
+  text-align: center;
+}

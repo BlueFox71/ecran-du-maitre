@@ -20,6 +20,7 @@ import { AppareilSurPlan, imageOutil } from '../shared/outilsChasse'
 import { PORTEE_RAMASSER_M, type AppareilPose, type OutilChasse, type OutilTelephone } from '@shared/chasse'
 import type { ParoleTelephone } from '@shared/parole'
 import { ObjetsDuPion, type AppareilAPortee } from './Outils'
+import { Carnet, type CarnetTel } from './Carnet'
 import { D20 } from '../shared/D20'
 import { barrieres, pasContraint, RAYON_PION, seCroisent, type Pt } from '@shared/murs'
 import { bordsOuverture } from '@shared/ouvertures'
@@ -213,6 +214,8 @@ interface Etat {
   pochette: { onglets: { id: number; nom: string; couleur?: string | null }[]; docs: DocPoche[] }
   /** Les mots du MJ, le plus récent d'abord. Absents d'un serveur plus ancien. */
   mots?: MotTel[]
+  /** Le carnet des chasseurs ; null sans aucune ligne. Absent d'un serveur plus ancien. */
+  carnet?: CarnetTel | null
   /** Ses affaires à lui, et les endroits du corps où les mettre. */
   objets: ObjetTel[]
   /** Les appareils de chasse posés dans le lieu affiché, que le plan dessine. */
@@ -293,11 +296,15 @@ interface Convive {
   appareils: number
 }
 
-type Onglet = 'fiche' | 'jet' | 'pion' | 'sac' | 'poche'
+type Onglet = 'fiche' | 'jet' | 'pion' | 'sac' | 'poche' | 'carnet'
 
 /** L'onglet d'une marque d'historique ; « outils » n'existe plus (les objets sont sur Pion). */
 const ongletDe = (v: unknown): Onglet =>
-  v === 'outils' ? 'pion' : v === 'fiche' || v === 'jet' || v === 'pion' || v === 'sac' || v === 'poche' ? v : 'fiche'
+  v === 'outils'
+    ? 'pion'
+    : v === 'fiche' || v === 'jet' || v === 'pion' || v === 'sac' || v === 'poche' || v === 'carnet'
+      ? v
+      : 'fiche'
 
 /**
  * Le bouton retour du téléphone.
@@ -900,6 +907,25 @@ function Table({
       }).catch(() => undefined)
     }
   }
+  /* Le carnet des chasseurs : seulement si la campagne en a un, et si ce
+     téléphone tient un personnage — c'est à lui que vont les marques. */
+  const avecCarnet = !!etat.carnet && etat.carnet.moi != null
+  useEffect(() => {
+    if (onglet === 'carnet' && !avecCarnet) setOnglet('fiche', true)
+  }, [onglet, avecCarnet, setOnglet])
+  const marquerCarnet = async (elementId: number, voulu: 'entoure' | 'barre' | null): Promise<string | null> => {
+    try {
+      const r = await fetch(`${API}/api/carnet?t=${encodeURIComponent(jeton)}`, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ elementId, etat: voulu })
+      })
+      if (r.ok) return null
+      return ((await r.json().catch(() => null)) as { erreur?: string } | null)?.erreur ?? 'La marque n’est pas passée.'
+    } catch {
+      return 'Le poste du MJ ne répond pas.'
+    }
+  }
   return (
     <div className="m-app">
       <header className="m-tete" style={teinte(etat.joueur?.couleur ?? null)}>
@@ -955,6 +981,9 @@ function Table({
         {onglet === 'pion' && <Plan etat={etat} jeton={jeton} ondes={ondes} />}
         {onglet === 'sac' && <Sac etat={etat} jeton={jeton} />}
         {onglet === 'poche' && <Poche etat={etat} jeton={jeton} onMot={ouvrirMot} />}
+        {onglet === 'carnet' && avecCarnet && etat.carnet ? (
+          <Carnet carnet={etat.carnet} lectureSeule={!!etat.spectateur} onMarquer={marquerCarnet} />
+        ) : null}
       </main>
 
       {mot ? <LireMot mot={mot} onClose={() => setMotOuvert(null)} /> : null}
@@ -962,14 +991,16 @@ function Table({
       <nav className="m-onglets" role="tablist">
         {/* Un spectateur ne jette pas de dés : pas d'onglet Jet. */}
         {(etat.spectateur
-          ? (['fiche', 'pion', 'sac', 'poche'] as Onglet[])
-          : (['fiche', 'jet', 'pion', 'sac', 'poche'] as Onglet[])
-        ).map((o) => (
+          ? (['fiche', 'pion', 'sac', 'poche', 'carnet'] as Onglet[])
+          : (['fiche', 'jet', 'pion', 'sac', 'poche', 'carnet'] as Onglet[])
+        )
+          .filter((o) => o !== 'carnet' || avecCarnet)
+          .map((o) => (
           <button key={o} role="tab" aria-selected={onglet === o} onClick={() => setOnglet(o)}>
             <span className="m-ic" aria-hidden="true">
-              {{ fiche: '▤', jet: '⬢', pion: '◉', sac: '▦', poche: '✉' }[o]}
+              {{ fiche: '▤', jet: '⬢', pion: '◉', sac: '▦', poche: '✉', carnet: '✎' }[o]}
             </span>
-            {{ fiche: 'Fiche', jet: 'Jet', pion: 'Pion', sac: 'Sac', poche: 'Pochette' }[o]}
+            {{ fiche: 'Fiche', jet: 'Jet', pion: 'Pion', sac: 'Sac', poche: 'Pochette', carnet: 'Carnet' }[o]}
             {/* Un point, pas un compte : à la table on veut savoir qu'il s'est
                 passé quelque chose, pas combien de fois. */}
             {o === 'poche' && (etat.pochette.docs.some((d) => !d.lu) || enAttente.length > 0) ? (
