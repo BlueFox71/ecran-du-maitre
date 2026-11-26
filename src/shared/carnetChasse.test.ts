@@ -10,11 +10,12 @@ describe('marqueSuivante', () => {
 })
 
 describe('listes de départ', () => {
-  it('les 12 indices et les 18 entités du livre, dans leur ordre', () => {
-    expect(INDICES_DEPART).toHaveLength(12)
+  it('les 9 indices et les 18 entités du livre, dans leur ordre', () => {
+    expect(INDICES_DEPART).toHaveLength(9)
     expect(ENTITES_DEPART).toHaveLength(18)
     expect(INDICES_DEPART[0]).toBe('EMF élevé')
-    expect(INDICES_DEPART.at(-1)).toBe('Objets manipulés ou lancés')
+    expect(INDICES_DEPART.at(-1)).toBe('Polaroïd / miroir')
+    expect(INDICES_DEPART).not.toContain('Détecteur de mouvement')
     expect(ENTITES_DEPART[0]).toBe('Fantôme')
     expect(ENTITES_DEPART.at(-1)).toBe('Démon')
   })

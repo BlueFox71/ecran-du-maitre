@@ -48,17 +48,17 @@ Tirées du livre de la séance 5 (`Séance 5 - Le Jardin de Jade\MJ\livre_fantom
 validées par Jules le 26/11/2026. Le livre est en cours de remise en cohérence avec ces
 indices, en parallèle (une autre session) : les noms ci-dessous font foi.
 
-**Indices (12), dans cet ordre :**
+**Indices (9), dans cet ordre :**
 EMF élevé · Spirit Box · Températures glaciales · Empreintes UV · Traces dans le sel ·
-Orbes sur caméra · Écriture automatique · Planche Ouija · Voix et murmures ·
-Détecteur de mouvement · Polaroïd / miroir · Objets manipulés ou lancés
+Orbes sur caméra · Écriture automatique · Planche Ouija · Polaroïd / miroir
 
 **Entités (18), dans l'ordre du livre :**
 Fantôme · Esprit · Poltergeist · Ombre · Revenant · Banshee · Spectre · Djinn · Yurei ·
 Oni · Yokai · Hantu · Goryo · Onryo · Les Jumeaux · Obake · Deogen · Démon
 
 « Apparition visible » et « Chute rapide de santé mentale » ont été écartés exprès : ce
-ne sont pas des indices.
+ne sont pas des indices. Le 27/11, « Détecteur de mouvement », « Voix et murmures » et
+« Objets manipulés ou lancés » ont été retirés à leur tour.
 
 ## Ce qui est décidé de la forme
 
