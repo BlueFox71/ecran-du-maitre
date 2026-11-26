@@ -28457,3 +28457,12 @@ button.at-titre:hover {
   gap: 6px;
   margin-top: 4px;
 }
+
+/* La fenêtre de chasse sur le grand visuel du Paravent : posée par-dessus la
+   carte, sans lui voler la souris. */
+.pu-fenetre-chasse {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+}

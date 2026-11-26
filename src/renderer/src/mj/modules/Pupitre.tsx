@@ -83,6 +83,7 @@ import { estPresente, presenterLeJoueur } from '../presentation'
 import { montreLaCarte } from '@shared/scene'
 import { PanneauSons, useSonsSurCarte, useTouchesSon } from '../components/PanneauSons'
 import { colorFor, etatSuivant } from '@shared/types'
+import { FenetreChasseVue } from '../../shared/chasse/FenetreChasse'
 
 /* ============================================================
    Pupitre : le fil de la séance à gauche, l'écran des
@@ -1627,6 +1628,14 @@ export function Pupitre(): JSX.Element {
                   onChoisirArticle={choisirArticle}
                   articlesMj={articlesScene}
                 />
+                {/* Le livre, la planche ou le tarot montrés à la table : la même
+                    fenêtre qu'eux, par-dessus la carte. Elle ne prend pas la
+                    souris : le MJ garde la main sur la carte dessous. */}
+                {display?.fenetreChasse ? (
+                  <div className="pu-fenetre-chasse">
+                    <FenetreChasseVue f={display.fenetreChasse} />
+                  </div>
+                ) : null}
               </div>
             </div>
             <span className={`big-badge live-pill ${pillClass}`}>
