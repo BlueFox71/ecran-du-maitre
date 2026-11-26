@@ -308,9 +308,17 @@ function Livre({ o, bloque, apercuIci }: { o: Objet; bloque: string | null; aper
   }
   const ecrire = async (t: TextePrepare): Promise<string | null> => {
     const r = await lancerEcriture(o.id, { ...t, ...main })
-    if (!r) setVu(null)
+    if (!r) {
+      setVu(null)
+      /* Ce qui vient d'être écrit : le livre de la page le trace aussitôt. */
+      setPages(await window.jdr.parole.pages(o.id))
+    }
     return r
   }
+  /* Sur la page Outils de chasse, le livre se montre tel qu'il est : on relit ses pages en arrivant. */
+  useEffect(() => {
+    if (apercuIci) void window.jdr.parole.pages(o.id).then(setPages)
+  }, [o.id, apercuIci])
 
   return (
     <div className="ap-corps">
@@ -368,9 +376,11 @@ function Livre({ o, bloque, apercuIci }: { o: Objet; bloque: string | null; aper
           « Écrire ». « Voir » à nouveau pour le fermer.
         </p>
       ) : null}
-      {apercuIci && apercu ? (
-        <div className="ap-apercu-ici">
-          <FenetreChasseVue f={apercu} />
+      {/* Sur la page Outils de chasse : le livre tel qu'il est (ce qui s'y écrit
+          se trace en direct), ou l'aperçu quand on regarde un texte en avance. */}
+      {apercuIci ? (
+        <div className={`ap-apercu-ici${apercu ? ' apercu' : ''}`}>
+          <FenetreChasseVue f={apercu ?? { sorte: 'livre', objetId: o.id, nom: o.nom, pages }} />
         </div>
       ) : null}
     </div>
