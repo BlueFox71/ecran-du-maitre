@@ -3781,7 +3781,10 @@ button.m-regarde-img {
 .m-cn-indices .m-cn-ligne,
 .m-cn-entites .m-cn-ligne {
   border-left: 3px solid var(--liste);
-  background: linear-gradient(90deg, var(--liste-wash), var(--surface) 60%);
+  /* Le « wash » de l'azur est presque la couleur du fond : on mélange la
+     teinte elle-même, assez pour qu'elle se voie. Le wash reste en secours. */
+  background: linear-gradient(90deg, var(--liste-wash), var(--surface) 70%);
+  background: linear-gradient(90deg, color-mix(in srgb, var(--liste) 24%, var(--surface)), var(--surface) 70%);
 }
 /* Sur une tablette, une ligne sur toute la largeur se lit mal : chaque liste
    passe en deux colonnes, remplies dans l'ordre de lecture, ligne à ligne. */
