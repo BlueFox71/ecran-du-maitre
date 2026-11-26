@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import type { Construction } from './atelier'
 import {
   gainSon,
+  grilleTemperatures,
   mesureSous,
   niveauEmfSous,
   pionSurPlan,
@@ -91,5 +92,49 @@ describe('pionSurPlan', () => {
   })
   it('écran plus haut que la carte', () => {
     expect(pionSurPlan({ x: 0.5, y: 0.75 }, 2, 1)).toEqual({ x: 0.5, y: 1 })
+  })
+})
+
+describe('pinceau relatif (réchauffer, refroidir)', () => {
+  const ecart = (e: number, pts: [number, number][], rayon = 1): TraitMesure => ({
+    id: String(Math.random()),
+    valeur: null,
+    ecart: e,
+    rayon,
+    pts
+  })
+  it("s'ajoute à l'ambiante, là où rien n'est peint", () => {
+    expect(temperatureSous(constr({ ambiante: 12, temperature: [ecart(-3, [[1, 1]])] }), [1, 1])).toBe(9)
+    expect(temperatureSous(constr({ ambiante: 12, temperature: [ecart(-3, [[1, 1]])] }), [4, 4])).toBe(12)
+  })
+  it("s'ajoute à la température peinte dessous, et les passages se cumulent", () => {
+    const t = [trait(5, [[1, 1]]), ecart(2, [[1, 1]]), ecart(2, [[1, 1]]), ecart(-1, [[1, 1]])]
+    expect(temperatureSous(constr({ ambiante: 12, temperature: t }), [1, 1])).toBe(8)
+  })
+  it('un même trait ne compte qu’une fois, même si ses points se chevauchent', () => {
+    const t = [ecart(2, [[1, 1], [1.2, 1], [1.4, 1]])]
+    expect(temperatureSous(constr({ ambiante: 10, temperature: t }), [1.2, 1])).toBe(12)
+  })
+  it('repeindre une température par-dessus efface les écarts dessous', () => {
+    const t = [ecart(5, [[1, 1]]), trait(0, [[1, 1]])]
+    expect(temperatureSous(constr({ ambiante: 10, temperature: t }), [1, 1])).toBe(0)
+  })
+  it('après la gomme, on repart de l’ambiante', () => {
+    const t = [trait(30, [[1, 1]]), trait(null, [[1, 1]]), ecart(-4, [[1, 1]])]
+    expect(temperatureSous(constr({ ambiante: 10, temperature: t }), [1, 1])).toBe(6)
+  })
+  it('reste dans les bornes, passage après passage', () => {
+    const t = [trait(33, [[1, 1]]), ecart(5, [[1, 1]]), ecart(-5, [[1, 1]])]
+    expect(temperatureSous(constr({ ambiante: 10, temperature: t }), [1, 1])).toBe(30)
+  })
+  it('la grille donne la même chose que la lecture point par point', () => {
+    const t = [trait(5, [[2, 2]], 1.5), ecart(3, [[3, 2], [4, 2]], 1), trait(null, [[2, 3]], 0.5), ecart(-2, [[2, 2]], 2)]
+    const k = 4
+    const g = grilleTemperatures(t, 6, 5, 12, k)
+    for (let j = 0; j < 5 * k; j++)
+      for (let i = 0; i < 6 * k; i++) {
+        const p: [number, number] = [(i + 0.5) / k, (j + 0.5) / k]
+        expect(g.valeurs[j * g.l + i]).toBe(temperatureSous(constr({ ambiante: 12, temperature: t }), p))
+      }
   })
 })

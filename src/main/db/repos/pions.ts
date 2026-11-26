@@ -11,9 +11,8 @@ import type { Pion, PionsDuLieu } from '@shared/types'
  * image de la bibliothèque.
  */
 
-/** Couleur déduite de l'identifiant : deux pions voisins ne se ressemblent pas. */
-const PALETTE = ['brass', 'moss', 'iris', 'blood', 'neutral']
-export const colorFor = (n: number): string => PALETTE[Math.abs(n) % PALETTE.length]
+import { colorFor } from '@shared/types'
+export { colorFor }
 
 export function initialsOf(name: string): string {
   return name

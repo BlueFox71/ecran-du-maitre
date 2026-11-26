@@ -2102,5 +2102,18 @@ export const MIGRATIONS: Migration[] = [
     ALTER TABLE objet ADD COLUMN outil TEXT;
     ALTER TABLE objet_placement ADD COLUMN pose_par INTEGER REFERENCES character(id) ON DELETE SET NULL;
     `
+  },
+  {
+    id: 98,
+    sql: `
+    /* Les mots du MJ appartiennent à une séance : le téléphone ne montre que
+       ceux de la séance en cours, plus ceux d'une soirée passée. Un mot posé
+       sur un moment prend la séance de ce moment ; un mot sans moment, écrit
+       avant ce changement, n'en a pas et ne revient plus chez les joueurs. */
+    ALTER TABLE mot ADD COLUMN session_id INTEGER REFERENCES game_session(id) ON DELETE CASCADE;
+    UPDATE mot SET session_id = (SELECT b.session_id FROM beat b WHERE b.id = mot.beat_id)
+     WHERE beat_id IS NOT NULL;
+    CREATE INDEX idx_mot_session ON mot(session_id, player_id, envoye_at);
+    `
   }
 ]

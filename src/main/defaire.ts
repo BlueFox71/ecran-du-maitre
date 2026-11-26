@@ -73,8 +73,17 @@ const MODULES: Record<string, string> = {
 
 /** Hors de ces modules, quelques canaux suivis un à un, et leur nom. */
 const CANAUX_SUIVIS: Record<string, string> = {
-  'pochette:removeOnglet': 'Onglet de la Pochette'
+  'pochette:removeOnglet': 'Onglet de la Pochette',
+  /* Les zones de chasse peintes depuis le plan : l'atelier, lui, garde son
+     propre historique, local au chantier. */
+  'atelier:mesures': 'Zones de chasse'
 }
+
+/**
+ * Des canaux dont chaque échange est un geste entier — un trait de pinceau :
+ * deux traits rapprochés restent deux pas, pas une rafale.
+ */
+const CANAUX_SANS_RAFALE = new Set(['atelier:mesures'])
 
 /**
  * Dans ces modules, les canaux qui relèvent du jeu ou de la séance et non de
@@ -230,7 +239,7 @@ const recolter = (): string[] => {
 const suivi = (canal: string): boolean =>
   canal in CANAUX_SUIVIS || (canal.split(':')[0] in MODULES && !CANAUX_HORS.has(canal))
 
-function noterPas(libelle: string, sqls: string[]): void {
+function noterPas(libelle: string, sqls: string[], rafale = true): void {
   const utiles = sqls.filter((q) => !INVERSES_DU_JEU.some((r) => r.test(q)))
   if (!utiles.length) return
   pileRefaire = []
@@ -243,6 +252,7 @@ function noterPas(libelle: string, sqls: string[]): void {
   const dernier = pileDefaire[pileDefaire.length - 1]
   const memes = cases(utiles)
   if (
+    rafale &&
     dernier?.quand &&
     maintenant - dernier.quand < RAFALE_MS &&
     memes !== null &&
@@ -268,7 +278,7 @@ export function envelopper<R>(canal: string, fn: () => R): R {
   const fin = (): void => {
     actifs = Math.max(0, actifs - 1)
     if (actifs === 0) activer(false)
-    noterPas(libelle, recolter())
+    noterPas(libelle, recolter(), !CANAUX_SANS_RAFALE.has(canal))
   }
   try {
     const r = fn()

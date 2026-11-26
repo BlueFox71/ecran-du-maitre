@@ -861,6 +861,18 @@ function nomsDesObjets(): Map<number, string> {
   return new Map(rows.map((r) => [r.i, r.nom]))
 }
 
+/**
+ * La taille d'un pion, en pour cent de la largeur **de la carte**, comme la
+ * table la montre. À la table, elle se compte en largeur d'écran : quand la
+ * carte n'occupe pas toute la largeur (des bandes à gauche et à droite), un
+ * pion y pèse plus lourd par rapport à elle.
+ */
+export function pionSurLaCarte(pourcentEcran: number, w: number | null, h: number | null): number {
+  if (!w || !h) return pourcentEcran
+  const part = Math.min(1, w / h / display.ratioEcran())
+  return pourcentEcran / part
+}
+
 function lieuVu(id: number): {
   id: number
   nom: string
@@ -868,6 +880,8 @@ function lieuVu(id: number): {
   w: number | null
   h: number | null
   allure: number
+  pion: number
+  metres: number
 } {
   const r = getDb()
     .prepare(
@@ -896,7 +910,10 @@ function lieuVu(id: number): {
     w: r?.w ?? null,
     h: r?.h ?? null,
     /* L'allure du pouce sur ce plan : réglée par le MJ dans l'éditeur. */
-    allure: echelleDe(id).allure
+    allure: echelleDe(id).allure,
+    pion: pionSurLaCarte(echelleDe(id).pionPourcent, r?.w ?? null, r?.h ?? null),
+    /* La largeur du plan en mètres : la portée de ramassage s'y mesure. */
+    metres: chasse.metresDuLieu(id)
   }
 }
 

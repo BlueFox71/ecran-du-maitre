@@ -51,6 +51,23 @@ export function de(placeId: number): Construction | null {
   return getConstruction(placeId)
 }
 
+/** Ce que lisent les outils de chasse : les zones peintes et la température ambiante. */
+export type Mesures = Pick<Construction, 'emf' | 'temperature' | 'ambiante'>
+
+/**
+ * Repeindre les zones d'EMF et de température depuis le plan du lieu, sans
+ * repasser par l'atelier : seuls ces calques changent. Ils ne se voient sur
+ * aucune image, rien n'est donc à redessiner ni à recaler.
+ */
+export function peindreMesures(placeId: number, m: Mesures): Mesures {
+  const c = getConstruction(placeId)
+  if (!c) throw new Error('Ce lieu ne sort pas de l’atelier')
+  const { emf: _e, temperature: _t, ambiante: _a, ...reste } = c
+  const neuve = lireConstruction({ ...reste, emf: m.emf, temperature: m.temperature, ambiante: m.ambiante })
+  setConstruction(placeId, neuve)
+  return { emf: neuve.emf, temperature: neuve.temperature, ambiante: neuve.ambiante }
+}
+
 const CADRE_IDENTITE: Cadre = { x: 0, y: 0, w: 1, h: 1 }
 
 /**

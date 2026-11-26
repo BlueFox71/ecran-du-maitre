@@ -25,6 +25,7 @@ import type {
 } from '@shared/types'
 import { urlPortraitMj } from './avatarsMj'
 import { AppareilSurPlan } from './outilsChasse'
+import type { OutilChasse } from '@shared/chasse'
 import { EcranStats } from './EcranStats'
 import { modificateur, signe } from '@shared/jet'
 
@@ -124,6 +125,10 @@ export interface ObjetSurCarte {
   cadre?: CadreCarre | null
   /** Survolé dans la fiche du lieu : il se montre, et ressort. */
   vise?: boolean
+  /** Un appareil de chasse : dessiné vu de dessus avec sa lueur, pas en vignette recadrée. */
+  outil?: OutilChasse
+  /** La couleur du pion de celui qui l'a posé : un disque derrière l'appareil. */
+  couleur?: string
 }
 
 /**
@@ -1746,7 +1751,15 @@ export function Framed({
                   <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
                     {(() => {
                       const a = chasse?.find((x) => x.placementId === o.id)
-                      return <AppareilSurPlan outil={o.outil} valeur={a?.valeur ?? 0} allume={a?.allume ?? false} taille={r * 6} />
+                      return (
+                        <AppareilSurPlan
+                          outil={o.outil}
+                          valeur={a?.valeur ?? 0}
+                          allume={a?.allume ?? false}
+                          taille={r * 6}
+                          couleur={o.couleur}
+                        />
+                      )
                     })()}
                   </div>
                 </foreignObject>
@@ -1985,13 +1998,31 @@ export function Framed({
                 {o.vise ? <circle className="halo-vise" r={o.image ? r * 4.8 : r * 2.6} strokeWidth={ep * 1.2} /> : null}
                 {/* Un losange de quelques pixels s'attrape mal : la prise est plus large. */}
                 {onDeplacerObjet ? <circle className="prise" r={o.image ? r * 3.8 : r * 2.4} /> : null}
-                {o.image ? (
+                {o.outil ? (
+                  /* Un appareil de chasse : vu de dessus, avec sa lueur, comme à la table. */
+                  <foreignObject x={-r * 8} y={-r * 8} width={r * 16} height={r * 16} style={{ overflow: 'visible' }}>
+                    <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                      {(() => {
+                        const a = chasse?.find((x) => x.placementId === o.id)
+                        return (
+                          <AppareilSurPlan
+                            outil={o.outil}
+                            valeur={a?.valeur ?? 0}
+                            allume={a?.allume ?? false}
+                            taille={r * 6}
+                            couleur={o.couleur}
+                          />
+                        )
+                      })()}
+                    </div>
+                  </foreignObject>
+                ) : o.image ? (
                   <ImageObjetCarte url={o.image} cadre={o.cadre ?? null} cote={r * 7} />
                 ) : (
                   <path d={`M0 ${-r}L${r} 0L0 ${r}L${-r} 0Z`} strokeWidth={ep * 0.9} />
                 )}
                 <text
-                  y={o.image ? r * 3.8 : r * 1.4}
+                  y={o.outil ? r * 3.4 : o.image ? r * 3.8 : r * 1.4}
                   textAnchor="middle"
                   dominantBaseline="hanging"
                   fontSize={Math.max(9, w * 0.011)}

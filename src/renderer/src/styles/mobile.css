@@ -888,6 +888,25 @@ img {
  * elle n'en laisse voir que ce que son personnage voit, alors ce qui reste
  * clair mérite d'être regardé — c'est la carte de la table, pas un fond.
  */
+/* Le contenu du plan, que les doigts agrandissent et déplacent ensemble. */
+.m-plan-zoom {
+  position: absolute;
+  inset: 0;
+  transform-origin: 0 0;
+}
+/* Agrandi : un bouton pour revenir à la carte entière. */
+.m-plan-entier {
+  position: absolute;
+  z-index: 6;
+  top: 6px;
+  right: 6px;
+  padding: 5px 10px;
+  border-radius: 99px;
+  border: 1px solid var(--line);
+  background: color-mix(in srgb, var(--surface) 88%, transparent);
+  color: var(--text);
+  font-size: 12px;
+}
 .m-plan-fond {
   position: absolute;
   inset: 0;
@@ -895,6 +914,10 @@ img {
   height: 100%;
   object-fit: cover;
   pointer-events: none;
+  /* Un calque d'affichage à elle (comme l'ombre, les portes, les objets et
+     chaque pion) : un pion qui marche ne fait plus repeindre ce qu'il
+     survole. Safari, sur iPad, repeignait l'ombre entière à chaque pas. */
+  will-change: transform;
 }
 
 /* L'ombre des murs se colle sur la carte, et ne prend aucun doigt. */
@@ -902,6 +925,7 @@ img {
   position: absolute;
   inset: 0;
   pointer-events: none;
+  will-change: transform;
 }
 /* Les portes, sous l'ombre : on ne voit que celles que son personnage voit. */
 .m-portes {
@@ -910,6 +934,7 @@ img {
   width: 100%;
   height: 100%;
   pointer-events: none;
+  will-change: transform;
 }
 .m-portes line {
   stroke-linecap: round;
@@ -938,6 +963,19 @@ img {
   stroke: #f0e8d6;
 }
 /* L'image de l'objet trouvé, dans un carré arrondi cerclé de clair. */
+/* Les images d'objets et les appareils posés, en HTML sur la carte. */
+.m-objets-html {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+}
+.m-objet-pose {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
 .m-objet-img {
   position: relative;
   width: 100%;
@@ -993,6 +1031,11 @@ img {
   /* L'ombre déborde de l'image de quelques pixels (voir Brouillard.tsx). */
   overflow: visible;
 }
+/* L'ombre en canvas (iPad, iPhone) : une image de quelques centaines de
+   pixels, agrandie en douceur sur toute la carte. */
+.brouillard-toile {
+  image-rendering: auto;
+}
 /* Ce qu'il n'a jamais vu : du noir, pas une teinte. Un joueur ne devine pas
    le plan d'une pièce où son personnage n'est jamais entré. */
 .br-noir {
@@ -1014,9 +1057,13 @@ img {
 }
 .m-pion {
   position: absolute;
-  width: 40px;
-  height: 40px;
-  margin: -20px 0 0 -20px;
+  /* `--d` : le diamètre, à l'échelle de la table (40 px d'un serveur plus ancien). */
+  width: var(--d, 40px);
+  height: var(--d, 40px);
+  margin: calc(var(--d, 40px) / -2) 0 0 calc(var(--d, 40px) / -2);
+  /* Le plan agrandi aux doigts : le pion garde sa taille à l'écran. */
+  transform: scale(var(--k, 1));
+  will-change: transform;
   border-radius: 50%;
   /* Le nez et la barre des inconscients sortent du jeton : c'est voulu, et
      c'est ce que fait l'écran de la table. Le portrait, lui, reste rond. */
@@ -1044,6 +1091,17 @@ img {
   height: 100%;
   object-fit: cover;
   border-radius: 50%;
+}
+/* Trop petit pour un portrait : un point plein de sa couleur, liseré sombre. */
+.m-pion.m-point {
+  border: 1.5px solid rgba(8, 12, 15, 0.85);
+  background: var(--pion-ring, var(--text-faint));
+}
+.m-point .m-nez::after {
+  margin-bottom: 1px;
+  border-left-width: 3px;
+  border-right-width: 3px;
+  border-bottom-width: 5px;
 }
 .m-mien {
   opacity: 1;
@@ -1132,7 +1190,7 @@ img {
  */
 .m-pupitre {
   display: grid;
-  /* Le disque reste au centre ; le levier se range dans la colonne de droite. */
+  /* Le disque reste au centre. */
   grid-template-columns: 1fr auto 1fr;
   align-items: center;
   justify-items: center;
@@ -1763,8 +1821,16 @@ img {
      — dans un inventaire : la mousse. */
 .m-grille {
   display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
+  /* Trois de front sur un téléphone : quatre, la case était trop étroite pour
+     un nom comme « Thermomètre ». */
+  grid-template-columns: repeat(3, minmax(0, 1fr));
   gap: 6px;
+}
+/* Un grand téléphone, ou une tablette en portrait étroit : quatre. */
+@media (min-width: 520px) {
+  .m-grille {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
 }
 /* Sur une tablette, huit de front : la place est là, autant voir tout le sac. */
 @media (min-width: 700px) {
@@ -1814,6 +1880,15 @@ img {
   border: 1px solid color-mix(in srgb, var(--genre) 55%, transparent);
   border-radius: 8px;
 }
+/* Une case vide, quand il n'y a rien : un emplacement libre, en pointillés. */
+.m-carte.m-carte-vide {
+  background: transparent;
+  border-style: dashed;
+  opacity: 0.55;
+}
+.m-carte-vide .m-carte-img {
+  background: transparent;
+}
 .m-carte-img {
   position: relative;
   display: grid;
@@ -1828,9 +1903,25 @@ img {
   opacity: 1;
 }
 .m-carte-img > img {
+  /* Calée sur toute la case : dans un bouton, certains navigateurs (la
+     tablette) ignorent le `height: 100%` d'une image, qui gardait alors sa
+     hauteur à elle et se faisait couper. */
+  position: absolute;
+  inset: 0;
   width: 100%;
   height: 100%;
   object-fit: cover;
+}
+.m-carte-img > img.m-carte-outil {
+  /* Calée sur toute la case plutôt que par la grille du bouton : certains
+     navigateurs (la tablette) ne donnent pas sa hauteur à l'image dans un
+     bouton, et elle se collait en haut. Ainsi elle est centrée partout. */
+  position: absolute;
+  inset: 4px 0;
+  width: 100%;
+  height: calc(100% - 8px);
+  object-fit: contain;
+  object-position: center;
 }
 .m-carte-init {
   font-family: 'Fraunces Variable', Georgia, serif;
@@ -1849,14 +1940,15 @@ img {
   font-weight: 600;
 }
 .m-carte-nom {
+  /* Collé au geste, en pied de carte : les noms s'alignent d'une carte à l'autre. */
+  margin-top: auto;
   padding-inline: 1px;
   font-size: 11.5px;
   line-height: 1.2;
+  /* Sur une ligne ; un nom trop long finit en « … ». */
+  white-space: nowrap;
   overflow: hidden;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  word-break: break-word;
+  text-overflow: ellipsis;
 }
 .m-carte-ou {
   padding-inline: 1px;
@@ -1871,7 +1963,6 @@ img {
 }
 /* Le geste en pied de carte, toujours à la même hauteur d'une carte à l'autre. */
 .m-carte-action {
-  margin-top: auto;
   width: 100%;
   padding: 6px 2px;
   border-radius: 99px;
@@ -2036,6 +2127,28 @@ img {
 /* --- un inventaire ouvert : le camion, la malle ------------------------- */
 /* Un cadre laiton, à part du sac : ce qui est dedans n'est à personne tant
    qu'on ne l'a pas pris. */
+/* La page Sac tient dans l'écran : ce qu'on porte et le sac en haut, les
+   inventaires dessous, qui défilent seuls dans la place qui reste. Si le haut
+   prend trop de place, la page défile quand même (l'inventaire garde 200 px). */
+.m-vue-sac {
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 17px;
+}
+.m-vue-sac > * {
+  flex: none;
+}
+.m-vue-sac > .m-sac-invs {
+  flex: 1 1 0;
+  min-height: 200px;
+  overflow-y: auto;
+  -webkit-overflow-scrolling: touch;
+  overscroll-behavior: contain;
+  display: grid;
+  gap: 12px;
+  align-content: start;
+}
 .m-inv {
   display: grid;
   gap: 9px;
@@ -2981,88 +3094,6 @@ button.m-regarde-img {
   }
 }
 
-/* « Regarder où je marche » : un levier vertical à droite du disque — une
-   boussole, l'interrupteur debout (en haut : il suit), et un mot dessous. */
-.m-levier {
-  justify-self: start;
-  display: grid;
-  justify-items: center;
-  gap: 6px;
-  margin-left: 14px;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.m-levier-icone {
-  width: 18px;
-  height: 18px;
-  fill: none;
-  stroke: var(--text-faint);
-  stroke-width: 1.8;
-}
-.m-levier-icone path {
-  fill: var(--text-faint);
-  stroke: none;
-}
-.m-levier.on .m-levier-icone {
-  stroke: var(--brass);
-}
-.m-levier.on .m-levier-icone path {
-  fill: var(--brass);
-}
-.m-levier-switch {
-  appearance: none;
-  -webkit-appearance: none;
-  position: relative;
-  width: 22px;
-  height: 40px;
-  margin: 0;
-  border-radius: 99px;
-  background: var(--line);
-  transition: background 0.18s ease;
-  cursor: pointer;
-}
-.m-levier-switch::after {
-  content: '';
-  position: absolute;
-  left: 3px;
-  bottom: 3px;
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  background: var(--text-dim);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
-  transition:
-    transform 0.18s ease,
-    background 0.18s ease;
-}
-.m-levier-switch:checked {
-  background: var(--brass);
-}
-.m-levier-switch:checked::after {
-  transform: translateY(-18px);
-  background: #fff;
-}
-.m-levier-switch:focus-visible {
-  outline: 2px solid var(--brass-ink);
-  outline-offset: 2px;
-}
-.m-levier-dit {
-  font-family: 'IBM Plex Mono', ui-monospace, monospace;
-  font-size: 9.5px;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--text-faint);
-}
-.m-levier.on .m-levier-dit {
-  color: var(--brass-ink);
-}
-@media (prefers-reduced-motion: reduce) {
-  .m-levier-switch,
-  .m-levier-switch::after {
-    transition: none;
-  }
-}
-
 /* --- Fiche : la biographie ------------------------------------------------- */
 .m-bio-bouton {
   justify-self: start;
@@ -3251,61 +3282,243 @@ button.m-regarde-img {
   font-weight: 700;
   font-display: swap;
 }
-.m-outils {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
+/* --- Pion : mes objets ------------------------------------------------------
+   Au téléphone, une bande sous le plan qui défile de côté ; à la tablette en
+   paysage, une colonne à droite du plan (voir plus bas). */
+.m-objets-pion {
+  display: grid;
+  gap: 6px;
+  min-width: 0;
 }
-.m-outil-ligne {
+.m-op-liste {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scroll-snap-type: x mandatory;
+  padding-bottom: 2px;
+  scrollbar-width: none;
+}
+.m-op-liste::-webkit-scrollbar {
+  display: none;
+}
+.m-op-carte {
+  flex: none;
+  /* Taille fixe : allumer, éteindre ou changer de mesure ne fait rien bouger. */
+  width: min(270px, 80vw);
+  height: 88px;
+  overflow: hidden;
   display: flex;
   align-items: center;
-  gap: 12px;
-  width: 100%;
-  padding: 8px 12px;
-  text-align: left;
-  color: var(--text);
+  gap: 8px;
+  padding: 7px 8px;
   background: var(--surface);
   border: 1px solid var(--line-soft);
-  border-radius: 10px;
+  border-radius: 12px;
+  scroll-snap-align: start;
 }
-.m-outil-ligne.pose {
-  opacity: 0.8;
+.m-op-carte.pose {
+  /* Même taille que les autres : seul le liseré dit qu'il est posé. */
+  border-style: dashed;
 }
-.m-outil-img {
+.m-op-ouvrir {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 0;
+  text-align: left;
+  color: var(--text);
+  background: none;
+  border: 0;
+}
+.m-op-img {
   flex: none;
-  width: 44px;
-  height: 56px;
+  width: 34px;
+  height: 46px;
   display: grid;
   place-items: center;
 }
-.m-outil-img img {
+.m-op-img img {
   max-width: 100%;
   max-height: 100%;
   object-fit: contain;
 }
-.m-outil-texte {
+.m-op-texte {
   flex: 1;
   min-width: 0;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  font-size: 12px;
+  gap: 3px;
+  font-size: 11.5px;
   color: var(--text-faint);
 }
-.m-outil-texte b {
-  font-size: 14px;
-  color: var(--text);
+.m-op-texte small {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.m-outil-valeur {
+.m-op-texte b {
+  font-size: 13.5px;
   color: var(--text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.m-op-leds {
+  display: flex;
+  gap: 4px;
+}
+.m-op-leds i {
+  width: 9px;
+  height: 9px;
+  border-radius: 50%;
+  background: #2a3236;
+}
+.m-op-lu {
+  white-space: nowrap;
+  color: var(--text);
+  font-size: 15px;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.m-op-degres.froid {
+  color: #9cc8ff;
+}
+.m-op-actions {
+  flex: none;
+  display: grid;
+  gap: 5px;
+  /* Une colonne de boutons de largeur fixe : « Allumer », « Éteindre », « Poser »
+     ou « Ramasser », la carte garde la même place pour son texte. */
+  width: 7.4em;
+}
+.m-op-actions .m-op-btn {
+  width: 100%;
+}
+.m-op-btn {
+  min-width: 40px;
+  min-height: 34px;
+  padding: 5px 9px;
+  border-radius: 8px;
+  border: 1px solid var(--line);
+  background: var(--raised);
+  color: var(--text);
+  font-size: 13px;
+  white-space: nowrap;
+}
+.m-op-btn.m-op-marche.on {
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+  color: var(--brass-ink);
+}
+.m-op-btn:disabled {
+  opacity: 0.5;
+}
+.m-op-marche {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+}
+.m-op-icone {
+  width: 15px;
+  height: 15px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.4;
+  stroke-linecap: round;
+}
+/* Un appareil posé à portée de main : on le voit, on peut le prendre. */
+.m-op-carte.pose.proche {
+  opacity: 1;
+  border-style: solid;
+  border-color: var(--brass-line);
+}
+.m-op-ramasser {
+  flex: none;
+  width: 7.4em;
+  border-color: var(--brass-line);
+  background: var(--brass-wash);
+  color: var(--brass-ink);
   font-weight: 600;
 }
-.m-outil-page {
+/* Les mots des boutons ne tiennent qu'à la tablette. */
+.m-op-dit {
+  display: none;
+}
+/* L'appareil en grand, par-dessus la page ; le retour le referme. */
+.m-op-grand {
+  position: fixed;
+  inset: 0;
+  z-index: 40;
   display: flex;
   flex-direction: column;
   align-items: center;
   gap: 12px;
+  padding: 15px 15px 24px;
+  overflow-y: auto;
+  background: var(--ground);
 }
+.m-op-grand .m-erreur {
+  width: 100%;
+}
+
+/* À la tablette en paysage : le plan à gauche, aussi grand que possible ; à
+   droite, les objets en haut et le disque en bas, sous le pouce droit. */
+.m-pion-plan,
+.m-pion-cote {
+  display: contents;
+}
+@media (min-width: 900px) and (orientation: landscape) {
+  .m-vue-pion {
+    grid-template-columns: minmax(0, 1fr) 320px;
+    align-items: start;
+    column-gap: 16px;
+  }
+  .m-pion-plan,
+  .m-pion-cote {
+    display: flex;
+    flex-direction: column;
+    gap: 11px;
+    min-width: 0;
+  }
+  .m-pion-plan .m-plan {
+    width: min(100%, calc(78svh * var(--ratio, 1.6)));
+  }
+  .m-pion-cote .m-pupitre {
+    margin-top: 6px;
+  }
+  .m-op-liste {
+    flex-direction: column;
+    overflow: visible;
+  }
+  .m-op-carte,
+  .m-op-carte.pose {
+    width: 100%;
+    height: auto;
+  }
+  .m-op-carte:not(.pose) {
+    flex-wrap: wrap;
+    padding: 10px;
+  }
+  .m-op-carte:not(.pose) .m-op-img {
+    width: 64px;
+    height: 86px;
+  }
+  .m-op-carte:not(.pose) .m-op-actions {
+    flex-basis: 100%;
+    width: auto;
+    display: flex;
+  }
+  .m-op-carte:not(.pose) .m-op-btn {
+    flex: 1;
+  }
+  .m-op-dit {
+    display: inline;
+  }
+}
+
 .m-outil-retour {
   align-self: flex-start;
   padding: 6px 4px;
@@ -3338,9 +3551,6 @@ button.m-regarde-img {
 }
 .m-outil-btn:disabled {
   opacity: 0.5;
-}
-.m-outil-page .m-erreur {
-  width: 100%;
 }
 
 /* L'appareil en main : la photo, et pour chaque LED la lumière qui en déborde
@@ -3418,20 +3628,4 @@ button.m-regarde-img {
 }
 .thermo-valeur {
   position: relative;
-}
-
-/* « Ramasser » : la bulle posée sur l'appareil touché, au-dessus de l'ombre. */
-.m-ramasser {
-  position: absolute;
-  z-index: 5;
-  translate: -50% calc(-100% - 22px);
-  padding: 8px 14px;
-  border-radius: 99px;
-  border: 1px solid var(--brass, #d8a94a);
-  background: var(--surface);
-  color: var(--text);
-  font-size: 13px;
-  font-weight: 600;
-  white-space: nowrap;
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.45);
 }

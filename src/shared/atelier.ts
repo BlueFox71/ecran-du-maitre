@@ -641,11 +641,19 @@ export function lireConstruction(brut: unknown): Construction {
   }
   /* Un calque de mesure : une gomme (`valeur: null`) est gardée, une valeur est
      ramenée par `normaliser` ; un trait sans id, sans points ou sans pinceau part. */
-  const calque = (brut: unknown, normaliser: (n: number) => number | null): TraitMesure[] => {
+  const calque = (brut: unknown, normaliser: (n: number) => number | null, relatif = false): TraitMesure[] => {
     const traits: TraitMesure[] = []
     for (const t of liste(brut)) {
       const pts = points(t?.pts, 1)
       if (!texte(t?.id) || !pts || !fini(t.rayon) || t.rayon <= 0) continue
+      /* Un pinceau relatif (réchauffer, refroidir) : seulement sur la température. */
+      if (t.ecart !== undefined) {
+        if (relatif && fini(t.ecart) && t.ecart !== 0) {
+          const ecart = Math.max(TEMPERATURE_MIN - TEMPERATURE_MAX, Math.min(TEMPERATURE_MAX - TEMPERATURE_MIN, t.ecart))
+          traits.push({ id: t.id, valeur: null, ecart, rayon: t.rayon, pts })
+        }
+        continue
+      }
       if (t.valeur === null) traits.push({ id: t.id, valeur: null, rayon: t.rayon, pts })
       else if (fini(t.valeur)) {
         const valeur = normaliser(t.valeur)
@@ -658,7 +666,7 @@ export function lireConstruction(brut: unknown): Construction {
     const niveau = Math.min(5, Math.round(n))
     return niveau >= 1 ? niveau : null
   })
-  const temperature = calque(v.temperature, (n) => Math.min(TEMPERATURE_MAX, Math.max(TEMPERATURE_MIN, n)))
+  const temperature = calque(v.temperature, (n) => Math.min(TEMPERATURE_MAX, Math.max(TEMPERATURE_MIN, n)), true)
   return {
     v: 1,
     ...(texte(v.base) ? { base: v.base } : {}),

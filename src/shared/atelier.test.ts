@@ -487,3 +487,20 @@ describe('lireConstruction — calques de mesure', () => {
     expect(nu).not.toHaveProperty('ambiante')
   })
 })
+
+describe('lireConstruction — pinceau relatif', () => {
+  const brut = (calque: 'emf' | 'temperature', ecart: unknown) => ({
+    ...constructionVide(),
+    [calque]: [{ id: 'r', valeur: null, ecart, rayon: 1, pts: [[1, 1]] }]
+  })
+  it('garde un écart sur la température', () => {
+    expect(lireConstruction(brut('temperature', -3)).temperature).toEqual([
+      { id: 'r', valeur: null, ecart: -3, rayon: 1, pts: [[1, 1]] }
+    ])
+  })
+  it("l'écart n'existe pas sur l'EMF, ni nul, ni abîmé", () => {
+    expect(lireConstruction(brut('emf', 2)).emf).toBeUndefined()
+    expect(lireConstruction(brut('temperature', 0)).temperature).toBeUndefined()
+    expect(lireConstruction(brut('temperature', 'x')).temperature).toBeUndefined()
+  })
+})

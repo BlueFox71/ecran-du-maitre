@@ -813,6 +813,9 @@ const api = {
     /** Un niveau de plus : le lieu doublé, construction comprise, rangé juste après. */
     ajouterNiveau: (placeId: number) => call<Place>('atelier:ajouterNiveau', placeId),
     de: (placeId: number) => call<Construction | null>('atelier:de', placeId),
+    /** Repeindre les zones d'EMF et de température d'un lieu bâti, depuis son plan. */
+    mesures: (placeId: number, m: Pick<Construction, 'emf' | 'temperature' | 'ambiante'>) =>
+      call<Pick<Construction, 'emf' | 'temperature' | 'ambiante'>>('atelier:mesures', placeId, m),
     /**
      * L'image devient la carte, le calque suit. `cadre` : où se place
      * l'ancienne carte dans la nouvelle, si le terrain a grandi.

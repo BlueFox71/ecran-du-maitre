@@ -61,17 +61,39 @@ export function AppareilPose({
   outil,
   valeur,
   allume,
-  taille
+  taille,
+  couleur
 }: {
   outil: OutilChasse
   valeur: number
   allume: boolean
   taille: number
+  /** La couleur du pion de celui qui l'a posé (`brass`, `azur`…) : un disque derrière lui. */
+  couleur?: string
 }): JSX.Element {
   const l = lueur(outil, valeur, allume)
   const boite: CSSProperties = { position: 'relative', width: taille / RAPPORT[outil], height: taille, flex: 'none' }
   return (
     <div style={boite}>
+      {couleur ? (
+        /* Le disque prend la couleur du pion (`--pion-ring`, posée par la classe `c-…`). */
+        <i
+          aria-hidden
+          className={`c-${couleur}`}
+          style={{
+            position: 'absolute',
+            left: '50%',
+            top: '50%',
+            width: taille * 0.95,
+            height: taille * 0.95,
+            transform: 'translate(-50%, -50%)',
+            borderRadius: '50%',
+            background: 'color-mix(in srgb, var(--pion-ring, #d8a94a) 45%, transparent)',
+            boxShadow: `0 0 0 ${Math.max(1.5, taille * 0.04)}px var(--pion-ring, #d8a94a)`,
+            pointerEvents: 'none'
+          }}
+        />
+      ) : null}
       {l ? (
         <i
           aria-hidden
@@ -98,12 +120,22 @@ export function AppareilPose({
   )
 }
 
-function EmfVivant(p: { valeur: number; allume: boolean; taille: number }): JSX.Element {
-  return <AppareilPose outil="emf" valeur={useNiveauVivant(p.valeur, p.allume)} allume={p.allume} taille={p.taille} />
+function EmfVivant(p: { valeur: number; allume: boolean; taille: number; couleur?: string }): JSX.Element {
+  return (
+    <AppareilPose outil="emf" valeur={useNiveauVivant(p.valeur, p.allume)} allume={p.allume} taille={p.taille} couleur={p.couleur} />
+  )
 }
 
-function ThermoVivant(p: { valeur: number; allume: boolean; taille: number }): JSX.Element {
-  return <AppareilPose outil="thermometre" valeur={useTemperatureVivante(p.valeur)} allume={p.allume} taille={p.taille} />
+function ThermoVivant(p: { valeur: number; allume: boolean; taille: number; couleur?: string }): JSX.Element {
+  return (
+    <AppareilPose
+      outil="thermometre"
+      valeur={useTemperatureVivante(p.valeur)}
+      allume={p.allume}
+      taille={p.taille}
+      couleur={p.couleur}
+    />
+  )
 }
 
 /**
@@ -118,6 +150,7 @@ export function AppareilSurPlan({
   valeur: number
   allume: boolean
   taille: number
+  couleur?: string
 }): JSX.Element {
   return outil === 'emf' ? <EmfVivant {...reste} /> : <ThermoVivant {...reste} />
 }

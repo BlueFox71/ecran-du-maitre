@@ -76,7 +76,14 @@ function outil(nom: string, quoi: 'emf' | 'thermometre'): number {
   return o
 }
 
+/** Tenu en main : à lui, et dans sa main droite (sans emplacement, il serait dans son sac). */
 function enMain(o: number, perso: number): number {
+  const pl = placer(o, s, { port: 'pj', characterId: perso, etat: 'porte' })
+  getDb().prepare(`UPDATE objet_placement SET emplacement = 'main-d' WHERE id = ?`).run(pl)
+  return pl
+}
+
+function dansLeSac(o: number, perso: number): number {
   return placer(o, s, { port: 'pj', characterId: perso, etat: 'porte' })
 }
 
@@ -522,7 +529,89 @@ it('un appareil posé dans une pièce non découpée se montre sur le lieu paren
 it('ramasser respecte la place du sac, avec le refus de « prendre »', () => {
   const { bob, pl } = posee()
   reglages.poser('sac.capacite', '1')
-  enMain(objet(s, 'Lampe'), bob)
+  dansLeSac(objet(s, 'Lampe'), bob)
   expect(() => chasse.ramasserOutil(bob, pl)).toThrow(/sac de Bob est plein/)
   expect(exemplaire(pl)!.port).toBe('lieu')
+})
+
+it('repeindre depuis le plan ne touche que les zones, et le moteur relit', async () => {
+  const { peindreMesures } = await import('../../atelier')
+  construire(salle, { sols: [{ id: 's1', assetId: 'parquet', pts: [[1, 1]], rayon: 1 } as never] })
+  const e = pose(outil('EMF', 'emf'), salle, 0.5, 0.5)
+  expect(de(e)?.valeur).toBe(4)
+  peindreMesures(salle, { emf: [{ id: 't2', valeur: 2, rayon: 1.5, pts: [[5, 5]] }], ambiante: 12 })
+  chasse.plansChanges()
+  chasse.recalculer()
+  expect(de(e)?.valeur).toBe(2)
+  const c = getConstruction(salle)!
+  expect(c.sols).toHaveLength(1)
+  expect(c.ambiante).toBe(12)
+  expect(c.temperature).toBeUndefined()
+})
+
+it('Ctrl+Z défait un trait de zone de chasse, un trait à la fois', async () => {
+  const { peindreMesures } = await import('../../atelier')
+  const defaire = await import('../../defaire')
+  vi.mock('electron', () => ({ BrowserWindow: { getAllWindows: () => [] } }))
+  defaire.installer(getDb())
+  construire(salle)
+  const t = (id: string, valeur: number) => ({ id, valeur, rayon: 1.5, pts: [[5, 5]] as [number, number][] })
+  defaire.envelopper('atelier:mesures', () => peindreMesures(salle, { emf: [t('a', 2)] }))
+  defaire.envelopper('atelier:mesures', () => peindreMesures(salle, { emf: [t('a', 2), t('b', 3)] }))
+  expect(getConstruction(salle)!.emf).toHaveLength(2)
+  expect(defaire.defaire()).toBe('Zones de chasse')
+  expect(getConstruction(salle)!.emf?.map((x) => x.id)).toEqual(['a'])
+  expect(defaire.defaire()).toBe('Zones de chasse')
+  expect(getConstruction(salle)!.emf?.map((x) => x.id)).toEqual(['t1'])
+  defaire.oublier()
+})
+
+it('ramasser : jusqu’à 5 m, pas au-delà (plan de 30 m sans échelle)', () => {
+  const { pl } = posee()
+  const pres = pj('Près')
+  addPion({ placeId: salle, characterId: pres, x: 0.5 + 4 / 30, y: 0.5 })
+  expect(chasse.ramasserOutil(pres, pl)).toBeNull()
+})
+
+it('ramasser à 6 m est refusé', () => {
+  const { pl } = posee()
+  const loin = pj('Six')
+  addPion({ placeId: salle, characterId: loin, x: 0.5 + 6 / 30, y: 0.5 })
+  expect(chasse.ramasserOutil(loin, pl)).toMatch(/Approche-toi/)
+})
+
+it('ramasser par-dessus un meuble bas : on tend le bras au-dessus de la table', () => {
+  const { bob, pl } = posee()
+  addMur({ placeId: salle, nature: 'obstacle-bas', pts: [[0.5025, 0], [0.5025, 1]] })
+  chasse.plansChanges()
+  expect(chasse.ramasserOutil(bob, pl)).toBeNull()
+})
+
+it('le téléphone distingue un appareil tenu en main d’un appareil rangé dans le sac', () => {
+  const bob = pj('Bob')
+  addPion({ placeId: salle, characterId: bob, x: 0.5, y: 0.5 })
+  const tenu = enMain(outil('EMF', 'emf'), bob)
+  const range = dansLeSac(outil('Thermo', 'thermometre'), bob)
+  chasse.recalculer(false)
+  const { outils } = chasse.lecteurTelephones()(bob, salle)
+  expect(outils.find((o) => o.placementId === tenu)?.ou).toBe('main')
+  expect(outils.find((o) => o.placementId === range)?.ou).toBe('sac')
+})
+
+it('ramasser met l’appareil dans une main libre ; mains prises, dans le sac', () => {
+  const { bob, pl } = posee()
+  expect(chasse.ramasserOutil(bob, pl)).toBeNull()
+  const main1 = getDb().prepare(`SELECT emplacement FROM objet_placement WHERE id = ?`).get(pl) as { emplacement: string | null }
+  expect(['main-g', 'main-d']).toContain(main1.emplacement)
+})
+
+it('ramasser, les deux mains prises : il va dans le sac', () => {
+  const { bob, pl } = posee()
+  const a = enMain(objet(s, 'Lampe'), bob)
+  const b = enMain(objet(s, 'Dague'), bob)
+  getDb().prepare(`UPDATE objet_placement SET emplacement = 'main-g' WHERE id = ?`).run(a)
+  getDb().prepare(`UPDATE objet_placement SET emplacement = 'main-d' WHERE id = ?`).run(b)
+  expect(chasse.ramasserOutil(bob, pl)).toBeNull()
+  const r = getDb().prepare(`SELECT emplacement FROM objet_placement WHERE id = ?`).get(pl) as { emplacement: string | null }
+  expect(r.emplacement).toBeNull()
 })

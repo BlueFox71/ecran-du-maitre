@@ -1,13 +1,24 @@
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
+import { memo, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react'
 import { createPortal } from 'react-dom'
 import { PION_COULEURS, porteFranchissable } from '@shared/types'
 import { Pings, usePings } from '../shared/Pings'
 import { Brouillard, regardsDes, sousUnRegard } from '../shared/Brouillard'
+import { BrouillardToile } from '../shared/BrouillardToile'
+
+/**
+ * L'ombre ne se redessine que quand ce qu'elle montre change : ses entrées
+ * (le calque, les yeux, gardés d'un pas à l'autre) ne bougent qu'une dizaine
+ * de fois par seconde, alors que la page, elle, se redessine à chaque image
+ * de la marche.
+ */
+const OmbreFigee = memo(Brouillard)
+/** La même ombre peinte dans un canvas : Safari y est rapide, pas sur les masques SVG. */
+const OmbreToile = memo(BrouillardToile)
 import { Visage } from '../shared/Visage'
 import { Piece } from '../shared/Piece'
 import { AppareilSurPlan, imageOutil } from '../shared/outilsChasse'
-import type { AppareilPose, OutilChasse, OutilTelephone } from '@shared/chasse'
-import { Outils } from './Outils'
+import { PORTEE_RAMASSER_M, type AppareilPose, type OutilChasse, type OutilTelephone } from '@shared/chasse'
+import { ObjetsDuPion, type AppareilAPortee } from './Outils'
 import { D20 } from '../shared/D20'
 import { barrieres, pasContraint, RAYON_PION, seCroisent, type Pt } from '@shared/murs'
 import { bordsOuverture } from '@shared/ouvertures'
@@ -218,7 +229,18 @@ interface Etat {
   /** Plein jour : la carte entière, sans ombre. */
   jour?: boolean
   /** Le lieu à l'écran, et la taille de son plan : le repère des murs. */
-  lieu: { id: number; nom: string; plan: string | null; w: number | null; h: number | null; allure?: number } | null
+  lieu: {
+    id: number
+    nom: string
+    plan: string | null
+    w: number | null
+    h: number | null
+    allure?: number
+    /** La taille d'un pion, en pour cent de la largeur de la carte, comme à la table. */
+    pion?: number
+    /** La largeur du plan, en mètres. */
+    metres?: number
+  } | null
   pions: PionVu[]
   /** Il avance dès qu'une porte ou une lampe bouge : c'est le signal de relire le calque. */
   calqueRev: number
@@ -268,7 +290,11 @@ interface Convive {
   appareils: number
 }
 
-type Onglet = 'fiche' | 'jet' | 'pion' | 'sac' | 'outils' | 'poche'
+type Onglet = 'fiche' | 'jet' | 'pion' | 'sac' | 'poche'
+
+/** L'onglet d'une marque d'historique ; « outils » n'existe plus (les objets sont sur Pion). */
+const ongletDe = (v: unknown): Onglet =>
+  v === 'outils' ? 'pion' : v === 'fiche' || v === 'jet' || v === 'pion' || v === 'sac' || v === 'poche' ? v : 'fiche'
 
 /**
  * Le bouton retour du téléphone.
@@ -382,7 +408,7 @@ export function Mobile(): JSX.Element {
   const [ferme, setFerme] = useState(false)
   const [erreur, setErreur] = useState<string | null>(null)
   const [onglet, setOngletBrut] = useState<Onglet>(
-    () => (history.state?.onglet as Onglet | undefined) ?? 'fiche'
+    () => ongletDe(history.state?.onglet)
   )
   /* Changer d'onglet laisse une marque ; le premier, posé à l'arrivée, la remplace. */
   const ongletVu = useRef(onglet)
@@ -397,7 +423,7 @@ export function Mobile(): JSX.Element {
   useEffect(() => {
     if (!history.state?.onglet) history.replaceState({ onglet }, '')
     const surRetour = (e: PopStateEvent): void => {
-      const o = (e.state?.onglet as Onglet | undefined) ?? 'fiche'
+      const o = ongletDe(e.state?.onglet)
       setOngletBrut(o)
     }
     window.addEventListener('popstate', surRetour)
@@ -925,7 +951,6 @@ function Table({
         {onglet === 'jet' && !etat.spectateur && <Jet etat={etat} jeton={jeton} />}
         {onglet === 'pion' && <Plan etat={etat} jeton={jeton} ondes={ondes} />}
         {onglet === 'sac' && <Sac etat={etat} jeton={jeton} />}
-        {onglet === 'outils' && <Outils outils={etat.outils ?? []} jeton={jeton} api={API} />}
         {onglet === 'poche' && <Poche etat={etat} jeton={jeton} onMot={ouvrirMot} />}
       </main>
 
@@ -934,17 +959,14 @@ function Table({
       <nav className="m-onglets" role="tablist">
         {/* Un spectateur ne jette pas de dés : pas d'onglet Jet. */}
         {(etat.spectateur
-          ? (['fiche', 'pion', 'sac', 'outils', 'poche'] as Onglet[])
-          : (['fiche', 'jet', 'pion', 'sac', 'outils', 'poche'] as Onglet[])
-        )
-          /* Objets : seulement quand il y a un outil de chasse à lire. */
-          .filter((o) => o !== 'outils' || (etat.outils ?? []).length > 0)
-          .map((o) => (
+          ? (['fiche', 'pion', 'sac', 'poche'] as Onglet[])
+          : (['fiche', 'jet', 'pion', 'sac', 'poche'] as Onglet[])
+        ).map((o) => (
           <button key={o} role="tab" aria-selected={onglet === o} onClick={() => setOnglet(o)}>
             <span className="m-ic" aria-hidden="true">
-              {{ fiche: '▤', jet: '⬢', pion: '◉', sac: '▦', outils: '◈', poche: '✉' }[o]}
+              {{ fiche: '▤', jet: '⬢', pion: '◉', sac: '▦', poche: '✉' }[o]}
             </span>
-            {{ fiche: 'Fiche', jet: 'Jet', pion: 'Pion', sac: 'Sac', outils: 'Objets', poche: 'Pochette' }[o]}
+            {{ fiche: 'Fiche', jet: 'Jet', pion: 'Pion', sac: 'Sac', poche: 'Pochette' }[o]}
             {/* Un point, pas un compte : à la table on veut savoir qu'il s'est
                 passé quelque chose, pas combien de fois. */}
             {o === 'poche' && (etat.pochette.docs.some((d) => !d.lu) || enAttente.length > 0) ? (
@@ -1634,7 +1656,8 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
     <div key={o.placementId} className={`m-carte m-c-${genre}`} style={teinte(o.teinte)}>
       <button className="m-carte-img" onClick={ouvrir} disabled={!ouvrir} tabIndex={ouvrir ? 0 : -1}>
         {o.outil ? (
-          <Visage url={imageOutil(o.outil)} cadre={null} alt={o.nom} />
+          /* La photo d'un appareil est en hauteur : on la montre entière, pas recadrée en carré. */
+          <img className="m-carte-outil" src={imageOutil(o.outil)} alt={o.nom} draggable={false} />
         ) : o.image ? (
           <Visage url={API + o.image} cadre={o.cadre} alt={o.nom} />
         ) : (
@@ -1642,6 +1665,7 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
         )}
         {o.qte > 1 ? <b className="m-carte-qte">×{o.qte}</b> : null}
       </button>
+      {/* Son nom, puis où il est porté, juste au-dessus du geste. */}
       <span className="m-carte-nom">{o.nom}</span>
       {sous ? <span className="m-carte-ou">{sous}</span> : null}
       {action}
@@ -1691,24 +1715,33 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
   const ouPorter = bonusEnChoix > 0 ? possibles.find((e) => !occupant(e.cle)) ?? possibles[0] ?? null : null
 
   return (
-    <div className="m-vue">
+    <div className="m-vue m-vue-sac">
       {erreur ? <p className="m-erreur">{erreur}</p> : null}
 
       <h2 className="m-titre m-t-porte">Ce que je porte</h2>
       {portes.length === 0 ? (
-        <p className="m-note">Rien sur toi pour l’instant.</p>
+        /* Rien de porté : une case vide, à la place des objets. */
+        <div className="m-grille">
+          <div className="m-carte m-c-porte m-carte-vide" role="note" aria-label="Rien de porté">
+            <span className="m-carte-img" />
+          </div>
+        </div>
       ) : (
         <div className="m-grille">{portes.map(ligne)}</div>
       )}
 
       <h2 className="m-titre m-t-sac">
-        Dans mon sac
+        Dans mes poches
         {etat.sac && etat.sac.capacite !== null ? (
           <span className={`m-sac-compte${sacPlein(etat.sac) ? ' plein' : ''}`}>{ditSac(etat.sac)}</span>
         ) : null}
       </h2>
       {sac.length === 0 ? (
-        <p className="m-note">Ton sac est vide.</p>
+        <div className="m-grille">
+          <div className="m-carte m-c-sac m-carte-vide" role="note" aria-label="Poches vides">
+            <span className="m-carte-img" />
+          </div>
+        </div>
       ) : (
         <div className="m-grille">{sac.map(ligne)}</div>
       )}
@@ -1720,7 +1753,10 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
       ) : null}
 
       {/* Les inventaires que le MJ a ouverts : on y pioche, l'objet tombe dans
-          le sac. Fermés, ils disparaissent d'ici. */}
+          le sac. Fermés, ils disparaissent d'ici. Eux seuls défilent : ce
+          qu'on porte et le sac restent sous les yeux. */}
+      {inventaires.length ? (
+      <div className="m-sac-invs">
       {inventaires.map((inv) => {
         const mot = cherche.trim().toLowerCase()
         const liste = inv.contenu.filter((c) => !mot || c.nom.toLowerCase().includes(mot))
@@ -1760,6 +1796,8 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
           </section>
         )
       })}
+      </div>
+      ) : null}
 
       {/* La fenêtre du choix, au milieu de l'écran. Rendue dans le corps du
           document, hors de la page qui défile : rien autour ne la rogne. */}
@@ -2776,20 +2814,25 @@ const CADENCE_MS = 50
  */
 const MENE_MS = 550
 
-/**
- * Sa préférence à lui : son pion se tourne-t-il là où il marche ? Oui par
- * défaut — on regarde où l'on va ; seul un « non » choisi sur ce téléphone
- * le garde fixe.
- */
-const CLE_SUIVRE = 'ecran-du-maitre/suivre'
+/** Tous les combien l'ombre suit le pion qui marche, en millisecondes. */
+const OMBRE_MS = 90
 
-const litSuivre = (): boolean => {
-  try {
-    return localStorage.getItem(CLE_SUIVRE) !== 'non'
-  } catch {
-    return true
-  }
-}
+/**
+ * Safari (et tout navigateur d'iPhone ou d'iPad, qui en est un) calcule le
+ * flou de l'ombre sur le processeur, sur toute la carte : chaque pas en
+ * devient lent. Là, l'ombre se passe de flou — bords nets, marche fluide.
+ */
+const OMBRE_SANS_FLOU = ((): boolean => {
+  const ua = navigator.userAgent
+  const ios = /iPad|iPhone|iPod/.test(ua) || (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)
+  const safari = /AppleWebKit/.test(ua) && !/Chrome|Chromium|Android/.test(ua)
+  return ios || safari
+})()
+
+/** En deçà, un portrait ne se lit plus : le pion devient un point de couleur. */
+const PION_LISIBLE_PX = 26
+/** Un point plus petit ne se verrait plus du tout. */
+const PION_POINT_MIN_PX = 9
 
 function Plan({
   etat,
@@ -2801,14 +2844,47 @@ function Plan({
   ondes: MobilePing[]
 }): JSX.Element {
   const [refus, setRefus] = useState<string | null>(null)
-  /* L'appareil posé que le doigt vient de toucher, et où il est (0 à 1). */
-  const [ramasser, setRamasser] = useState<{ id: number; x: number; y: number } | null>(null)
   const [calque, setCalque] = useState<CalqueBrouillard | null>(null)
-  const [suivre, setSuivre] = useState(litSuivre)
   /* Le PNJ regardé qu'on agrandit d'un toucher ; le bouton retour le referme. */
   const [zoomPnj, setZoomPnj] = useState<{ url: string; nom: string; par: string[] } | null>(null)
   useRetourFerme(!!zoomPnj, () => setZoomPnj(null))
   const cadre = useRef<HTMLDivElement>(null)
+  /* La largeur du plan à l'écran du téléphone : la taille des pions s'y mesure. */
+  const [largeurPlan, setLargeurPlan] = useState(0)
+  useEffect(() => {
+    const el = cadre.current
+    if (!el) return
+    const ro = new ResizeObserver(() => setLargeurPlan(el.offsetWidth))
+    ro.observe(el)
+    return () => ro.disconnect()
+  }, [!!etat.lieu, etat.gele])
+  /*
+   * Le pion, à la même échelle qu'à la table. Trop petit pour un portrait
+   * lisible, il devient un point de sa couleur : un visage de quelques
+   * pixels ne se reconnaît pas, une couleur si.
+   */
+  const pionPx = etat.lieu?.pion && largeurPlan ? (etat.lieu.pion / 100) * largeurPlan : 40
+  const enPoint = pionPx < PION_LISIBLE_PX
+  const pionDiam = Math.max(PION_POINT_MIN_PX, Math.min(40, pionPx))
+  /*
+   * Le zoom aux doigts. La page interdit celui du navigateur (il agrandirait
+   * toute l'application) : le plan zoome lui-même. Deux doigts pincent,
+   * un doigt fait glisser la carte agrandie ; une tape reste une tape.
+   * `x`, `y` : le décalage du contenu, en pixels du cadre.
+   */
+  const zoom = useRef<HTMLDivElement>(null)
+  const [vue, setVue] = useState({ s: 1, x: 0, y: 0 })
+  const vueRef = useRef(vue)
+  vueRef.current = vue
+  const doigts = useRef(new Map<number, { x: number; y: number }>())
+  const departZoom = useRef<{
+    vue: { s: number; x: number; y: number }
+    milieu: { x: number; y: number }
+    ecart: number
+  } | null>(null)
+  const aBouge = useRef(false)
+  /* Un autre lieu : on repart de la carte entière. */
+  useEffect(() => setVue({ s: 1, x: 0, y: 0 }), [etat.lieu?.id])
   /* La dernière tape : deux coups rapprochés au même endroit font un ping. */
   const tape = useRef<{ t: number; x: number; y: number }>({ t: 0, x: 0, y: 0 })
 
@@ -2893,6 +2969,18 @@ function Plan({
     return barrieres(calque.murs, 'pas', enPx, calque.ouvertures)
   }, [calque, nat])
 
+  /** Ce qui empêche de tendre le bras : le pas, sans les meubles bas (on ramasse par-dessus une table). */
+  const barrieresBras = useMemo(() => {
+    if (!calque?.murs.length || !nat) return null
+    const enPx = (q: PointMur): Pt => ({ x: q[0] * nat.w, y: q[1] * nat.h })
+    return barrieres(
+      calque.murs.filter((m) => m.nature !== 'obstacle-bas'),
+      'pas',
+      enPx,
+      calque.ouvertures
+    )
+  }, [calque, nat])
+
   /*
    * Les portes du lieu, dans le même repère. Dessinées **sous** l'ombre, elles
    * n'apparaissent que là où le personnage voit ; et quand le pas bute, c'est
@@ -2962,7 +3050,11 @@ function Plan({
     const battre = (now: number): void => {
       if (!vivant) return
       image = requestAnimationFrame(battre)
-      const dt = Math.min(0.06, (now - avant) / 1000)
+      /* Le temps écoulé depuis l'image d'avant, borné : au-delà, c'est une
+         pause (onglet caché), pas une image lente. Assez large pour qu'un
+         appareil qui rame (Safari sur iPad, mode Économie d'énergie) fasse
+         avancer le pion à sa vraie allure, par plus grands pas. */
+      const dt = Math.min(0.15, (now - avant) / 1000)
       avant = now
 
       const p = pousse.current
@@ -3009,7 +3101,8 @@ function Plan({
             setBute(texte)
           }
         }
-        if (suivre) capVise.current = (Math.atan2(p.x, -p.y) * 180) / Math.PI
+        /* Le regard suit la marche : on regarde où l'on va. */
+        capVise.current = (Math.atan2(p.x, -p.y) * 180) / Math.PI
         if (vise.x !== q.x || vise.y !== q.y) {
           /* Le point qu'on quitte : le poste refera le même chemin. */
           if (chemin.current.length < 240) chemin.current.push([q.x, q.y])
@@ -3076,7 +3169,7 @@ function Plan({
       cancelAnimationFrame(image)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [!!mien, etat.gele, suivre, barrieresPas, portes, nat?.w, nat?.h, jeton, allure])
+  }, [!!mien, etat.gele, barrieresPas, portes, nat?.w, nat?.h, jeton, allure])
 
   /* ---- le pupitre : un disque qui fait marcher, un anneau qui fait tourner ---- */
 
@@ -3140,15 +3233,6 @@ function Plan({
     viser(e)
   }
 
-  const reglerSuivre = (v: boolean): void => {
-    setSuivre(v)
-    try {
-      localStorage.setItem(CLE_SUIVRE, v ? 'oui' : 'non')
-    } catch {
-      /* navigation privée : le réglage tiendra le temps de l'onglet */
-    }
-  }
-
   /**
    * Montrer un point du doigt. Deux tapes plutôt qu'une : une tape isolée est
    * trop facile à donner en posant le pouce sur l'écran, et l'onde partirait
@@ -3166,9 +3250,8 @@ function Plan({
     } else setRefus(null)
   }
 
-  /** Ramasser l'appareil touché ; le refus du serveur se lit en clair sous le plan. */
+  /** Ramasser un appareil à portée ; le refus du serveur se lit en clair sous le plan. */
   const ramasserAppareil = async (placementId: number): Promise<void> => {
-    setRamasser(null)
     setRefus(null)
     try {
       const r = await fetch(`${API}/api/ramasser?t=${encodeURIComponent(jeton)}`, {
@@ -3185,34 +3268,57 @@ function Plan({
     }
   }
 
-  const tapoter = (e: React.PointerEvent): void => {
-    const b = cadre.current?.getBoundingClientRect()
+  /* Le contenu ne quitte jamais le cadre : agrandi, ses bords restent dehors. */
+  const bornerZoom = (s: number, x: number, y: number): { s: number; x: number; y: number } => {
+    const el = cadre.current
+    const S = Math.min(6, Math.max(1, s))
+    if (!el || S <= 1.02) return { s: 1, x: 0, y: 0 }
+    const w = el.clientWidth
+    const h = el.clientHeight
+    return { s: S, x: Math.min(0, Math.max(w - w * S, x)), y: Math.min(0, Math.max(h - h * S, y)) }
+  }
+  const localPlan = (e: { clientX: number; clientY: number }): { x: number; y: number } => {
+    const b = cadre.current!.getBoundingClientRect()
+    return { x: e.clientX - b.left, y: e.clientY - b.top }
+  }
+  /* On repart de l'état présent à chaque doigt posé ou levé : passer de deux
+     doigts à un ne fait pas sauter la carte. */
+  const reprendreZoom = (v: { s: number; x: number; y: number }): void => {
+    const pts = [...doigts.current.values()]
+    if (!pts.length) {
+      departZoom.current = null
+      return
+    }
+    const milieu = pts.length > 1 ? { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 } : pts[0]
+    const ecart = pts.length > 1 ? Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) : 0
+    departZoom.current = { vue: v, milieu, ecart }
+  }
+
+  /* Agrandi, le cadre suit son pion : il ne sort pas de l'écran en marchant. */
+  useEffect(() => {
+    const v = vueRef.current
+    const el = cadre.current
+    if (v.s <= 1 || !el || !mien || doigts.current.size) return
+    const w = el.clientWidth
+    const h = el.clientHeight
+    const px = pose.x * w * v.s + v.x
+    const py = pose.y * h * v.s + v.y
+    const marge = 0.22
+    let x = v.x
+    let y = v.y
+    if (px < w * marge) x += w * marge - px
+    else if (px > w * (1 - marge)) x -= px - w * (1 - marge)
+    if (py < h * marge) y += h * marge - py
+    else if (py > h * (1 - marge)) y -= py - h * (1 - marge)
+    if (x !== v.x || y !== v.y) setVue(bornerZoom(v.s, x, y))
+  }, [pose.x, pose.y])
+
+  const tapoter = (e: { clientX: number; clientY: number }): void => {
+    /* Le contenu, agrandi ou non : son rectangle à l'écran dit où l'on a tapé sur la carte. */
+    const b = zoom.current?.getBoundingClientRect()
     if (!b) return
     const x = (e.clientX - b.left) / b.width
     const y = (e.clientY - b.top) / b.height
-    /* Un appareil posé sous le doigt : on propose de le ramasser (le pion, lui,
-       se déplace par son anneau — un toucher sur la carte ne le fait pas marcher). */
-    const proche = (calque?.objets ?? []).find(
-      (o) =>
-        o.outil &&
-        etat.appareilsPoses?.some((a) => a.placementId === o.id) &&
-        Math.hypot((o.x - x) * b.width, (o.y - y) * b.height) < 26
-    )
-    /* Seulement s'il est sous un regard : la bulle passe au-dessus de l'ombre,
-       elle trahirait un appareil laissé dans le noir. Sans ombre dessinée
-       (plein jour, plan sans murs), tout se voit. */
-    const ombre = !!calque?.murs.length && !!nat && !etat.jour
-    const touche =
-      proche &&
-      (!ombre || sousUnRegard(regardsDes(calque!, yeux, nat!.w, nat!.h), proche.x * nat!.w, proche.y * nat!.h))
-        ? proche
-        : null
-    if (touche) {
-      setRefus(null)
-      setRamasser(touche.id === ramasser?.id ? null : { id: touche.id, x: touche.x, y: touche.y })
-      return
-    }
-    setRamasser(null)
     const now = Date.now()
     const t = tape.current
     /* Deux tapes en moins de 400 ms, à moins de 5 % l'une de l'autre. */
@@ -3225,6 +3331,28 @@ function Plan({
   }
 
   /*
+   * La position que l'ombre suit. Calculer ce que voit le personnage (les
+   * murs, les cônes, le flou) est ce qui coûte le plus à chaque pas : on le
+   * refait une dizaine de fois par seconde, pas à chaque image. Le pion, lui,
+   * reste fluide ; à l'arrêt, l'ombre le rattrape aussitôt.
+   */
+  const [poseOmbre, setPoseOmbre] = useState(pose)
+  const derniereOmbre = useRef(0)
+  useEffect(() => {
+    const reste = OMBRE_MS - (performance.now() - derniereOmbre.current)
+    if (reste <= 0) {
+      derniereOmbre.current = performance.now()
+      setPoseOmbre(pose)
+      return
+    }
+    const t = setTimeout(() => {
+      derniereOmbre.current = performance.now()
+      setPoseOmbre(pose)
+    }, reste)
+    return () => clearTimeout(t)
+  }, [pose.x, pose.y, pose.cap])
+
+  /*
    * Les yeux de la table : un pion de personnage, et lui seul. Le sien regarde
    * depuis là où son pouce l'a mis, pas depuis le dernier message reçu —
    * sinon l'ombre traînerait d'un demi-pas derrière lui.
@@ -3233,17 +3361,45 @@ function Plan({
    * une nouvelle à chaque dessin la ferait recalculer pour un pouce qui remue
    * dans son disque.
    */
+  /* Le poste renvoie l'état à chaque pas, avec une liste de pions neuve même
+     quand rien n'a bougé : on ne refait les yeux (et donc l'ombre) que si
+     une position a vraiment changé. */
+  const signatureYeux = etat.pions
+    .filter((p) => p.characterId != null && !p.pnj)
+    .map((p) => (p.mien ? `m${p.characterId}` : `${p.characterId}:${p.x}:${p.y}:${p.rotation}`))
+    .join('|')
   const yeux = useMemo(
     () =>
       etat.pions
         .filter((p) => p.characterId != null && !p.pnj)
         .map((p) =>
           p.mien
-            ? { x: pose.x, y: pose.y, cap: pose.cap, characterId: p.characterId as number }
+            ? { x: poseOmbre.x, y: poseOmbre.y, cap: poseOmbre.cap, characterId: p.characterId as number }
             : { x: p.x, y: p.y, cap: p.rotation, characterId: p.characterId as number }
         ),
-    [etat.pions, pose.x, pose.y, pose.cap]
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [signatureYeux, poseOmbre.x, poseOmbre.y, poseOmbre.cap]
   )
+
+  /*
+   * Les appareils posés à portée de main : tout près du pion (un peu en deçà
+   * de ce que le poste accepte, pour qu'il ne refuse pas au bord) et sans mur
+   * entre eux. Pas besoin de le voir : à tâtons dans le noir, on le prend aussi.
+   */
+  const aPortee = useMemo((): AppareilAPortee[] => {
+    if (!mien || !nat || etat.spectateur || !calque?.objets?.length) return []
+    const pa = { x: pose.x * nat.w, y: pose.y * nat.h }
+    /* La portée en mètres, ramenée aux pixels du plan (30 m de large d'un serveur plus ancien). */
+    const limite = (0.93 * PORTEE_RAMASSER_M * nat.w) / (etat.lieu?.metres || 30)
+    return calque.objets
+      .filter((o) => {
+      if (!o.outil || !etat.appareilsPoses?.some((a) => a.placementId === o.id)) return false
+      const pb = { x: o.x * nat.w, y: o.y * nat.h }
+      if (Math.hypot(pb.x - pa.x, pb.y - pa.y) > limite) return false
+      return !barrieresBras?.some((m) => seCroisent(pa, pb, m.a, m.b))
+      })
+      .map((o) => ({ id: o.id, nom: o.nom, outil: o.outil! }))
+  }, [mien?.id, nat, calque, etat.appareilsPoses, etat.spectateur, etat.lieu?.metres, pose.x, pose.y, barrieresBras])
   /* Les pions « au regard » hors de tout champ de vision : on ne les dessine
      pas, comme sur l'écran de la table. Sans calque, on ne peut pas savoir —
      on les tait plutôt que de les trahir. */
@@ -3289,12 +3445,17 @@ function Plan({
             ? 'L’écran est figé par le maître du jeu. Ton pion reprendra sa liberté quand il le dégèlera.'
             : 'Aucun lieu n’est à l’écran pour l’instant.'}
         </p>
+        <ObjetsDuPion outils={etat.outils ?? []} jeton={jeton} api={API} />
       </div>
     )
   }
 
   return (
     <div className="m-vue m-vue-pion">
+      {/* À la tablette en paysage, deux colonnes : le plan à gauche, les
+          objets et le disque à droite. Au téléphone, ces deux boîtes
+          s'effacent (`display: contents`) et tout se suit. */}
+      <div className="m-pion-plan">
       <section>
         <span className="m-eyebrow">Lieu courant</span>
         <div className="m-lieu-nom">{etat.lieu.nom}</div>
@@ -3303,12 +3464,69 @@ function Plan({
       <div
         className="m-plan"
         ref={cadre}
-        onPointerDown={etat.spectateur ? undefined : tapoter}
+        onPointerDown={(e) => {
+          e.currentTarget.setPointerCapture(e.pointerId)
+          doigts.current.set(e.pointerId, localPlan(e))
+          aBouge.current = doigts.current.size > 1
+          reprendreZoom(vueRef.current)
+        }}
+        onPointerMove={(e) => {
+          if (!doigts.current.has(e.pointerId) || !departZoom.current) return
+          doigts.current.set(e.pointerId, localPlan(e))
+          const pts = [...doigts.current.values()]
+          const d = departZoom.current
+          if (pts.length > 1) {
+            const milieu = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 }
+            const ecart = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y)
+            const s = (d.vue.s * ecart) / Math.max(1, d.ecart)
+            /* Le point de la carte qui était sous les doigts y reste. */
+            const cx = (d.milieu.x - d.vue.x) / d.vue.s
+            const cy = (d.milieu.y - d.vue.y) / d.vue.s
+            setVue(bornerZoom(s, milieu.x - cx * s, milieu.y - cy * s))
+            aBouge.current = true
+          } else {
+            const dx = pts[0].x - d.milieu.x
+            const dy = pts[0].y - d.milieu.y
+            if (Math.hypot(dx, dy) > 8) aBouge.current = true
+            if (d.vue.s > 1 && aBouge.current) setVue(bornerZoom(d.vue.s, d.vue.x + dx, d.vue.y + dy))
+          }
+        }}
+        onPointerUp={(e) => {
+          doigts.current.delete(e.pointerId)
+          /* Une tape franche, sans glisser ni pincer : un point montré à la table. */
+          if (doigts.current.size === 0 && !aBouge.current && !etat.spectateur) tapoter(e)
+          reprendreZoom(vueRef.current)
+        }}
+        onPointerCancel={(e) => {
+          doigts.current.delete(e.pointerId)
+          reprendreZoom(vueRef.current)
+        }}
         style={{
           aspectRatio: nat ? `${nat.w} / ${nat.h}` : '16 / 10',
           ['--ratio' as string]: nat ? nat.w / nat.h : 1.6
         }}
       >
+        {vue.s > 1 ? (
+          <button
+            className="m-plan-entier"
+            onPointerDown={(e) => e.stopPropagation()}
+            onPointerUp={(e) => e.stopPropagation()}
+            onClick={() => setVue({ s: 1, x: 0, y: 0 })}
+          >
+            Carte entière
+          </button>
+        ) : null}
+        <div
+          className="m-plan-zoom"
+          ref={zoom}
+          /* `--k` défait l'agrandissement sur les pions : la carte grossit, eux
+             gardent leur taille à l'écran — ils rétrécissent sur la carte. */
+          style={
+            vue.s > 1
+              ? { transform: `translate(${vue.x}px, ${vue.y}px) scale(${vue.s})`, ['--k' as string]: 1 / vue.s }
+              : undefined
+          }
+        >
         {/* La carte se lit maintenant au lieu de s'effacer : l'ombre ne laisse
             voir que ce que son personnage voit, alors il peut la regarder. */}
         {etat.lieu.plan ? (
@@ -3362,38 +3580,12 @@ function Plan({
           >
             {calque.objets.map((o) => {
               const r = Math.max(nat.w, nat.h) * 0.008
-              /* Un appareil de chasse : l'appareil vu de dessus, avec sa lueur ;
-                 éteint tant que le serveur ne dit rien de lui. */
-              if (o.outil) {
-                const a = etat.appareilsPoses?.find((x) => x.placementId === o.id)
-                return (
-                  <g key={o.id} transform={`translate(${o.x * nat.w} ${o.y * nat.h})`}>
-                    <foreignObject
-                      x={-r * 8}
-                      y={-r * 8}
-                      width={r * 16}
-                      height={r * 16}
-                      style={{ overflow: 'visible' }}
-                    >
-                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <AppareilSurPlan outil={o.outil} valeur={a?.valeur ?? 0} allume={a?.allume ?? false} taille={r * 6} />
-                      </div>
-                    </foreignObject>
-                  </g>
-                )
-              }
+              /* Un appareil : dessiné en HTML par-dessus (voir plus bas). */
+              if (o.outil) return null
               return (
                 <g key={o.id} transform={`translate(${o.x * nat.w} ${o.y * nat.h})`}>
-                  {/* Son image s'il en a une, comme à l'écran de la table ; sinon le losange. */}
-                  {o.image ? (
-                    <foreignObject x={-r * 2.6} y={-r * 2.6} width={r * 5.2} height={r * 5.2}>
-                      <div className="m-objet-img">
-                        <Visage url={API + o.image} cadre={o.cadre ?? null} />
-                      </div>
-                    </foreignObject>
-                  ) : (
-                    <path d={`M0 ${-r}L${r} 0L0 ${r}L${-r} 0Z`} strokeWidth={r * 0.25} />
-                  )}
+                  {/* Son image s'il en a une (en HTML, plus bas) ; sinon le losange. */}
+                  {o.image ? null : <path d={`M0 ${-r}L${r} 0L0 ${r}L${-r} 0Z`} strokeWidth={r * 0.25} />}
                   <text
                     y={o.image ? r * 2.9 : r * 1.4}
                     textAnchor="middle"
@@ -3408,19 +3600,52 @@ function Plan({
             })}
           </svg>
         ) : null}
-        {ramasser ? (
-          <button
-            className="m-ramasser"
-            style={{ left: `${ramasser.x * 100}%`, top: `${ramasser.y * 100}%` }}
-            onPointerDown={(e) => e.stopPropagation()}
-            onClick={() => void ramasserAppareil(ramasser.id)}
-          >
-            Ramasser
-          </button>
+        {/*
+          * Les images des objets et les appareils, en HTML posé sur la carte
+          * plutôt que dans le SVG : Safari (iPad, iPhone) n'affiche pas un
+          * `foreignObject` dès que la page a des calques d'affichage ou un
+          * zoom — les objets posés disparaissaient du plan. Toujours sous
+          * l'ombre : ce qu'on ne voit pas d'ici reste dans le noir.
+          */}
+        {calque?.objets?.length && nat && largeurPlan ? (
+          <div className="m-objets-html" aria-hidden="true">
+            {calque.objets.map((o) => {
+              /* Les tailles du SVG, en pixels du plan, ramenées à l'écran. */
+              const px = largeurPlan / nat.w
+              const r = Math.max(nat.w, nat.h) * 0.008 * px
+              const ou = { left: `${o.x * 100}%`, top: `${o.y * 100}%` }
+              if (o.outil) {
+                const a = etat.appareilsPoses?.find((x) => x.placementId === o.id)
+                return (
+                  <div key={o.id} className="m-objet-pose" style={ou}>
+                    <AppareilSurPlan
+                      outil={o.outil}
+                      valeur={a?.valeur ?? 0}
+                      allume={a?.allume ?? false}
+                      taille={r * 6}
+                      couleur={o.couleur}
+                    />
+                  </div>
+                )
+              }
+              if (!o.image) return null
+              return (
+                <div key={o.id} className="m-objet-pose" style={{ ...ou, width: r * 5.2, height: r * 5.2 }}>
+                  <div className="m-objet-img">
+                    <Visage url={API + o.image} cadre={o.cadre ?? null} />
+                  </div>
+                </div>
+              )
+            })}
+          </div>
         ) : null}
         {calque?.murs.length && nat && !etat.jour ? (
           <div className="m-ombre">
-            <Brouillard calque={calque} yeux={yeux} w={nat.w} h={nat.h} />
+            {OMBRE_SANS_FLOU ? (
+              <OmbreToile calque={calque} yeux={yeux} w={nat.w} h={nat.h} />
+            ) : (
+              <OmbreFigee calque={calque} yeux={yeux} w={nat.w} h={nat.h} />
+            )}
           </div>
         ) : null}
         {/* Le nom des pièces que le MJ montre : par-dessus l'ombre, comme à
@@ -3463,24 +3688,36 @@ function Plan({
               key={p.id}
               className={`m-pion c-${p.color}${p.mien ? ' m-mien' : ''}${
                 p.etat ? ` ${p.etat}` : ''
-              }${p.id === etat.pionEnJeuId ? ' m-en-jeu' : ''}`}
+              }${p.id === etat.pionEnJeuId ? ' m-en-jeu' : ''}${enPoint ? ' m-point' : ''}`}
               style={{
                 left: `${q.x * 100}%`,
                 top: `${q.y * 100}%`,
-                ['--cap' as string]: `${q.cap}deg`
+                ['--cap' as string]: `${q.cap}deg`,
+                ['--d' as string]: `${pionDiam}px`
               }}
               title={p.etat ? `${p.label} — ${p.etat === 'ko' ? 'inconscient' : 'blessé'}` : p.label}
             >
-              {p.url ? <Visage url={API + p.url} cadre={p.cadre} /> : p.initials}
+              {enPoint ? null : p.url ? <Visage url={API + p.url} cadre={p.cadre} /> : p.initials}
               {/* Le nez dit de quel côté il regarde. Le sien le porte toujours,
                   les autres seulement quand ils sont tournés — comme à la table. */}
               {p.characterId != null && (p.mien || q.cap) ? <span className="m-nez" /> : null}
             </div>
           )
         })}
+        </div>
       </div>
 
       {refus ? <p className="m-erreur">{refus}</p> : null}
+      </div>
+
+      <div className="m-pion-cote">
+      <ObjetsDuPion
+        outils={etat.outils ?? []}
+        jeton={jeton}
+        api={API}
+        aPortee={aPortee}
+        onRamasser={(id) => void ramasserAppareil(id)}
+      />
 
       {etat.spectateur ? (
         <p className="m-note">Spectateur : tu suis le plan, sans bouger de pion ni montrer de point.</p>
@@ -3529,30 +3766,6 @@ function Plan({
                 </span>
               </div>
             </div>
-            {/* Le regard suit la marche ? Un levier vertical collé au disque :
-                on le voit en jouant, sans une ligne de plus sous le pouce. */}
-            <label
-              className={`m-levier${suivre ? ' on' : ''}`}
-              title={
-                suivre
-                  ? 'Regarder où je marche : ton personnage se tourne vers là où tu le pousses'
-                  : 'Regard fixe : il garde son regard en marchant, l’anneau le tourne'
-              }
-            >
-              <svg className="m-levier-icone" viewBox="0 0 24 24" aria-hidden="true">
-                <circle cx="12" cy="12" r="8.5" />
-                <path d="M12 6.5l2.6 6.6L12 11.6l-2.6 1.5z" />
-              </svg>
-              <input
-                type="checkbox"
-                role="switch"
-                className="m-levier-switch"
-                aria-label="Regarder où je marche"
-                checked={suivre}
-                onChange={(e) => reglerSuivre(e.target.checked)}
-              />
-              <span className="m-levier-dit">{suivre ? 'suit' : 'fixe'}</span>
-            </label>
           </div>
 
           <p className="m-note">
@@ -3594,6 +3807,7 @@ function Plan({
           </div>
         </section>
       ) : null}
+      </div>
 
       {zoomPnj ? (
         <button className="m-zoom-pnj" onClick={() => setZoomPnj(null)} aria-label="Fermer l’image">

@@ -1,5 +1,5 @@
 import { randomUUID } from 'node:crypto'
-import { activeCampaignId, getDb } from '../index'
+import { activeCampaignId, activeSessionId, getDb } from '../index'
 import type { MotSecret } from '@shared/types'
 
 /**
@@ -73,14 +73,26 @@ function poser(
   envoyer: boolean,
   vibre: boolean
 ): void {
-  /* Le joueur doit être de cette campagne : on part de sa ligne, pas du numéro. */
+  /* Le joueur doit être de cette campagne : on part de sa ligne, pas du numéro.
+     Le mot est de la séance de son moment, sinon de celle qu'on joue. */
   const ins = getDb().prepare(
-    `INSERT INTO mot (campaign_id, lot, beat_id, player_id, texte, envoye_at, vibre)
-     SELECT campaign_id, ?, ?, id, ?, CASE WHEN ? THEN datetime('now') END, ?
-       FROM player WHERE id = ? AND campaign_id = ?`
+    `INSERT INTO mot (campaign_id, session_id, lot, beat_id, player_id, texte, envoye_at, vibre)
+     SELECT campaign_id, COALESCE((SELECT session_id FROM beat WHERE id = @beat), @session),
+            @lot, @beat, id, @texte, CASE WHEN @envoyer THEN datetime('now') END, @vibre
+       FROM player WHERE id = @joueur AND campaign_id = @campagne`
   )
+  const session = activeSessionId()
   for (const p of new Set(playerIds))
-    ins.run(lot, beatId, texte, envoyer ? 1 : 0, vibre ? 1 : 0, p, activeCampaignId())
+    ins.run({
+      lot,
+      beat: beatId,
+      texte,
+      envoyer: envoyer ? 1 : 0,
+      vibre: vibre ? 1 : 0,
+      joueur: p,
+      campagne: activeCampaignId(),
+      session
+    })
 }
 
 /** Écrire un mot, pour un joueur ou plusieurs. `envoyer` faux : il est gardé sur son moment. */
@@ -148,12 +160,18 @@ export function reprendreTout(): number {
    Ce que le téléphone lit, et ce qu'il en dit
    ============================================================ */
 
-/** Les mots partis vers ce joueur, le plus récent d'abord. Jamais ceux d'un autre. */
+/**
+ * Les mots partis vers ce joueur pendant la séance en cours, le plus récent
+ * d'abord. Jamais ceux d'un autre, ni ceux d'une séance passée.
+ */
 export function motsDe(playerId: number): MotSecret[] {
   return (
     getDb()
-      .prepare(`${SELECT} AND m.player_id = ? AND m.envoye_at IS NOT NULL ORDER BY m.envoye_at DESC, m.id DESC`)
-      .all(activeCampaignId(), playerId) as Ligne[]
+      .prepare(
+        `${SELECT} AND m.player_id = ? AND m.session_id = ? AND m.envoye_at IS NOT NULL
+          ORDER BY m.envoye_at DESC, m.id DESC`
+      )
+      .all(activeCampaignId(), playerId, activeSessionId()) as Ligne[]
   ).map(versMot)
 }
 

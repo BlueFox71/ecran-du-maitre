@@ -90,7 +90,7 @@ import { SelecteurApparence, porteurDe } from '../components/Apparences'
 import { estPresente, presenterLeJoueur } from '../presentation'
 import { montreLaCarte } from '@shared/scene'
 import { PanneauSons, useSonsSurCarte, useTouchesSon } from '../components/PanneauSons'
-import { etatSuivant } from '@shared/types'
+import { colorFor, etatSuivant } from '@shared/types'
 
 /* ============================================================
    Pupitre : le fil de la séance à gauche, l'écran des
@@ -387,7 +387,12 @@ export function Pupitre(): JSX.Element {
           nom: x.qte > 1 ? `${o.nom} ×${x.qte}` : o.nom,
           etat: x.etat,
           image: o.outil ? imageObjet(o, s.allItems) : o.imageItemId != null ? (s.allItems.find((i) => i.id === o.imageItemId)?.url ?? null) : null,
-          cadre: o.outil ? null : o.imageCadre
+          cadre: o.outil ? null : o.imageCadre,
+          ...(o.outil ? { outil: o.outil } : {}),
+          /* Posé par un joueur : la couleur de son pion, derrière l'appareil. */
+          ...(o.outil && x.posePar != null
+            ? { couleur: s.characters.find((c) => c.id === x.posePar)?.color ?? colorFor(x.posePar) }
+            : {})
         }))
     )
   }, [s.objets, s.places, s.allItems, editPlaceId])
@@ -1663,6 +1668,8 @@ export function Pupitre(): JSX.Element {
                     .map((p) => ({ nom: p.name, x: p.ancre![0], y: p.ancre![1] }))}
                   sonsMj={sonsScene}
                   objetsMj={objetsVises}
+                  /* Ce que lisent les appareils : leur lueur sur la carte. */
+                  chasse={s.chasse}
                   onDeplacerObjet={editPlaceId != null ? deplacerObjet : undefined}
                   onBasculerObjet={editPlaceId != null ? basculerObjet : undefined}
                   onChoisirObjet={editPlaceId != null ? choisirObjet : undefined}

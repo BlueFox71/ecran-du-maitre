@@ -343,6 +343,10 @@ export interface PieceVue {
 }
 
 /** Un objet posé sur le plan, tel que les joueurs le voient. */
+/** Couleur déduite de l'identifiant : deux pions voisins ne se ressemblent pas. */
+const PALETTE_PIONS = ['brass', 'moss', 'iris', 'blood', 'neutral']
+export const colorFor = (n: number): string => PALETTE_PIONS[Math.abs(n) % PALETTE_PIONS.length]
+
 export interface ObjetVu {
   /** L'exemplaire (`objet_placement`), pas le modèle. */
   id: number
@@ -356,6 +360,8 @@ export interface ObjetVu {
   cadre?: CadreCarre | null
   /** Un outil de chasse posé là ; absent pour un objet ordinaire. */
   outil?: OutilChasse
+  /** La couleur du pion de celui qui l'a posé (`c-<couleur>`) : elle le fait ressortir sur la carte. */
+  couleur?: string
 }
 
 /**

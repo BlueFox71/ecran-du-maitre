@@ -14,7 +14,7 @@
 import { activeCampaignId, activeSessionId, getDb } from '../index'
 import { copierLigne } from '../copie'
 import { mediaUrl } from '../../vault'
-import { UNITE_VALEUR_PAR_DEFAUT, eclaire, lisCadreCarre } from '@shared/types'
+import { UNITE_VALEUR_PAR_DEFAUT, colorFor, eclaire, lisCadreCarre } from '@shared/types'
 import { lireCampagne } from '@shared/reglages'
 import { estOutil } from '@shared/chasse'
 import type { OutilChasse } from '@shared/chasse'
@@ -751,6 +751,22 @@ function desequiperLibre(placementId: number): Objet | null {
  * On ne porte qu'un exemplaire à la fois : de trois dagues au sac, une seule
  * passe à la ceinture, les deux autres restent où elles étaient.
  */
+/** La première main libre d'un personnage (la droite d'abord), ou `null` s'il a les mains pleines. */
+export function mainLibre(characterId: number): string | null {
+  const prises = new Set(
+    (
+      getDb()
+        .prepare(
+          `SELECT emplacement FROM objet_placement
+            WHERE character_id = ? AND port = 'pj' AND emplacement IS NOT NULL
+              AND (session_id = ? OR session_id IS NULL)`
+        )
+        .all(characterId, activeSessionId()) as { emplacement: string }[]
+    ).map((r) => r.emplacement)
+  )
+  return ['main-d', 'main-g'].find((m) => !prises.has(m)) ?? null
+}
+
 function porterLibre(placementId: number, emplacement: string | null): Objet | null {
   const db = getDb()
   const cur = db
@@ -843,11 +859,13 @@ export function objetsVus(placeId: number | null): ObjetVu[] {
   const rows = getDb()
     .prepare(
       `SELECT p.id, p.pos_x AS x, p.pos_y AS y, p.qte, o.nom,
-              i.rel_path AS image, o.image_cadre AS cadre, o.outil
+              i.rel_path AS image, o.image_cadre AS cadre, o.outil,
+              p.pose_par AS posePar, c.color AS couleur
          FROM objet_placement p
          JOIN objet o ON o.id = p.objet_id
          JOIN place l ON l.id = p.place_id
          LEFT JOIN item i ON i.id = o.image_item_id
+         LEFT JOIN character c ON c.id = p.pose_par
         WHERE p.port = 'lieu' AND p.etat = 'trouve'
           AND p.pos_x IS NOT NULL AND p.pos_y IS NOT NULL
           AND (p.place_id = @placeId OR l.parent_id = @placeId)
@@ -863,6 +881,8 @@ export function objetsVus(placeId: number | null): ObjetVu[] {
     image: string | null
     cadre: string | null
     outil: string | null
+    posePar: number | null
+    couleur: string | null
   }[]
   /* Son image aussi : sur la carte, on reconnaît une lampe à son dessin plus
      vite qu'à son nom. Elle ne dit rien de plus que ce que l'objet montre. */
@@ -874,7 +894,9 @@ export function objetsVus(placeId: number | null): ObjetVu[] {
     qte: r.qte ?? 1,
     image: mediaUrl(r.image),
     cadre: lisCadreCarre(r.cadre),
-    ...(estOutil(r.outil) ? { outil: r.outil } : {})
+    ...(estOutil(r.outil) ? { outil: r.outil } : {}),
+    /* Un appareil posé par un joueur porte la couleur de son pion. */
+    ...(estOutil(r.outil) && r.posePar != null ? { couleur: r.couleur ?? colorFor(r.posePar) } : {})
   }))
 }
 
@@ -892,6 +914,8 @@ export interface ExemplaireOutil {
   eteinte: boolean
   /** Posé et trouvé : seul celui-là peut se montrer à la table (comme `objetsVus`). */
   trouve: boolean
+  /** À un personnage, mais sur aucun emplacement (main, ceinture…) : rangé dans son sac. */
+  dansLeSac: boolean
 }
 
 /**
@@ -904,7 +928,7 @@ export function exemplairesOutils(): ExemplaireOutil[] {
     .prepare(
       `SELECT p.id, p.objet_id AS objetId, o.nom, o.outil, p.port, p.place_id AS placeId,
               p.character_id AS characterId, p.pos_x AS x, p.pos_y AS y,
-              p.pose_par AS posePar, p.eteinte, p.etat
+              p.pose_par AS posePar, p.eteinte, p.etat, p.emplacement
          FROM objet_placement p
          JOIN objet o ON o.id = p.objet_id
         WHERE o.outil IS NOT NULL AND p.port IN ('pj', 'lieu')
@@ -926,7 +950,9 @@ export function exemplairesOutils(): ExemplaireOutil[] {
       pos: r.port === 'lieu' && r.x != null && r.y != null ? { x: r.x, y: r.y } : null,
       posePar: r.port === 'lieu' ? (r.posePar ?? null) : null,
       eteinte: !!r.eteinte,
-      trouve: r.etat === 'trouve'
+      trouve: r.etat === 'trouve',
+      /* Porté par un personnage mais sur aucun emplacement : rangé dans son sac. */
+      dansLeSac: r.port === 'pj' && !r.emplacement
     }))
 }
 

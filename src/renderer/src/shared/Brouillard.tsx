@@ -146,18 +146,13 @@ export function sousUnRegard(regards: ZoneVue[], x: number, y: number): boolean 
   return regards.some((z) => z.every((pts) => dansPolygone(pts, x, y)))
 }
 
-export function Brouillard({
-  calque,
-  yeux,
-  w,
-  h
-}: {
-  calque: CalqueBrouillard
-  yeux: Oeil[]
-  /** La taille naturelle de l'image : le repère de tout ce qu'on dessine. */
-  w: number
-  h: number
-}): JSX.Element | null {
+/**
+ * Ce que voient les joueurs, calculé sans rien dessiner : leurs regards et
+ * leurs couches, les lueurs, la lumière du dehors, et ce que la table a déjà
+ * vu. Deux façons de le peindre s'en servent — les masques SVG de
+ * `Brouillard`, et le canvas de `BrouillardToile` (iPad, iPhone).
+ */
+export function useOmbre(calque: CalqueBrouillard, yeux: Oeil[], w: number, h: number) {
   const { murs, ouvertures, lumieres, lumGarde } = calque
   const nuit = nuitNoire(calque.astre)
   /* Ceux qui portent de la lumière, réduits à ceux qui sont sur cette carte :
@@ -316,44 +311,6 @@ export function Brouillard({
 
   /* La mémoire de la table : ce qui a été vu et qu'on ne regarde plus. Elle ne
      sert que si le lieu garde ce qu'il éclaire — sinon rien ne se retient. */
-  /*
-   * Un identifiant par calque, et non par taille d'image.
-   *
-   * Deux ombres peuvent vivre dans la même page — la régie et son moniteur, ou
-   * les deux images d'un enchaînement chez les joueurs. Avec un `id` calculé
-   * sur la taille, elles portaient le même : le navigateur résout `url(#…)`
-   * sur le premier venu, et l'une se masquait avec les masques de l'autre.
-   *
-   * Il se prend **ici**, avec les autres crochets : plus bas, après le retour
-   * anticipé du cas « personne sur la carte », le nombre de crochets changeait
-   * d'un rendu à l'autre — et React casse le composant quand le dernier pion
-   * quitte le lieu, ou quand le premier y arrive.
-   */
-  const propre = useId().replace(/:/g, '')
-
-  /**
-   * Une empreinte des lueurs, collée à l'identifiant des masques.
-   *
-   * Sans elle, souffler les lampes ne change rien à l'écran. React remplace
-   * pourtant bien les polygones du masque `-lum` — mesuré : neuf lueurs
-   * deviennent deux —, mais **le navigateur ne repeint pas** ce qui référence
-   * ce masque, parce qu'il est lui-même utilisé depuis un autre masque
-   * (`<g mask="url(#…-lum)">`, dans `-vu`, `-champ` et `-noir`). Le rendu
-   * gardait l'ancienne lumière jusqu'à ce qu'un pion bouge et force le
-   * repeint — d'où l'impression que les lampes n'obéissaient qu'au pas des
-   * joueurs.
-   *
-   * Changer l'identifiant quand la lumière change crée des masques neufs :
-   * il n'y a plus rien à réutiliser. L'empreinte se calcule sur les polygones
-   * déjà en main, donc elle ne coûte qu'une boucle d'entiers, et elle ne
-   * bouge que si l'image doit bouger.
-   */
-  const empreinte = useMemo(
-    () => `${empreinteLueurs(lueurs)}${empreinteDehors(dehors)}`,
-    [lueurs, dehors]
-  )
-
-  const id = `${propre}-${empreinte}`
 
   const carreaux = useMemo(() => (w > 0 && h > 0 ? grille(w, h) : null), [w, h])
   const [connu, setConnu] = useState<Set<number>>(new Set())
@@ -403,6 +360,67 @@ export function Brouillard({
     [lumGarde, carreaux, connu]
   )
 
+  return { murs, ouvertures, lumGarde, regardsY, couchesY, lueurs, dehors, sousLaLampe, connu, inconnu }
+}
+
+export function Brouillard({
+  calque,
+  yeux,
+  w,
+  h,
+  sansFlou = false
+}: {
+  calque: CalqueBrouillard
+  yeux: Oeil[]
+  /** La taille naturelle de l'image : le repère de tout ce qu'on dessine. */
+  w: number
+  h: number
+  /** Bords nets : le flou coûte trop cher à certains navigateurs (Safari). */
+  sansFlou?: boolean
+}): JSX.Element | null {
+  const flou = sansFlou ? undefined : 'flou'
+  const { murs, ouvertures, lumGarde, regardsY, couchesY, lueurs, dehors, sousLaLampe, connu, inconnu } =
+    useOmbre(calque, yeux, w, h)
+
+  /*
+   * Un identifiant par calque, et non par taille d'image.
+   *
+   * Deux ombres peuvent vivre dans la même page — la régie et son moniteur, ou
+   * les deux images d'un enchaînement chez les joueurs. Avec un `id` calculé
+   * sur la taille, elles portaient le même : le navigateur résout `url(#…)`
+   * sur le premier venu, et l'une se masquait avec les masques de l'autre.
+   *
+   * Il se prend **ici**, avec les autres crochets : plus bas, après le retour
+   * anticipé du cas « personne sur la carte », le nombre de crochets changeait
+   * d'un rendu à l'autre — et React casse le composant quand le dernier pion
+   * quitte le lieu, ou quand le premier y arrive.
+   */
+  const propre = useId().replace(/:/g, '')
+
+  /**
+   * Une empreinte des lueurs, collée à l'identifiant des masques.
+   *
+   * Sans elle, souffler les lampes ne change rien à l'écran. React remplace
+   * pourtant bien les polygones du masque `-lum` — mesuré : neuf lueurs
+   * deviennent deux —, mais **le navigateur ne repeint pas** ce qui référence
+   * ce masque, parce qu'il est lui-même utilisé depuis un autre masque
+   * (`<g mask="url(#…-lum)">`, dans `-vu`, `-champ` et `-noir`). Le rendu
+   * gardait l'ancienne lumière jusqu'à ce qu'un pion bouge et force le
+   * repeint — d'où l'impression que les lampes n'obéissaient qu'au pas des
+   * joueurs.
+   *
+   * Changer l'identifiant quand la lumière change crée des masques neufs :
+   * il n'y a plus rien à réutiliser. L'empreinte se calcule sur les polygones
+   * déjà en main, donc elle ne coûte qu'une boucle d'entiers, et elle ne
+   * bouge que si l'image doit bouger.
+   */
+  const empreinte = useMemo(
+    () => `${empreinteLueurs(lueurs)}${empreinteDehors(dehors)}`,
+    [lueurs, dehors]
+  )
+
+  const id = `${propre}-${empreinte}`
+
   /* Personne sur la carte : personne ne regarde, on n'y voit donc rien — la
      nuit, comme ailleurs hors des regards. Montrer le plan entier tant qu'on
      n'y avait pas posé de pion donnait aux joueurs ce qu'un pion leur aurait
@@ -438,7 +456,7 @@ export function Brouillard({
    */
   const regardsDans = (voir: boolean): JSX.Element => (
     /* Les bords des cônes, adoucis : tout le regard passe par un léger flou. */
-    <g filter={`url(#${id}-flou)`}>
+    <g filter={flou && `url(#${id}-flou)`}>
       {sousLaLampe ? (
         <g mask={`url(#${id}-lum)`}>
           {couchesY.map((c, i) => (
@@ -495,7 +513,7 @@ export function Brouillard({
           <DegradesLueurs lueurs={lueurs} id={`${id}-g`} />
           {/* Le même flou que le regard : une lueur arrêtée par un mur, ou le
               bord d'un faisceau, ne fait pas un trait net. */}
-          <g filter={`url(#${id}-flou)`}>
+          <g filter={flou && `url(#${id}-flou)`}>
             {lueurs.map((l, i) => (
               <polygon
                 key={i}
@@ -540,7 +558,7 @@ export function Brouillard({
           dans le dos des joueurs ne les regarde pas. Le blanc ne teinte rien.
           En styles posés sur l'élément : le téléphone ne charge pas app.css. */}
       {sousLaLampe && lueurs.some(aUneTeinte) ? (
-        <g mask={`url(#${id}-champ)`} filter={`url(#${id}-flou)`}>
+        <g mask={`url(#${id}-champ)`} filter={flou && `url(#${id}-flou)`}>
           {lueurs.filter(aUneTeinte).map((l, i) => (
             <polygon key={i} points={polygone(l.pts)} fill={l.teinte} style={TEINTE_LUEUR} />
           ))}

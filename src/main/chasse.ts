@@ -18,7 +18,7 @@
 import * as display from './display'
 import * as mobile from './mobile'
 import { getDb } from './db'
-import { donner, exemplairesOutils, situer } from './db/repos/objets'
+import { donner, exemplairesOutils, mainLibre, porter, situer } from './db/repos/objets'
 import { pionsPartout } from './db/repos/pions'
 import { listMurs } from './db/repos/murs'
 import { listOuvertures } from './db/repos/ouvertures'
@@ -28,6 +28,7 @@ import { barrieres, RAYON_PION, seCroisent, type Barriere, type Pt } from '@shar
 import {
   LARGEUR_PLAN_DEFAUT_M,
   PORTEE_LECTURE_M,
+  PORTEE_RAMASSER_M,
   TEMPERATURE_MAX,
   TEMPERATURE_MIN,
   gainSon,
@@ -60,6 +61,11 @@ export interface Plan {
   h: number
   /** Ce qui arrête le pas — et donc le son, en partie. En pixels du plan. */
   murs: Barriere[]
+  /**
+   * Ce qui empêche de tendre le bras : les mêmes, sans les meubles bas — on
+   * ramasse un appareil par-dessus une table ou un comptoir.
+   */
+  mursBras: Barriere[]
   /** Lue au premier besoin : juger qui lit un appareil n'a pas à relire tout le terrain. */
   readonly construction: Construction | null
   /** La largeur du plan, en mètres : celle du terrain bâti, sinon l'échelle. */
@@ -74,11 +80,17 @@ function lirePlan(plan: number): Plan {
     w,
     h,
     murs: barrieres(listMurs(plan), 'pas', enPx, listOuvertures(plan)),
+    mursBras: barrieres(
+      listMurs(plan).filter((m) => m.nature !== 'obstacle-bas'),
+      'pas',
+      enPx,
+      listOuvertures(plan)
+    ),
     get construction() {
       if (construction === undefined) construction = getConstruction(plan)
       return construction
     },
-    metres: largeurConstruiteM(plan) ?? echelleDe(plan).metres ?? LARGEUR_PLAN_DEFAUT_M
+    metres: metresDuPlan(plan)
   }
 }
 
@@ -92,6 +104,20 @@ const plansLus = new Map<number, Plan>()
 /** Un mur, une porte, un terrain, une image ou une échelle ont pu changer : les plans seront relus. */
 export function plansChanges(): void {
   plansLus.clear()
+}
+
+/** La largeur d'un plan, en mètres : celle du terrain bâti, sinon l'échelle, sinon 30 m. */
+function metresDuPlan(plan: number): number {
+  return largeurConstruiteM(plan) ?? echelleDe(plan).metres ?? LARGEUR_PLAN_DEFAUT_M
+}
+
+/**
+ * La largeur du plan d'un lieu, en mètres : le téléphone y mesure la portée de
+ * ramassage. Sans passer par `lirePlan`, qui demande au téléphone son repère —
+ * lequel se construit avec ce nombre-ci.
+ */
+export function metresDuLieu(placeId: number): number {
+  return metresDuPlan(planDe(placeId))
 }
 
 function planDuLieu(placeId: number): Plan {
@@ -151,6 +177,8 @@ interface Calcul {
   pions: Pion[]
   /** Les exemplaires posés dans un lieu, avec ou sans point sur le plan. */
   poses: Set<number>
+  /** Ceux qu'un personnage a rangés dans son sac, plutôt qu'en main. */
+  sacs: Set<number>
 }
 
 function calculer(): Calcul {
@@ -158,14 +186,16 @@ function calculer(): Calcul {
   /* Une séance sans outil ne coûte rien : ni pions, ni plans à lire. */
   if (exemplaires.length === 0) {
     controles.clear()
-    return (dernier = { appareils: [], trouves: new Set(), pions: [], poses: new Set() })
+    return (dernier = { appareils: [], trouves: new Set(), pions: [], poses: new Set(), sacs: new Set() })
   }
   const { pions, plan } = contexte()
   const affiche = display.getState().placeId
   const out: AppareilChasse[] = []
   const trouves = new Set<number>()
   const poses = new Set<number>()
+  const sacs = new Set<number>()
   for (const ex of exemplaires) {
+    if (ex.dansLeSac) sacs.add(ex.placementId)
     let ou: AppareilChasse['ou'] = 'ailleurs'
     let placeId: number | null = null
     let pos: AppareilChasse['pos'] = null
@@ -228,7 +258,7 @@ function calculer(): Calcul {
   /* Ce qui n'est plus un appareil — supprimé, plus un outil, jeté, rangé —
      perd le contrôle du MJ : il ne le retrouvera pas en revenant. */
   for (const id of controles.keys()) if (!out.some((a) => a.placementId === id)) controles.delete(id)
-  return (dernier = { appareils: out, trouves, pions, poses })
+  return (dernier = { appareils: out, trouves, pions, poses, sacs })
 }
 
 /** Tous les appareils, en main ou posés, avec ce qu'ils lisent en ce moment. */
@@ -317,7 +347,7 @@ export function lecteurTelephones(): (
   characterId: number | null,
   placeId: number | null
 ) => { outils: OutilTelephone[]; appareilsPoses: AppareilPose[] } {
-  const { appareils: tous, trouves, pions, poses } = dernier ?? calculer()
+  const { appareils: tous, trouves, pions, poses, sacs } = dernier ?? calculer()
   if (tous.length === 0) return () => ({ outils: [], appareilsPoses: [] })
   const ctx: ContexteChasse = { pions, plan: planDuLieu }
   return (characterId, placeId) => {
@@ -336,7 +366,7 @@ export function lecteurTelephones(): (
           placementId: a.placementId,
           nom: a.nom,
           outil: a.outil,
-          ou: pose ? 'lieu' : 'main',
+          ou: pose ? 'lieu' : sacs.has(a.placementId) ? 'sac' : 'main',
           allume: a.allume,
           valeur
         })
@@ -406,12 +436,15 @@ export function ramasserOutil(characterId: number, placementId: number): string 
   if (!p) return 'Ton pion n’est pas dans ce lieu.'
   const g = plan(ex.placeId)
   const pion = ouEstLePion(p, g)
+  const t = trajet(pion, ex.pos, g)
+  if (t.m > PORTEE_RAMASSER_M) return 'Approche-toi pour le ramasser.'
   const pa = { x: pion.x * g.w, y: pion.y * g.h }
   const pb = { x: ex.pos.x * g.w, y: ex.pos.y * g.h }
-  if (Math.hypot(pb.x - pa.x, pb.y - pa.y) > 3 * RAYON_PION * Math.max(g.w, g.h))
-    return 'Approche-toi pour le ramasser.'
-  if (g.murs.some((m) => seCroisent(pa, pb, m.a, m.b))) return 'Un mur te sépare de cet appareil.'
+  if (g.mursBras.some((m) => seCroisent(pa, pb, m.a, m.b))) return 'Un mur te sépare de cet appareil.'
   donner(placementId, { port: 'pj', characterId })
+  /* On le ramasse à la main : dans une main libre, sinon il file au sac. */
+  const main = mainLibre(characterId)
+  if (main) porter(placementId, main)
   return null
 }
 

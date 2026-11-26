@@ -141,6 +141,9 @@ export function registerIpc(): void {
       display.rehabiller()
       /* Un onglet de la Pochette rendu : les téléphones le retrouvent. */
       mobile.broadcast()
+      /* Une zone de chasse défaite : les appareils relisent le plan. */
+      chasse.plansChanges()
+      chasse.recalculer()
     }
     return libelle
   }
@@ -786,6 +789,13 @@ export function registerIpc(): void {
   on('atelier:construire', (placeId: number) => atelier.construire(placeId))
   on('atelier:ajouterNiveau', (placeId: number) => atelier.ajouterNiveau(placeId))
   on('atelier:de', (placeId: number) => atelier.de(placeId))
+  on('atelier:mesures', (placeId: number, m: atelier.Mesures) => {
+    const r = atelier.peindreMesures(placeId, m)
+    /* Les plans gardés en mémoire portent l'ancienne construction. */
+    chasse.plansChanges()
+    chasse.recalculer()
+    return r
+  })
   on('atelier:assets', () => atelierAssets.tousLesAssets())
   on('atelier:importer', (meta: any, png: Uint8Array) => atelierAssets.importer(meta, png))
   on('atelier:retirerAsset', (id: string) => atelierAssets.retirer(id))

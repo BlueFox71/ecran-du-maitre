@@ -98,6 +98,7 @@ import {
 import { ApercuDuCiel } from '../components/ApercuDuCiel'
 import { SuiteAriane } from '../components/SuiteAriane'
 import { CalqueSons, VoletSons, useSonsDEssai, useZonesSon } from '../components/CalqueSons'
+import { CalqueMesures, VoletMesures, useMesures } from '../chasse/CalqueMesures'
 
 /** Ce qu'on est en train de créer à la chaîne, et sous quel contenant. */
 type Rafale = { parentId: number | null; tier: PlaceTier }
@@ -2429,6 +2430,13 @@ function FicheLieu({
   /** Les sons posés sur ce plan, et l'outil Son en main. */
   const zs = useZonesSon(p.id)
   const [sonArme, setSonArme] = useState(false)
+  /** L'outil « Zones de chasse » en main : on peint l'EMF et la température, sur un plan bâti seulement. */
+  const [mesArme, setMesArme] = useState(false)
+  const mes = useMesures(p.id, !!p.construit, mesArme)
+  /* Un plan qui n'est pas bâti n'a pas de zones : l'outil se repose. */
+  useEffect(() => {
+    if (!p.construit) setMesArme(false)
+  }, [p.id, p.construit])
   /** Le pion d'essai est posé, ou l'on attend son point de départ. */
   const enTest = mu.essai !== null || mu.attenteDepart
   const [outil, setOutil] = useState<OutilAnnotation>(null)
@@ -3160,7 +3168,9 @@ function FicheLieu({
      des murs ; repère et texte, ceux des annotations ; pièce, le tracé d'un
      lieu au rectangle (ou la désignation de ses murs). « Choisir » prend un
      mur, une porte, une lampe ou un repère, selon ce qu'on vise. */
-  const outilRail: OutilRail = sonArme
+  const outilRail: OutilRail = mesArme
+    ? 'mesure'
+    : sonArme
     ? 'son'
     : trace === 'lieu' || mu.pourPiece !== null
       ? 'piece'
@@ -3192,8 +3202,9 @@ function FicheLieu({
     mu.setLumChoisie(null)
     setChoisi(null)
     setSonArme(o === 'son')
+    setMesArme(o === 'mesure')
     zs.setChoisie(null)
-    if (o === 'son') {
+    if (o === 'son' || o === 'mesure') {
       setMurs(false)
       setAnnote(false)
       setOutil(null)
@@ -3247,7 +3258,7 @@ function FicheLieu({
         if (mu.pourPiece !== null) return void mu.setPourPiece(null)
         if (trace === 'lieu' && rect) return void setRect(null)
         if (sonArme && zs.choisie != null) return void zs.setChoisie(null)
-        if (sonArme) return void choisirOutil('choisir')
+        if (sonArme || mesArme) return void choisirOutil('choisir')
         if (trace === 'lieu' || annote) return void choisirOutil('choisir')
       }
       if (sansOutils) return
@@ -3443,7 +3454,7 @@ function FicheLieu({
         </div>
       )
     }
-    const o = OUTILS_RAIL.find((x) => x.cle === outilRail)!
+    const o = OUTILS_RAIL.find((x) => x.cle === outilRail) ?? OUTIL_MESURE
     return (
       <div className={`annot-barre pe-barre${o.mj ? ' pe-mj' : ''}`}>
         <span className="pe-nom">{o.label}</span>
@@ -3520,6 +3531,11 @@ function FicheLieu({
               ou désigne les murs qui le bornent. Les murs fermés font déjà des pièces : nomme-les à droite.
             </span>
           ) : null
+        ) : outilRail === 'mesure' ? (
+          <span className="note">
+            Glisse sur le plan pour peindre · repeindre remplace · clic droit ou <kbd>Échap</kbd> annule le trait ·
+            jamais chez les joueurs
+          </span>
         ) : outilRail === 'son' ? (
           <span className="note">
             Clique sur le plan pour poser un son · glisse le cercle pour le déplacer, tire sa poignée pour
@@ -3850,6 +3866,8 @@ function FicheLieu({
                 {sonArme || (calques.mj && !vueJoueursOn && !enTest && zs.zones.length) ? (
                   <CalqueSons z={zs} arme={sonArme && !sansOutils} />
                 ) : null}
+                {/* Les zones de chasse : peintes ici, vues ici seulement, outil en main. */}
+                {mesArme && !sansOutils ? <CalqueMesures z={mes} arme /> : null}
                 {apercuPion && ech ? (
                   <ApercuPion taille={ech.pionPourcent} pose={poseApercu} onPose={setPoseApercu} />
                 ) : null}
@@ -4027,6 +4045,8 @@ function FicheLieu({
                 ) : null
               }
             />
+          ) : mesArme ? (
+            <VoletMesures z={mes} onFini={() => choisirOutil('choisir')} />
           ) : sonArme ? (
             <VoletSons z={zs} pieces={piecesQq} metres={ech?.metres ?? null} ambiance={ambianceDuLieu} />
           ) : lampeChoisie ? (
@@ -4141,6 +4161,36 @@ function FicheLieu({
                   ))}
                 </div>
               ) : null}
+              {/* Les zones de chasse se peignent d'ici : on prend le pinceau, le
+                  volet devient le sien, « Terminé » y ramène. */}
+              {onglet === 'quiquoi' && p.construit ? (
+                <div className="mes-acces">
+                  <span className="eyebrow">Zones de chasse</span>
+                  <div className="at-outils">
+                    {(
+                      [
+                        ['emf', 'Peindre l’EMF', mes.nbEmf],
+                        ['temperature', 'Peindre la température', mes.nbTemperature]
+                      ] as const
+                    ).map(([k, l, n]) => (
+                      <button
+                        key={k}
+                        className="btn btn-sm"
+                        disabled={sansOutils}
+                        title="Ce que lisent l’EMF et le thermomètre des joueurs — jamais montré à la table"
+                        onClick={() => {
+                          mes.setPinceau((x) => ({ ...x, calque: k, geste: 'pinceau' }))
+                          choisirOutil('mesure')
+                        }}
+                      >
+                        <IconOutilMesure />
+                        {l}
+                        {n ? <span className="n">{n}</span> : null}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : null}
               {onglet === 'quiquoi' && pieceRangee ? (
                 <>
                   <div className="pe-qq-pieces">
@@ -4246,7 +4296,19 @@ function FicheLieu({
 }
 
 /** Un outil de la barre de gauche : sa touche, son icône, son groupe. */
-type OutilRail = 'choisir' | 'mur' | 'rideau' | 'porte' | 'fenetre' | 'lumiere' | 'piece' | 'gomme' | 'repere' | 'texte' | 'son'
+type OutilRail =
+  | 'choisir'
+  | 'mur'
+  | 'rideau'
+  | 'porte'
+  | 'fenetre'
+  | 'lumiere'
+  | 'piece'
+  | 'gomme'
+  | 'repere'
+  | 'texte'
+  | 'son'
+  | 'mesure'
 
 const OUTILS_RAIL: { cle: OutilRail; label: string; touche: string; groupe?: string; mj?: boolean; icone: JSX.Element }[] = [
   { cle: 'choisir', label: 'Choisir', touche: 'v', icone: <IconSouris /> },
@@ -4262,6 +4324,10 @@ const OUTILS_RAIL: { cle: OutilRail; label: string; touche: string; groupe?: str
   /* Un son posé : il part quand un pion entre dans son cercle. */
   { cle: 'son', label: 'Son', touche: 's', groupe: 'MJ', mj: true, icone: <IconNote /> }
 ]
+
+/* Les zones de chasse n'ont pas de place dans la barre : on prend leur
+   pinceau depuis l'onglet « Objets et PNJ ». La barre du haut les nomme. */
+const OUTIL_MESURE = { cle: 'mesure' as const, label: 'Zones de chasse', mj: true }
 
 /* Les icônes des outils qui n'en avaient pas : un trait, un rideau, une porte,
    une fenêtre, un contour de pièce. */
@@ -4297,6 +4363,16 @@ function IconOutilFenetre(): JSX.Element {
     </svg>
   )
 }
+function IconOutilMesure(): JSX.Element {
+  return (
+    <svg className="ico" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.1" aria-hidden="true">
+      <rect x="5" y="6.5" width="6" height="8" rx="1" />
+      <path d="M6.8 9h2.4M6.8 11h2.4" />
+      <path d="M5.2 4.2a4 4 0 0 1 5.6 0M3.6 2.6a6.3 6.3 0 0 1 8.8 0" />
+    </svg>
+  )
+}
+
 function IconOutilPiece(): JSX.Element {
   return (
     <svg className="ico" viewBox="0 0 16 16" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.1" aria-hidden="true">
