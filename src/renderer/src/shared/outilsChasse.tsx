@@ -166,5 +166,10 @@ export function AppareilSurPlan({
 }): JSX.Element {
   if (outil === 'emf') return <EmfVivant {...reste} />
   if (outil === 'thermometre') return <ThermoVivant {...reste} />
+  /* Le livre et la planche, couchés en largeur, paraîtraient énormes à la hauteur d'un EMF. */
+  if (outil === 'livre' || outil === 'planche') return <AppareilPose outil={outil} {...reste} taille={reste.taille * REDUIT_A_PLAT} />
   return <AppareilPose outil={outil} {...reste} />
 }
+
+/** La part de leur taille que gardent le livre et la planche posés sur un plan. */
+const REDUIT_A_PLAT = 0.55
