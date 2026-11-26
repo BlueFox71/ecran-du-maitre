@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from 'electron'
 import type { FenetreChasse, ParoleObjet, Passage, TextePrepare, TexteTarot } from '@shared/parole'
+import type { CarnetVu, GenreCarnet } from '@shared/carnetChasse'
 import type { Brut } from '@shared/reglages'
 import type { EnvoiWow, JoueurWow, PersoAAssocier, QuetePreparee, Regles, ServeurWow } from '@shared/wow'
 import type { Modif } from '@shared/modifs'
@@ -646,6 +647,21 @@ const api = {
     ajouter: (arcane: string, texte: string) => call<void>('tarot:ajouter', arcane, texte),
     modifier: (id: number, texte: string) => call<void>('tarot:modifier', id, texte),
     retirer: (id: number) => call<void>('tarot:retirer', id)
+  },
+
+  /** Le carnet des chasseurs : ses lignes se règlent ici ; les marques viennent des téléphones. */
+  carnetChasse: {
+    etat: () => call<CarnetVu>('carnetChasse:etat'),
+    ajouter: (genre: GenreCarnet, nom: string) => call<CarnetVu>('carnetChasse:ajouter', genre, nom),
+    renommer: (id: number, nom: string) => call<CarnetVu>('carnetChasse:renommer', id, nom),
+    retirer: (id: number) => call<CarnetVu>('carnetChasse:retirer', id),
+    ordonner: (genre: GenreCarnet, ids: number[]) => call<CarnetVu>('carnetChasse:ordonner', genre, ids),
+    /** Une marque posée sur un téléphone, une ligne changée : relire. */
+    onChange: (cb: () => void) => {
+      const h = (): void => cb()
+      ipcRenderer.on('carnetChasse:change', h)
+      return () => void ipcRenderer.removeListener('carnetChasse:change', h)
+    }
   },
 
   objets: {

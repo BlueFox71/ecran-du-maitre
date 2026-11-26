@@ -34,6 +34,7 @@ import * as reglages from './db/repos/reglages'
 import * as chars from './db/repos/characters'
 import { CLE_FICHE_AVANT_WOW, FICHE_WOW, type Regles } from '@shared/wow'
 import { lireCampagne } from '@shared/reglages'
+import * as carnetChasse from './db/repos/carnetChasse'
 import type { ProjectInfo } from '@shared/types'
 
 const MARQUE = '.ecran-du-maitre'
@@ -111,6 +112,8 @@ export function openProject(dir: string): ProjectInfo {
      et la migration trouverait deux dossiers « Lieux » à fusionner. */
   fsLib.rangerDansLeDossierDeLApp()
   fsLib.rangerTextesDesMoments()
+  /* Les listes du carnet des chasseurs, une seule fois, pour une campagne de chasse. */
+  carnetChasse.poserListesDeDepart()
   alignerNomsDesTextes()
   synchroniserLieux()
   synchroniserPnj()

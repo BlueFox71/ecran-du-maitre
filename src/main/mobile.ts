@@ -29,7 +29,7 @@ import { copieReduite, vignettesDir } from './vault'
 import { plageDemandee } from './plage'
 import * as chars from './db/repos/characters'
 import * as players from './db/repos/players'
-import { listPionsVus, movePion, tournerPion } from './db/repos/pions'
+import { initialsOf, listPionsVus, movePion, tournerPion } from './db/repos/pions'
 import { calqueDe } from './db/repos/murs'
 import { echelleDe, planDe } from './db/repos/echelle'
 import { barrieres, cheminContraint, distanceAuSegment, RAYON_PION, type Pt } from '@shared/murs'
@@ -41,6 +41,8 @@ import * as poche from './db/repos/pochette'
 import * as motsRepo from './db/repos/mots'
 import * as objets from './db/repos/objets'
 import * as carnet from './carnet'
+import * as carnetChasse from './db/repos/carnetChasse'
+import type { CarnetVu } from '@shared/carnetChasse'
 import { lireCampagne, lirePoste, type ReglagesPoste } from '@shared/reglages'
 import { monnaiesActives } from '@shared/monnaies'
 import { refusSac } from '@shared/sac'
@@ -53,7 +55,7 @@ import * as parole from './parole'
 import { bonusParCarac, noterJet } from './jetDuPerso'
 import * as rolls from './db/repos/rolls'
 import { bonusDuPerso } from '@shared/modifs'
-import { EMPLACEMENTS_OBJET, PION_COULEURS, etatDeVie } from '@shared/types'
+import { EMPLACEMENTS_OBJET, PION_COULEURS, colorFor, etatDeVie } from '@shared/types'
 import { AbonneSse } from './fluxSse'
 import type { CadreCarre, MobileInfo, MobileDevice, MobileNudge, MobilePing, StatsEcran } from '@shared/types'
 
@@ -592,6 +594,33 @@ let jetsAttendus = new Map<number, { titre: string; caracKey: string }>()
 export function poserJetsAttendus(liste: { characterId: number; titre: string; caracKey: string }[]): void {
   jetsAttendus = new Map(liste.map((j) => [j.characterId, { titre: j.titre, caracKey: j.caracKey }]))
   broadcast()
+}
+
+/**
+ * Le carnet des chasseurs tel que les téléphones et le MJ le voient : les
+ * lignes de la campagne, et les marques de la séance des seuls personnages
+ * présents — un absent ne vient pas brouiller le carnet des autres. C'est la
+ * seule fabrique de `CarnetVu`.
+ */
+export function carnetVu(): CarnetVu {
+  const presents = chars.listJoueurs()
+  const ici = new Set(presents.map((c) => c.id))
+  return {
+    elements: carnetChasse.elements(),
+    marques: carnetChasse.marquesDeLaSeance().filter((m) => ici.has(m.characterId)),
+    joueurs: presents.map((c) => ({
+      characterId: c.id,
+      nom: c.name,
+      color: c.color ?? colorFor(c.id),
+      initiales: initialsOf(c.name)
+    }))
+  }
+}
+
+/** Une marque posée, une ligne changée : les téléphones et le poste du MJ relisent. */
+export function carnetChange(): void {
+  broadcast()
+  versMj('carnetChasse:change', null)
 }
 
 /** Pousse l'état à tous les téléphones. Appelé quand le PC change quelque chose. */

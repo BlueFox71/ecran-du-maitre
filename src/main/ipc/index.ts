@@ -40,8 +40,10 @@ import * as display from '../display'
 import * as tours from '../tours'
 import * as voix from '../voix'
 import * as tarot from '../db/repos/tarot'
+import * as carnetChasse from '../db/repos/carnetChasse'
 import * as parole from '../parole'
 import type { TextePrepare } from '@shared/parole'
+import type { CarnetVu, GenreCarnet } from '@shared/carnetChasse'
 import * as prepa from '../preparation'
 import * as regieSon from '../sons'
 import * as chasse from '../chasse'
@@ -677,6 +679,31 @@ export function registerIpc(): void {
   on('tarot:ajouter', (arcane: string, texte: string) => tarot.ajouterTexteTarot(arcane, texte))
   on('tarot:modifier', (id: number, texte: string) => tarot.modifierTexteTarot(id, texte))
   on('tarot:retirer', (id: number) => tarot.retirerTexteTarot(id))
+
+  /* ---------------- le carnet des chasseurs ----------------
+     Les lignes se règlent ici, et se défont au Ctrl+Z ; les marques, elles,
+     arrivent des téléphones (voir mobile.ts). */
+  const carnetApres = (): CarnetVu => {
+    mobile.carnetChange()
+    return mobile.carnetVu()
+  }
+  on('carnetChasse:etat', () => mobile.carnetVu())
+  on('carnetChasse:ajouter', (genre: GenreCarnet, nom: string) => {
+    carnetChasse.ajouterElement(genre, nom)
+    return carnetApres()
+  })
+  on('carnetChasse:renommer', (id: number, nom: string) => {
+    carnetChasse.renommerElement(id, nom)
+    return carnetApres()
+  })
+  on('carnetChasse:retirer', (id: number) => {
+    carnetChasse.retirerElement(id)
+    return carnetApres()
+  })
+  on('carnetChasse:ordonner', (genre: GenreCarnet, ids: number[]) => {
+    carnetChasse.ordonner(genre, ids)
+    return carnetApres()
+  })
   on('objets:copy', (id: number) => eclaireAutrement(objets.copyObjet(id)))
   on('objets:remove', (id: number) => eclaireAutrement(objets.removeObjet(id)))
   on('objets:poser', (input: any) => eclaireAutrement(objets.poser(input)))
