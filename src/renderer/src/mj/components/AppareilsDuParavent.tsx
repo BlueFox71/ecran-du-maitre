@@ -27,9 +27,11 @@ import { texteTemperature } from '../chasse/temperature'
 import { imageOutil } from '../../shared/outilsChasse'
 import { VuePlanche, plancheBouge } from '../../shared/chasse/Vues'
 import { useMaintenant } from '../../shared/chasse/temps'
+import { FenetreChasseVue } from '../../shared/chasse/FenetreChasse'
 import { estMesureur, seRegleAllume, type AppareilChasse } from '@shared/chasse'
 import {
   REGLAGES_VOIX,
+  type FenetreChasse,
   type Goutte,
   type ParoleObjet,
   type Passage,
@@ -277,23 +279,26 @@ interface Main {
  * enregistré avec le texte. « Voir » montre le passage en avance sur le
  * visuel du Paravent, à la suite de ce qui est déjà écrit, pour le MJ seul.
  */
-function Livre({ o, bloque }: { o: Objet; bloque: string | null }): JSX.Element {
+function Livre({ o, bloque, apercuIci }: { o: Objet; bloque: string | null; apercuIci: boolean }): JSX.Element {
   const [main, setMain] = useState<Main>({ ecriture: ECRITURES[0].id, taille: 1, angle: 0 })
   const [vu, setVu] = useState<TextePrepare | null>(null)
   const [pages, setPages] = useState<Passage[]>([])
   const setApercu = useStore((s) => s.setApercuChasse)
 
-  /* L'aperçu suit les réglages ; il disparaît quand on ferme, ou quand le panneau part. */
+  /* L'aperçu : les pages déjà écrites et ce texte, en entier — tout au début
+     du temps, pour qu'il apparaisse écrit plutôt que de s'écrire. */
+  const apercu: FenetreChasse | null = vu
+    ? {
+        sorte: 'livre',
+        objetId: o.id,
+        nom: o.nom,
+        pages: [...pages.map((p) => ({ ...p, debut: 0 })), { id: -1, texte: vu.texte, ...main, debut: 0 }]
+      }
+    : null
+  /* Dans le Paravent, il passe sur son visuel ; il disparaît quand on ferme, ou quand le panneau part. */
   useEffect(() => {
-    if (!vu) return setApercu(null)
-    setApercu({
-      sorte: 'livre',
-      objetId: o.id,
-      nom: o.nom,
-      /* Tout au début du temps : l'aperçu montre le texte déjà écrit, en entier. */
-      pages: [...pages.map((p) => ({ ...p, debut: 0 })), { id: -1, texte: vu.texte, ...main, debut: 0 }]
-    })
-  }, [vu, main, pages])
+    if (!apercuIci) setApercu(apercu)
+  }, [vu, main, pages, apercuIci])
   useEffect(() => () => setApercu(null), [])
 
   const voir = async (t: TextePrepare): Promise<void> => {
@@ -359,15 +364,31 @@ function Livre({ o, bloque }: { o: Objet; bloque: string | null }): JSX.Element 
       />
       {vu ? (
         <p className="ap-aide">
-          Aperçu sur le visuel du Paravent : règle la main, puis « Écrire ». « Voir » à nouveau pour le fermer.
+          {apercuIci ? 'Aperçu ci-dessous, pour toi seul' : 'Aperçu sur le visuel du Paravent'} : règle la main, puis
+          « Écrire ». « Voir » à nouveau pour le fermer.
         </p>
+      ) : null}
+      {apercuIci && apercu ? (
+        <div className="ap-apercu-ici">
+          <FenetreChasseVue f={apercu} />
+        </div>
       ) : null}
     </div>
   )
 }
 
 /** Une carte d'appareil en jeu. */
-function Appareil({ a, o, ou }: { a: AppareilChasse; o: Objet | undefined; ou: string }): JSX.Element {
+function Appareil({
+  a,
+  o,
+  ou,
+  apercuIci
+}: {
+  a: AppareilChasse
+  o: Objet | undefined
+  ou: string
+  apercuIci: boolean
+}): JSX.Element {
   return (
     <article className={`ap-carte${a.controle ? ' controle' : ''}`}>
       <header>
@@ -403,7 +424,7 @@ function Appareil({ a, o, ou }: { a: AppareilChasse; o: Objet | undefined; ou: s
           <Textes o={o} verbe="Dire" bloque={horsJeu(a)} onLancer={(t) => lancerVoix(o.id, t.texte, o.parole)} />
         </div>
       ) : o && a.outil === 'livre' ? (
-        <Livre o={o} bloque={horsJeu(a)} />
+        <Livre o={o} bloque={horsJeu(a)} apercuIci={apercuIci} />
       ) : o && a.outil === 'planche' ? (
         <div className="ap-corps">
           <Montrer sorte="planche" objetId={o.id} />
@@ -504,7 +525,11 @@ function Tarot(): JSX.Element {
   )
 }
 
-export function AppareilsDuParavent(): JSX.Element {
+/**
+ * `apercuIci` : l'aperçu du livre s'affiche sous lui (la page Outils de
+ * chasse), et non sur le visuel du Paravent.
+ */
+export function AppareilsDuParavent({ apercuIci = false }: { apercuIci?: boolean }): JSX.Element {
   const chasse = useStore((s) => s.chasse)
   const objets = useStore((s) => s.objets)
   const characters = useStore((s) => s.characters)
@@ -525,7 +550,13 @@ export function AppareilsDuParavent(): JSX.Element {
         <p className="ap-aide">Aucun appareil porté ou posé pour l’instant.</p>
       ) : (
         chasse.map((a) => (
-          <Appareil key={a.placementId} a={a} o={objets.find((x) => x.id === a.objetId)} ou={ou(a)} />
+          <Appareil
+            key={a.placementId}
+            a={a}
+            o={objets.find((x) => x.id === a.objetId)}
+            ou={ou(a)}
+            apercuIci={apercuIci}
+          />
         ))
       )}
       <Tarot />

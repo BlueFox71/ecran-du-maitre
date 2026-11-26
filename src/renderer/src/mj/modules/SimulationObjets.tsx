@@ -14,7 +14,7 @@
  */
 import { useEffect, useState } from 'react'
 import { Emf } from './Emf'
-import { Appareils } from '../chasse/Appareils'
+import { AppareilsDuParavent } from '../components/AppareilsDuParavent'
 import { Livre } from '../chasse/Livre'
 import { Thermometre } from '../chasse/Thermometre'
 import { SpiritBox } from '../chasse/SpiritBox'
@@ -113,7 +113,12 @@ export function SimulationObjets(): JSX.Element {
         </div>
       </div>
 
-      <Appareils />
+      {/* Les appareils en jeu, avec les mêmes commandes que dans le panneau
+          Objets du Paravent : la main sur l'EMF et le thermomètre, les textes
+          de la spirit box et du livre, la goutte de la planche, le tarot. */}
+      <div className="simu-appareils">
+        <AppareilsDuParavent apercuIci />
+      </div>
 
       <nav className="simu-menu" aria-label="Objets à simuler">
         {OBJETS.map((o) => (
