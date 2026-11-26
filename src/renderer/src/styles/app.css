@@ -9376,6 +9376,37 @@ input[type='range']::-webkit-slider-thumb {
   background: var(--pion-ring, var(--text-faint));
   transform: rotate(-30deg);
 }
+
+/* ---- les listes du carnet, dans les paramètres ---- */
+.cn-liste {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 460px;
+}
+.cn-ligne {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.cn-nom {
+  flex: 1;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid var(--line-soft);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+}
+.cn-nom:focus {
+  border-color: var(--brass);
+  outline: none;
+}
+.cn-ajout {
+  margin-top: 4px;
+}
 .pt-liste {
   display: grid;
   gap: 3px;

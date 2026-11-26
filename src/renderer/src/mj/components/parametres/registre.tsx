@@ -6,6 +6,7 @@ import {
   IconEye,
   IconFolder,
   IconMurs,
+  IconPen,
   IconPeople,
   IconPortable,
   IconSablier,
@@ -17,6 +18,7 @@ import type { Cherchable } from './chercher'
 import * as campagne from './rubriques/campagne'
 import * as regles from './rubriques/regles'
 import * as sante from './rubriques/sante'
+import * as carnet from './rubriques/carnet'
 import * as ecran from './rubriques/ecran'
 import * as attente from './rubriques/attente'
 import * as murs from './rubriques/murs'
@@ -38,6 +40,7 @@ export type Rubrique =
   | 'campagne'
   | 'regles'
   | 'sante'
+  | 'carnet'
   | 'ecran'
   | 'attente'
   | 'murs'
@@ -98,6 +101,12 @@ export const RUBRIQUES: InfoRubrique[] = [
     nom: 'Santé mentale',
     icone: <IconEye />,
     quoi: 'L’assistance du Paravent pour la santé mentale : le jet, les paliers et ce qu’ils changent, la folie, les hallucinations, les pertes et les remèdes.'
+  },
+  {
+    id: 'carnet',
+    nom: 'Carnet des chasseurs',
+    icone: <IconPen />,
+    quoi: 'Les indices et les entités que les joueurs entourent ou barrent sur leur téléphone. Rien ne se déduit tout seul : c’est le livre qui fait le travail.'
   },
   {
     id: 'ecran',
@@ -167,6 +176,7 @@ export const REGLAGES: Reglage[] = [
   ...campagne.reglages,
   ...regles.reglages,
   ...sante.reglages,
+  ...carnet.reglages,
   ...ecran.reglages,
   ...attente.reglages,
   ...murs.reglages,
