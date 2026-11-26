@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { FenetreChasse, TextePrepare, TexteTarot } from '@shared/parole'
+import type { FenetreChasse, Passage, TextePrepare, TexteTarot } from '@shared/parole'
 import type { Brut } from '@shared/reglages'
 import type { EnvoiWow, JoueurWow, PersoAAssocier, QuetePreparee, Regles, ServeurWow } from '@shared/wow'
 import type { Modif } from '@shared/modifs'
@@ -140,7 +140,8 @@ const api = {
     montrer: (f: { sorte: 'livre' | 'planche'; objetId: number } | null) => call<void>('parole:montrer', f),
     tarot: (arcane: string, texte: string) => call<void>('parole:tarot', arcane, texte),
     retirerTarot: () => call<void>('parole:retirerTarot'),
-    table: () => call<FenetreChasse | null>('parole:table')
+    table: () => call<FenetreChasse | null>('parole:table'),
+    pages: (objetId: number) => call<Passage[]>('parole:pages', objetId)
   },
   app: {
     /** Ouvre le panneau d'émojis du système ; il écrit dans le champ qui a la main. */

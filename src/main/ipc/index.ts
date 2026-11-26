@@ -192,6 +192,7 @@ export function registerIpc(): void {
   ipcMain.handle('parole:tarot', (_e, arcane: string, texte: string) => parole.tirerTarot(arcane, texte))
   ipcMain.handle('parole:retirerTarot', () => parole.retirerTarot())
   ipcMain.handle('parole:table', () => parole.fenetreDeLaTable())
+  ipcMain.handle('parole:pages', (_e, objetId: number) => parole.pagesDe(objetId))
 
   /*
    * Le portrait du MJ, pris n'importe où sur le disque. Il suit le maître du

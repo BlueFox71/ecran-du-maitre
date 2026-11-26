@@ -3,6 +3,68 @@ import sonNiveau3 from '../../assets/chasse/emf-niveau3.mp3'
 import { useStore } from '../store'
 import { useSons } from '../sons'
 import { SonEmf } from './emf'
+import { SonSpirit } from './spirit'
+import { SonCrayon, delaiLettre } from './ecriture'
+import { calendrier, hasardFixe } from '../../shared/chasse/temps'
+import { REGLAGES_VOIX, type ParoleObjet, type TextePrepare } from '@shared/parole'
+
+/** La radio de chaque spirit box qui grésille, par fiche d'objet : la voix passe par elle. */
+const radios = new Map<number, SonSpirit>()
+
+/** Le débit de la voix de Windows, celui de la simulation par défaut. */
+const DEBIT = -2
+
+/**
+ * La spirit box dit ce texte : la voix (préparée par Windows, une seconde ou
+ * deux) passe dans le grésillement de sa radio, et le texte part vers les
+ * téléphones **au moment où elle commence**. `null` : fait ; sinon la raison.
+ */
+export async function lancerVoix(objetId: number, texte: string, parole: ParoleObjet): Promise<string | null> {
+  const t = texte.trim()
+  if (!t) return null
+  const voix = parole.voix ?? { nom: null, reglages: REGLAGES_VOIX }
+  let wav: Uint8Array
+  try {
+    wav = await window.jdr.spirit.parler(t, voix.nom, DEBIT)
+  } catch (e) {
+    return `La voix n’a pas pu être préparée : ${e instanceof Error ? e.message : String(e)}`
+  }
+  const refus = await window.jdr.parole.dire(objetId, t)
+  if (refus) return refus
+  const radio = radios.get(objetId)
+  if (radio) {
+    radio.setReglages(voix.reglages)
+    await radio.dire(wav)
+  }
+  return null
+}
+
+let crayon: SonCrayon | null = null
+
+/**
+ * Une main invisible écrit ce texte dans le livre : le poste l'enregistre et
+ * l'horodate, et le PC gratte le papier au rythme exact où les lettres
+ * apparaissent sur les téléphones et à la table. `null` : fait ; sinon la raison.
+ */
+export async function lancerEcriture(objetId: number, t: TextePrepare): Promise<string | null> {
+  const refus = await window.jdr.parole.ecrire(objetId, t)
+  if (refus) return refus
+  const c = calendrier(await window.jdr.parole.pages(objetId))
+  const dernier = c[c.length - 1]
+  if (!dernier) return null
+  /* Chaque lettre à son heure : les mêmes délais que ceux du dessin (`temps.ts`). */
+  let quand = dernier.debut - Date.now()
+  Array.from(dernier.p.texte).forEach((l, i) => {
+    const d = delaiLettre(l, 0.5, hasardFixe(dernier.p.id * 1000 + i))
+    if (l.trim())
+      setTimeout(() => {
+        crayon ??= new SonCrayon()
+        crayon.gratter(d)
+      }, Math.max(0, quand))
+    quand += d
+  })
+  return null
+}
 
 /** Combien de temps une voix devenue muette attend avant d'être rendue. */
 const REPIT_MS = 5000
@@ -71,16 +133,41 @@ export function SonsChasse(): null {
       x.son.setVolume(a.gain * general)
     }
     for (const id of [...v.keys()]) if (!presents.has(id)) rendre(id)
+
+    /* Les spirit box allumées et en jeu : leur radio grésille, au volume du moteur. */
+    const allumees = new Set<number>()
+    for (const a of chasse) {
+      if (tu || a.outil !== 'spiritbox' || !a.allume || a.ou === 'ailleurs') continue
+      allumees.add(a.objetId)
+      let r = radios.get(a.objetId)
+      if (!r) {
+        r = new SonSpirit()
+        radios.set(a.objetId, r)
+        r.setVolume(0)
+        r.demarrer()
+      }
+      r.setVolume(a.gain * general)
+    }
+    for (const [id, r] of [...radios]) {
+      if (allumees.has(id)) continue
+      r.arreter()
+      radios.delete(id)
+    }
   }, [chasse, general])
 
   useEffect(() => {
+    const toutCouper = (): void => {
+      for (const id of [...voix.current.keys()]) rendre(id)
+      for (const r of radios.values()) r.arreter()
+      radios.clear()
+    }
     const taire = window.jdr.regieSon.onSilence(() => {
       tuSur.current = courant.current
-      for (const id of [...voix.current.keys()]) rendre(id)
+      toutCouper()
     })
     return () => {
       taire()
-      for (const id of [...voix.current.keys()]) rendre(id)
+      toutCouper()
     }
   }, [])
 

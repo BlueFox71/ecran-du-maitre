@@ -135,6 +135,11 @@ export function retirerTarot(): void {
   diffuser()
 }
 
+/** Ce qui a été écrit dans ce livre pendant la soirée (le PC y cale le bruit du crayon). */
+export function pagesDe(objetId: number): Passage[] {
+  return pages.get(objetId) ?? []
+}
+
 /** Ce que la table montre en ce moment, dans sa fenêtre ; `null` : rien. */
 export function fenetreDeLaTable(): FenetreChasse | null {
   if (montre?.sorte === 'livre')
