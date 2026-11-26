@@ -1,5 +1,5 @@
 /**
- * Simulation Objets — le matériel du chasseur de fantômes, essayé à part
+ * Outils de chasse (ex-« Simulation Objets ») — le matériel du chasseur de fantômes, essayé à part
  * avant d'aller sur la carte : l'EMF, le thermomètre, la Spirit Box, la planche
  * de spiritisme, le tarot, le livre d'écriture.
  *
@@ -104,7 +104,7 @@ export function SimulationObjets(): JSX.Element {
     <section className="view simu-vue">
       <div className="vhead">
         <div>
-          <h2>Simulation Objets</h2>
+          <h2>Outils de chasse</h2>
           <p>
             Le matériel des chasseurs de fantômes, à essayer et à régler pour toi seul. Les appareils
             en jeu, eux, sont ceux des joueurs : en prendre le contrôle change ce que montrent leurs

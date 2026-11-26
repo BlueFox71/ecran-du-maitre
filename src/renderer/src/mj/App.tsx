@@ -283,7 +283,7 @@ export function App(): JSX.Element {
                 jamais choisies valent chasse aux fantômes). */}
             {s.reglages.regles !== 'wow' ? (
               <div className="nav-sous">
-                <NavItem id="emf" label="Simulation Objets" icon={<IconEmf />} />
+                <NavItem id="emf" label="Outils de chasse" icon={<IconEmf />} />
               </div>
             ) : null}
             {/* La sonothèque : les sons de la campagne, rangés en planches,

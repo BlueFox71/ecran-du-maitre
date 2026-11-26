@@ -39,7 +39,7 @@ const PAGES: Record<Exclude<ViewId, 'editor'>, Maillon[]> = {
   plans: [{ label: 'Matière' }, { label: 'Lieux', view: 'places' }, { label: 'Plans' }],
   atelier: [{ label: 'Matière' }, { label: 'Lieux', view: 'places' }, { label: 'Atelier' }],
   objets: [{ label: 'Matière' }, { label: 'Objets' }],
-  emf: [{ label: 'Matière' }, { label: 'Objets', view: 'objets' }, { label: 'Simulation Objets' }],
+  emf: [{ label: 'Matière' }, { label: 'Objets', view: 'objets' }, { label: 'Outils de chasse' }],
   sons: [{ label: 'Matière' }, { label: 'Sons' }],
   sheets: [{ label: 'Table' }, { label: 'Fiches' }],
   pochette: [{ label: 'Table' }, { label: 'Pochette' }],

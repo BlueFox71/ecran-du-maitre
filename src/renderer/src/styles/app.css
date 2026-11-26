@@ -27414,7 +27414,7 @@ button.at-titre:hover {
 /* ============================================================
    L'EMF — le détecteur du chasseur de fantômes (modules/Emf.tsx)
    ============================================================ */
-/* ---- Simulation Objets : une case par objet ---- */
+/* ---- Outils de chasse : une case par objet ---- */
 .simu-vue {
   overflow-y: auto;
 }
@@ -28293,7 +28293,7 @@ button.at-titre:hover {
   gap: 6px;
 }
 
-/* Les appareils de chasse en jeu, en tête de Simulation Objets. */
+/* Les appareils de chasse en jeu, en tête de Outils de chasse. */
 .chasse-appareils { margin-bottom: 16px; }
 .chasse-appareils h3 { margin: 0 0 8px; font-size: 14px; }
 .chasse-appareils ul { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
