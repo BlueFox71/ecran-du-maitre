@@ -757,6 +757,15 @@ function etatJoueur(playerId: number, appareils: ReturnType<typeof chasse.lecteu
       }))
     },
     /*
+     * Son carnet des chasseurs : les lignes, ses marques et celles des autres
+     * présents. Rien du tout si la campagne n'a aucune ligne — pas d'onglet.
+     * `moi` : son personnage, pour reconnaître ses propres marques.
+     */
+    carnet: (() => {
+      const c = carnetVu()
+      return c.elements.length ? { ...c, moi: perso?.id ?? null } : null
+    })(),
+    /*
      * Les mots que le MJ lui a glissés — à lui seul, et seulement ceux qui sont
      * partis : `motsDe` ne laisse passer ni le mot du voisin, ni celui que le
      * MJ garde encore pour plus tard.
@@ -1046,6 +1055,7 @@ function router(req: IncomingMessage, res: ServerResponse): void {
     if (chemin === '/api/couleur') return void lireJson(req, res, (b) => couleur(res, url, b))
     if (chemin === '/api/pochette/lu') return void lireJson(req, res, (b) => pocheLu(res, url, b))
     if (chemin === '/api/mot/lu') return void lireJson(req, res, (b) => motLu(res, url, b))
+    if (chemin === '/api/carnet') return void lireJson(req, res, (b) => marquerCarnet(res, url, b))
     if (chemin === '/api/equiper') return void lireJson(req, res, (b) => equiper(res, url, b))
     if (chemin === '/api/poser') return void lireJson(req, res, (b) => poserRamasser(res, url, b, chasse.poserOutil, true))
     if (chemin === '/api/ramasser') return void lireJson(req, res, (b) => poserRamasser(res, url, b, chasse.ramasserOutil))
@@ -1372,6 +1382,24 @@ function motLu(res: ServerResponse, url: URL, corps: any): void {
     broadcast()
   }
   json(res, 200, { lu: true })
+}
+
+/**
+ * Une marque du carnet : le téléphone envoie l'état voulu (entouré, barré, ou
+ * rien), jamais « au suivant » — un envoi répété ne fait pas tourner deux fois.
+ * La marque est celle de son personnage ; sans personnage, pas de carnet.
+ */
+function marquerCarnet(res: ServerResponse, url: URL, corps: any): void {
+  const ap = exige(res, url)
+  if (!ap) return
+  const characterId = players.getPlayer(ap.playerId)?.characterId ?? null
+  if (characterId == null) return json(res, 403, { erreur: 'Aucun personnage ne t’est attribué.' })
+  const elementId = Number(corps.elementId)
+  const etat = corps.etat === 'entoure' || corps.etat === 'barre' ? corps.etat : corps.etat == null ? null : undefined
+  if (!Number.isFinite(elementId) || etat === undefined || !carnetChasse.marquer(characterId, elementId, etat))
+    return json(res, 400, { erreur: 'Indice inconnu.' })
+  carnetChange()
+  json(res, 200, { ok: true })
 }
 
 /**
