@@ -150,10 +150,10 @@ export function ObjetsDeScene({
         ) : null}
       </header>
 
-      {/* Les outils de chasse en jeu, et le tarot : à un geste, quel que soit le lieu. */}
-      <AppareilsDuParavent />
-
       <div className="tb-salles">
+        {/* Les outils de chasse en jeu, et le tarot : à un geste, quel que
+            soit le lieu — dans la zone qui défile, pour que rien ne soit coupé. */}
+        <AppareilsDuParavent />
         {placeId == null ? (
           <p className="os-vide">Aucun lieu à l’écran.</p>
         ) : salles.length === 0 ? (

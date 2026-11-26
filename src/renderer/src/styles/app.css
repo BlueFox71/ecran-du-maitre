@@ -28444,8 +28444,13 @@ button.at-titre:hover {
   gap: 3px;
 }
 .ap-cases .btn {
-  min-width: 26px;
-  padding-inline: 5px;
+  min-width: 0;
+  padding: 2px 5px;
+  font-size: 11px;
+  line-height: 1.3;
+}
+.ap-planche-clic {
+  cursor: pointer;
 }
 .ap-tarot {
   display: grid;

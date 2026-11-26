@@ -7,6 +7,7 @@ import { DesSurTable } from '../../shared/DesSurTable'
 import { montreLaCarte } from '@shared/scene'
 import { IconEyeOff, IconExpand, IconQr } from './Icons'
 import type { CalqueBrouillard, CollageCell, Pointer } from '@shared/types'
+import { FenetreChasseVue } from '../../shared/chasse/FenetreChasse'
 
 /**
  * Moniteur de l'écran joueurs, en haut à gauche et visible depuis tous les modules.
@@ -105,6 +106,8 @@ export function Monitor(): JSX.Element {
             /* Gelé, les joueurs ne le voient pas : le moniteur non plus. */
             pointer={frozen ? null : pointer}
           />
+          {/* Le livre, la planche ou le tarot montrés à la table : la même fenêtre qu'eux. */}
+          {display?.fenetreChasse ? <FenetreChasseVue f={display.fenetreChasse} /> : null}
           {/* Pendant un gel, rien ne part vers les joueurs : une onde n'aurait
               pas lieu d'apparaître sur ce qu'ils voient encore. */}
           {!frozen ? <Pings pings={ondes.pings} /> : null}

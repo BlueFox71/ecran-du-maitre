@@ -14,7 +14,15 @@ import { Curseur } from '../chasse/Appareils'
 import { lancerEcriture, lancerVoix } from '../chasse/SonsChasse'
 import { ECRITURES, ecritureParId } from '../chasse/ecriture'
 import { ARCANES } from '../chasse/arcanes'
-import { CASES_CHIFFRES, CASES_LETTRES, CASES_MOTS, caseDeLaTouche } from '../chasse/spiritisme'
+import {
+  CASES_CHIFFRES,
+  CASES_LETTRES,
+  CASES_MOTS,
+  PLANCHE_H,
+  PLANCHE_L,
+  TOUTES_LES_CASES,
+  caseDeLaTouche
+} from '../chasse/spiritisme'
 import { texteTemperature } from '../chasse/temperature'
 import { imageOutil } from '../../shared/outilsChasse'
 import { VuePlanche, plancheBouge } from '../../shared/chasse/Vues'
@@ -212,7 +220,19 @@ function Planche({ o, bloque }: { o: Objet; bloque: string | null }): JSX.Elemen
   })
   return (
     <div className="ap-planche" onMouseEnter={() => setSurvol(true)} onMouseLeave={() => setSurvol(false)}>
-      <VuePlanche goutte={goutte} maintenant={maintenant} />
+      {/* Un clic sur la planche même : la goutte va à la case la plus proche. */}
+      <div
+        className="ap-planche-clic"
+        onClick={(e) => {
+          const r = e.currentTarget.getBoundingClientRect()
+          const x = ((e.clientX - r.left) / r.width) * PLANCHE_L
+          const y = ((e.clientY - r.top) / r.height) * PLANCHE_H
+          const c = TOUTES_LES_CASES.reduce((m, q) => (Math.hypot(q.x - x, q.y - y) < Math.hypot(m.x - x, m.y - y) ? q : m))
+          if (Math.hypot(c.x - x, c.y - y) < 110) void viser(c.id)
+        }}
+      >
+        <VuePlanche goutte={goutte} maintenant={maintenant} />
+      </div>
       <div className="ap-cases">
         {[...CASES_MOTS, ...CASES_LETTRES, ...CASES_CHIFFRES].map((c) => (
           <button key={c.id} className="btn btn-sm" disabled={bouge || !!bloque} onClick={() => void viser(c.id)}>
@@ -220,7 +240,9 @@ function Planche({ o, bloque }: { o: Objet; bloque: string | null }): JSX.Elemen
           </button>
         ))}
       </div>
-      <p className="ap-aide">{bloque ?? 'Souris sur la planche : les touches du clavier la font glisser.'}</p>
+      <p className="ap-aide">
+        {bloque ?? 'Clique une lettre sur la planche ou ci-dessus ; souris sur la planche, le clavier aussi.'}
+      </p>
       {refus ? <p className="ap-refus">{refus}</p> : null}
     </div>
   )
