@@ -9296,6 +9296,86 @@ input[type='range']::-webkit-slider-thumb {
   font-size: 11px;
   color: var(--text-faint);
 }
+
+/* ---- les carnets des chasseurs, dans l'onglet Portables ----
+   Lecture seule : qui a entouré, qui a barré. Les pastilles reprennent la
+   forme de celles du téléphone, pleines. */
+.cj {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin: 14px 0;
+}
+.cj-genre {
+  margin-top: 4px;
+  font-size: 10.5px;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--text-faint);
+}
+.cj-liste {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 2px;
+}
+.cj-ligne {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 0;
+  padding: 3px 6px;
+  border-radius: 4px;
+  font-size: 12.5px;
+  color: var(--text);
+}
+.cj-ligne:nth-child(odd) {
+  background: var(--sunk);
+}
+.cj-ligne.vide .cj-nom {
+  color: var(--text-faint);
+}
+.cj-nom {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+.cj-qui {
+  flex: none;
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 3px;
+  max-width: 50%;
+}
+.cj-pastille {
+  position: relative;
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  font-size: 8.5px;
+  font-weight: 700;
+  color: var(--pion-ring, var(--text-faint));
+}
+.cj-pastille.entoure {
+  border: 2px solid var(--pion-ring, var(--line));
+}
+.cj-pastille.barre {
+  background: var(--pion-fill, var(--neutral-wash));
+}
+.cj-pastille.barre::after {
+  content: '';
+  position: absolute;
+  left: 1px;
+  right: 1px;
+  top: 8px;
+  height: 2px;
+  background: var(--pion-ring, var(--text-faint));
+  transform: rotate(-30deg);
+}
 .pt-liste {
   display: grid;
   gap: 3px;
