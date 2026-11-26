@@ -3648,6 +3648,8 @@ button.m-regarde-img {
   display: flex;
   flex-direction: column;
   gap: 14px;
+  /* Un peu d'air sous l'en-tête, avant « Indices ». */
+  padding-top: 10px;
   padding-bottom: 12px;
 }
 .m-cn-titre {
