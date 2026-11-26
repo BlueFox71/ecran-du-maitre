@@ -68,7 +68,8 @@ const MODULES: Record<string, string> = {
   templates: 'Fiche de campagne',
   sheet: 'Fiche de campagne',
   models: 'Fiche de campagne',
-  catalogue: 'Fiche de campagne'
+  catalogue: 'Fiche de campagne',
+  tarot: 'Tarot'
 }
 
 /** Hors de ces modules, quelques canaux suivis un à un, et leur nom. */

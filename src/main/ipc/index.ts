@@ -39,6 +39,7 @@ import * as pions from '../db/repos/pions'
 import * as display from '../display'
 import * as tours from '../tours'
 import * as voix from '../voix'
+import * as tarot from '../db/repos/tarot'
 import * as prepa from '../preparation'
 import * as regieSon from '../sons'
 import * as chasse from '../chasse'
@@ -658,6 +659,11 @@ export function registerIpc(): void {
   }))
   on('objets:add', (input: { nom: string; familleId?: number | null }) => remue(objets.addObjet(input)))
   on('objets:update', (id: number, patch: any) => eclaireAutrement(objets.updateObjet(id, patch)))
+  /* Les textes du tarot, carte par carte, pour la séance. */
+  on('tarot:liste', () => tarot.textesTarot())
+  on('tarot:ajouter', (arcane: string, texte: string) => tarot.ajouterTexteTarot(arcane, texte))
+  on('tarot:modifier', (id: number, texte: string) => tarot.modifierTexteTarot(id, texte))
+  on('tarot:retirer', (id: number) => tarot.retirerTexteTarot(id))
   on('objets:copy', (id: number) => eclaireAutrement(objets.copyObjet(id)))
   on('objets:remove', (id: number) => eclaireAutrement(objets.removeObjet(id)))
   on('objets:poser', (input: any) => eclaireAutrement(objets.poser(input)))

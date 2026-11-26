@@ -22,20 +22,9 @@ export function texteFrequence(f: number): string {
   return f.toFixed(1)
 }
 
-/** Les réglages de la voix, tous de 0 à 1 sauf `grave` (vitesse de lecture). */
-export interface ReglagesVoix {
-  /** Vitesse de lecture : sous 1, la voix descend et ralentit. */
-  grave: number
-  /** Part de la voix perdue entre deux stations. */
-  hachage: number
-  /** L'écho, de sec à caverneux. */
-  echo: number
-  /** Netteté des paroles : à 0, tout passe à la râpe (grain métallique, saturation) ; à 1, la voix reste lisible. */
-  clarte: number
-}
-
-/** Les réglages de départ : une voix d'outre-tombe, mais dont on comprend les mots. */
-export const REGLAGES_VOIX: ReglagesVoix = { grave: 0.8, hachage: 0.15, echo: 0.45, clarte: 0.6 }
+/* Les réglages de la voix vivent dans le partagé : la fiche d'une spirit box les garde. */
+import { REGLAGES_VOIX, type ReglagesVoix } from '@shared/parole'
+export { REGLAGES_VOIX, type ReglagesVoix }
 
 /* ============================================================
    Le son

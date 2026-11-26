@@ -2115,5 +2115,24 @@ export const MIGRATIONS: Migration[] = [
      WHERE beat_id IS NOT NULL;
     CREATE INDEX idx_mot_session ON mot(session_id, player_id, envoye_at);
     `
+  },
+  {
+    id: 99,
+    sql: `
+    /* Les outils qui parlent : ce que le MJ prépare pour une spirit box ou un
+       livre (textes, voix), en JSON sur la fiche — recopié avec l'objet quand
+       on duplique une séance. Et les textes du tarot, carte par carte, pour
+       la séance. */
+    ALTER TABLE objet ADD COLUMN parole TEXT;
+    CREATE TABLE tarot_texte (
+      id          INTEGER PRIMARY KEY AUTOINCREMENT,
+      campaign_id INTEGER NOT NULL REFERENCES campaign(id) ON DELETE CASCADE,
+      session_id  INTEGER NOT NULL REFERENCES game_session(id) ON DELETE CASCADE,
+      arcane      TEXT NOT NULL,
+      texte       TEXT NOT NULL,
+      ord         INTEGER NOT NULL DEFAULT 0
+    );
+    CREATE INDEX idx_tarot_texte ON tarot_texte(session_id, arcane, ord);
+    `
   }
 ]

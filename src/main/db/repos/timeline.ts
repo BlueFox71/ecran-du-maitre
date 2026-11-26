@@ -3,6 +3,7 @@ import { getItem } from './library'
 import { copierLieu } from './places'
 import { copierPnj } from './characters'
 import { copierLigne } from '../copie'
+import { copierTarot } from './tarot'
 import { ranger } from './objets'
 import { copierDoc, copierFamille, copierInventaire, copierObjet, copierOnglet, nouvelleCorrespondance, rattacherASeance } from './copieSeance'
 import { copierTrame } from './trame'
@@ -328,6 +329,8 @@ function copierObjetsEtPochette(
   for (const o of ids(`SELECT id FROM pochette_onglet WHERE session_id = ? ORDER BY ord, id`)) copierOnglet(o, nid, c)
   for (const d of ids(`SELECT id FROM pochette WHERE session_id = ? ORDER BY ord, id`))
     copierDoc(d, nid, c, suite ? 'actuel' : 'depart')
+  /* Les textes du tarot préparés pour la séance, carte par carte. */
+  copierTarot(srcId, nid)
 }
 
 function beatItems(beatId: number): Item[] {

@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
+import type { TexteTarot } from '@shared/parole'
 import type { Brut } from '@shared/reglages'
 import type { EnvoiWow, JoueurWow, PersoAAssocier, QuetePreparee, Regles, ServeurWow } from '@shared/wow'
 import type { Modif } from '@shared/modifs'
@@ -631,6 +632,14 @@ const api = {
    * les annotations et les murs, rien ici ne passe par `display` : ce que le MJ
    * sait d'un objet ne peut pas atteindre la fenêtre des joueurs.
    */
+  /** Les textes du tarot, préparés carte par carte pour la séance. */
+  tarot: {
+    liste: () => call<TexteTarot[]>('tarot:liste'),
+    ajouter: (arcane: string, texte: string) => call<void>('tarot:ajouter', arcane, texte),
+    modifier: (id: number, texte: string) => call<void>('tarot:modifier', id, texte),
+    retirer: (id: number) => call<void>('tarot:retirer', id)
+  },
+
   objets: {
     /** Tout d'un coup : la réserve, ses rayons, et l'unité de valeur. */
     list: () =>

@@ -1,6 +1,7 @@
 /** Types partagés entre le processus principal, le préchargement et les interfaces. */
 import type { Modif } from './modifs'
 import type { OutilChasse } from './chasse'
+import type { ParoleObjet } from './parole'
 
 export type ItemKind = 'doc' | 'image' | 'video' | 'audio' | 'pdf' | 'other'
 
@@ -943,6 +944,8 @@ export interface Objet {
   effets: EffetObjet[]
   /** L'outil de chasse que cet objet est (détecteur EMF, thermomètre) ; `null`, un objet ordinaire. */
   outil: OutilChasse | null
+  /** Ce que le MJ a préparé pour lui s'il parle (spirit box, livre) : textes, voix. */
+  parole: ParoleObjet
   /** Où ses exemplaires se trouvent, dans l'ordre où on les a posés. */
   placements: ObjetPlacement[]
   /**

@@ -18,6 +18,7 @@ import { UNITE_VALEUR_PAR_DEFAUT, colorFor, eclaire, lisCadreCarre } from '@shar
 import { lireCampagne } from '@shared/reglages'
 import { estOutil } from '@shared/chasse'
 import type { OutilChasse } from '@shared/chasse'
+import { lireParole, type ParoleObjet } from '@shared/parole'
 import { EPSILON_SAC, REFUS_SAC, alourdi, ditPlaces, etatSac, sacPlein } from '@shared/sac'
 import type { EtatSac, LigneSac } from '@shared/sac'
 import * as reglages from './reglages'
@@ -137,7 +138,7 @@ export function removeFamille(id: number): void {
 const SELECT_OBJET = `
   SELECT id, nom, famille_id AS familleId, image_item_id AS imageItemId, image_cadre AS imageCadre,
          unique_piece AS uniquePiece, qte, poids, places, bonus_sac AS bonusSac, valeur, prix, vu, su,
-         equipable, emplacements, charge_nom AS chargeNom, charge_max AS chargeMax, effets, outil
+         equipable, emplacements, charge_nom AS chargeNom, charge_max AS chargeMax, effets, outil, parole
     FROM objet`
 
 /** Les endroits du corps notés sur l'objet ; une liste vide si rien n'est dit. */
@@ -205,6 +206,7 @@ function toObjet(r: any, ex: Exemplaires | undefined): Objet {
     chargeMax: r.chargeMax == null ? null : Number(r.chargeMax),
     effets: lireEffets(r.effets),
     outil: estOutil(r.outil) ? r.outil : null,
+    parole: lireParole(r.parole),
     placements: ex?.placements ?? [],
     corbeille: ex?.corbeille ?? []
   }
@@ -338,6 +340,7 @@ export interface ObjetPatch {
   chargeMax?: number | null
   effets?: EffetObjet[]
   outil?: OutilChasse | null
+  parole?: ParoleObjet
 }
 
 /**
@@ -373,7 +376,8 @@ export function updateObjet(id: number, patch: ObjetPatch): Objet | null {
          unique_piece = @unique, qte = @qte, poids = @poids, places = @places,
          bonus_sac = @bonusSac, valeur = @valeur, prix = @prix,
          vu = @vu, su = @su, equipable = @equipable, emplacements = @emplacements,
-         charge_nom = @chargeNom, charge_max = @chargeMax, effets = @effets, outil = @outil
+         charge_nom = @chargeNom, charge_max = @chargeMax, effets = @effets, outil = @outil,
+         parole = @parole
        WHERE id = @id`
     )
     .run({
@@ -412,7 +416,9 @@ export function updateObjet(id: number, patch: ObjetPatch): Objet | null {
       chargeMax: v.chargeMax,
       effets: JSON.stringify(v.effets),
       /* Une valeur qui n'est pas un outil connu ne change rien. */
-      outil: patch.outil === null || estOutil(patch.outil) ? patch.outil : cur.outil
+      outil: patch.outil === null || estOutil(patch.outil) ? patch.outil : cur.outil,
+      /* Relue avant d'être écrite : rien d'abîmé n'entre en base. */
+      parole: JSON.stringify(lireParole(v.parole))
     })
   return getObjet(id)
 }
@@ -439,7 +445,8 @@ export function copyObjet(id: number): Objet | null {
     chargeNom: src.chargeNom,
     chargeMax: src.chargeMax,
     effets: src.effets.map((e) => ({ ...e })),
-    outil: src.outil
+    outil: src.outil,
+    parole: lireParole(src.parole)
   })
 }
 
