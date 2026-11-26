@@ -3762,3 +3762,12 @@ button.m-regarde-img {
   color: var(--text-faint);
   text-align: center;
 }
+/* Sur une tablette, une ligne sur toute la largeur se lit mal : chaque liste
+   passe en deux colonnes, remplies dans l'ordre de lecture, ligne à ligne. */
+@media (min-width: 700px) {
+  .m-cn-liste {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px 8px;
+  }
+}
