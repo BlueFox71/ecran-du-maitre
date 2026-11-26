@@ -322,6 +322,15 @@ export function controler(placementId: number, valeur: number | null): AppareilC
 }
 
 /**
+ * Le dernier calcul, pour les outils qui parlent (`parole.ts`) : les appareils,
+ * ceux qu'on a rangés dans un sac, et de quoi juger qui les voit.
+ */
+export function etatDesAppareils(): { appareils: AppareilChasse[]; sacs: Set<number>; ctx: ContexteChasse } {
+  const d = dernier ?? calculer()
+  return { appareils: d.appareils, sacs: d.sacs, ctx: { pions: d.pions, plan: planDuLieu } }
+}
+
+/**
  * Le joueur peut-il lire cet appareil ? Le sien, en main, toujours ; un autre
  * seulement si son pion est sur le même plan, assez près, sans mur entre eux
  * — pas de lecture à distance dans le noir. Pour plusieurs appels de suite,
@@ -370,6 +379,7 @@ export function lecteurTelephones(): (
         if (a.ou === 'lieu') valeur = lisiblePar(a, characterId, ctx) ? a.valeur : null
         outils.push({
           placementId: a.placementId,
+          objetId: a.objetId,
           nom: a.nom,
           outil: a.outil,
           ou: pose ? 'lieu' : sacs.has(a.placementId) ? 'sac' : 'main',

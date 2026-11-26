@@ -79,6 +79,8 @@ export interface AppareilChasse {
 /** Un appareil sur la fiche du téléphone : porté, ou posé par son joueur. */
 export interface OutilTelephone {
   placementId: number
+  /** La fiche d'objet : ce que l'outil dit s'y rattache (`ParoleTelephone.objetId`). */
+  objetId: number
   nom: string
   outil: OutilChasse
   /** Tenu en main (un emplacement), rangé dans le sac, ou posé dans le lieu. */

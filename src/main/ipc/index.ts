@@ -40,6 +40,8 @@ import * as display from '../display'
 import * as tours from '../tours'
 import * as voix from '../voix'
 import * as tarot from '../db/repos/tarot'
+import * as parole from '../parole'
+import type { TextePrepare } from '@shared/parole'
 import * as prepa from '../preparation'
 import * as regieSon from '../sons'
 import * as chasse from '../chasse'
@@ -180,6 +182,16 @@ export function registerIpc(): void {
   ipcMain.handle('spirit:parler', (_e, texte: string, nomVoix: string | null, debit: number) =>
     voix.parler(texte, nomVoix, debit)
   )
+  /* Les outils qui parlent, en jeu : ce que le MJ leur fait dire ou écrire,
+     où il fait glisser la goutte, ce qu'il montre à la table. Le jeu, pas la
+     préparation : rien de tout ceci ne se défait d'un Ctrl+Z. */
+  ipcMain.handle('parole:dire', (_e, objetId: number, texte: string) => parole.dire(objetId, texte))
+  ipcMain.handle('parole:ecrire', (_e, objetId: number, t: TextePrepare) => parole.ecrire(objetId, t))
+  ipcMain.handle('parole:viser', (_e, objetId: number, caseId: string) => parole.viser(objetId, caseId))
+  ipcMain.handle('parole:montrer', (_e, f: { sorte: 'livre' | 'planche'; objetId: number } | null) => parole.montrer(f))
+  ipcMain.handle('parole:tarot', (_e, arcane: string, texte: string) => parole.tirerTarot(arcane, texte))
+  ipcMain.handle('parole:retirerTarot', () => parole.retirerTarot())
+  ipcMain.handle('parole:table', () => parole.fenetreDeLaTable())
 
   /*
    * Le portrait du MJ, pris n'importe où sur le disque. Il suit le maître du

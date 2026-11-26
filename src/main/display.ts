@@ -9,6 +9,7 @@ import { getSon } from './db/repos/sons'
 import { dansLeLieu, planDe } from './db/repos/echelle'
 import { mediaUrl } from './vault'
 import { COLLAGE_CELLS, ENCART_NEUF, jaugeSanite } from '@shared/types'
+import type { FenetreChasse } from '@shared/parole'
 import type {
   AudioState,
   CollageCell,
@@ -554,6 +555,13 @@ export function reglerFenetre(itemId: number, patch: ReglageFenetre): DisplaySta
     : state.fenetres.map((x) => (x === f ? neuve : x))
   broadcast()
   return state
+}
+
+/** Ce que les outils qui parlent montrent à la table (`parole.ts`) ; `null` : rien. */
+export function setFenetreChasse(f: FenetreChasse | null): void {
+  if (JSON.stringify(f ?? null) === JSON.stringify(state.fenetreChasse ?? null)) return
+  state.fenetreChasse = f
+  broadcast()
 }
 
 /** Ferme la fenêtre d'une image ; sans image, les ferme toutes. */

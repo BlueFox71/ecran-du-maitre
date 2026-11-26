@@ -49,6 +49,7 @@ import * as reglagesCampagne from './db/repos/reglages'
 import * as display from './display'
 import * as prepa from './preparation'
 import * as chasse from './chasse'
+import * as parole from './parole'
 import { bonusParCarac, noterJet } from './jetDuPerso'
 import * as rolls from './db/repos/rolls'
 import { bonusDuPerso } from '@shared/modifs'
@@ -750,6 +751,10 @@ function etatJoueur(playerId: number, appareils: ReturnType<typeof chasse.lecteu
     /* Ses appareils de chasse, en main ou posés par lui, et ceux posés dans le lieu affiché. */
     outils: chasseDuJoueur.outils,
     appareilsPoses: chasseDuJoueur.appareilsPoses,
+    /* Ce que disent la spirit box, le livre, la planche qu'il tient ou qui sont posés près de lui. */
+    paroles: parole.paroleDe(perso?.id ?? null),
+    /* L'heure du poste : les animations (livre, goutte) partent de ses instants à lui. */
+    horloge: Date.now(),
     /* Ce que tient son sac, pour qu'il sache avant de piocher s'il a la place. */
     sac: perso ? sacDe(perso.id) : null,
     /* Le jet de Volonté que le MJ attend de lui ; le spectateur, lui, ne l’affiche pas. */

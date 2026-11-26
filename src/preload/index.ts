@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron'
-import type { TexteTarot } from '@shared/parole'
+import type { FenetreChasse, TextePrepare, TexteTarot } from '@shared/parole'
 import type { Brut } from '@shared/reglages'
 import type { EnvoiWow, JoueurWow, PersoAAssocier, QuetePreparee, Regles, ServeurWow } from '@shared/wow'
 import type { Modif } from '@shared/modifs'
@@ -128,6 +128,19 @@ const api = {
     voix: () => call<{ nom: string; langue: string; genre: string }[]>('spirit:voix'),
     parler: (texte: string, voix: string | null, debit: number) =>
       call<Uint8Array>('spirit:parler', texte, voix, debit)
+  },
+  /**
+   * Les outils qui parlent, en jeu. Chaque geste rend `null` s'il est fait,
+   * sinon la raison du refus (« Elle est dans un sac. »).
+   */
+  parole: {
+    dire: (objetId: number, texte: string) => call<string | null>('parole:dire', objetId, texte),
+    ecrire: (objetId: number, t: TextePrepare) => call<string | null>('parole:ecrire', objetId, t),
+    viser: (objetId: number, caseId: string) => call<string | null>('parole:viser', objetId, caseId),
+    montrer: (f: { sorte: 'livre' | 'planche'; objetId: number } | null) => call<void>('parole:montrer', f),
+    tarot: (arcane: string, texte: string) => call<void>('parole:tarot', arcane, texte),
+    retirerTarot: () => call<void>('parole:retirerTarot'),
+    table: () => call<FenetreChasse | null>('parole:table')
   },
   app: {
     /** Ouvre le panneau d'émojis du système ; il écrit dans le champ qui a la main. */

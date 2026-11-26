@@ -81,3 +81,46 @@ export function lireParole(brut: unknown): ParoleObjet {
       : undefined
   return { textes, ...(voix ? { voix } : {}) }
 }
+
+/* ============================================================
+   En jeu : ce que les outils ont dit pendant la soirée
+   ============================================================ */
+
+/** Un passage écrit dans un livre. `debut` : l'instant (ms, horloge du poste) où la main a commencé. */
+export interface Passage {
+  id: number
+  texte: string
+  ecriture: string
+  taille: number
+  angle: number
+  debut: number
+}
+
+/** La goutte de la planche : de quelle case vers quelle case, depuis quand. `''` : la case de repos. */
+export interface Goutte {
+  de: string
+  vers: string
+  debut: number
+}
+
+/** Un outil qui parle, tel qu'un téléphone le voit : en main, ou posé assez près de son pion. */
+export interface ParoleTelephone {
+  placementId: number
+  objetId: number
+  outil: 'spiritbox' | 'livre' | 'planche'
+  /** Spirit box : le dernier texte dit, et quand la voix a commencé. */
+  dit?: { texte: string; a: number }
+  /** Livre : tout ce qui y a été écrit pendant la soirée. */
+  pages?: Passage[]
+  /** Planche : où va la goutte. */
+  goutte?: Goutte
+}
+
+/** Ce que le MJ montre à la table, dans une fenêtre par-dessus le plan. */
+export type FenetreChasse =
+  | { sorte: 'livre'; objetId: number; nom: string; pages: Passage[] }
+  | { sorte: 'planche'; objetId: number; nom: string; goutte: Goutte | null }
+  | { sorte: 'tarot'; cartes: { arcane: string; texte: string }[] }
+
+/** L'écriture d'un passage quand le texte n'en dit rien : la première de `ECRITURES`. */
+export const ECRITURE_DEFAUT = 'helpme'

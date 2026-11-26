@@ -1,7 +1,7 @@
 /** Types partagés entre le processus principal, le préchargement et les interfaces. */
 import type { Modif } from './modifs'
 import type { OutilChasse } from './chasse'
-import type { ParoleObjet } from './parole'
+import type { FenetreChasse, ParoleObjet } from './parole'
 
 export type ItemKind = 'doc' | 'image' | 'video' | 'audio' | 'pdf' | 'other'
 
@@ -2453,6 +2453,8 @@ export interface DisplayState {
    * les calques peints, que les joueurs ne doivent jamais deviner.
    */
   chasse?: { placementId: number; outil: OutilChasse; valeur: number; allume: boolean }[]
+  /** Le livre, la planche ou le tirage de tarot que le MJ montre, en fenêtre par-dessus le plan. */
+  fenetreChasse?: FenetreChasse | null
   pions: Pion[]
   /** Taille des pions du lieu, en pourcentage de la largeur de l'écran. */
   pionSize: number
