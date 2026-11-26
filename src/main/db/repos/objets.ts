@@ -907,6 +907,22 @@ export function objetsVus(placeId: number | null): ObjetVu[] {
   }))
 }
 
+/**
+ * Un outil de chasse rangé dans les poches s'éteint : on ne garde pas un EMF
+ * allumé au fond d'un sac. Repris en main, il reste éteint jusqu'à ce que le
+ * joueur l'allume. Rend le nombre d'outils éteints.
+ */
+export function eteindreLesOutilsEnPoche(): number {
+  return getDb()
+    .prepare(
+      `UPDATE objet_placement SET eteinte = 1
+        WHERE port = 'pj' AND emplacement IS NULL AND eteinte = 0
+          AND objet_id IN (SELECT id FROM objet WHERE outil IS NOT NULL)
+          AND (session_id = ? OR session_id IS NULL)`
+    )
+    .run(activeSessionId()).changes
+}
+
 /** Un exemplaire d'outil de chasse, en main ou posé : ce que le moteur des appareils lit. */
 export interface ExemplaireOutil {
   placementId: number
