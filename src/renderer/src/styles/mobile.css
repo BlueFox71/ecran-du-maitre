@@ -1891,7 +1891,8 @@ img {
 }
 /* Une main libre : le dos de la main, en pâle, la gauche en miroir. */
 .m-main-ic {
-  font-size: 28px;
+  /* À peu près la moitié de la case, quelle que soit la grille. */
+  font-size: clamp(32px, 9vw, 48px);
   line-height: 1;
   opacity: 0.6;
   filter: grayscale(1);
