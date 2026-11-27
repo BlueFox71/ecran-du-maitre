@@ -28674,6 +28674,8 @@ button.at-titre:hover {
   background: none;
   color: inherit;
   cursor: pointer;
+}
+
 /* Le filtre World of Warcraft de l'atelier : l'icône du jeu, en couleurs. */
 .at-filtre-wow {
   display: inline-flex;
