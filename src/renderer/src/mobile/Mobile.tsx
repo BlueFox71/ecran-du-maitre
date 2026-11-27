@@ -1768,8 +1768,9 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
               aria-label={`${nomDe(cle)} : rien`}
             >
               <span className="m-carte-img">
+                {/* Le dos de la main (🤚), pas la paume. */}
                 <span className="m-main-ic" aria-hidden="true">
-                  ✋
+                  🤚
                 </span>
               </span>
               <span className="m-carte-nom">{nomDe(cle)}</span>
