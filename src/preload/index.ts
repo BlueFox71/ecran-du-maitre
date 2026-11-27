@@ -2,7 +2,17 @@ import { contextBridge, ipcRenderer } from 'electron'
 import type { FenetreChasse, ParoleObjet, Passage, TextePrepare, TexteTarot } from '@shared/parole'
 import type { CarnetVu, GenreCarnet } from '@shared/carnetChasse'
 import type { Brut } from '@shared/reglages'
-import type { EnvoiWow, JoueurWow, PersoAAssocier, QuetePreparee, Regles, ServeurWow } from '@shared/wow'
+import type {
+  CatalogueObjetWow,
+  EffetFicheWow,
+  EnvoiWow,
+  JoueurWow,
+  ObjetFicheWow,
+  PersoAAssocier,
+  QuetePreparee,
+  Regles,
+  ServeurWow
+} from '@shared/wow'
 import type { Modif } from '@shared/modifs'
 import type { EvenementSm } from '@shared/santeMentale'
 import type { Cible, Plage } from '@shared/surlignage'
@@ -97,6 +107,7 @@ import type {
   Transition,
   StatsEcran
 } from '@shared/types'
+import type { Ambiance } from '@shared/ambiance'
 
 /**
  * Un élément tel que le voit l'interface : avec ses URL jdr:// prêtes à
@@ -198,6 +209,20 @@ const api = {
     quetes: () => call<QuetePreparee[]>('wow:quetes'),
     /** Les personnages créés dans l'Aventure qui attendent leur joueur. */
     aAssocier: () => call<PersoAAssocier[]>('wow:aAssocier'),
+    /** Le joueur de l'Aventure d'un personnage de l'Écran, s'il en a un. */
+    joueurDe: (characterId: number) => call<string | null>('wow:joueurDe', characterId),
+    /** Poser ou retirer un effet depuis la fiche : il part dans l'Aventure du joueur. */
+    effetFiche: (characterId: number, effet: EffetFicheWow) => call<boolean>('wow:effetFiche', characterId, effet),
+    /** Le niveau d'un personnage WoW, posé sur sa fiche : son Aventure suit. */
+    niveau: (characterId: number, niveau: number) => call<Character | null>('wow:niveau', characterId, niveau),
+    /** Armure, défense, initiative, résistances d'un personnage WoW, réglées sur sa fiche : son Aventure suit. */
+    combat: (characterId: number, totaux: Record<string, number>) =>
+      call<Character | null>('wow:combat', characterId, totaux),
+    /** Chercher dans le catalogue d'objets du jeu, par le nom. */
+    chercherObjets: (texte: string) => call<CatalogueObjetWow[]>('wow:chercherObjets', texte),
+    /** Donner ou reprendre un objet depuis la fiche : reçu tout de suite, ou à sa prochaine connexion. */
+    objetFiche: (characterId: number, envoi: ObjetFicheWow) =>
+      call<'recu' | 'en-attente' | 'echec'>('wow:objetFiche', characterId, envoi),
     associer: (characterId: number, choix: { playerId?: number | null; nouveau?: string | null }) =>
       call<void>('wow:associer', characterId, choix),
     /** Un personnage vient d'être créé dans l'Aventure. Renvoie le désabonnement. */
@@ -596,6 +621,9 @@ const api = {
     cielEspace: (id: number, astre: Astre | null) =>
       call<Place | null>('places:cielEspace', id, astre),
     ciel: (id: number) => call<CielDuLieu>('places:ciel', id),
+    /** La teinte générale de la carte et le temps qu'il y fait ; `null`, la carte telle quelle. */
+    ambiance: (id: number, a: Ambiance | null) => call<Ambiance | null>('places:ambiance', id, a),
+    lireAmbiance: (id: number) => call<Ambiance | null>('places:lireAmbiance', id),
     nord: (id: number, nord: number) => call<CielDuLieu>('places:nord', id, nord),
     /** Jusqu'ou le regard porte ici, en part de la largeur ; `null`, sans limite. */
     regardPortee: (id: number, portee: number | null) =>

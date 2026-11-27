@@ -81,6 +81,23 @@ const frais = (): Present[] => {
 }
 
 /** Toute la table, pour le MJ. */
+/** Un jet de dé fait dans l'Aventure : l'Écran le montre à la table. */
+export interface JetTable {
+  id: string
+  nom: string
+  titre: string
+  faces: number
+  de: number
+  bonus: number
+  total: number
+  dd: number | null
+  issue: 'crit' | 'ok' | 'ko' | null
+}
+let surJet: ((j: JetTable) => void) | null = null
+export function onJet(f: (j: JetTable) => void): void {
+  surJet = f
+}
+
 export function presents(): Present[] {
   return frais()
 }
@@ -252,13 +269,35 @@ async function repondre(req: IncomingMessage, res: ServerResponse): Promise<void
     BOITES.delete(id)
     const autres = frais()
       .filter((p) => p.id !== id)
-      .map((p) => ({ id: p.id, nom: p.nom, classe: p.classe }))
+      /* Le compteur de chacun (dégâts, soins, dés) : tout le monde voit le classement. */
+      .map((p) => ({ id: p.id, nom: p.nom, classe: p.classe, compteur: (p.etat as { compteur?: unknown } | null)?.compteur ?? null }))
     return json(res, { presents: autres, courrier })
   }
   if (url === '/__table/envoi' && req.method === 'POST') {
     const o = await lireJson(req)
     if (!o || !Array.isArray(o.a) || !o.quoi) return envoyer(res, 400, TYPES['.txt'], 'envoi illisible')
     deposer(String(o.de ?? ''), String(o.nom ?? ''), o.a as string[], o.quoi)
+    return json(res, { ok: true })
+  }
+  /* Un jet de dé : il part sur l'écran de la table, comme ceux des téléphones. */
+  if (url === '/__table/jet' && req.method === 'POST') {
+    const o = await lireJson(req)
+    const id = idTable(String(o?.de ?? ''))
+    const j = o?.jet as Record<string, unknown> | undefined
+    const n = (v: unknown, d = 0): number => (Number.isFinite(Number(v)) ? Math.round(Number(v)) : d)
+    if (!id || !j || typeof j !== 'object') return envoyer(res, 400, TYPES['.txt'], 'jet illisible')
+    const issue = j.issue === 'crit' || j.issue === 'ok' || j.issue === 'ko' ? j.issue : null
+    surJet?.({
+      id,
+      nom: String(o?.nom ?? id).slice(0, 60),
+      titre: String(j.titre ?? 'Jet').slice(0, 80),
+      faces: Math.max(2, Math.min(1000, n(j.faces, 20))),
+      de: n(j.de),
+      bonus: n(j.bonus),
+      total: n(j.total),
+      dd: j.dd == null ? null : n(j.dd),
+      issue
+    })
     return json(res, { ok: true })
   }
   if (url === '/__table/etat') {

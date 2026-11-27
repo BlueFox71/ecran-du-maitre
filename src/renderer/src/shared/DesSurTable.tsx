@@ -67,9 +67,52 @@ function CarteSm({ a, onVu }: { a: AnnonceSm; onVu?: (id: number) => void }): JS
   )
 }
 
+const VERDICTS = { crit: 'Critique !', ok: 'Réussite', ko: 'Échec' } as const
+
 function DeTombe({ d, onVu }: { d: DeSurTable; onVu?: (id: number) => void }): JSX.Element {
   const [deja] = useState(() => vus.has(d.id))
   const [pose, setPose] = useState(deja)
+  /* Un jet de l'Aventure : un dé d'or, le titre en lettres du jeu, et le verdict qui éclate. */
+  if (d.wow) {
+    const w = d.wow
+    return (
+      <div className="des-table-de des-wow">
+        <span className="des-wow-titre">
+          <b>{d.perso || d.joueur}</b>
+          <span>{d.carac}</span>
+        </span>
+        <div className="des-wow-de">
+          <D20
+            valeur={d.de}
+            sansChute={deja}
+            onPose={() => {
+              vus.add(d.id)
+              setPose(true)
+            }}
+          />
+          {d.faces && d.faces !== 20 ? <span className="des-wow-faces">D{d.faces}</span> : null}
+        </div>
+        <span className={`des-table-calc des-wow-calc${pose ? ' vu' : ''}`}>
+          {d.bonus ? (
+            <>
+              {d.de} {signe(d.bonus)} = <b>{d.total}</b>
+            </>
+          ) : (
+            <b>{d.total}</b>
+          )}
+          {w.dd != null ? <span className="des-wow-dd"> contre {w.dd}</span> : null}
+        </span>
+        {w.issue ? (
+          <span className={`des-wow-verdict ${w.issue}${pose ? ' vu' : ''}`}>{VERDICTS[w.issue]}</span>
+        ) : null}
+        {onVu ? (
+          <button className="des-table-vu" onClick={() => onVu(d.id)}>
+            Vu
+          </button>
+        ) : null}
+      </div>
+    )
+  }
   return (
     <div className={`des-table-de c-${d.couleur ?? 'neutral'}`}>
       <span className="des-table-qui">

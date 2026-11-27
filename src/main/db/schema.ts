@@ -3,6 +3,19 @@
 import type Database from 'better-sqlite3'
 import { repartirParSeance } from './repartition'
 
+/** Ajoute une colonne si la table ne l'a pas encore. */
+function ajouterColonne(db: Database.Database, table: string, colonne: string, definition: string): void {
+  const cols = db.prepare(`PRAGMA table_info(${table})`).all() as { name: string }[]
+  if (!cols.some((c) => c.name === colonne)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${colonne} ${definition}`)
+}
+
+/** Les colonnes des deux migrations 97 (voir là-bas), posées seulement si elles manquent. */
+function colonnesCroisees(db: Database.Database): void {
+  ajouterColonne(db, 'objet', 'outil', 'TEXT')
+  ajouterColonne(db, 'objet_placement', 'pose_par', 'INTEGER REFERENCES character(id) ON DELETE SET NULL')
+  ajouterColonne(db, 'place', 'ambiance', 'TEXT')
+}
+
 /**
  * `sql` d'abord, puis `run` s'il y a un travail que le SQL seul ne sait pas
  * faire (recopier des lignes en suivant leurs liens), dans la même
@@ -2095,13 +2108,15 @@ export const MIGRATIONS: Migration[] = [
   },
   {
     id: 97,
-    sql: `
-    /* Un objet peut être un outil de chasse (le détecteur EMF, le thermomètre) :
-       'emf' | 'thermometre', NULL pour un objet ordinaire. Un exemplaire posé
-       dans un lieu garde le personnage qui l'y a posé depuis son téléphone. */
-    ALTER TABLE objet ADD COLUMN outil TEXT;
-    ALTER TABLE objet_placement ADD COLUMN pose_par INTEGER REFERENCES character(id) ON DELETE SET NULL;
-    `
+    /* Deux 97 se sont croisées : celle des outils de chasse (objet.outil,
+       objet_placement.pose_par) et celle de l'ambiance des cartes
+       (place.ambiance), publiée en 1.16.0. Celle-ci pose ce qui manque ;
+       la 101 rattrape l'autre moitié chez qui avait déjà l'une des deux.
+       Un objet peut être un outil de chasse ('emf', 'thermometre'… NULL pour
+       un objet ordinaire) ; un exemplaire posé dans un lieu garde le
+       personnage qui l'y a posé depuis son téléphone. */
+    sql: ``,
+    run: colonnesCroisees
   },
   {
     id: 98,
@@ -2158,5 +2173,11 @@ export const MIGRATIONS: Migration[] = [
       PRIMARY KEY (session_id, character_id, element_id)
     );
     `
+  },
+  {
+    id: 101,
+    /* Voir la 97 : l'autre moitié, chez qui n'avait que l'une des deux. */
+    sql: ``,
+    run: colonnesCroisees
   }
 ]

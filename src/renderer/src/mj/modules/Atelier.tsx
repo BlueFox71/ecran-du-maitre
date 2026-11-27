@@ -10,17 +10,21 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { useStore } from '../store'
 import type { AssetAtelier } from '@shared/atelierAssets'
 import type { Place } from '@shared/types'
+import { AMBIANCE_NEUTRE, type Ambiance } from '@shared/ambiance'
+import { MeteoAnimee, TeinteAmbiance } from '../../shared/Ambiance'
 import { bordsPourTaille, niveauxDuLieu, tailleMinimale, type Ancre, type Construction } from '@shared/atelier'
 import { chargerImages, type ImagesAtelier } from '../atelier/images'
 import { useConstruction, type ConstructionOuverte } from '../atelier/useConstruction'
 import { Toile, type Outil } from '../atelier/Toile'
-import { useEssaiAtelier } from '../atelier/Essai'
+import { useEssaiAtelier, type EssaiAtelier } from '../atelier/Essai'
 import { IconSoleil } from '../components/Icons'
 import { EtapeSol } from '../atelier/etapes/Sol'
 import { EtapeMurs } from '../atelier/etapes/Murs'
 import { EtapeOuvertures } from '../atelier/etapes/Ouvertures'
 import { EtapeDeco } from '../atelier/etapes/Deco'
 import { EtapeEclairage } from '../atelier/etapes/Eclairage'
+import { useFiltreWow } from '../atelier/Palette'
+import iconeWow from '../../assets/atelier/wow.png'
 
 /** L'atelier s'enregistre de lui-même à ce rythme, s'il y a des changements. */
 const AUTO_ENREGISTREMENT = 5 * 60 * 1000
@@ -53,6 +57,11 @@ export interface PropsEtape {
   barreOutils: HTMLElement | null
   /** « Test lumière », tenu : la construction dans le noir, avec ce que les lampes éclairent. */
   setTestLum: (v: boolean) => void
+  /** La teinte générale de la carte et le temps qu'il y fait, enregistrés aussitôt. */
+  ambiance: Ambiance
+  reglerAmbiance: (patch: Partial<Ambiance>) => void
+  /** Les murs et le ciel du lieu, ceux de l'essai : un ciel réglé se voit aussitôt au test. */
+  murs: EssaiAtelier['murs']
 }
 
 export function Atelier(): JSX.Element {
@@ -73,6 +82,7 @@ export function Atelier(): JSX.Element {
 function Chantier({ place }: { place: Place }): JSX.Element {
   const s = useStore()
   const [assets, setAssets] = useState<AssetAtelier[]>([])
+  const [filtreWow, setFiltreWow] = useFiltreWow()
   const images = useMemo<ImagesAtelier>(() => new Map(), [])
   const [versionImages, setVersionImages] = useState(0)
   const parId = useMemo(() => new Map(assets.map((a) => [a.id, a])), [assets])
@@ -95,6 +105,31 @@ function Chantier({ place }: { place: Place }): JSX.Element {
   const [apercuTaille, setApercuTaille] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
   const [quitter, setQuitter] = useState(false)
   const essai = useEssaiAtelier(place.id, co.c)
+
+  /* L'ambiance du lieu : elle ne fait pas partie de la construction, elle
+     s'enregistre aussitôt, comme les lampes (les curseurs, un peu après). */
+  const [ambiance, setAmbiance] = useState<Ambiance>(AMBIANCE_NEUTRE)
+  const ecritAmbiance = useRef<ReturnType<typeof setTimeout> | null>(null)
+  useEffect(() => {
+    let vivant = true
+    void window.jdr.places.lireAmbiance(place.id).then((a) => {
+      if (vivant) setAmbiance(a ?? AMBIANCE_NEUTRE)
+    })
+    return () => {
+      vivant = false
+    }
+  }, [place.id])
+  const reglerAmbiance = useCallback(
+    (patch: Partial<Ambiance>) => {
+      setAmbiance((avant) => {
+        const neuve = { ...avant, ...patch }
+        if (ecritAmbiance.current) clearTimeout(ecritAmbiance.current)
+        ecritAmbiance.current = setTimeout(() => void window.jdr.places.ambiance(place.id, neuve), 200)
+        return neuve
+      })
+    },
+    [place.id]
+  )
 
   /* Tant que des images manquent, un voile de chargement couvre le chantier :
      on ne montre pas un lieu à moitié dessiné. */
@@ -200,9 +235,14 @@ function Chantier({ place }: { place: Place }): JSX.Element {
         recharger,
         grille,
         barreOutils,
-        setTestLum: essai.setTestLum
+        setTestLum: essai.setTestLum,
+        ambiance,
+        reglerAmbiance,
+        murs: essai.murs
       }
     : null
+  /* L'ambiance se voit à l'étape de l'éclairage et pendant un essai. */
+  const voirAmbiance = etape === 'eclairage' || essai.enTest
 
   return (
     <section className="view at-chantier">
@@ -237,6 +277,15 @@ function Chantier({ place }: { place: Place }): JSX.Element {
         {/* Les étapes y posent leurs outils (l'objet choisi : plans, miroirs, alignements). */}
         <div className="at-barre-outils" ref={setBarreOutils} />
         <span className="spacer" />
+        <button
+          className="btn btn-sm at-filtre-wow"
+          aria-pressed={filtreWow}
+          title={filtreWow ? 'Montrer de nouveau tous les assets' : 'Ne montrer que les assets World of Warcraft'}
+          onClick={() => setFiltreWow(!filtreWow)}
+        >
+          <img src={iconeWow} alt="" />
+          WoW
+        </button>
         <button className="btn btn-sm" aria-pressed={grille} onClick={() => setGrille(!grille)}>
           ▦ Grille
         </button>
@@ -259,17 +308,12 @@ function Chantier({ place }: { place: Place }): JSX.Element {
           disabled={essai.enTest || !essai.peutTesterLum}
           title={
             essai.peutTesterLum
-              ? 'Maintenir appuyé : la construction en cours dans le noir, avec ce que les lampes éclairent'
+              ? essai.testLum
+                ? 'Cliquer pour revenir à la construction éclairée'
+                : 'Cliquer : la construction en cours dans le noir, avec ce que les lampes éclairent. Recliquer pour revenir.'
               : 'Pose d’abord une lampe (étape Éclairage) : il n’y aurait rien à montrer'
           }
-          onPointerDown={(e) => {
-            if (e.button !== 0) return
-            e.currentTarget.setPointerCapture(e.pointerId)
-            essai.setTestLum(true)
-          }}
-          onPointerUp={() => essai.setTestLum(false)}
-          onPointerCancel={() => essai.setTestLum(false)}
-          onLostPointerCapture={() => essai.setTestLum(false)}
+          onClick={() => essai.setTestLum(!essai.testLum)}
         >
           <IconSoleil />
           Test lumière
@@ -391,7 +435,19 @@ function Chantier({ place }: { place: Place }): JSX.Element {
             grille={grille && !essai.enTest && !essai.testLum}
             outil={essai.enTest ? null : outil}
             repeindre={repeint}
-            calque={essai.calque}
+            calque={
+              voirAmbiance ? (
+                <>
+                  <TeinteAmbiance ambiance={ambiance} />
+                  {essai.calque}
+                  <div className="at-meteo">
+                    <MeteoAnimee meteo={ambiance.meteo} force={ambiance.meteoForce} />
+                  </div>
+                </>
+              ) : (
+                essai.calque
+              )
+            }
             apercuTaille={agrandir ? apercuTaille : null}
           />
         ) : (

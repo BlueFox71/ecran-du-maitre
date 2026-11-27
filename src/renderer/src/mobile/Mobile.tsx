@@ -185,6 +185,8 @@ interface Etat {
   /** Un spectateur : il suit ce joueur en lecture seule. Absent d'un serveur plus ancien. */
   spectateur?: boolean
   campagne: string | null
+  /** Une campagne WoW : l'identifiant du joueur dans l'Aventure, et le port du jeu. */
+  wow?: { joueur: string; port: number } | null
   joueur: { id: number; nom: string; couleur: string | null } | null
   /** Les couleurs des autres joueurs. Absent d'un serveur plus ancien. */
   couleursPrises?: { cle: string; par: string }[]
@@ -337,7 +339,15 @@ export function useRetourFerme(ouvert: boolean, fermer: () => void): void {
   }, [ouvert])
 }
 
+/**
+ * La vue « plan seul » : celle que l'Aventure d'un joueur WoW pose sous elle.
+ * Elle tourne dans une page d'une autre adresse, où le navigateur cloisonne le
+ * stockage : le jeton du téléphone lui arrive donc dans l'adresse.
+ */
+const PARAMS = new URLSearchParams(location.search)
+const PLAN_SEUL = PARAMS.get('vue') === 'plan'
 const jetonGarde = (): string | null => {
+  if (PLAN_SEUL && PARAMS.get('t')) return PARAMS.get('t')
   try {
     return localStorage.getItem(CLE)
   } catch {
@@ -573,6 +583,30 @@ export function Mobile(): JSX.Element {
   }
 
   /* ---------------- les écrans ---------------- */
+
+  /* Le plan seul, sous l'Aventure : rien d'autre que le plan et les pions. */
+  if (PLAN_SEUL && etat && jeton) {
+    return (
+      <div className="m-plan-seul">
+        <Plan etat={etat} jeton={jeton} ondes={ondes.pings} />
+      </div>
+    )
+  }
+  /* Une campagne WoW : le joueur part dans son Aventure, posée sur ce plan. */
+  if (etat?.wow && !etat.spectateur && jeton && !PLAN_SEUL) {
+    const fond = location.origin + location.pathname + '?vue=plan&t=' + encodeURIComponent(jeton)
+    const url =
+      location.protocol + '//' + location.hostname + ':' + etat.wow.port +
+      '/Application/Arbre-de-talents.html?joueur=' + encodeURIComponent(etat.wow.joueur) +
+      '&fond=' + encodeURIComponent(fond)
+    location.replace(url)
+    return (
+      <div className="m-vide">
+        <IconeApp />
+        <p>Ouverture de ton Aventure…</p>
+      </div>
+    )
+  }
 
   if (etat?.preparation && etat.perso && !etat.spectateur && prepaRangee !== etat.preparation.depuis) {
     const depuis = etat.preparation.depuis

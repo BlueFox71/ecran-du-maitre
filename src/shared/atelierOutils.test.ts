@@ -148,6 +148,16 @@ describe('redimensionner', () => {
     expect(o.l).toBeGreaterThanOrEqual(0.1)
     expect(o.h).toBeGreaterThanOrEqual(0.1)
   })
+  it('tiré au-delà du coin opposé, il se retourne en miroir dans ce sens', () => {
+    /* Le meuble va de (4, 4.5) à (6, 5.5) ; on tire le coin bas-droit à gauche du bord gauche. */
+    const o = redimensionner(meuble({}), 2, [2, 5.5], false)
+    expect(o.l).toBeCloseTo(2, 6)
+    expect(o.h).toBeCloseTo(1, 6)
+    expect(o.x).toBeCloseTo(3, 6)
+    expect(o.y).toBeCloseTo(5, 6)
+    expect(o.miroirX).toBe(true)
+    expect(o.miroirY).toBeFalsy()
+  })
 })
 
 describe('tourner', () => {
@@ -483,6 +493,15 @@ describe('étirer un objet par un côté', () => {
 
   it('ne descend pas sous la taille minimale', () => {
     expect(etirer(o, 1, [0, 5]).l).toBeGreaterThan(0)
+  })
+
+  it('tiré au-delà du côté opposé, il se retourne en miroir de l’autre côté', () => {
+    /* Le bord gauche est à 3 : tirer la droite jusqu'à 1 donne 2 de large, de 1 à 3. */
+    const r = etirer(o, 1, [1, 5])
+    expect(r).toMatchObject({ l: 2, h: 2, x: 2, y: 5, miroirX: true })
+    expect(r.miroirY).toBeFalsy()
+    /* Retourné une seconde fois, il revient à l'endroit. */
+    expect(etirer(r, 3, [4, 5]).miroirX).toBeFalsy()
   })
 })
 

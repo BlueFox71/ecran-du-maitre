@@ -99,9 +99,10 @@ function BoutonIcone({
 type Geste =
   /** `depart` : la place de chaque objet du groupe quand on l'a saisi. */
   | { quoi: 'deplacer'; id: string; prise: PointCase; depart: Map<string, PointCase> }
-  | { quoi: 'coin'; id: string; i: number }
+  /** `depart` : l'objet quand on l'a saisi — tiré au-delà du bord opposé, il se retourne en miroir. */
+  | { quoi: 'coin'; id: string; i: number; depart: ObjetPose }
   /** Le milieu d'un côté : 0 haut, 1 droite, 2 bas, 3 gauche. */
-  | { quoi: 'cote'; id: string; i: number }
+  | { quoi: 'cote'; id: string; i: number; depart: ObjetPose }
   | { quoi: 'tourner'; id: string }
   /** Un rectangle de sélection tiré depuis le vide ; `plus` : il ajoute à la sélection (Ctrl). */
   | { quoi: 'cadre'; de: PointCase; plus: boolean; base: string[] }
@@ -286,13 +287,13 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
             const i = coins.findIndex((q) => Math.hypot(brut[0] - q[0], brut[1] - q[1]) < prise)
             if (i >= 0) {
               co.marquer()
-              geste.current = { quoi: 'coin', id: seul.id, i }
+              geste.current = { quoi: 'coin', id: seul.id, i, depart: seul }
               return
             }
             const j = milieuxDesCotes(seul).findIndex((q) => Math.hypot(brut[0] - q[0], brut[1] - q[1]) < prise)
             if (j >= 0) {
               co.marquer()
-              geste.current = { quoi: 'cote', id: seul.id, i: j }
+              geste.current = { quoi: 'cote', id: seul.id, i: j, depart: seul }
               return
             }
           }
@@ -332,8 +333,8 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
               false
             )
           }
-          if (g.quoi === 'coin') majObjets([g.id], (o) => redimensionner(o, g.i, brut, !e.altKey), false)
-          if (g.quoi === 'cote') majObjets([g.id], (o) => etirer(o, g.i, brut), false)
+          if (g.quoi === 'coin') majObjets([g.id], () => redimensionner(g.depart, g.i, brut, !e.altKey), false)
+          if (g.quoi === 'cote') majObjets([g.id], () => etirer(g.depart, g.i, brut), false)
           if (g.quoi === 'tourner') majObjets([g.id], (o) => tourner(o, brut, e.shiftKey), false)
           if (g.quoi === 'tournerGroupe') {
             let delta = angleVers(g.centre, brut) - g.a0
@@ -572,6 +573,7 @@ export function EtapeDeco(props: PropsEtape): JSX.Element {
             {seul ? (
               <li>Milieu d’un côté : allonger ou rétrécir dans ce sens seulement</li>
             ) : null}
+            {seul ? <li>Tirer un coin ou un côté au-delà du bord opposé : retourner l’objet en miroir</li> : null}
             <li>
               Rond : tourner {seul ? 'l’objet' : 'le groupe'} (<kbd>Maj</kbd> : par 15°)
             </li>

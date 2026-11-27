@@ -355,6 +355,108 @@
   color: #f0d193;
   font-size: 4.6cqmin;
 }
+/*
+ * Un jet de l'Aventure WoW : le dé d'or, une plaque sombre bordée d'or pour
+ * le titre, le chiffre en or, et le verdict en grandes lettres du jeu —
+ * vert, rouge, ou orangé qui éclate pour un critique.
+ */
+.des-wow {
+  --d20-couleur: #e0b354;
+  font-family: 'Friz Quadrata', 'Cinzel', 'Trajan Pro', Georgia, 'Times New Roman', serif;
+}
+.des-wow-titre {
+  display: grid;
+  justify-items: center;
+  gap: 0.3cqmin;
+  padding: 1cqmin 3.2cqmin 1.2cqmin;
+  background: linear-gradient(#2a2319, #120e09);
+  border: 0.35cqmin solid #b3914a;
+  border-radius: 0.8cqmin;
+  box-shadow: 0 0 0 0.25cqmin #000, inset 0 0.2cqmin 0 #8a7650, 0 1cqmin 3cqmin rgba(0, 0, 0, 0.7);
+  white-space: nowrap;
+}
+.des-wow-titre b {
+  font-size: 3.2cqmin;
+  font-weight: 700;
+  color: #ffd100;
+  text-shadow: 0 0.25cqmin 0.3cqmin #000;
+}
+.des-wow-titre span {
+  font-size: 2.4cqmin;
+  color: #e8d7a8;
+}
+.des-wow-de {
+  position: relative;
+  filter: drop-shadow(0 0 2.4cqmin rgba(255, 196, 70, 0.45));
+}
+.des-wow-faces {
+  position: absolute;
+  right: -1cqmin;
+  top: -1cqmin;
+  font-size: 2.2cqmin;
+  font-weight: 700;
+  padding: 0.3cqmin 1.2cqmin;
+  border-radius: 99px;
+  color: #120e09;
+  background: #e0b354;
+  border: 0.25cqmin solid #000;
+}
+.des-wow-calc {
+  background: rgba(8, 6, 4, 0.88);
+  border: 0.25cqmin solid #6d5b3c;
+  color: #e8d7a8;
+}
+.des-wow-calc b {
+  color: #ffd100;
+  text-shadow: 0 0 1.2cqmin rgba(255, 209, 0, 0.5);
+}
+.des-wow-dd {
+  font-size: 2.6cqmin;
+  color: #c8b88a;
+}
+.des-wow-verdict {
+  font-size: 6.4cqmin;
+  font-weight: 700;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  -webkit-text-stroke: 0.18cqmin #000;
+  text-shadow: 0 0.35cqmin 0.4cqmin #000;
+  opacity: 0;
+  transform: scale(2.2);
+}
+.des-wow-verdict.vu {
+  animation: des-wow-eclat 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) forwards;
+}
+.des-wow-verdict.ok {
+  color: #1eff00;
+}
+.des-wow-verdict.ko {
+  color: #ff3b2f;
+}
+.des-wow-verdict.crit {
+  color: #ffb000;
+  text-shadow: 0 0 2cqmin #ff7a00, 0 0.35cqmin 0.4cqmin #000;
+}
+.des-wow-verdict.crit.vu {
+  animation:
+    des-wow-eclat 0.55s cubic-bezier(0.2, 1.6, 0.4, 1) forwards,
+    des-wow-brille 1.1s ease-in-out 0.55s infinite alternate;
+}
+@keyframes des-wow-eclat {
+  0% {
+    opacity: 0;
+    transform: scale(2.2);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+}
+@keyframes des-wow-brille {
+  to {
+    text-shadow: 0 0 4cqmin #ffcf40, 0 0.35cqmin 0.4cqmin #000;
+  }
+}
 /* Le « Vu » du MJ, sous le dé : seul élément de la couche qui prend la souris,
    pour que la scène dessous reste maniable. */
 .des-table-vu {

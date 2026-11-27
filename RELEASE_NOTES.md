@@ -1,14 +1,23 @@
-<!-- version: 1.14.0 -->
+<!-- version: 1.17.0 -->
 ### Nouveautés
-- **La spirit box, le livre d'écriture et la planche de spiritisme passent dans la main des joueurs.** Dans la fiche d'un objet, choisis son outil : comme l'EMF, on le porte, on le pose, on le ramasse depuis la page Pion du téléphone.
-- **La spirit box parle.** Allumée, elle grésille sur le PC. Prépare tes textes pour la séance et sa voix (la voix de Windows, grave, hachage, écho, clarté) ; en jeu, un clic sur « Dire » et elle le prononce à travers la radio — sur le téléphone de celui qui l'a en main, l'écran de la spirit box frémit pendant qu'elle parle.
-- **Le livre s'écrit tout seul.** Prépare tes textes avec leur écriture, leur taille et leur inclinaison ; « Écrire », et une main invisible les trace lettre par lettre sur le téléphone, pendant que le PC fait gratter le crayon. Les pages restent écrites : celui qui ramasse le livre les lit.
-- **La goutte de la planche glisse en direct.** Clique sur une lettre, un chiffre, Oui, Non ou Au revoir — ou tape la touche au clavier, la souris sur la planche — et la goutte y va, sur le téléphone du joueur.
-- **Montre le livre ou la planche à la table**, dans une fenêtre par-dessus le plan : l'écriture et la goutte s'y animent en même temps que sur le téléphone.
-- **Le tarot, avec un vrai jeu.** Un joueur tire une carte et te la nomme ; choisis-la parmi les 22 arcanes et l'un des textes que tu as préparés pour elle et pour la séance : la carte s'affiche à la table avec son texte. Les cartes s'ajoutent côte à côte jusqu'à ce que tu retires le tapis.
-- **Tout se pilote depuis le panneau Objets du Paravent** : les appareils en jeu, quel que soit le lieu à l'écran — EMF et thermomètre avec leur mesure et la prise de contrôle, spirit box, livre, planche — et le tarot.
+- **Les outils de chasse passent dans la main des joueurs.** Dans la fiche d'un objet, choisis son outil : EMF, thermomètre, spirit box, livre d'écriture ou planche de spiritisme. Les joueurs les prennent dans un inventaire, les portent, les allument et les posent depuis la page Pion de leur téléphone ; un bouton « Ramasser » apparaît quand ils sont tout près d'un appareil posé.
+- **Peins l'EMF et la température sur tes plans**, en mode plan, dans le volet Objets et PNJ : des zones de niveau EMF de 1 à 5, des températures du bleu glacial au rouge, une pipette, ±1 °C, un pinceau qui réchauffe ou refroidit et Ctrl+Z. Les joueurs ne voient jamais ces zones, seulement ce que mesurent leurs appareils.
+- **Le son sort du PC** : le grésillement de chaque EMF, plus fort quand un joueur s'approche et étouffé à travers les murs, et celui de la spirit box allumée — avec un curseur de volume pour chacune.
+- **La spirit box parle.** Prépare tes textes pour la séance et sa voix (grave, hachage, écho, clarté) ; en jeu, « Dire » et elle le prononce à travers la radio.
+- **Le livre s'écrit tout seul.** Choisis l'écriture, la taille et l'inclinaison au moment d'écrire, regarde-le d'abord avec « Voir » (toi seul), puis « Écrire » : une main invisible le trace lettre par lettre pendant que le PC fait gratter le crayon. Les pages restent écrites.
+- **La goutte de la planche ouija glisse en direct** : clique sur une lettre, un chiffre, Oui, Non ou Au revoir — ou tape la touche au clavier.
+- **Le tarot, avec un vrai jeu.** Un joueur tire une carte et te la nomme ; choisis-la parmi les 22 arcanes avec l'un de tes textes, et elle s'affiche à la table.
+- **Montre le livre, la planche ou le tarot à la table**, dans une fenêtre par-dessus le plan : tu la vois aussi sur le visuel du Paravent.
+- **Le carnet des chasseurs.** Sur le téléphone, un onglet Carnet : chaque joueur entoure ou barre les indices et les entités, et voit les marques des autres en clair. Tu suis les carnets depuis l'onglet Portables, et tu règles les deux listes dans les paramètres. Chaque séance part d'un carnet vierge.
+- **Tout se pilote du volet Objets du Paravent** et de la page **Outils de chasse** (l'ancienne Simulation Objets) : chaque outil en jeu y est replié, un clic le déplie ; prends le contrôle d'un EMF ou d'un thermomètre quand le fantôme attaque.
 
 ### Améliorations
-- **Un outil de chasse rangé dans les poches s'éteint.** Repris en main, il reste éteint jusqu'à ce que le joueur l'allume.
-- Un outil qui parle posé dans un lieu se lit sur le téléphone de chaque joueur proche, sans mur entre eux ; rangé dans un sac, il se tait.
-- Dupliquer une séance ou préparer la suivante emporte les textes préparés des outils et du tarot.
+- **Le Paravent n'a plus qu'un visuel** : ce que tu montres part tout de suite. Les plans du lieu s'affichent sous la liste, celui en direct en tête, avec les joueurs qui s'y tiennent.
+- **Sur le téléphone, les poches et les mains** : une case par main libre dans « Ce que je porte » ; un outil rangé dans les poches s'éteint.
+- Un appareil posé sur le plan prend la couleur du pion de celui qui l'a posé ; le livre et la planche y sont plus discrets.
+- On peut zoomer le plan du téléphone avec les doigts.
+- Déplacer son pion est fluide sur iPad.
+- Dupliquer une séance emporte les textes préparés des outils et du tarot.
+
+### Corrections
+- La pochette du téléphone ne montre plus les messages d'une séance précédente.

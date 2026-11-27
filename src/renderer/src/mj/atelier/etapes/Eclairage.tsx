@@ -10,6 +10,7 @@ import type { PointCase } from '@shared/atelier'
 import { lueurDeLampe } from '@shared/essai'
 import type { PropsEtape } from '../../modules/Atelier'
 import { BarreLumiere, useMurs } from '../../components/Murs'
+import { METEOS, MOMENTS, momentDe, type Moment } from '@shared/ambiance'
 
 
 /** Une teinte de lampe (`#rgb` ou `#rrggbb`), à une opacité donnée. */
@@ -23,10 +24,137 @@ function teinte(hex: string, a: number): string {
 
 export function EtapeEclairage(props: PropsEtape): JSX.Element {
   const { place, co } = props
-  if (!place.mapItemId) return <p className="at-aide">Enregistre une première fois pour poser la lumière.</p>
-  if (co.agrandi)
-    return <p className="at-aide">Le terrain a changé de taille : enregistre d’abord, pour que les lampes se placent juste.</p>
-  return <Lampes {...props} />
+  return (
+    <>
+      <ReglageAmbiance {...props} />
+      <span className="eyebrow">Lampes</span>
+      {!place.mapItemId ? (
+        <p className="at-aide">Enregistre une première fois pour poser les lampes.</p>
+      ) : co.agrandi ? (
+        <p className="at-aide">Le terrain a changé de taille : enregistre d’abord, pour que les lampes se placent juste.</p>
+      ) : (
+        <Lampes {...props} />
+      )}
+    </>
+  )
+}
+
+/**
+ * L'ambiance de la carte, d'un seul réglage : un moment (jour, aube, nuit…)
+ * règle à la fois la clarté du lieu — le soleil, la lune ou la nuit noire,
+ * qui décident de ce que les joueurs voient — et la couleur de la carte. Elle
+ * s'enregistre aussitôt et se voit chez les joueurs dès que la carte est à
+ * l'écran.
+ */
+function ReglageAmbiance({ ambiance: a, reglerAmbiance: regler, murs: m }: PropsEtape): JSX.Element {
+  /* Le ciel que ce lieu règle — ou celui de l'espace, qui le règle pour tous. */
+  const ciel = m.espace ? (m.cielGeneral?.astre ?? null) : m.cielGeneral ? m.cielGeneral.astre : m.astreLieu
+  const verrou = !m.espace && !!m.cielGeneral
+  const teinte = a.teinte && a.force > 0 ? a.teinte : null
+  const choisi = momentDe(ciel?.nature, teinte)
+  const [aMoi, setAMoi] = useState(false)
+  const libre = aMoi || (!choisi && (!!teinte || !!ciel))
+
+  const choisir = (mo: Moment): void => {
+    setAMoi(false)
+    if (!verrou) void m.reglerAstre({ nature: mo.astre, cap: ciel?.cap ?? 135 })
+    regler({ teinte: mo.teinte, force: mo.teinte ? mo.force : a.force })
+  }
+
+  return (
+    <div className="at-section at-ambiance">
+      <span className="eyebrow">Ambiance de la carte</span>
+      <div className="at-outils">
+        {MOMENTS.map((mo) => (
+          <button
+            key={mo.cle}
+            className="btn btn-sm"
+            aria-pressed={!libre && choisi?.cle === mo.cle}
+            title={mo.titre}
+            onClick={() => choisir(mo)}
+          >
+            {mo.label}
+          </button>
+        ))}
+        <button
+          className="btn btn-sm"
+          aria-pressed={libre}
+          title="Choisir la couleur de la carte toi-même"
+          onClick={() => setAMoi(!libre)}
+        >
+          Couleur à moi…
+        </button>
+      </div>
+      {verrou ? (
+        <p className="at-aide">
+          Le jour et la nuit sont réglés pour tout l’espace « {m.cielGeneral!.nom} » : ici, seule la couleur change.
+        </p>
+      ) : null}
+      {libre ? (
+        <>
+          <label className="at-curseur" title="La couleur que prend toute la carte">
+            <span>Couleur</span>
+            <input
+              type="color"
+              value={a.teinte ?? '#3d5f9e'}
+              onChange={(e) => regler({ teinte: e.target.value, force: a.force > 0 ? a.force : 0.35 })}
+            />
+            <button className="btn btn-sm btn-ghost" title="La carte telle qu’elle est peinte" onClick={() => regler({ teinte: null })}>
+              Aucune
+            </button>
+          </label>
+          {teinte ? (
+            <label className="at-curseur" title="Combien la couleur pèse sur la carte">
+              <span>Force</span>
+              <input
+                type="range"
+                min={5}
+                max={100}
+                step={1}
+                value={Math.round(a.force * 100)}
+                onChange={(e) => regler({ force: Number(e.target.value) / 100 })}
+              />
+              <span className="num">{Math.round(a.force * 100)} %</span>
+            </label>
+          ) : null}
+        </>
+      ) : null}
+
+      <span className="eyebrow">Météo</span>
+      <div className="at-outils">
+        {METEOS.map((m) => (
+          <button
+            key={m.cle}
+            className="btn btn-sm"
+            aria-pressed={a.meteo === m.cle}
+            title={m.titre}
+            onClick={() => regler({ meteo: m.cle })}
+          >
+            {m.label}
+          </button>
+        ))}
+      </div>
+      {a.meteo !== 'aucune' ? (
+        <label className="at-curseur" title="Une bruine ou une averse, un voile ou une purée de pois">
+          <span>Intensité</span>
+          <input
+            type="range"
+            min={5}
+            max={100}
+            step={1}
+            value={Math.round(a.meteoForce * 100)}
+            onChange={(e) => regler({ meteoForce: Number(e.target.value) / 100 })}
+          />
+          <span className="num">{Math.round(a.meteoForce * 100)} %</span>
+        </label>
+      ) : null}
+      <p className="at-aide">
+        Le moment règle aussi ce que les joueurs voient : de nuit, on y voit moins, et la nuit noire ne
+        montre que ce qu’éclairent les lampes. La couleur et la météo, elles, ne cachent rien. Tout
+        s’enregistre aussitôt et se voit chez les joueurs.
+      </p>
+    </div>
+  )
 }
 
 function Lampes({ place, co, setOutil, repeindre, setTestLum }: PropsEtape): JSX.Element {

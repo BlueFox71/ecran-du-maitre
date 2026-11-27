@@ -252,20 +252,20 @@ export function filtrerAssets(
 export const MES_OBJETS = 'Mes objets'
 
 /** Les décors, dans l'ordre de la liste déroulante. */
-export const THEMES = ['Classique', 'Moderne', 'Restaurant', 'Concert', 'Enquête', 'Speakeasy', 'Ville']
+export const THEMES = ['Classique', 'Moderne', 'Restaurant', 'Concert', 'Enquête', 'Speakeasy', 'Ville', 'Azeroth']
 
 /** Les familles et leurs rayons, dans l'ordre des colonnes (celui des icônes). */
 export const FAMILLES: { famille: string; rayons: string[] }[] = [
-  { famille: 'Mobilier', rayons: ['Assises', 'Tables', 'Lits', 'Rangements', 'Bureau', 'Cheminées', 'Tapis', 'Paravents'] },
+  { famille: 'Mobilier', rayons: ['Assises', 'Tables', 'Lits', 'Rangements', 'Bureau', 'Cheminées', 'Tapis', 'Paravents', 'Artisanat'] },
   { famille: 'Cuisine et bain', rayons: ['Cuisine', 'Électroménager', 'Bain', 'Bar', 'Buffet'] },
-  { famille: 'Lumière', rayons: ['Lampes', 'Lampadaires', 'Plafonniers', 'Appliques', 'Bougies', 'Projecteurs'] },
+  { famille: 'Lumière', rayons: ['Lampes', 'Lampadaires', 'Plafonniers', 'Appliques', 'Bougies', 'Projecteurs', 'Braseros'] },
   {
     famille: 'Déco et objets',
-    rayons: ['Décoration', 'Livres et papiers', 'Vaisselle', 'Nourriture', 'Instruments', 'Sonorisation', 'Indices', 'Armes']
+    rayons: ['Décoration', 'Livres et papiers', 'Vaisselle', 'Nourriture', 'Instruments', 'Sonorisation', 'Indices', 'Armes', 'Rituels', 'Échecs', 'Marqueurs', 'Effets']
   },
-  { famille: 'Nature', rayons: ['Arbres', 'Végétation', 'Rochers', 'Bois mort', 'Toiles d’araignées'] },
-  { famille: 'Architecture', rayons: ['Escaliers', 'Scène', 'Colonnes', 'Cloisons'] },
-  { famille: 'Extérieur', rayons: ['Voirie', 'Marquages', 'Véhicules', 'Mobilier urbain', 'Ruelle'] },
+  { famille: 'Nature', rayons: ['Arbres', 'Végétation', 'Rochers', 'Cristaux', 'Bois mort', 'Toiles d’araignées'] },
+  { famille: 'Architecture', rayons: ['Escaliers', 'Ponts', 'Portails', 'Scène', 'Colonnes', 'Cloisons', 'Débris'] },
+  { famille: 'Extérieur', rayons: ['Voirie', 'Marquages', 'Véhicules', 'Mobilier urbain', 'Ruelle', 'Camp'] },
   { famille: 'Personnages', rayons: ['Personnel', 'Invités', 'Public', 'Corps', 'Ossements'] }
 ]
 
@@ -297,6 +297,18 @@ export function appliquerRangement(assets: AssetAtelier[], brut: unknown): Asset
 export function placeDansLeCatalogue(a: AssetAtelier): { famille: string; rayon: string | null } {
   if (a.source === 'moi') return { famille: MES_OBJETS, rayon: a.categorie === 'Divers' ? null : a.categorie }
   return { famille: a.categorie, rayon: a.sousCategorie ?? null }
+}
+
+/** Les portes dessinées pour Azeroth : rangées avec les autres, elles n'ont ni thème ni catégorie à elles. */
+const OUVERTURES_AZEROTH = new Set(['porte-forteresse', 'porte-portail-ville', 'porte-taverne', 'porte-palissade-orque', 'porte-ogre', 'porte-karazhan'])
+
+/**
+ * Un asset de World of Warcraft ? Les objets le disent par leur thème, les
+ * sols et les murs par leur catégorie, les portes par leur nom.
+ */
+export function estAzeroth(a: AssetAtelier): boolean {
+  if (a.theme === 'Azeroth' || a.categorie === 'Azeroth') return true
+  return a.source === 'pack' && OUVERTURES_AZEROTH.has(a.id.replace(/^pack:ouvertures\//, ''))
 }
 
 /** Un objet va-t-il avec ce décor ? Sans thème (un import), il va avec tous. */

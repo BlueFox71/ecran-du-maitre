@@ -12,6 +12,7 @@
  *   sur la carte du niveau, au lieu de chercher une image chacune.
  */
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { MeteoAnimee, TeinteAmbiance } from '../../shared/Ambiance'
 import { Valeur } from '../components/Valeur'
 import { urlPortraitMj } from '../../shared/avatarsMj'
 import { imageObjet } from '../../shared/outilsChasse'
@@ -3724,6 +3725,13 @@ function FicheLieu({
                       : {})
                   }}
                 />
+                {/* La couleur générale et la météo, comme les joueurs les verront. */}
+                {!calage ? <TeinteAmbiance ambiance={mu.ambiance} /> : null}
+                {!calage && mu.ambiance.meteo !== 'aucune' ? (
+                  <div className="at-meteo">
+                    <MeteoAnimee meteo={mu.ambiance.meteo} force={mu.ambiance.meteoForce} />
+                  </div>
+                ) : null}
                 {(calage && grille) || (calques.grille && !calage) ? <div className="cal-grille" aria-hidden="true" /> : null}
                 {calage ? <CalqueCalage vue={calage} onVue={setCalage} /> : null}
                 {annote && calques.mj ? (

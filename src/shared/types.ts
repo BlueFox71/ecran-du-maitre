@@ -2,6 +2,7 @@
 import type { Modif } from './modifs'
 import type { OutilChasse } from './chasse'
 import type { FenetreChasse, ParoleObjet } from './parole'
+import type { Ambiance } from './ambiance'
 
 export type ItemKind = 'doc' | 'image' | 'video' | 'audio' | 'pdf' | 'other'
 
@@ -281,7 +282,11 @@ export const FAISCEAUX_LUMIERE = [30, 60, 90, 120, 180]
 export const TEINTES_LUMIERE: { cle: string; label: string }[] = [
   { cle: '#ffffff', label: 'Blanc' },
   { cle: '#f5d98a', label: 'Jaune' },
-  { cle: '#e8944a', label: 'Orange' }
+  { cle: '#e8944a', label: 'Orange' },
+  { cle: '#ff5a3c', label: 'Rouge' },
+  { cle: '#8fb8ff', label: 'Bleu lunaire' },
+  { cle: '#7dff5a', label: 'Vert gangrené' },
+  { cle: '#b07aff', label: 'Violet arcanique' }
 ]
 
 /**
@@ -321,6 +326,8 @@ export interface CalqueBrouillard {
   porteurs: { characterId: number; rayon: number; ouverture: number; objet: string; teinte: string }[]
   /** Le soleil ou la lune de cette carte ; `null`, la nuit noire d'avant. */
   astre: Astre | null
+  /** La teinte générale et le temps qu'il fait ; absent d'un poste plus ancien. */
+  ambiance?: Ambiance | null
   /**
    * Les objets que la table sait là : trouvés, et posés en un point du plan —
    * dans le lieu même ou l'une de ses pièces. Ce que l'objet cache, sa fiche,
@@ -766,6 +773,25 @@ export interface CharacterData {
    * diffusé**. Absent, aucun.
    */
   effetsObjets?: EffetSurEntite[]
+  /**
+   * Un personnage WoW : les effets en cours dans son Aventure (buffs, malus),
+   * tenus en miroir par `main/wowFiches.ts`. Absent hors WoW.
+   */
+  aurasWow?: { nom: string; mal: boolean; tours: number; pile: number; lbl: string }[]
+  /** Un personnage WoW : son niveau, décidé sur la fiche de l'Écran et suivi par son Aventure. */
+  niveauWow?: number
+  /** Un personnage WoW : ses totaux de combat (armure, défense, initiative, résistances), tels que son Aventure les calcule. */
+  combatWow?: { armure: number; defense: number; initiative: number; resist: Record<string, number> }
+  /**
+   * Un personnage WoW : son équipement, ses sacs, ses talents et ses sorts,
+   * tels que son Aventure les montrait la dernière fois qu'elle était ouverte.
+   */
+  aventureWow?: {
+    equip: { c: string; nom: string; q: number }[]
+    sacs: { nom: string; q: number; qte: number }[]
+    talents: { nom: string; rang: number; max: number }[]
+    sorts: { nom: string; niveau: number }[]
+  }
 }
 
 /** Un objet de la campagne, et ce qu'il fait à ce personnage-là. */
@@ -2503,6 +2529,10 @@ export interface DeSurTable {
   /** Tout ce qui s'ajoute au dé : modificateur et bonus. */
   bonus: number
   total: number
+  /** Le nombre de faces, quand ce n'est pas un d20 (un jet de l'Aventure). */
+  faces?: number
+  /** Un jet de l'Aventure WoW : il se montre à la manière du jeu, avec son verdict. */
+  wow?: { dd: number | null; issue: 'crit' | 'ok' | 'ko' | null }
 }
 
 /** Un gain ou une perte de santé mentale, annoncé à la table. */

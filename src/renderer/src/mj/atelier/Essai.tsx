@@ -32,6 +32,8 @@ export interface EssaiAtelier {
   /** Il y a quelque chose à éclairer : une lampe, ou le soleil, la lune. */
   peutTesterLum: boolean
   setTestLum: (v: boolean) => void
+  /** Les murs, lampes et ciel du lieu : l'étape de l'éclairage règle le ciel par eux. */
+  murs: ReturnType<typeof useMurs>
 }
 
 export function useEssaiAtelier(placeId: number, c: Construction | null): EssaiAtelier {
@@ -137,6 +139,7 @@ export function useEssaiAtelier(placeId: number, c: Construction | null): EssaiA
     volet,
     testLum: testLum && !enTest,
     peutTesterLum: mu.lumieres.length > 0 || !!mu.astre,
-    setTestLum
+    setTestLum,
+    murs: mu
   }
 }

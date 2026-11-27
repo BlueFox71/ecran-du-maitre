@@ -10,6 +10,7 @@ import {
   FAMILLES,
   filtrerAssets,
   filtrerObjets,
+  estAzeroth,
   lireCatalogue,
   lumiereEnAlpha,
   raccorder,
@@ -253,5 +254,27 @@ describe('les assets manquants', () => {
     }
     const connus = new Set(['pack:sols/herbe', 'pack:sols/dalles', 'pack:murs/pierre'])
     expect(assetsManquants(c, connus)).toEqual(['pack:murs/laque', 'pack:objets/dragon'])
+  })
+})
+
+describe('le filtre World of Warcraft', () => {
+  const racine = join(__dirname, '..', '..', 'resources', 'atelier')
+  const pack = appliquerRangement(
+    lireCatalogue(JSON.parse(readFileSync(join(racine, 'catalogue.json'), 'utf8')), 'pack'),
+    readFileSync(join(racine, 'rangement.json'), 'utf8')
+  )
+  const wow = pack.filter(estAzeroth)
+
+  it('garde les sols, murs, portes et objets d’Azeroth, et rien d’autre', () => {
+    const ids = new Set(wow.map((a) => a.id))
+    for (const id of ['sols/herbe-elwynn', 'murs/mur-palissade-orque', 'ouvertures/porte-taverne', 'objets/catapulte-orque'])
+      expect(ids.has('pack:' + id)).toBe(true)
+    for (const id of ['sols/herbe-verte', 'ouvertures/porte-bois', 'objets/lit-double'])
+      expect(ids.has('pack:' + id)).toBe(false)
+    expect(new Set(wow.map((a) => a.type))).toEqual(new Set(['sol', 'mur', 'porte', 'objet']))
+  })
+
+  it('ne prend pas un import du MJ pour une porte d’Azeroth', () => {
+    expect(estAzeroth({ id: 'moi:ouvertures/porte-taverne', source: 'moi', type: 'porte', nom: 'x', categorie: 'Divers', fichier: 'x.png' })).toBe(false)
   })
 })

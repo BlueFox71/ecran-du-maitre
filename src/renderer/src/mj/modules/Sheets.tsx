@@ -31,6 +31,8 @@ import type { UiItem } from '../../../../preload/index'
 import { PION_COULEURS } from '@shared/types'
 import { ChampEmojis } from '../components/ChampEmojis'
 import { Bourse } from '../components/Bourse'
+import { EffetsWow } from '../components/EffetsWow'
+import { PanneauAventure } from '../components/PanneauAventure'
 import { EffetsObjetsFiche } from '../components/EffetsObjets'
 import type {
   ButinLigne,
@@ -731,6 +733,10 @@ function SheetBody({
           {ch.kind === 'pnj' ? <EffetsObjetsFiche ch={ch} /> : null}
 
           <Bourse ch={ch} />
+
+          {/* Un personnage WoW : ses effets en cours, reliés à son Aventure. */}
+          {ch.kind === 'pj' ? <EffetsWow ch={ch} /> : null}
+          {ch.kind === 'pj' ? <PanneauAventure ch={ch} /> : null}
 
           {!tpl.spec.sansCompetences && (
           <section className="sect sect-skills">
