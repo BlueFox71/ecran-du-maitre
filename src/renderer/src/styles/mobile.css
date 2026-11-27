@@ -1889,14 +1889,14 @@ img {
 .m-carte-vide .m-carte-img {
   background: transparent;
 }
-/* Une main libre : la main dessinée en pâle, la droite en miroir. */
+/* Une main libre : le dos de la main, en pâle, la gauche en miroir. */
 .m-main-ic {
   font-size: 28px;
   line-height: 1;
   opacity: 0.6;
   filter: grayscale(1);
 }
-.m-main-libre.main-d .m-main-ic {
+.m-main-libre.main-g .m-main-ic {
   transform: scaleX(-1);
 }
 .m-carte-img {
