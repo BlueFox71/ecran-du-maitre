@@ -61,20 +61,32 @@ export function Carnet({
           aria-label={`${el.nom}${m === 'entoure' ? ', entouré' : m === 'barre' ? ', barré' : ''}`}
         >
           <span className={`m-cn-nom${m ? ` ${m}` : ''}`}>{el.nom}</span>
-          <span className="m-cn-autres">
-            {autres.map((x) => {
-              const j = carnet.joueurs.find((p) => p.characterId === x.characterId)
-              return (
-                <span
-                  key={x.characterId}
-                  className={`m-cn-pastille c-${j?.color ?? 'neutral'} ${x.etat}`}
-                  title={`${j?.nom ?? '?'} : ${x.etat === 'entoure' ? 'entouré' : 'barré'}`}
-                >
-                  {j?.initiales ?? '?'}
-                </span>
-              )
-            })}
-          </span>
+          {/* Les autres, en clair sous le mot : qui a entouré, qui a barré,
+              chaque prénom à la couleur de son pion. */}
+          {autres.length ? (
+            <span className="m-cn-autres">
+              {(['entoure', 'barre'] as const).map((etat) => {
+                const qui = autres.filter((x) => x.etat === etat)
+                if (!qui.length) return null
+                return (
+                  <span key={etat} className={`m-cn-groupe ${etat}`}>
+                    <span className="m-cn-signe" aria-label={etat === 'entoure' ? 'entouré par' : 'barré par'}>
+                      {etat === 'entoure' ? '○' : '✕'}
+                    </span>
+                    {qui.map((x, i) => {
+                      const j = carnet.joueurs.find((p) => p.characterId === x.characterId)
+                      return (
+                        <span key={x.characterId} className={`m-cn-qui c-${j?.color ?? 'neutral'}`}>
+                          {j?.nom ?? '?'}
+                          {i < qui.length - 1 ? ', ' : ''}
+                        </span>
+                      )
+                    })}
+                  </span>
+                )
+              })}
+            </span>
+          ) : null}
         </button>
       </li>
     )
