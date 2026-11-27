@@ -1753,16 +1753,30 @@ function Sac({ etat, jeton }: { etat: Etat; jeton: string }): JSX.Element {
       {erreur ? <p className="m-erreur">{erreur}</p> : null}
 
       <h2 className="m-titre m-t-porte">Ce que je porte</h2>
-      {portes.length === 0 ? (
-        /* Rien de porté : une case vide, à la place des objets. */
-        <div className="m-grille">
-          <div className="m-carte m-c-porte m-carte-vide" role="note" aria-label="Rien de porté">
-            <span className="m-carte-img" />
-          </div>
-        </div>
-      ) : (
-        <div className="m-grille">{portes.map(ligne)}</div>
-      )}
+      {/* Ce qu'il porte, puis une case par main restée libre : on voit d'un
+          coup d'œil qu'il n'a rien en main — ce qui compte quand il faut
+          ouvrir une porte, tenir une lampe ou se défendre. */}
+      <div className="m-grille">
+        {portes.map(ligne)}
+        {(['main-g', 'main-d'] as const)
+          .filter((cle) => !portes.some((o) => o.emplacement === cle))
+          .map((cle) => (
+            <div
+              key={cle}
+              className={`m-carte m-c-porte m-carte-vide m-main-libre ${cle}`}
+              role="note"
+              aria-label={`${nomDe(cle)} : rien`}
+            >
+              <span className="m-carte-img">
+                <span className="m-main-ic" aria-hidden="true">
+                  ✋
+                </span>
+              </span>
+              <span className="m-carte-nom">{nomDe(cle)}</span>
+              <span className="m-carte-ou">vide</span>
+            </div>
+          ))}
+      </div>
 
       <h2 className="m-titre m-t-sac">
         Dans mes poches
